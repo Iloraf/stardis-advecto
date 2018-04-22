@@ -2,6 +2,7 @@
 
 #include "stardis-app.h"
 #include <sdis.h>
+#include <tinyexpr.h>
 
 static void
 geometry_get_position
@@ -43,7 +44,7 @@ geometry_get_interface
 struct fluid {
   double cp; /* Calorific capacity */
   double rho; /* Volumic mass */
-  double temperature; /* < 0 means for unknown temperature */
+  char* temperature; 
 };
 
 static double
@@ -67,7 +68,22 @@ fluid_get_temperature
   (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct fluid* fluid_props = sdis_data_cget(data);
-  return fluid_props->temperature;
+  double temperature = 0;
+  char* math_expr = fluid_props->temperature;
+  double x, y, z, t;  
+  /* Store variable names and pointers. */
+  te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
+  int err;
+    
+  /* Compile the expression with variables. */
+  te_expr *expr = te_compile(math_expr, vars, 4, &err);
+  x = vtx->P[0];
+  y = vtx->P[1];
+  z = vtx->P[2];
+  t = vtx->time;
+  temperature = te_eval(expr);
+  te_free(expr);
+  return temperature;
 }
 
 /*******************************************************************************
@@ -78,7 +94,7 @@ struct solid {
   double lambda; /* Conductivity */
   double rho; /* Volumic mass */
   double delta; /* Numerical parameter */
-  double temperature; /* < 0 means for unknown temperature */
+  char* temperature;
 };
 
 static double
@@ -128,11 +144,25 @@ static double
 solid_get_temperature
   (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
+  double temperature = 0;
   const struct solid* solid_props = sdis_data_cget(data);
   if (vtx->time > 0){
     return -1;
   }else{
-    return solid_props->temperature;
+    char* math_expr = solid_props->temperature;
+    double x, y, z;  
+    /* Store variable names and pointers. */
+    te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}};
+    int err;
+    
+    /* Compile the expression with variables. */
+    te_expr *expr = te_compile(math_expr, vars, 3, &err);
+    x = vtx->P[0];
+    y = vtx->P[1];
+    z = vtx->P[2];
+    temperature = te_eval(expr);
+    te_free(expr);
+    return temperature;
   }
 }
 
@@ -141,7 +171,7 @@ solid_get_temperature
  ******************************************************************************/
 struct interface {
   double hc; /* Convection coefficient */
-  double temperature; /* < 0 means for unknown temperature */
+  char* temperature;
   double epsilon;
   double alpha;
 };
@@ -159,7 +189,28 @@ interface_get_temperature
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
   const struct interface* interface_props = sdis_data_cget(data);
-  return interface_props->temperature;
+
+  if (interface_props->temperature == NULL) {
+    return -1;
+  } else {
+
+    double temperature = 0;
+    char* math_expr = interface_props->temperature;
+    double x, y, z, t;  
+    /* Store variable names and pointers. */
+    te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
+    int err;
+
+    /* Compile the expression with variables. */
+    te_expr *expr = te_compile(math_expr, vars, 4, &err);
+    x = frag->P[0];
+    y = frag->P[1];
+    z = frag->P[2];
+    t = frag->time;
+    temperature = te_eval(expr);
+    te_free(expr);
+    return temperature;
+  }
 }
 
 static double
@@ -269,13 +320,13 @@ stardis_compute(struct stardis* stardis)
 
     if (bound_id > -1){  /* boundary interface */
       double hc = stardis->boundary[bound_id].hc;
-      double T = stardis->boundary[bound_id].T;
+      char* T = stardis->boundary[bound_id].T;
 
       SDIS(data_create(dev, sizeof(struct interface), ALIGNOF(struct interface), NULL, &data));
       interface_props = sdis_data_get(data);
       if (hc > -1) {
         interface_props->hc = hc;
-        interface_props->temperature = -1;
+        interface_props->temperature = NULL;
       } else {
         interface_props->temperature = T;
       }

@@ -1,4 +1,4 @@
-#STL_filename h h_coeff T_env | STL_filename T T_value
-b_h_1.stl h 0 300
-b_T_1.stl T 300
-b_T_2.stl T 400
+#STL_filename h h_coeff T_env(x,y,z,t) | STL_filename T T_value(x,y,z,t)
+b_h_1.stl   h   0   "300"
+b_T_1.stl   T   "300 + sin(2*pi*t)"
+b_T_2.stl   T   "300 + sin(2*pi*t)"

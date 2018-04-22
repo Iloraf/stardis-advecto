@@ -11,7 +11,7 @@ all: stardis-app
 stardis-app: $(SRC) $(DEPS)
 	$(CC) -o stardis-app $(SRC) $(INC) $(LDFLAGS)
 
-debug: main.c
+debug: $(SRC) $(DEPS)
 	$(CC) -g -o stardis-app-dbg $(SRC) $(INC) $(LDFLAGS)
 
 clean:

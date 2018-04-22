@@ -2,6 +2,8 @@
 
 #include <string.h>
 #include "stardis-app.h"
+#include <tinyexpr.h>
+
 
 #define MEDIUM 0
 #define BOUNDARY 1
@@ -65,12 +67,10 @@ parse_medium_line(char* line, char** stl_filename, struct material* mat)
     fprintf(stderr,"invalid delta\n");
     goto error;
   }
-  tk = strtok(NULL," ");
-  res = cstr_to_double(tk, &mat->Tinit);
-  if (res != RES_OK) {
-    fprintf(stderr,"invalid Tinit\n");
-    goto error;
-  }
+  tk = strtok(NULL,"\"");
+  tk = strtok(NULL,"\"");
+  mat->Tinit = malloc(strlen(tk) + 1);
+  strcpy(mat->Tinit,tk);  
 
 exit:
   return res;
@@ -81,11 +81,7 @@ error:
 static res_T
 parse_boundary_line(char* line, char** stl_filename, struct boundary* bound)
 {
-#define H_TYPE 0
-#define T_TYPE 1
-  char bc_type;
   char* tk = NULL;
-  double value = 0;
   res_T res = RES_OK;
 
   tk = strtok(line," ");
@@ -94,36 +90,29 @@ parse_boundary_line(char* line, char** stl_filename, struct boundary* bound)
 
   tk = strtok(NULL," ");
   if (strcmp(tk,"h")==0 || strcmp(tk,"H")==0  ){
-    bc_type = H_TYPE;
+    tk = strtok(NULL," ");
+    res = cstr_to_double(tk, &bound->hc);
+    if (res != RES_OK ) {
+      fprintf(stderr,"invalid value parameter: %g \n", bound->hc);
+      goto error;
+    }
+
+    tk = strtok(NULL,"\"");
+    tk = strtok(NULL,"\"");
+    bound->T = malloc(strlen(tk) + 1);
+    strcpy(bound->T,tk);  
+
   } else  if (strcmp(tk,"t")==0 || strcmp(tk,"T")==0  ){
-    bc_type = T_TYPE;
+
+    tk = strtok(NULL,"\"");
+    tk = strtok(NULL,"\"");
+    bound->T = malloc(strlen(tk) + 1);
+    strcpy(bound->T,tk);  
+
   } else {
     fprintf(stderr,"unknown boundary type: %s\n", tk);
     goto error;
   }
-
-  tk = strtok(NULL," ");
-  res = cstr_to_double(tk, &value);
-  if (res != RES_OK || value < 0) {
-    fprintf(stderr,"invalid value parameter: %g \n", value);
-    goto error;
-  }
-
-  if (bc_type == H_TYPE){
-    bound->hc = value;
-    tk = strtok(NULL," ");
-    res = cstr_to_double(tk, &value);
-    if (res != RES_OK || value < 0) {
-      fprintf(stderr,"invalid value parameter: %g \n", value);
-      goto error;
-    }
-    bound->T = value;
-  }
-  
-  if (bc_type == T_TYPE) bound->T = value;  
-
-#undef H_TYPE
-#undef T_TYPE
 
 exit:
   return res;

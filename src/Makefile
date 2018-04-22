@@ -1,7 +1,9 @@
 CC=gcc
-INC=-I../Stardis-0.1.0-GNU-Linux64/include
-LDFLAGS=-lsdis -lsstl -lrsys -L../Stardis-0.1.0-GNU-Linux64/lib -Wl,-rpath=../Stardis-0.1.0-GNU-Linux64/lib
-SRC=main.c stardis-app.c stardis-compute.c
+SDIS_SDK=../Stardis-0.1.0-GNU-Linux64
+
+INC=-I$(SDIS_SDK)/include
+LDFLAGS=-lsdis -lsstl -lrsys -ltinyexpr -lm -L$(SDIS_SDK)/lib -Wl,-rpath=$(SDIS_SDK)/lib
+SRC=main.c stardis-app.c stardis-compute.c 
 DEPS=args.h stardis-app.h
 
 all: stardis-app 

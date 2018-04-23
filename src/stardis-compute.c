@@ -2,7 +2,6 @@
 
 #include "stardis-app.h"
 #include <sdis.h>
-#include <tinyexpr.h>
 
 static void
 geometry_get_position

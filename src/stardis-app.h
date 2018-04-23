@@ -9,6 +9,7 @@
 #include <rsys/stretchy_array.h>
 #include <rsys/hash_table.h>
 #include <sdis.h>
+#include <tinyexpr.h>
 #include "args.h"
 
 struct vertex{

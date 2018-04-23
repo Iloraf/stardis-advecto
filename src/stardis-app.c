@@ -2,7 +2,6 @@
 
 #include <string.h>
 #include "stardis-app.h"
-#include <tinyexpr.h>
 
 
 #define MEDIUM 0
@@ -305,6 +304,26 @@ error:
   goto exit;
 }
 
+static res_T
+check_consistency
+(struct boundary* boundary, double* probe)
+{
+  res_T res = RES_OK;
+  int i = 0;
+
+  for (i=0; i<sa_size(boundary); ++i){
+    if (strchr(boundary[i].T,'t') && probe[3] == INF) {
+      fprintf(stderr,"Transient bounday condition is inconsistent with INF time of the probe.\n");
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+  
+exit:
+  return res;
+error:
+  goto exit;
+}
 
 /*******************************************************************************
  *
@@ -322,6 +341,7 @@ stardis_init
       &stardis->geometry, 
       &stardis->material, 
       &stardis->boundary); 
+  if (res != RES_OK) goto error;
 
   stardis->N = args->N;
   stardis->nthreads = args->nthreads;
@@ -329,6 +349,9 @@ stardis_init
   stardis->probe[1] = args->probe[1];
   stardis->probe[2] = args->probe[2];
   stardis->probe[3] = args->probe[3];
+
+  res = check_consistency(stardis->boundary, stardis->probe);
+  if (res != RES_OK) goto error;
 
 exit:
   return res;

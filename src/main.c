@@ -1,5 +1,4 @@
-/* Copyright (C) 2018 |Meso|Star> (contact@meso-star.com)*/
-
+/* Copyright (C) 2018 |Meso|Star> (contact@meso-star.com) */
 
 #include "stardis-app.h"
 
@@ -9,7 +8,7 @@ dump_boundary(FILE* stream, struct boundary* bound)
   int i = 0;
   fprintf(stream,"# bound_id hc T\n");
   for (i=0; i<sa_size(bound); ++i){
-    fprintf(stream,"%i  %g %g\n",i , bound[i].hc, bound[i].T);
+    fprintf(stream,"%i  %g %s\n", i, bound[i].hc, bound[i].T);
   }
 }
 

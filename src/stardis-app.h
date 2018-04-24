@@ -118,15 +118,15 @@ struct stardis{
 #define NULL_STARDIS__ {NULL_GEOMETRY__, NULL, NULL, 0, 0, {0,0,0,0}}
 static const struct stardis NULL_STARDIS = NULL_STARDIS__;
 
-res_T 
+extern res_T 
 stardis_init
   (const struct args* args,
    struct stardis* stardis);
 
-res_T
+extern res_T
 stardis_compute(struct stardis* stardis);
 
-res_T
+extern res_T
 stardis_release(struct stardis* stardis);
 
 #endif /*STARDIS-APP_H*/

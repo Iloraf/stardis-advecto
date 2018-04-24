@@ -392,7 +392,7 @@ exit:
 
   sa_release(bound2fluid);
 
-  SDIS(estimator_ref_get(estimator));
+  SDIS(estimator_ref_put(estimator));
   SDIS(scene_ref_put(scn));
   SDIS(device_ref_put(dev));
   return res;

@@ -1,8 +1,7 @@
-/* Copyright (C) 2018 |Meso|Star> (contact@meso-star.com)*/
+/* Copyright (C) 2018 |Meso|Star> (contact@meso-star.com) */
 
 #include <string.h>
 #include "stardis-app.h"
-
 
 #define MEDIUM 0
 #define BOUNDARY 1
@@ -10,7 +9,6 @@
 /*******************************************************************************
  *
  ******************************************************************************/
-
 static inline char*
 read_line(char** pb, FILE* stream)
 {
@@ -41,7 +39,7 @@ parse_medium_line(char* line, char** stl_filename, struct material* mat)
 
   tk = strtok(line," ");
   *stl_filename = malloc(strlen(tk) + 1);
-  strcpy(*stl_filename,tk);  
+  strcpy(*stl_filename,tk);
   tk = strtok(NULL," ");
   res = cstr_to_double(tk, &mat->lambda);
   if (res != RES_OK) {
@@ -69,7 +67,7 @@ parse_medium_line(char* line, char** stl_filename, struct material* mat)
   tk = strtok(NULL,"\"");
   tk = strtok(NULL,"\"");
   mat->Tinit = malloc(strlen(tk) + 1);
-  strcpy(mat->Tinit,tk);  
+  strcpy(mat->Tinit,tk);
 
 exit:
   return res;
@@ -85,7 +83,7 @@ parse_boundary_line(char* line, char** stl_filename, struct boundary* bound)
 
   tk = strtok(line," ");
   *stl_filename = malloc(strlen(tk) + 1);
-  strcpy(*stl_filename,tk);  
+  strcpy(*stl_filename,tk);
 
   tk = strtok(NULL," ");
   if (strcmp(tk,"h")==0 || strcmp(tk,"H")==0  ){
@@ -99,14 +97,14 @@ parse_boundary_line(char* line, char** stl_filename, struct boundary* bound)
     tk = strtok(NULL,"\"");
     tk = strtok(NULL,"\"");
     bound->T = malloc(strlen(tk) + 1);
-    strcpy(bound->T,tk);  
+    strcpy(bound->T,tk);
 
   } else  if (strcmp(tk,"t")==0 || strcmp(tk,"T")==0  ){
 
     tk = strtok(NULL,"\"");
     tk = strtok(NULL,"\"");
     bound->T = malloc(strlen(tk) + 1);
-    strcpy(bound->T,tk);  
+    strcpy(bound->T,tk);
 
   } else {
     fprintf(stderr,"unknown boundary type: %s\n", tk);
@@ -151,7 +149,7 @@ read_vertices
   return res;
 }
 
-static res_T 
+static res_T
 read_triangles
 (int FLAG,
  struct sstl_desc* desc,
@@ -199,7 +197,7 @@ read_stl
  struct htable_triangle* triangle2id,
  struct geometry* geometry)
 {
-  res_T res = RES_OK; 
+  res_T res = RES_OK;
   struct sstl* sstl = NULL;
   struct sstl_desc desc;
   unsigned* id2id = NULL;
@@ -221,7 +219,7 @@ exit:
 error:
   goto exit;
 }
-  
+
 
 /*******************************************************************************
  *
@@ -296,8 +294,8 @@ geometry_analyse
   fclose(input);
 
 exit:
-  htable_vertex_init(NULL, &vertex2id);
-  htable_triangle_init(NULL, &triangle2id);
+  htable_vertex_release(&vertex2id);
+  htable_triangle_release(&triangle2id);
   sa_release(line);
   return res;
 error:
@@ -313,12 +311,12 @@ check_consistency
 
   for (i=0; i<sa_size(boundary); ++i){
     if (strchr(boundary[i].T,'t') && probe[3] == INF) {
-      fprintf(stderr,"Transient bounday condition is inconsistent with INF time of the probe.\n");
+      fprintf(stderr,"Transient boundary condition is inconsistent with INF time of the probe.\n");
       res = RES_BAD_ARG;
       goto error;
     }
   }
-  
+
 exit:
   return res;
 error:
@@ -329,18 +327,18 @@ error:
  *
  ******************************************************************************/
 
-res_T 
+res_T
 stardis_init
   (const struct args* args,
    struct stardis* stardis)
 {
   res_T res = RES_OK;
 
-  res = geometry_analyse(args->medium_filename, 
-      args->bc_filename, 
-      &stardis->geometry, 
-      &stardis->material, 
-      &stardis->boundary); 
+  res = geometry_analyse(args->medium_filename,
+      args->bc_filename,
+      &stardis->geometry,
+      &stardis->material,
+      &stardis->boundary);
   if (res != RES_OK) goto error;
 
   stardis->N = args->N;
@@ -358,7 +356,7 @@ exit:
 error:
   goto exit;
 }
- 
+
 
 res_T
 stardis_release(struct stardis* stardis)
@@ -368,7 +366,7 @@ stardis_release(struct stardis* stardis)
   res = release_geometry(&stardis->geometry);
   sa_release(stardis->material);
   sa_release(stardis->boundary);
-  
+
 exit:
   return res;
 error:

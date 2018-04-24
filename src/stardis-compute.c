@@ -261,7 +261,7 @@ stardis_compute(struct stardis* stardis)
   size_t nfailures;
   int i = 0;
 
-  SDIS(device_create(NULL, NULL, SDIS_NTHREADS_DEFAULT, 0, &dev));
+  SDIS(device_create(NULL, NULL, stardis->nthreads, 0, &dev));
 
   /* Setup the fluid shader */
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;

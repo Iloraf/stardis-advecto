@@ -389,6 +389,7 @@ exit:
     SDIS(interface_ref_put(interfaces[i]));
   }
   sa_release(interfaces);
+  stardis->geometry.interfaces = NULL;
 
   sa_release(bound2fluid);
 

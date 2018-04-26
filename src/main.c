@@ -53,6 +53,12 @@ int main(int argc, char** argv){
   res = stardis_init(&args, &stardis);
   if (res != RES_OK) goto error;
 
+  if (args.mode == DUMP_VTK){
+    res = dump_vtk(stdout, &stardis.geometry, stardis.geometry.boundary_count);
+    if (res != RES_OK) goto error;
+    goto exit;
+  }
+
   res =  stardis_compute(&stardis);
   if (res != RES_OK) goto error;
 

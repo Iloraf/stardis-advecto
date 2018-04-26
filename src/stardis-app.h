@@ -106,6 +106,7 @@ struct boundary{
 #define NULL_BOUNDARY__  {-1, NULL}
 static const struct boundary NULL_BOUNDARY = NULL_BOUNDARY__;
 
+
 struct stardis{
   struct geometry geometry;
   struct material* material; /*array of materials*/
@@ -128,5 +129,8 @@ stardis_compute(struct stardis* stardis);
 
 extern res_T
 stardis_release(struct stardis* stardis);
+
+extern res_T
+dump_vtk(FILE* output, const struct geometry* geometry, int nbound);
 
 #endif /*STARDIS-APP_H*/

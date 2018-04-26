@@ -348,8 +348,10 @@ stardis_init
   stardis->probe[2] = args->probe[2];
   stardis->probe[3] = args->probe[3];
 
-  res = check_consistency(stardis->boundary, stardis->probe);
-  if (res != RES_OK) goto error;
+  if (args->mode == PROBE_COMPUTE){
+    res = check_consistency(stardis->boundary, stardis->probe);
+    if (res != RES_OK) goto error;
+  }
 
 exit:
   return res;
@@ -366,6 +368,58 @@ stardis_release(struct stardis* stardis)
   res = release_geometry(&stardis->geometry);
   sa_release(stardis->material);
   sa_release(stardis->boundary);
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+
+res_T
+dump_vtk
+(FILE* output,
+ const struct geometry* geometry, 
+ int nbound)
+{
+  res_T res = RES_OK;
+  int i,j = 0;
+  struct vertex* vtx = geometry->vertex;
+  struct triangle* tri = geometry->triangle;
+  
+  if (!output){
+    fprintf(stderr, "Invalid output file to dump vtk.\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  fprintf(output,"# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET POLYDATA\n");
+  fprintf(output,"POINTS %i float\n\n", sa_size(vtx));
+  for (i=0; i<sa_size(vtx); ++i){
+    fprintf(output,"%f %f %f\n",SPLIT3(vtx[i].xyz));
+  }
+  fprintf(output,"\nPOLYGONS %i %i\n", sa_size(tri), 4*sa_size(tri));
+  for (i=0; i<sa_size(tri); ++i){
+    fprintf(output,"3 %i %i %i\n",SPLIT3(tri[i].indices));
+  }
+  fprintf(output,"\nCELL_DATA %i \n", sa_size(tri));
+  fprintf(output,"SCALARS medium_front float 1\n");
+  fprintf(output,"LOOKUP_TABLE default\n");
+  for (i=0; i<sa_size(tri); ++i){
+    fprintf(output,"%i\n",tri[i].medium_front);
+  }
+  fprintf(output,"SCALARS medium_back float 1\n");
+  fprintf(output,"LOOKUP_TABLE default\n");
+  for (i=0; i<sa_size(tri); ++i){
+    fprintf(output,"%i\n",tri[i].medium_back);
+  }
+  for (j=0; j<nbound; ++j){
+    fprintf(output,"SCALARS bound_id float 1\n");
+    fprintf(output,"LOOKUP_TABLE default\n");
+    for (i=0; i<sa_size(tri); ++i){
+      fprintf(output,"%i\n",tri[i].bound_id);
+    }
+  }
 
 exit:
   return res;

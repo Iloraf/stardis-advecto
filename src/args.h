@@ -7,11 +7,10 @@
 #include <rsys/rsys.h>
 #include <rsys/cstr.h>
 
-static void
-print_help(char* prog)
-{
-  printf("usage %s -m MEDIUM.txt -b BOUNDARY.txt [-p X:Y:Z:TIME] [-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n", prog);  
-}
+enum stardis_mode{
+  PROBE_COMPUTE,
+  DUMP_VTK
+};
 
 struct args{
   char* medium_filename;
@@ -19,8 +18,16 @@ struct args{
   size_t N;
   unsigned nthreads;
   double probe[4];
+  enum stardis_mode mode;
 };
-#define ARGS_DEFAULT {NULL, NULL, 10000, SDIS_NTHREADS_DEFAULT, {0,0,0,INF}}
+#define ARGS_DEFAULT__ {NULL, NULL, 10000, SDIS_NTHREADS_DEFAULT, {0,0,0,INF}, PROBE_COMPUTE}
+static const struct args ARGS_DEFAULT = ARGS_DEFAULT__; 
+
+static void
+print_help(char* prog)
+{
+  printf("usage %s -m MEDIUM.txt -b BOUNDARY.txt [-p X:Y:Z:TIME] [-d] [-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n", prog);  
+}
 
 static res_T
 parse_args(const int argc, char** argv, struct args* args)
@@ -35,7 +42,7 @@ parse_args(const int argc, char** argv, struct args* args)
     goto error;
   }
 
-  while((opt = getopt(argc, argv, "hn:t:b:m:p:")) != -1) {
+  while((opt = getopt(argc, argv, "hn:t:b:m:p:d")) != -1) {
     switch(opt) {
       case 'h':
         print_help(argv[0]);
@@ -74,6 +81,9 @@ parse_args(const int argc, char** argv, struct args* args)
           fprintf(stderr, "Invalid argument -p\n", optarg);
           goto error;
         }
+        break;
+      case 'd':
+        args->mode = DUMP_VTK;
         break;
     }
   }

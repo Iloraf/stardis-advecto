@@ -1,5 +1,5 @@
 CC=gcc
-SDIS_SDK=../Stardis-0.1.0-GNU-Linux64
+SDIS_SDK=../Stardis-0.3.0-GNU-Linux64
 
 INC=-I$(SDIS_SDK)/include
 LDFLAGS=-lsdis -lsstl -lrsys -ltinyexpr -lm -L$(SDIS_SDK)/lib -Wl,-rpath=$(SDIS_SDK)/lib

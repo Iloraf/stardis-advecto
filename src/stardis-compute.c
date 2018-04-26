@@ -246,6 +246,8 @@ stardis_compute(struct stardis* stardis)
   struct sdis_fluid_shader fluid_shader = SDIS_FLUID_SHADER_NULL;
   struct sdis_medium** fluid_medium = NULL;
 
+  struct sdis_interface_side_shader interface_shader_front = SDIS_INTERFACE_SIDE_SHADER_NULL;
+  struct sdis_interface_side_shader interface_shader_back = SDIS_INTERFACE_SIDE_SHADER_NULL;
   struct sdis_interface_shader interface_shader_boundary = SDIS_INTERFACE_SHADER_NULL;
   struct sdis_interface_shader interface_shader_connection = SDIS_INTERFACE_SHADER_NULL;
   struct interface* interface_props = NULL;
@@ -293,6 +295,7 @@ stardis_compute(struct stardis* stardis)
   solid_shader.delta_solid = solid_get_delta;
   solid_shader.delta_boundary = solid_get_delta_boundary;
   solid_shader.temperature = solid_get_temperature;
+  solid_shader.volumic_power = NULL;
 
   /* Create the solid medium */
   for (i=0; i<stardis->geometry.medium_count; ++i){
@@ -309,10 +312,16 @@ stardis_compute(struct stardis* stardis)
   }
 
   /* Setup the interface shader */
+  interface_shader_front.temperature = interface_get_temperature;
+  interface_shader_front.flux = NULL;
+  interface_shader_front.emissivity = interface_get_epsilon;
+  interface_shader_front.specular_fraction = interface_get_alpha;
+
+  interface_shader_back = interface_shader_front;
+
   interface_shader_boundary.convection_coef = interface_get_convection_coef;
-  interface_shader_boundary.temperature = interface_get_temperature;
-  interface_shader_boundary.emissivity = interface_get_epsilon;
-  interface_shader_boundary.specular_fraction = interface_get_alpha;
+  interface_shader_boundary.front = interface_shader_front;
+  interface_shader_boundary.back = interface_shader_back;
 
   for (i=0; i<sa_size(stardis->geometry.triangle); ++i){
     int bound_id = stardis->geometry.triangle[i].bound_id;
@@ -364,7 +373,6 @@ stardis_compute(struct stardis* stardis)
   SDIS(estimator_get_failure_count(estimator, &nfailures));
 
   /* Print the results */
-  /*ref = T0 + probe_pos[2]/2.*(T1 - T0);*/
   printf("Temperature at [%g, %g, %g, %g] = %g +/- %g\n",
       pos[0], pos[1], pos[2], time,
       temperature.E, /* Expected value */

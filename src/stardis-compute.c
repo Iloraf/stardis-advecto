@@ -94,6 +94,7 @@ struct solid {
   double rho; /* Volumic mass */
   double delta; /* Numerical parameter */
   char* temperature;
+  char* power;
 };
 
 static double
@@ -163,6 +164,29 @@ solid_get_temperature
     te_free(expr);
     return temperature;
   }
+}
+
+static double
+solid_get_power
+  (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
+{
+  double power = 0;
+  const struct solid* solid_props = sdis_data_cget(data);
+  char* math_expr = solid_props->temperature;
+  double x, y, z, t;  
+  /* Store variable names and pointers. */
+  te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
+  int err;
+    
+  /* Compile the expression with variables. */
+  te_expr *expr = te_compile(math_expr, vars, 3, &err);
+  x = vtx->P[0];
+  y = vtx->P[1];
+  z = vtx->P[2];
+  t = vtx->time;
+  power = te_eval(expr);
+  te_free(expr);
+  return power;
 }
 
 /*******************************************************************************
@@ -295,7 +319,7 @@ stardis_compute(struct stardis* stardis)
   solid_shader.delta_solid = solid_get_delta;
   solid_shader.delta_boundary = solid_get_delta_boundary;
   solid_shader.temperature = solid_get_temperature;
-  solid_shader.volumic_power = NULL;
+  solid_shader.volumic_power = solid_get_power;
 
   /* Create the solid medium */
   for (i=0; i<stardis->geometry.medium_count; ++i){
@@ -307,6 +331,7 @@ stardis_compute(struct stardis* stardis)
     solid_props->rho    = stardis->material[i].rho;
     solid_props->delta  = stardis->material[i].delta;
     solid_props->temperature = stardis->material[i].Tinit;
+    solid_props->temperature = stardis->material[i].power;
     SDIS(solid_create(dev, &solid_shader, data, sa_add(solid_medium, 1)));
     SDIS(data_ref_put(data));
   }

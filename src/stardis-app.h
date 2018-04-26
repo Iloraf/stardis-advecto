@@ -95,8 +95,9 @@ struct material{
   double cp;
   double delta;
   char* Tinit;
+  char* power;
 };
-#define NULL_MATERIAL__ {0.0 ,0.0 ,0.0, 0.0, NULL}
+#define NULL_MATERIAL__ {0.0 ,0.0 ,0.0, 0.0, NULL, NULL}
 static const struct material NULL_MATERIAL = NULL_MATERIAL__;
 
 struct boundary{

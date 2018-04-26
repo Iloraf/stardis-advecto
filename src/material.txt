@@ -1,4 +1,4 @@
-#STL_filename lambda rho cp delta Tinit(x,y,z)
-m_1.stl   1.0   1.0   1.0   0.05    "300 + x"
-m_2.stl   1.0   1.0   1.0   0.05    "300 - 2*y + z  "
-m_3.stl   1.0   1.0   1.0   0.05    "300 + 10*x"
+#STL_filename lambda rho cp delta Tinit(x,y,z) volumic_power(x,y,z,t)
+m_1.stl   1.0   1.0   1.0   0.05    "300"   "1"
+m_2.stl   1.0   1.0   1.0   0.05    "300"   "1"
+m_3.stl   1.0   1.0   1.0   0.05    "300"   "1"  

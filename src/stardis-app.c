@@ -69,6 +69,11 @@ parse_medium_line(char* line, char** stl_filename, struct material* mat)
   mat->Tinit = malloc(strlen(tk) + 1);
   strcpy(mat->Tinit,tk);
 
+  tk = strtok(NULL,"\"");
+  tk = strtok(NULL,"\"");
+  mat->power = malloc(strlen(tk) + 1);
+  strcpy(mat->power,tk);
+
 exit:
   return res;
 error:

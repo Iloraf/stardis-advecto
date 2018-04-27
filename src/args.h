@@ -58,12 +58,11 @@ print_help(char* prog)
   printf("\n -t NUM_OF_THREADS :\n");
   printf("    default value: all threads available.\n");
   printf("\n -r AMBIENT_RAD_TEMP:REFERENCE_TEMP :\n");
-  printf("    solve the coupled radiative transfer.\n");
+  printf("    Parameters for the radiative transfer.\n");
   printf("    AMBIENT_RAD_TEMP is the ambient radiative temperature .\n");
   printf("    REFERENCE_TEMP is the temperature used for the linearization.\n");
   printf("    of theradiative transfer.\n");
-
- 
+  printf("    default value : 300:300.\n");
 }
 
 static res_T
@@ -89,7 +88,7 @@ parse_args(const int argc, char** argv, struct args* args)
 
       case 'n':
         res = cstr_to_ulong(optarg, &args->N);
-        if (res != RES_OK){
+        if (res != RES_OK || args->N <= 0){
           fprintf(stderr, "Invalid argument -n %s\n", optarg);
           goto error;
         }
@@ -105,7 +104,7 @@ parse_args(const int argc, char** argv, struct args* args)
 
       case 't':
         res = cstr_to_uint(optarg, &args->nthreads);
-        if (res != RES_OK){
+        if (res != RES_OK || args->nthreads <= 0){
           fprintf(stderr, "Invalid argument -t %s\n", optarg);
           goto error;
         }
@@ -126,7 +125,7 @@ parse_args(const int argc, char** argv, struct args* args)
 
       case 's':
         cstr_to_double(optarg, &args->scale_factor);
-        if (res != RES_OK){
+        if (res != RES_OK || args->scale_factor <=0){
           fprintf(stderr, "Invalid argument -s\n", optarg);
           goto error;
         }
@@ -135,7 +134,9 @@ parse_args(const int argc, char** argv, struct args* args)
       case 'r':
         cstr_to_list_double(optarg, ':', args->radiative_temp, &len, 2);
         if(res == RES_OK && len != 2) res = RES_BAD_ARG;
-        if (res != RES_OK){
+        if (res != RES_OK 
+            || args->radiative_temp[0] <=0
+            || args->radiative_temp[1] <=0){
           fprintf(stderr, "Invalid argument -r\n", optarg);
           goto error;
         }

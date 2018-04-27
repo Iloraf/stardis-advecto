@@ -11,6 +11,20 @@ les notes de version en ci-dessous pour avoir la bonne version du SDK.
 
 # Note de versions
 
+## v0.3
+
+Passage à la version 0.3.0 du  SDK de stardis-solver. La version modifié du SDK
+est disponible sur le NAS
+(meso-star/repo/Stardis-0.1.0-GNU-Linux64_modified.tar.gz). Trois fonctionnalités
+ont été ajoutés :
+
+ - la puissance volumique;
+ - la possibilité de renseigner l'argument fp_to_meter de la fonction solve de
+   stardis-solver;
+ - une option pour dumper la géométrie après analyse au format VTK avec des tags
+   medium front/back et id des conditions limites.
+
+
 ## v0.1
 
 Evalue une température sonde uniquement, pour un système purement conductif.Les
@@ -19,6 +33,3 @@ version repose sur le SDK de Stardis modifié 0.1.0 disponible sur la NAS
 (meso-star/repo/Stardis-0.1.0-GNU-Linux64_modified.tar.gz). La modification
 consiste en l'ajout de la bibliothèqe sstl et tinyexpr
 (https://github.com/codeplea/tinyexpr (https://github.com/codeplea/tinyexpr)
-
-
-

@@ -42,26 +42,39 @@ parse_medium_line(char* line, char** stl_filename, struct material* mat)
   strcpy(*stl_filename,tk);
   tk = strtok(NULL," ");
   res = cstr_to_double(tk, &mat->lambda);
-  if (res != RES_OK) {
+  if (res != RES_OK || mat->lambda <= 0.0) {
     fprintf(stderr,"invalid lambda\n");
     goto error;
   }
   tk = strtok(NULL," ");
   res = cstr_to_double(tk, &mat->rho);
-  if (res != RES_OK) {
+  if (res != RES_OK || mat->rho <= 0.0) {
     fprintf(stderr,"invalid rho\n");
     goto error;
   }
   tk = strtok(NULL," ");
   res = cstr_to_double(tk, &mat->cp);
-  if (res != RES_OK) {
+  if (res != RES_OK || mat->cp <= 0.0){
     fprintf(stderr,"invalid cp\n");
     goto error;
   }
   tk = strtok(NULL," ");
   res = cstr_to_double(tk, &mat->delta);
-  if (res != RES_OK) {
+  if (res != RES_OK || mat->delta <= 0.0){
     fprintf(stderr,"invalid delta\n");
+    goto error;
+  }
+  tk = strtok(NULL," ");
+  res = cstr_to_double(tk, &mat->emissivity);
+  if (res != RES_OK || mat->emissivity < 0.0 || mat->emissivity > 1.0){
+    fprintf(stderr,"invalid emissivity\n");
+    goto error;
+  }
+  tk = strtok(NULL," ");
+  res = cstr_to_double(tk, &mat->specular_fraction);
+  if (res != RES_OK ||
+      mat->specular_fraction < 0.0 || mat->specular_fraction > 1.0){
+    fprintf(stderr,"invalid specular_fraction\n");
     goto error;
   }
   tk = strtok(NULL,"\"");
@@ -353,6 +366,8 @@ stardis_init
   stardis->probe[2] = args->probe[2];
   stardis->probe[3] = args->probe[3];
   stardis->scale_factor = args->scale_factor;
+  stardis->radiative_temp[0] = args->radiative_temp[0];
+  stardis->radiative_temp[1] = args->radiative_temp[1];
 
   if (args->mode == PROBE_COMPUTE){
     res = check_consistency(stardis->boundary, stardis->probe);

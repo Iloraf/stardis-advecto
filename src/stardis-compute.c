@@ -195,7 +195,7 @@ solid_get_power
 struct interface {
   double hc; /* Convection coefficient */
   char* temperature;
-  double epsilon;
+  double emissivity;
   double alpha;
 };
 
@@ -237,11 +237,11 @@ interface_get_temperature
 }
 
 static double
-interface_get_epsilon
+interface_get_emissivity
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
   const struct interface* interface_props = sdis_data_cget(data);
-  return interface_props->epsilon;
+  return interface_props->emissivity;
 }
 
 
@@ -339,7 +339,7 @@ stardis_compute(struct stardis* stardis)
   /* Setup the interface shader */
   interface_shader_front.temperature = interface_get_temperature;
   interface_shader_front.flux = NULL;
-  interface_shader_front.emissivity = interface_get_epsilon;
+  interface_shader_front.emissivity = interface_get_emissivity;
   interface_shader_front.specular_fraction = interface_get_alpha;
 
   interface_shader_back = interface_shader_front;
@@ -354,6 +354,10 @@ stardis_compute(struct stardis* stardis)
     if (bound_id > -1){  /* boundary interface */
       double hc = stardis->boundary[bound_id].hc;
       char* T = stardis->boundary[bound_id].T;
+      double emissivity =
+        stardis->material[stardis->geometry.triangle[i].medium_front].emissivity;
+      double alpha =
+        stardis->material[stardis->geometry.triangle[i].medium_front].specular_fraction;
 
       SDIS(data_create(dev, sizeof(struct interface), ALIGNOF(struct interface), NULL, &data));
       interface_props = sdis_data_get(data);
@@ -363,8 +367,8 @@ stardis_compute(struct stardis* stardis)
       } else {
         interface_props->temperature = T;
       }
-      interface_props->epsilon = 0;
-      interface_props->alpha = 0;
+      interface_props->emissivity = emissivity; 
+      interface_props->alpha = alpha;
       SDIS(interface_create(dev,
             solid_medium[stardis->geometry.triangle[i].medium_front],
             fluid_medium[bound2fluid[bound_id]],
@@ -395,7 +399,8 @@ stardis_compute(struct stardis* stardis)
         stardis->N, 
         pos,time, 
         stardis->scale_factor,
-        300.0, 300.0, 
+        stardis->radiative_temp[0], 
+        stardis->radiative_temp[1], 
         &estimator));
 
   /* Fetch the estimation data */

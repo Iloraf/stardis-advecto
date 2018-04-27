@@ -20,14 +20,17 @@ struct args{
   double probe[4];
   enum stardis_mode mode;
   double scale_factor;
+  double radiative_temp[2];
 };
-#define ARGS_DEFAULT__ {NULL, NULL, 10000, SDIS_NTHREADS_DEFAULT, {0,0,0,INF}, PROBE_COMPUTE, 1.0}
+#define ARGS_DEFAULT__ {NULL, NULL, 10000, SDIS_NTHREADS_DEFAULT, {0,0,0,INF}, PROBE_COMPUTE, 1.0, {300,300}}
 static const struct args ARGS_DEFAULT = ARGS_DEFAULT__; 
 
 static void
 print_help(char* prog)
 {
-  printf("usage %s -m MEDIUM.txt -b BOUNDARY.txt [-p X:Y:Z:TIME] [-s SCALE_FACTOR] [-d] [-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n", prog);  
+  printf("usage : \n%s -m MEDIUM.txt -b BOUNDARY.txt [-p X:Y:Z:TIME]\n", prog);  
+  printf("[-s SCALE_FACTOR] [-d] [-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n");  
+  printf("[-r AMBIENT_RAD_TEMP:REFERENCE_TEMP]\n");  
   printf("\n  -h : print this help.\n");
   printf("\nArguments\n");
   printf("---------\n");
@@ -54,6 +57,13 @@ print_help(char* prog)
   printf("    default value: 10000.\n");
   printf("\n -t NUM_OF_THREADS :\n");
   printf("    default value: all threads available.\n");
+  printf("\n -r AMBIENT_RAD_TEMP:REFERENCE_TEMP :\n");
+  printf("    solve the coupled radiative transfer.\n");
+  printf("    AMBIENT_RAD_TEMP is the ambient radiative temperature .\n");
+  printf("    REFERENCE_TEMP is the temperature used for the linearization.\n");
+  printf("    of theradiative transfer.\n");
+
+ 
 }
 
 static res_T
@@ -69,7 +79,7 @@ parse_args(const int argc, char** argv, struct args* args)
     goto error;
   }
 
-  while((opt = getopt(argc, argv, "hn:t:b:m:p:ds:")) != -1) {
+  while((opt = getopt(argc, argv, "hn:t:b:m:p:ds:r:")) != -1) {
     switch(opt) {
       case 'h':
         print_help(argv[0]);
@@ -109,13 +119,24 @@ parse_args(const int argc, char** argv, struct args* args)
           goto error;
         }
         break;
+
       case 'd':
         args->mode = DUMP_VTK;
         break;
+
       case 's':
         cstr_to_double(optarg, &args->scale_factor);
         if (res != RES_OK){
           fprintf(stderr, "Invalid argument -s\n", optarg);
+          goto error;
+        }
+        break;
+
+      case 'r':
+        cstr_to_list_double(optarg, ':', args->radiative_temp, &len, 2);
+        if(res == RES_OK && len != 2) res = RES_BAD_ARG;
+        if (res != RES_OK){
+          fprintf(stderr, "Invalid argument -r\n", optarg);
           goto error;
         }
         break;

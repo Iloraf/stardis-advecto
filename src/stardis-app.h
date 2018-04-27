@@ -94,10 +94,12 @@ struct material{
   double rho;
   double cp;
   double delta;
+  double emissivity;
+  double specular_fraction;
   char* Tinit;
   char* power;
 };
-#define NULL_MATERIAL__ {0.0 ,0.0 ,0.0, 0.0, NULL, NULL}
+#define NULL_MATERIAL__ {0.0 ,0.0 ,0.0, 0.0, 0.0, 0.0, NULL, NULL}
 static const struct material NULL_MATERIAL = NULL_MATERIAL__;
 
 struct boundary{
@@ -117,8 +119,9 @@ struct stardis{
   unsigned nthreads;
   double probe[4]; /*x,y,z,t of probe*/
   double scale_factor;
+  double radiative_temp[2];
 };
-#define NULL_STARDIS__ {NULL_GEOMETRY__, NULL, NULL, 0, 0, {0,0,0,0}, 0}
+#define NULL_STARDIS__ {NULL_GEOMETRY__, NULL, NULL, 0, 0, {0,0,0,0}, 0, {300,300}}
 static const struct stardis NULL_STARDIS = NULL_STARDIS__;
 
 extern res_T 

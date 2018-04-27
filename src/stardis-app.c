@@ -352,6 +352,7 @@ stardis_init
   stardis->probe[1] = args->probe[1];
   stardis->probe[2] = args->probe[2];
   stardis->probe[3] = args->probe[3];
+  stardis->scale_factor = args->scale_factor;
 
   if (args->mode == PROBE_COMPUTE){
     res = check_consistency(stardis->boundary, stardis->probe);

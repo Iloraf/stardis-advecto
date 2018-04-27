@@ -391,7 +391,12 @@ stardis_compute(struct stardis* stardis)
   pos[1] = stardis->probe[1];
   pos[2] = stardis->probe[2];
   time   = stardis->probe[3];
-  SDIS(solve_probe(scn, stardis->N, pos, time, 1.0, 300.0, 300.0, &estimator));
+  SDIS(solve_probe(scn,
+        stardis->N, 
+        pos,time, 
+        stardis->scale_factor,
+        300.0, 300.0, 
+        &estimator));
 
   /* Fetch the estimation data */
   SDIS(estimator_get_temperature(estimator, &temperature));

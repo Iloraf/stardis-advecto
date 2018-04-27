@@ -11,6 +11,12 @@ les notes de version en ci-dessous pour avoir la bonne version du SDK.
 
 # Note de versions
 
+## v0.3.1
+Ajout du tranfert radiatif. Ce qui ajoute deux nouveaux parametrès par medium : 
+
+- emissivity;
+- specular_fraction.
+
 ## v0.3
 
 Passage à la version 0.3.0 du  SDK de stardis-solver. La version modifié du SDK

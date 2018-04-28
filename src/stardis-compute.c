@@ -2,6 +2,7 @@
 
 #include "stardis-app.h"
 #include <sdis.h>
+#include <rsys/double3.h>
 
 static void
 geometry_get_position
@@ -253,6 +254,46 @@ interface_get_alpha
   return interface_props->alpha;
 }
 
+
+static res_T
+select_probe_type
+(const struct sdis_scene* scn, 
+ const struct triangle* triangle,
+ const struct material* mat,
+ double pos[], 
+ size_t* iprim, 
+ double uv[])
+{
+  res_T res = RES_OK;
+  size_t i = 0;
+  double projected_pos[3] = {0,0,0};
+  double dp[3] = {0,0,0};
+  double delta = 0;
+
+  for (i=0; i<sa_size(triangle); ++i){
+      
+    res = sdis_scene_boundary_project_position(scn, i, pos, uv);
+
+    res = sdis_scene_get_boundary_position(scn, i, uv, projected_pos);
+  
+    d3_sub(dp, pos, projected_pos);
+
+    delta = mat[triangle[i].medium_front].delta; 
+    if (d3_len(dp) < delta*2.1){
+      *iprim = i;
+      fprintf(stderr,"The probe is very close to the primitive %lu.\n",*iprim );
+      fprintf(stderr,"So the probe is moved to this primitive at the position: %g %g %g\n",
+          SPLIT3(projected_pos));
+      d3_set(pos, projected_pos);
+      break;
+    }
+  }
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  *
  ******************************************************************************/
@@ -395,13 +436,38 @@ stardis_compute(struct stardis* stardis)
   pos[1] = stardis->probe[1];
   pos[2] = stardis->probe[2];
   time   = stardis->probe[3];
-  SDIS(solve_probe(scn,
-        stardis->N, 
-        pos,time, 
-        stardis->scale_factor,
-        stardis->radiative_temp[0], 
-        stardis->radiative_temp[1], 
-        &estimator));
+  {
+    double uv[2] = {0,0};
+    size_t iprim = -1;
+
+    res = select_probe_type(scn, 
+       stardis->geometry.triangle,
+       stardis->material,
+       pos, 
+       &iprim, 
+       uv);
+
+    if(iprim == -1){
+    SDIS(solve_probe(scn,
+          stardis->N, 
+          pos,time, 
+          stardis->scale_factor,
+          stardis->radiative_temp[0], 
+          stardis->radiative_temp[1], 
+          &estimator));
+    } else {
+    SDIS(solve_probe_boundary(scn,
+          stardis->N,
+          iprim,
+          uv,
+          time,
+          SDIS_FRONT,
+          stardis->scale_factor,
+          stardis->radiative_temp[0], 
+          stardis->radiative_temp[1], 
+          &estimator));
+    }
+  }
 
   /* Fetch the estimation data */
   SDIS(estimator_get_temperature(estimator, &temperature));

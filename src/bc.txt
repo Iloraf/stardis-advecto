@@ -1,4 +1,5 @@
-#STL_filename h h_coeff T_env(x,y,z,t) | STL_filename T T_value(x,y,z,t)
+#STL_filename h h_coeff T_env(x,y,z,t) | STL_filename T T_value(x,y,z,t) | STL_filename F F_value(x,y,z,t)
 b_h_1.stl   h   0   "300"
+#b_h_1.stl   F   "100"
 b_T_1.stl   T   "300"
 b_T_2.stl   T   "300"

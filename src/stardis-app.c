@@ -124,6 +124,13 @@ parse_boundary_line(char* line, char** stl_filename, struct boundary* bound)
     bound->T = malloc(strlen(tk) + 1);
     strcpy(bound->T,tk);
 
+  } else  if (strcmp(tk,"f")==0 || strcmp(tk,"F")==0  ){
+
+    tk = strtok(NULL,"\"");
+    tk = strtok(NULL,"\"");
+    bound->flux = malloc(strlen(tk) + 1);
+    strcpy(bound->flux,tk);
+
   } else {
     fprintf(stderr,"unknown boundary type: %s\n", tk);
     goto error;
@@ -328,7 +335,7 @@ check_consistency
   int i = 0;
 
   for (i=0; i<sa_size(boundary); ++i){
-    if (strchr(boundary[i].T,'t') && probe[3] == INF) {
+    if ( boundary[i].T && strchr(boundary[i].T,'t') && probe[3] == INF) {
       fprintf(stderr,"Transient boundary condition is inconsistent with INF time of the probe.\n");
       res = RES_BAD_ARG;
       goto error;

@@ -105,8 +105,9 @@ static const struct material NULL_MATERIAL = NULL_MATERIAL__;
 struct boundary{
   double hc;
   char* T;
+  char* flux;
 };
-#define NULL_BOUNDARY__  {-1, NULL}
+#define NULL_BOUNDARY__  {-1, NULL, NULL}
 static const struct boundary NULL_BOUNDARY = NULL_BOUNDARY__;
 
 

@@ -196,6 +196,7 @@ solid_get_power
 struct interface {
   double hc; /* Convection coefficient */
   char* temperature;
+  char* flux;
   double emissivity;
   double alpha;
 };
@@ -234,6 +235,35 @@ interface_get_temperature
     temperature = te_eval(expr);
     te_free(expr);
     return temperature;
+  }
+}
+
+static double
+interface_get_flux
+  (const struct sdis_interface_fragment* frag, struct sdis_data* data)
+{
+  const struct interface* interface_props = sdis_data_cget(data);
+
+  if (interface_props->flux == NULL) {
+    return SDIS_FLUX_NONE;
+  } else {
+
+    double flux = 0;
+    char* math_expr = interface_props->flux;
+    double x, y, z, t;  
+    /* Store variable names and pointers. */
+    te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
+    int err;
+
+    /* Compile the expression with variables. */
+    te_expr *expr = te_compile(math_expr, vars, 4, &err);
+    x = frag->P[0];
+    y = frag->P[1];
+    z = frag->P[2];
+    t = frag->time;
+    flux = te_eval(expr);
+    te_free(expr);
+    return flux;
   }
 }
 
@@ -379,7 +409,7 @@ stardis_compute(struct stardis* stardis)
 
   /* Setup the interface shader */
   interface_shader_front.temperature = interface_get_temperature;
-  interface_shader_front.flux = NULL;
+  interface_shader_front.flux = interface_get_flux;
   interface_shader_front.emissivity = interface_get_emissivity;
   interface_shader_front.specular_fraction = interface_get_alpha;
 
@@ -395,6 +425,7 @@ stardis_compute(struct stardis* stardis)
     if (bound_id > -1){  /* boundary interface */
       double hc = stardis->boundary[bound_id].hc;
       char* T = stardis->boundary[bound_id].T;
+      char* flux = stardis->boundary[bound_id].flux;
       double emissivity =
         stardis->material[stardis->geometry.triangle[i].medium_front].emissivity;
       double alpha =
@@ -405,8 +436,13 @@ stardis_compute(struct stardis* stardis)
       if (hc > -1) {
         interface_props->hc = hc;
         interface_props->temperature = NULL;
-      } else {
+        interface_props->flux = NULL;
+      } else if (T != NULL){
         interface_props->temperature = T;
+        interface_props->flux = NULL;
+      } else if (flux != NULL){
+        interface_props->temperature = NULL;
+        interface_props->flux = flux;
       }
       interface_props->emissivity = emissivity; 
       interface_props->alpha = alpha;

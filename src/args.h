@@ -45,12 +45,12 @@ print_help(char* prog)
   printf("\n -p X:Y:Z:TIME :\n");
   printf("    this is the position and the time of the probe.\n");
   printf("    default value: 0.0:0.0:0.0:INF.\n");
-  printf("    The probe must be in a medium. If some boundary consitions are\n");
+  printf("    The probe must be in a medium. If some boundary conditions are\n");
   printf("    time-dependant, TIME can not be INF.\n");
   printf("\n -s SCALE_FACTOR :\n");
   printf("    default value: 1.0.\n");
   printf("\n -d :\n");
-  printf("    dump geometry in VTK format which medium front/back id and\n");
+  printf("    dump geometry in VTK format with medium front/back id and\n");
   printf("    boundary id.\n");
   printf("\n -n NUM_OF_REALIZATIONS :\n");
   printf("    number of Monte-Carlo realizations.\n");

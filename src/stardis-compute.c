@@ -4,9 +4,6 @@
 #include <sdis.h>
 #include <rsys/double3.h>
 
-#define IMG_WIDTH 640
-#define IMG_HEIGHT 480
-#define SPP 256 
 #include <rsys/image.h>
 
 static void
@@ -367,8 +364,8 @@ dump_image(const struct sdis_accum_buffer* buf)
 
   /* Allocate the image memory space */
   CHK(image_init(NULL, &img) == RES_OK);
-  CHK(image_setup(&img, IMG_WIDTH, IMG_HEIGHT, IMG_WIDTH*3, IMAGE_RGB8, NULL)
-    == RES_OK);
+  CHK(image_setup(&img, layout.width, layout.height, layout.width*3/*pitch*/,
+    IMAGE_RGB8, NULL) == RES_OK);
 
   FOR_EACH(iy, 0, layout.height) {
     const double* src_row = temps + iy*layout.width;
@@ -573,8 +570,6 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
     /* Write the image */
     dump_image(buf);
-    SDIS(camera_ref_put(cam));
-    SDIS(accum_buffer_ref_put(buf));
   }
 
   if (mode == PROBE_COMPUTE){

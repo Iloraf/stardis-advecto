@@ -536,15 +536,15 @@ dump_vtk
   }
 
   fprintf(output,"# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET POLYDATA\n");
-  fprintf(output,"POINTS %i float\n\n", sa_size(vtx));
+  fprintf(output,"POINTS %i float\n\n", (int)sa_size(vtx));
   for (i=0; i<sa_size(vtx); ++i){
     fprintf(output,"%f %f %f\n",SPLIT3(vtx[i].xyz));
   }
-  fprintf(output,"\nPOLYGONS %i %i\n", sa_size(tri), 4*sa_size(tri));
+  fprintf(output,"\nPOLYGONS %i %i\n", (int)sa_size(tri), (int)(4*sa_size(tri)));
   for (i=0; i<sa_size(tri); ++i){
     fprintf(output,"3 %i %i %i\n",SPLIT3(tri[i].indices));
   }
-  fprintf(output,"\nCELL_DATA %i \n", sa_size(tri));
+  fprintf(output,"\nCELL_DATA %i \n", (int)sa_size(tri));
   fprintf(output,"SCALARS medium_front float 1\n");
   fprintf(output,"LOOKUP_TABLE default\n");
   for (i=0; i<sa_size(tri); ++i){

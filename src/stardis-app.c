@@ -31,6 +31,55 @@ read_line(char** pb, FILE* stream)
   return b;
 }
 
+char** split_line(char* a_str, const char a_delim)
+{
+  char** result    = 0;
+  size_t count     = 0;
+  char* tmp        = a_str;
+  char* last_comma = 0;
+  char delim[2];
+  delim[0] = a_delim;
+  delim[1] = 0;
+
+  /* Count how many elements will be extracted. */
+  while (*tmp)
+  {
+    if (a_delim == *tmp)
+    {
+      count++;
+      last_comma = tmp;
+    }
+    tmp++;
+  }
+
+  /* Add space for trailing token. */
+  count += last_comma < (a_str + strlen(a_str) - 1);
+
+  /* Add space for terminating null string so caller
+     knows where the list of returned strings ends. */
+  count++;
+
+  result = malloc(sizeof(char*) * count);
+
+  if (result)
+  {
+    size_t idx  = 0;
+    char* token = strtok(a_str, delim);
+
+    while (token)
+    {
+      assert(idx < count);
+      *(result + idx++) = strdup(token);
+      token = strtok(0, delim);
+    }
+    assert(idx == count - 1);
+    *(result + idx) = 0;
+  }
+
+  return result;
+}
+
+
 static res_T
 parse_medium_line(char* line, char** stl_filename, struct material* mat)
 {
@@ -348,6 +397,66 @@ error:
   goto exit;
 }
 
+static res_T
+parse_camera
+(char* cam_param, struct camera* cam)
+{
+  char** line = NULL;
+  char** opt = NULL;
+  res_T res = RES_OK;
+
+  line = split_line(cam_param,':');
+  
+  if (line)
+  {
+    int i = 0;
+    for (i = 0; *(line + i); i++)
+    {
+      size_t len = 0;
+      opt = split_line(line[i],'=');
+      if (strcmp(opt[0],"fov")==0){
+        res = cstr_to_double(opt[1], &cam->fov);
+        if (res != RES_OK) goto error;
+      } else if (strcmp(opt[0],"up")==0) {
+        res = cstr_to_list_double(opt[1], ',', cam->up, &len, 3);
+        if (res != RES_OK || len != 3) goto error;
+      } else if (strcmp(opt[0],"tgt")==0) {
+        res = cstr_to_list_double(opt[1], ',', cam->tgt, &len, 3);
+        if (res != RES_OK || len != 3) goto error;
+      } else if (strcmp(opt[0],"pos")==0) {
+        res = cstr_to_list_double(opt[1], ',', cam->pos, &len, 3);
+        if (res != RES_OK || len != 3) goto error;
+      } else if (strcmp(opt[0],"img")==0) {
+        res = cstr_to_list_uint(opt[1], 'x', cam->img, &len, 2);
+        if (res != RES_OK || len != 2) goto error;
+      } else if (strcmp(opt[0],"spp")==0) {
+        res = cstr_to_uint(opt[1], &cam->spp);
+        if (res != RES_OK) goto error;
+      } 
+    }
+  }
+
+exit:
+  if (line){
+    int i = 0;
+    for (i=0; *(line+i);i++){
+     free(line[i]);
+    }
+    free(line);
+  }
+  if (opt){
+    int i = 0;
+    for (i=0; *(opt+i);i++){
+      free(opt[i]);
+    }
+    free(opt);
+  }
+ 
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  *
  ******************************************************************************/
@@ -380,6 +489,11 @@ stardis_init
     res = check_consistency(stardis->boundary, stardis->probe);
     if (res != RES_OK) goto error;
   }
+
+ if (args->mode == IR_COMPUTE){
+    res = parse_camera(args->camera, &stardis->camera);
+    if (res != RES_OK) goto error;
+ }
 
 exit:
   return res;

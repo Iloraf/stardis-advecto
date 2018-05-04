@@ -22,7 +22,7 @@ int main(int argc, char** argv){
     goto exit;
   }
 
-  res =  stardis_compute(&stardis);
+  res =  stardis_compute(&stardis, args.mode);
   if (res != RES_OK) goto error;
 
 exit:

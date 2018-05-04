@@ -4,6 +4,11 @@
 #include <sdis.h>
 #include <rsys/double3.h>
 
+#define IMG_WIDTH 640
+#define IMG_HEIGHT 480
+#define SPP 256 
+#include <rsys/image.h>
+
 static void
 geometry_get_position
 (const size_t ivert, 
@@ -324,12 +329,72 @@ error:
   goto exit;
 }
 
+static void
+dump_image(const struct sdis_accum_buffer* buf)
+{
+  struct sdis_accum_buffer_layout layout = SDIS_ACCUM_BUFFER_LAYOUT_NULL;
+  struct image img;
+  double* temps = NULL;
+  const struct sdis_accum* accums = NULL;
+  double Tmax = -DBL_MAX;
+  double Tmin =  DBL_MAX;
+  double norm;
+  size_t ix, iy;
+
+  CHK(buf != NULL);
+  CHK(sdis_accum_buffer_get_layout(buf, &layout) == RES_OK);
+
+  temps = mem_alloc(layout.width*layout.height*sizeof(double));
+  CHK(temps != NULL);
+
+  /* Compute the per pixel temperature */
+  CHK(sdis_accum_buffer_map(buf, &accums) == RES_OK);
+  FOR_EACH(iy, 0, layout.height) {
+    const struct sdis_accum* row_accums = accums + iy * layout.width;
+    double* row = temps + iy * layout.width;
+    FOR_EACH(ix, 0, layout.width) {
+      row[ix] = row_accums[ix].sum_weights / (double)row_accums[ix].nweights;
+      Tmax = MMAX(row[ix], Tmax);
+      Tmin = MMIN(row[ix], Tmin);
+    }
+  }
+  if(Tmax != Tmin) {
+    norm = Tmax - Tmin;
+  } else {
+    Tmin = 0;
+    norm = 1;
+  }
+
+  /* Allocate the image memory space */
+  CHK(image_init(NULL, &img) == RES_OK);
+  CHK(image_setup(&img, IMG_WIDTH, IMG_HEIGHT, IMG_WIDTH*3, IMAGE_RGB8, NULL)
+    == RES_OK);
+
+  FOR_EACH(iy, 0, layout.height) {
+    const double* src_row = temps + iy*layout.width;
+    char* dst_row = img.pixels + iy*img.pitch;
+    FOR_EACH(ix, 0, layout.width) {
+      unsigned char* pixels = (unsigned char*)
+        (dst_row + ix * sizeof_image_format(img.format));
+      const unsigned char T = (unsigned char)
+        ((src_row[ix] - Tmin)/ norm * 255.0);
+      pixels[0] = T;
+      pixels[1] = T;
+      pixels[2] = T;
+    }
+  }
+  CHK(image_write_ppm_stream(&img, 0/*binary?*/, stdout) == RES_OK);
+  image_release(&img);
+  mem_rm(temps);
+}
+
+
 /*******************************************************************************
  *
  ******************************************************************************/
   
 res_T
-stardis_compute(struct stardis* stardis)
+stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 {
   res_T res = RES_OK;
   struct sdis_device* dev = NULL;
@@ -341,16 +406,22 @@ stardis_compute(struct stardis* stardis)
   struct sdis_fluid_shader fluid_shader = SDIS_FLUID_SHADER_NULL;
   struct sdis_medium** fluid_medium = NULL;
 
-  struct sdis_interface_side_shader interface_shader_front = SDIS_INTERFACE_SIDE_SHADER_NULL;
-  struct sdis_interface_side_shader interface_shader_back = SDIS_INTERFACE_SIDE_SHADER_NULL;
-  struct sdis_interface_shader interface_shader_boundary = SDIS_INTERFACE_SHADER_NULL;
-  struct sdis_interface_shader interface_shader_connection = SDIS_INTERFACE_SHADER_NULL;
+  struct sdis_interface_side_shader interface_shader_front =
+    SDIS_INTERFACE_SIDE_SHADER_NULL;
+  struct sdis_interface_side_shader interface_shader_back =
+    SDIS_INTERFACE_SIDE_SHADER_NULL;
+  struct sdis_interface_shader interface_shader_boundary = 
+    SDIS_INTERFACE_SHADER_NULL;
+  struct sdis_interface_shader interface_shader_connection = 
+    SDIS_INTERFACE_SHADER_NULL;
   struct interface* interface_props = NULL;
   struct sdis_interface** interfaces = NULL;
 
-  struct sdis_scene* scn;
-  struct sdis_estimator* estimator;
+  struct sdis_scene* scn = NULL; 
+  struct sdis_estimator* estimator = NULL;
   struct sdis_mc temperature;
+  struct sdis_accum_buffer* buf = NULL;
+  struct sdis_camera* cam = NULL;
 
   int* bound2fluid = NULL;
   double pos[3] = {0,0,0};
@@ -358,7 +429,7 @@ stardis_compute(struct stardis* stardis)
   size_t nfailures;
   int i = 0;
 
-  SDIS(device_create(NULL, NULL, stardis->nthreads, 0, &dev));
+  SDIS(device_create(NULL, NULL, stardis->nthreads, 1, &dev));
 
   /* Setup the fluid shader */
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
@@ -467,57 +538,97 @@ stardis_compute(struct stardis* stardis)
         sa_size(stardis->geometry.vertex), 
         geometry_get_position, &stardis->geometry, &scn));
 
-  /* Launch the probe simulation */
-  pos[0] = stardis->probe[0];
-  pos[1] = stardis->probe[1];
-  pos[2] = stardis->probe[2];
-  time   = stardis->probe[3];
-  {
-    double uv[2] = {0,0};
-    size_t iprim = -1;
 
-    res = select_probe_type(scn, 
-       stardis->geometry.triangle,
-       stardis->material,
-       pos, 
-       &iprim, 
-       uv);
+  if (mode == IR_COMPUTE){
+    size_t width = (size_t)stardis->camera.img[0];
+    size_t height = (size_t)stardis->camera.img[1];
 
-    if(iprim == -1){
-    SDIS(solve_probe(scn,
-          stardis->N, 
-          pos,time, 
+    /* Setup the camera */
+    SDIS(camera_create(dev, &cam));
+    SDIS(camera_set_proj_ratio(cam, (double)width/(double)height));
+    SDIS(camera_set_fov(cam, MDEG2RAD(stardis->camera.fov)));
+    SDIS(camera_look_at(cam, 
+          stardis->camera.pos,
+          stardis->camera.tgt,
+          stardis->camera.up));
+
+    /* Create the accum buffer */
+    SDIS(accum_buffer_create(dev,
+          width,
+          height,
+          &buf));
+
+    /* Launch the simulation */
+    SDIS(solve_camera(scn, 
+          cam,
+          INF,
           stardis->scale_factor,
           stardis->radiative_temp[0], 
           stardis->radiative_temp[1], 
-          &estimator));
-    } else {
-    SDIS(solve_probe_boundary(scn,
-          stardis->N,
-          iprim,
-          uv,
-          time,
-          SDIS_FRONT,
-          stardis->scale_factor,
-          stardis->radiative_temp[0], 
-          stardis->radiative_temp[1], 
-          &estimator));
-    }
+          width,
+          height,
+          stardis->camera.spp,
+          sdis_accum_buffer_write,
+          buf));
+
+    /* Write the image */
+    dump_image(buf);
+    SDIS(camera_ref_put(cam));
+    SDIS(accum_buffer_ref_put(buf));
   }
 
-  /* Fetch the estimation data */
-  SDIS(estimator_get_temperature(estimator, &temperature));
-  SDIS(estimator_get_failure_count(estimator, &nfailures));
+  if (mode == PROBE_COMPUTE){
+    /* Launch the probe simulation */
+    pos[0] = stardis->probe[0];
+    pos[1] = stardis->probe[1];
+    pos[2] = stardis->probe[2];
+    time   = stardis->probe[3];
+    {
+      double uv[2] = {0,0};
+      size_t iprim = -1;
 
-  /* Print the results */
-  printf("Temperature at [%g, %g, %g, %g] = %g +/- %g\n",
-      pos[0], pos[1], pos[2], time,
-      temperature.E, /* Expected value */
-      temperature.SE); /* Standard error */
-  printf("#failures: %lu/%lu\n", 
-      (unsigned long)nfailures,
-      (unsigned long)stardis->N);
+      res = select_probe_type(scn, 
+          stardis->geometry.triangle,
+          stardis->material,
+          pos, 
+          &iprim, 
+          uv);
 
+      if(iprim == -1){
+        SDIS(solve_probe(scn,
+              stardis->N, 
+              pos,time, 
+              stardis->scale_factor,
+              stardis->radiative_temp[0], 
+              stardis->radiative_temp[1], 
+              &estimator));
+      } else {
+        SDIS(solve_probe_boundary(scn,
+              stardis->N,
+              iprim,
+              uv,
+              time,
+              SDIS_FRONT,
+              stardis->scale_factor,
+              stardis->radiative_temp[0], 
+              stardis->radiative_temp[1], 
+              &estimator));
+      }
+    }
+
+    /* Fetch the estimation data */
+    SDIS(estimator_get_temperature(estimator, &temperature));
+    SDIS(estimator_get_failure_count(estimator, &nfailures));
+
+    /* Print the results */
+    printf("Temperature at [%g, %g, %g, %g] = %g +/- %g\n",
+        pos[0], pos[1], pos[2], time,
+        temperature.E, /* Expected value */
+        temperature.SE); /* Standard error */
+    printf("#failures: %lu/%lu\n", 
+        (unsigned long)nfailures,
+        (unsigned long)stardis->N);
+  }
 
 exit:
   for (i=0; i<sa_size(solid_medium); ++i){
@@ -538,9 +649,11 @@ exit:
 
   sa_release(bound2fluid);
 
-  SDIS(estimator_ref_put(estimator));
-  SDIS(scene_ref_put(scn));
-  SDIS(device_ref_put(dev));
+  if (cam) SDIS(camera_ref_put(cam));
+  if (buf) SDIS(accum_buffer_ref_put(buf));
+  if (estimator) SDIS(estimator_ref_put(estimator));
+  if (scn) SDIS(scene_ref_put(scn));
+  if (dev) SDIS(device_ref_put(dev));
   return res;
 error:
   goto exit;

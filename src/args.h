@@ -9,6 +9,7 @@
 
 enum stardis_mode{
   PROBE_COMPUTE,
+  IR_COMPUTE,
   DUMP_VTK
 };
 
@@ -21,8 +22,9 @@ struct args{
   enum stardis_mode mode;
   double scale_factor;
   double radiative_temp[2];
+  char* camera;
 };
-#define ARGS_DEFAULT__ {NULL, NULL, 10000, SDIS_NTHREADS_DEFAULT, {0,0,0,INF}, PROBE_COMPUTE, 1.0, {300,300}}
+#define ARGS_DEFAULT__ {NULL, NULL, 10000, SDIS_NTHREADS_DEFAULT, {0,0,0,INF}, PROBE_COMPUTE, 1.0, {300,300}, NULL}
 static const struct args ARGS_DEFAULT = ARGS_DEFAULT__; 
 
 static void
@@ -62,8 +64,16 @@ print_help(char* prog)
   printf("    AMBIENT_RAD_TEMP is the ambient radiative temperature .\n");
   printf("    REFERENCE_TEMP is the temperature used for the linearization.\n");
   printf("    of theradiative transfer.\n");
-  printf("    default value : 300:300.\n");
+  printf("\n -R spp=SPP:fov=FOV:up=XUP,YUP,ZUP:pos=X,Y,Z:tgt=XT,YT,ZT:img=WxH :\n");
+  printf("    The infra-red rendering mode.\n");
+  printf("    spp is the number of samples per pixel (default: 4).\n");
+  printf("    fov is the field of view (default: 70 degrees).\n");
+  printf("    up is the up direction (default: 0,0,1).\n");
+  printf("    pos is the position of camera (default: 1,1,1).\n");
+  printf("    tgt is the target (default: 0,0,0).\n");
+  printf("    img is the resolution (default: 640x480).\n");
 }
+
 
 static res_T
 parse_args(const int argc, char** argv, struct args* args)
@@ -78,7 +88,7 @@ parse_args(const int argc, char** argv, struct args* args)
     goto error;
   }
 
-  while((opt = getopt(argc, argv, "hn:t:b:m:p:ds:r:")) != -1) {
+  while((opt = getopt(argc, argv, "hn:t:b:m:p:ds:r:R:")) != -1) {
     switch(opt) {
       case 'h':
         print_help(argv[0]);
@@ -111,7 +121,7 @@ parse_args(const int argc, char** argv, struct args* args)
         break;
 
       case 'p':
-        cstr_to_list_double(optarg, ':', args->probe, &len, 4);
+        cstr_to_list_double(optarg, ',', args->probe, &len, 4);
         if(res == RES_OK && len != 4) res = RES_BAD_ARG;
         if (res != RES_OK){
           fprintf(stderr, "Invalid argument -p\n", optarg);
@@ -132,7 +142,7 @@ parse_args(const int argc, char** argv, struct args* args)
         break;
 
       case 'r':
-        cstr_to_list_double(optarg, ':', args->radiative_temp, &len, 2);
+        cstr_to_list_double(optarg, ',', args->radiative_temp, &len, 2);
         if(res == RES_OK && len != 2) res = RES_BAD_ARG;
         if (res != RES_OK 
             || args->radiative_temp[0] <=0
@@ -140,6 +150,11 @@ parse_args(const int argc, char** argv, struct args* args)
           fprintf(stderr, "Invalid argument -r\n", optarg);
           goto error;
         }
+        break;
+
+      case 'R':
+        args->mode = IR_COMPUTE;
+        args->camera = optarg;
         break;
     }
   }

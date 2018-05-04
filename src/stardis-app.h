@@ -38,7 +38,7 @@ struct triangle{
   int medium_back;
   int bound_id;
 };
-#define NULL_TRIANGLE__ {{0, 0, 0}, {0, 0, 0}, 0, 0, -1}
+#define NULL_TRIANGLE__ {{0, 0, 0}, {0, 0, 0}, -1, -1, -1}
 static const struct triangle NULL_TRIANGLE = NULL_TRIANGLE__;
 
 static char
@@ -110,6 +110,16 @@ struct boundary{
 #define NULL_BOUNDARY__  {-1, NULL, NULL}
 static const struct boundary NULL_BOUNDARY = NULL_BOUNDARY__;
 
+struct camera{
+  double pos[3];
+  double tgt[3];
+  double up[3];
+  double fov;
+  unsigned spp;
+  unsigned img[2];
+};
+#define NULL_CAMERA__ {{1,1,1},{0,0,0},{0,0,1},70,4,{640,480}} 
+static const struct camera NULL_CAMERA = NULL_CAMERA__;
 
 struct stardis{
   struct geometry geometry;
@@ -121,8 +131,9 @@ struct stardis{
   double probe[4]; /*x,y,z,t of probe*/
   double scale_factor;
   double radiative_temp[2];
+  struct camera camera;
 };
-#define NULL_STARDIS__ {NULL_GEOMETRY__, NULL, NULL, 0, 0, {0,0,0,0}, 0, {300,300}}
+#define NULL_STARDIS__ {NULL_GEOMETRY__, NULL, NULL, 0, 0, {0,0,0,0}, 0, {300,300}, NULL_CAMERA__}
 static const struct stardis NULL_STARDIS = NULL_STARDIS__;
 
 extern res_T 
@@ -131,7 +142,7 @@ stardis_init
    struct stardis* stardis);
 
 extern res_T
-stardis_compute(struct stardis* stardis);
+stardis_compute(struct stardis* stardis, enum stardis_mode mode);
 
 extern res_T
 stardis_release(struct stardis* stardis);

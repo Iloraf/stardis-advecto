@@ -12,6 +12,14 @@
 #include <tinyexpr.h>
 #include "args.h"
 
+#define FREE_AARRAY(ARRAY) if (ARRAY) {\
+  int i = 0; \
+  for (i=0; *(ARRAY+i);i++){\
+    free(ARRAY[i]);\
+  }\
+  free(ARRAY);\
+}
+
 struct vertex{
   float xyz[3];
 };
@@ -73,7 +81,7 @@ struct geometry{
 #define NULL_GEOMETRY__ {NULL, NULL, 0, 0, NULL}
 static const struct geometry NULL_GEOMETRY = NULL_GEOMETRY__;
 
-static res_T
+static inline res_T
 release_geometry
 (struct geometry* geom)
 {
@@ -83,10 +91,7 @@ release_geometry
   sa_release(geom->triangle);
   sa_release(geom->interfaces);
 
-exit:
   return res;
-error:
-  goto exit;
 }
 
 struct material{

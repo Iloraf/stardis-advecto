@@ -4,6 +4,7 @@
 #define ARGS_H
 
 #include <unistd.h>
+#include <getopt.h>
 #include <rsys/rsys.h>
 #include <rsys/cstr.h>
 
@@ -30,7 +31,7 @@ static const struct args ARGS_DEFAULT = ARGS_DEFAULT__;
 static void
 print_help(char* prog)
 {
-  printf("usage : \n%s -m MEDIUM.txt -b BOUNDARY.txt [-p X:Y:Z:TIME]\n", prog);  
+  printf("usage : \n%s -m MEDIUM.txt -b BOUNDARY.txt [-p X,Y,Z,TIME]\n", prog);  
   printf("[-s SCALE_FACTOR] [-d] [-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n");  
   printf("[-r AMBIENT_RAD_TEMP:REFERENCE_TEMP]\n");  
   printf("\n  -h : print this help.\n");
@@ -59,7 +60,7 @@ print_help(char* prog)
   printf("    default value: 10000.\n");
   printf("\n -t NUM_OF_THREADS :\n");
   printf("    default value: all threads available.\n");
-  printf("\n -r AMBIENT_RAD_TEMP:REFERENCE_TEMP :\n");
+  printf("\n -r AMBIENT_RAD_TEMP,REFERENCE_TEMP :\n");
   printf("    Parameters for the radiative transfer.\n");
   printf("    AMBIENT_RAD_TEMP is the ambient radiative temperature .\n");
   printf("    REFERENCE_TEMP is the temperature used for the linearization.\n");
@@ -75,7 +76,7 @@ print_help(char* prog)
 }
 
 
-static res_T
+static inline res_T
 parse_args(const int argc, char** argv, struct args* args)
 {
   int opt = 0;
@@ -124,7 +125,7 @@ parse_args(const int argc, char** argv, struct args* args)
         cstr_to_list_double(optarg, ',', args->probe, &len, 4);
         if(res == RES_OK && len != 4) res = RES_BAD_ARG;
         if (res != RES_OK){
-          fprintf(stderr, "Invalid argument -p\n", optarg);
+          fprintf(stderr, "Invalid argument -p %s\n", optarg);
           goto error;
         }
         break;
@@ -136,7 +137,7 @@ parse_args(const int argc, char** argv, struct args* args)
       case 's':
         cstr_to_double(optarg, &args->scale_factor);
         if (res != RES_OK || args->scale_factor <=0){
-          fprintf(stderr, "Invalid argument -s\n", optarg);
+          fprintf(stderr, "Invalid argument -s %s\n", optarg);
           goto error;
         }
         break;
@@ -147,7 +148,7 @@ parse_args(const int argc, char** argv, struct args* args)
         if (res != RES_OK 
             || args->radiative_temp[0] <=0
             || args->radiative_temp[1] <=0){
-          fprintf(stderr, "Invalid argument -r\n", optarg);
+          fprintf(stderr, "Invalid argument -r %s\n", optarg);
           goto error;
         }
         break;

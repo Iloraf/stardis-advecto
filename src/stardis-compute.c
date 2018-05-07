@@ -320,10 +320,7 @@ select_probe_type
       break;
     }
   }
-exit:
   return res;
-error:
-  goto exit;
 }
 
 static void
@@ -537,8 +534,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
 
   if (mode == IR_COMPUTE){
-    size_t width = (size_t)stardis->camera.img[0];
-    size_t height = (size_t)stardis->camera.img[1];
+   size_t width = (size_t)stardis->camera.img[0];
+   size_t height = (size_t)stardis->camera.img[1];
 
     /* Setup the camera */
     SDIS(camera_create(dev, &cam));
@@ -564,7 +561,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
           stardis->radiative_temp[1], 
           width,
           height,
-          stardis->camera.spp,
+          (size_t)stardis->camera.spp,
           sdis_accum_buffer_write,
           buf));
 
@@ -582,11 +579,11 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       double uv[2] = {0,0};
       size_t iprim = -1;
 
-      res = select_probe_type(scn, 
+      res = select_probe_type(scn,
           stardis->geometry.triangle,
           stardis->material,
-          pos, 
-          &iprim, 
+          pos,
+          &iprim,
           uv);
 
       if(iprim == -1){
@@ -625,7 +622,6 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         (unsigned long)stardis->N);
   }
 
-exit:
   for (i=0; i<sa_size(solid_medium); ++i){
     SDIS(medium_ref_put(solid_medium[i]));
   }
@@ -649,8 +645,7 @@ exit:
   if (estimator) SDIS(estimator_ref_put(estimator));
   if (scn) SDIS(scene_ref_put(scn));
   if (dev) SDIS(device_ref_put(dev));
+
   return res;
-error:
-  goto exit;
 }
 

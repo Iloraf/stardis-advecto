@@ -1,5 +1,6 @@
 /* Copyright (C) 2018 |Meso|Star> (contact@meso-star.com) */
 
+#define _GNU_SOURCE 1
 #include <string.h>
 #include "stardis-app.h"
 
@@ -278,7 +279,6 @@ read_stl
 
   SSTL(create(NULL, NULL, 0, &sstl));
 
-
   SSTL(load(sstl, *stl_filename));
   SSTL(get_desc(sstl, &desc));
 
@@ -286,12 +286,8 @@ read_stl
   read_triangles(FLAG, &desc, triangle2id, id2id, NULL, &id, &geometry->triangle);
   sa_release(id2id);
 
-
-exit:
-   SSTL(ref_put(sstl));
+  SSTL(ref_put(sstl));
   return res;
-error:
-  goto exit;
 }
 
 
@@ -339,6 +335,7 @@ geometry_analyse
         &vertex2id, &triangle2id, geometry);
 
     geometry->medium_count += 1;
+    if (stl_filename) free(stl_filename);
   }
   fclose(input);
 
@@ -363,6 +360,7 @@ geometry_analyse
         &vertex2id, &triangle2id, geometry);
 
     geometry->boundary_count += 1;
+    if (stl_filename) free(stl_filename);
   }
 
   fclose(input);
@@ -437,20 +435,8 @@ parse_camera
   }
 
 exit:
-  if (line){
-    int i = 0;
-    for (i=0; *(line+i);i++){
-     free(line[i]);
-    }
-    free(line);
-  }
-  if (opt){
-    int i = 0;
-    for (i=0; *(opt+i);i++){
-      free(opt[i]);
-    }
-    free(opt);
-  }
+  FREE_AARRAY(line)
+  FREE_AARRAY(opt)
  
   return res;
 error:
@@ -505,11 +491,23 @@ error:
 res_T
 stardis_release(struct stardis* stardis)
 {
+  int i = 0;
   res_T res = RES_OK;
 
-  res = release_geometry(&stardis->geometry);
+  for (i=0; i<sa_size(stardis->material); ++i){
+    free(stardis->material[i].Tinit);
+    free(stardis->material[i].power);
+  }
   sa_release(stardis->material);
+
+  for (i=0; i<sa_size(stardis->boundary); ++i){
+    free(stardis->boundary[i].T);
+    free(stardis->boundary[i].flux);
+  }
   sa_release(stardis->boundary);
+
+  res = release_geometry(&stardis->geometry);
+  if (res != RES_OK) goto error;
 
 exit:
   return res;

@@ -432,16 +432,14 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
   /* create fluid for each hc boundary */
   for (i=0; i<stardis->geometry.boundary_count; ++i){
+    SDIS(data_create(dev, sizeof(struct fluid), ALIGNOF(struct fluid), NULL, &data));
+    fluid_props = sdis_data_get(data); /* Fetch the allocated memory space */
+    fluid_props->cp = 0;
+    fluid_props->rho = 0;
+    fluid_props->temperature = stardis->boundary[i].T; 
+    SDIS(fluid_create(dev, &fluid_shader, data, sa_add(fluid_medium, 1)));
+    SDIS(data_ref_put(data));
     if (stardis->boundary[i].hc > -1) {
-      
-      SDIS(data_create(dev, sizeof(struct fluid), ALIGNOF(struct fluid), NULL, &data));
-      fluid_props = sdis_data_get(data); /* Fetch the allocated memory space */
-      fluid_props->cp = 0;
-      fluid_props->rho = 0;
-      fluid_props->temperature = stardis->boundary[i].T; 
-      SDIS(fluid_create(dev, &fluid_shader, data, sa_add(fluid_medium, 1)));
-      SDIS(data_ref_put(data));
-
       sa_push(bound2fluid, sa_size(fluid_medium)-1);
     } else {
       sa_push(bound2fluid, 0);

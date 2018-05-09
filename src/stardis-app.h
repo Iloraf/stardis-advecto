@@ -99,20 +99,20 @@ struct material{
   double rho;
   double cp;
   double delta;
-  double emissivity;
-  double specular_fraction;
   char* Tinit;
   char* power;
 };
-#define NULL_MATERIAL__ {0.0 ,0.0 ,0.0, 0.0, 0.0, 0.0, NULL, NULL}
+#define NULL_MATERIAL__ {0.0 ,0.0 ,0.0, 0.0, NULL, NULL}
 static const struct material NULL_MATERIAL = NULL_MATERIAL__;
 
 struct boundary{
   double hc;
   char* T;
   char* flux;
+  double emissivity;
+  double specular_fraction;
 };
-#define NULL_BOUNDARY__  {-1, NULL, NULL}
+#define NULL_BOUNDARY__  {-1, NULL, NULL, 0.0 , 0.0}
 static const struct boundary NULL_BOUNDARY = NULL_BOUNDARY__;
 
 struct camera{
@@ -123,7 +123,7 @@ struct camera{
   unsigned spp;
   unsigned img[2];
 };
-#define NULL_CAMERA__ {{1,1,1},{0,0,0},{0,0,1},70,4,{640,480}} 
+#define NULL_CAMERA__ {{1,1,1},{0,0,0},{0,0,1},30,4,{640,480}} 
 static const struct camera NULL_CAMERA = NULL_CAMERA__;
 
 struct stardis{

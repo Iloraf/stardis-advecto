@@ -114,19 +114,6 @@ parse_medium_line(char* line, char** stl_filename, struct material* mat)
     fprintf(stderr,"invalid delta\n");
     goto error;
   }
-  tk = strtok(NULL," ");
-  res = cstr_to_double(tk, &mat->emissivity);
-  if (res != RES_OK || mat->emissivity < 0.0 || mat->emissivity > 1.0){
-    fprintf(stderr,"invalid emissivity\n");
-    goto error;
-  }
-  tk = strtok(NULL," ");
-  res = cstr_to_double(tk, &mat->specular_fraction);
-  if (res != RES_OK ||
-      mat->specular_fraction < 0.0 || mat->specular_fraction > 1.0){
-    fprintf(stderr,"invalid specular_fraction\n");
-    goto error;
-  }
   tk = strtok(NULL,"\"");
   tk = strtok(NULL,"\"");
   mat->Tinit = malloc(strlen(tk) + 1);
@@ -152,6 +139,20 @@ parse_boundary_line(char* line, char** stl_filename, struct boundary* bound)
   tk = strtok(line," ");
   *stl_filename = malloc(strlen(tk) + 1);
   strcpy(*stl_filename,tk);
+
+  tk = strtok(NULL," ");
+  res = cstr_to_double(tk, &bound->emissivity);
+  if (res != RES_OK || bound->emissivity < 0.0 || bound->emissivity > 1.0){
+    fprintf(stderr,"invalid emissivity\n");
+    goto error;
+  }
+  tk = strtok(NULL," ");
+  res = cstr_to_double(tk, &bound->specular_fraction);
+  if (res != RES_OK ||
+      bound->specular_fraction < 0.0 || bound->specular_fraction > 1.0){
+    fprintf(stderr,"invalid specular_fraction\n");
+    goto error;
+  }
 
   tk = strtok(NULL," ");
   if (strcmp(tk,"h")==0 || strcmp(tk,"H")==0  ){

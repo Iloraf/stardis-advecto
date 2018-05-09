@@ -473,10 +473,13 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   /* Setup the interface shader */
   interface_shader_front.temperature = interface_get_temperature;
   interface_shader_front.flux = interface_get_flux;
-  interface_shader_front.emissivity = interface_get_emissivity;
-  interface_shader_front.specular_fraction = interface_get_alpha;
+  interface_shader_front.emissivity = NULL;
+  interface_shader_front.specular_fraction = NULL;
 
-  interface_shader_back = interface_shader_front;
+  interface_shader_back.temperature = interface_get_temperature;
+  interface_shader_back.flux = NULL;
+  interface_shader_back.emissivity = interface_get_emissivity;
+  interface_shader_back.specular_fraction = interface_get_alpha;
 
   interface_shader_boundary.convection_coef = interface_get_convection_coef;
   interface_shader_boundary.front = interface_shader_front;
@@ -490,9 +493,9 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       char* T = stardis->boundary[bound_id].T;
       char* flux = stardis->boundary[bound_id].flux;
       double emissivity =
-        stardis->material[stardis->geometry.triangle[i].medium_front].emissivity;
+        stardis->boundary[stardis->geometry.triangle[i].bound_id].emissivity;
       double alpha =
-        stardis->material[stardis->geometry.triangle[i].medium_front].specular_fraction;
+        stardis->boundary[stardis->geometry.triangle[i].bound_id].specular_fraction;
 
       SDIS(data_create(dev, sizeof(struct interface), ALIGNOF(struct interface), NULL, &data));
       interface_props = sdis_data_get(data);

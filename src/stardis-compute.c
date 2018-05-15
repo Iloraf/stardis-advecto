@@ -327,12 +327,8 @@ static void
 dump_image(const struct sdis_accum_buffer* buf)
 {
   struct sdis_accum_buffer_layout layout = SDIS_ACCUM_BUFFER_LAYOUT_NULL;
-  struct image img;
   double* temps = NULL;
   const struct sdis_accum* accums = NULL;
-  double Tmax = -DBL_MAX;
-  double Tmin =  DBL_MAX;
-  double norm;
   size_t ix, iy;
 
   CHK(buf != NULL);
@@ -343,42 +339,21 @@ dump_image(const struct sdis_accum_buffer* buf)
 
   /* Compute the per pixel temperature */
   CHK(sdis_accum_buffer_map(buf, &accums) == RES_OK);
+  fprintf(stdout,"# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET STRUCTURED_POINTS\n");
+  fprintf(stdout,"DIMENSIONS %i %i 1\n", (int)layout.width, (int)layout.height);
+  fprintf(stdout,"ORIGIN 0 0 0\n");
+  fprintf(stdout,"SPACING 1 1 1\n");
+  fprintf(stdout,"POINT_DATA %i\n", (int)layout.width*(int)layout.height);
+  fprintf(stdout,"SCALARS temperature float 1\n");
+  fprintf(stdout,"LOOKUP_TABLE default\n");
   FOR_EACH(iy, 0, layout.height) {
-    const struct sdis_accum* row_accums = accums + iy * layout.width;
+    const struct sdis_accum* row_accums = accums + (layout.height - 1 - iy) * layout.width;
     double* row = temps + iy * layout.width;
     FOR_EACH(ix, 0, layout.width) {
       row[ix] = row_accums[ix].sum_weights / (double)row_accums[ix].nweights;
-      Tmax = MMAX(row[ix], Tmax);
-      Tmin = MMIN(row[ix], Tmin);
+      fprintf(stdout,"%f\n",row[ix]);
     }
   }
-  if(Tmax != Tmin) {
-    norm = Tmax - Tmin;
-  } else {
-    Tmin = 0;
-    norm = 1;
-  }
-
-  /* Allocate the image memory space */
-  CHK(image_init(NULL, &img) == RES_OK);
-  CHK(image_setup(&img, layout.width, layout.height, layout.width*3/*pitch*/,
-    IMAGE_RGB8, NULL) == RES_OK);
-
-  FOR_EACH(iy, 0, layout.height) {
-    const double* src_row = temps + iy*layout.width;
-    char* dst_row = img.pixels + iy*img.pitch;
-    FOR_EACH(ix, 0, layout.width) {
-      unsigned char* pixels = (unsigned char*)
-        (dst_row + ix * sizeof_image_format(img.format));
-      const unsigned char T = (unsigned char)
-        ((src_row[ix] - Tmin)/ norm * 255.0);
-      pixels[0] = T;
-      pixels[1] = T;
-      pixels[2] = T;
-    }
-  }
-  CHK(image_write_ppm_stream(&img, 0/*binary?*/, stdout) == RES_OK);
-  image_release(&img);
   mem_rm(temps);
 }
 
@@ -649,4 +624,3 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
   return res;
 }
-

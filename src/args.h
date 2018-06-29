@@ -7,6 +7,7 @@
 #include <getopt.h>
 #include <rsys/rsys.h>
 #include <rsys/cstr.h>
+#include <sdis_version.h>
 
 enum stardis_mode{
   PROBE_COMPUTE,
@@ -31,6 +32,8 @@ static const struct args ARGS_DEFAULT = ARGS_DEFAULT__;
 static void
 print_help(char* prog)
 {
+  printf("stardis-app built-on stardis library version %i.%i.%i\n",
+      Stardis_VERSION_MAJOR,Stardis_VERSION_MINOR,Stardis_VERSION_PATCH);
   printf("usage : \n%s -m MEDIUM.txt -b BOUNDARY.txt [-p X,Y,Z,TIME]\n", prog);  
   printf("[-s SCALE_FACTOR] [-d] [-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n");  
   printf("[-r AMBIENT_RAD_TEMP:REFERENCE_TEMP]\n");  
@@ -47,7 +50,7 @@ print_help(char* prog)
   printf("-------------------\n");
   printf("\n -p X:Y:Z:TIME :\n");
   printf("    this is the position and the time of the probe.\n");
-  printf("    default value: 0.0:0.0:0.0:INF.\n");
+  printf("    default value: 0.0,0.0,0.0,INF.\n");
   printf("    The probe must be in a medium. If some boundary conditions are\n");
   printf("    time-dependant, TIME can not be INF.\n");
   printf("\n -s SCALE_FACTOR :\n");

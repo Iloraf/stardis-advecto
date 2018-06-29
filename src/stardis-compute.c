@@ -2,6 +2,7 @@
 
 #include "stardis-app.h"
 #include <sdis.h>
+#include <sdis_version.h>
 #include <rsys/double3.h>
 
 #include <rsys/image.h>
@@ -132,6 +133,7 @@ solid_get_delta
   return solid_props->delta;
 }
 
+#if Stardis_VERSION_MINOR == 3
 static double
 solid_get_delta_boundary
   (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
@@ -140,8 +142,9 @@ solid_get_delta_boundary
   return solid_props->delta
     /* Emperical scale factor that ensures that delta_boundary > delta withouht
      * being an exact multiple of delta. */
-    * 2.1 ;
+    /** 2.1 */;
 }
+#endif
 
 static double
 solid_get_temperature
@@ -311,7 +314,7 @@ select_probe_type
     d3_sub(dp, pos, projected_pos);
 
     delta = mat[triangle[i].medium_front].delta; 
-    if (d3_len(dp) < delta*2.1){
+    if (d3_len(dp) < delta){
       *iprim = i;
       fprintf(stderr,"The probe is very close to the primitive %lu.\n",*iprim );
       fprintf(stderr,"So the probe is moved to this primitive at the position: %g %g %g\n",
@@ -425,8 +428,10 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   solid_shader.calorific_capacity = solid_get_calorific_capacity;
   solid_shader.thermal_conductivity = solid_get_thermal_conductivity;
   solid_shader.volumic_mass = solid_get_volumic_mass;
-  solid_shader.delta_solid = solid_get_delta;
+  solid_shader.delta_solid = solid_get_delta;  
+#if Stardis_VERSION_MINOR == 3
   solid_shader.delta_boundary = solid_get_delta_boundary;
+#endif
   solid_shader.temperature = solid_get_temperature;
   solid_shader.volumic_power = solid_get_power;
 

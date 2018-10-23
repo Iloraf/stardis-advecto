@@ -397,7 +397,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
   int* bound2fluid = NULL;
   double pos[3] = {0,0,0};
-  double time = 0;
+  double time[2] = { 0, 0};
   size_t nfailures;
   int i = 0;
 
@@ -555,7 +555,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     pos[0] = stardis->probe[0];
     pos[1] = stardis->probe[1];
     pos[2] = stardis->probe[2];
-    time   = stardis->probe[3];
+    time[0] = time[1]  = stardis->probe[3];
     {
       double uv[2] = {0,0};
       size_t iprim = -1;
@@ -570,7 +570,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       if(iprim == -1){
         SDIS(solve_probe(scn,
               stardis->N, 
-              pos,time, 
+              pos,
+              time, 
               stardis->scale_factor,
               stardis->radiative_temp[0], 
               stardis->radiative_temp[1], 
@@ -595,7 +596,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
     /* Print the results */
     printf("Temperature at [%g, %g, %g, %g] = %g +/- %g\n",
-        pos[0], pos[1], pos[2], time,
+        pos[0], pos[1], pos[2], time[0],
         temperature.E, /* Expected value */
         temperature.SE); /* Standard error */
     printf("#failures: %lu/%lu\n", 

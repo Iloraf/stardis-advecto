@@ -3,7 +3,6 @@
 #ifndef ARGS_H
 #define ARGS_H
 
-#include <unistd.h>
 #include <getopt.h>
 #include <rsys/rsys.h>
 #include <rsys/cstr.h>

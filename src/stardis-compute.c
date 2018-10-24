@@ -198,7 +198,7 @@ solid_get_power
 /*******************************************************************************
  * Interface data
  ******************************************************************************/
-struct interface {
+struct intface {
   double hc; /* Convection coefficient */
   char* temperature;
   char* flux;
@@ -210,7 +210,7 @@ static double
 interface_get_convection_coef
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
-  const struct interface* interface_props = sdis_data_cget(data);
+  const struct intface* interface_props = sdis_data_cget(data);
   return interface_props->hc;
 }
 
@@ -218,7 +218,7 @@ static double
 interface_get_temperature
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
-  const struct interface* interface_props = sdis_data_cget(data);
+  const struct intface* interface_props = sdis_data_cget(data);
 
   if (interface_props->temperature == NULL) {
     return -1;
@@ -247,7 +247,7 @@ static double
 interface_get_flux
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
-  const struct interface* interface_props = sdis_data_cget(data);
+  const struct intface* interface_props = sdis_data_cget(data);
 
   if (interface_props->flux == NULL) {
     return SDIS_FLUX_NONE;
@@ -276,7 +276,7 @@ static double
 interface_get_emissivity
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
-  const struct interface* interface_props = sdis_data_cget(data);
+  const struct intface* interface_props = sdis_data_cget(data);
   return interface_props->emissivity;
 }
 
@@ -285,7 +285,7 @@ static double
 interface_get_alpha
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
-  const struct interface* interface_props = sdis_data_cget(data);
+  const struct intface* interface_props = sdis_data_cget(data);
   return interface_props->alpha;
 }
 
@@ -386,7 +386,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     SDIS_INTERFACE_SHADER_NULL;
   struct sdis_interface_shader interface_shader_connection = 
     SDIS_INTERFACE_SHADER_NULL;
-  struct interface* interface_props = NULL;
+  struct intface* interface_props = NULL;
   struct sdis_interface** interfaces = NULL;
 
   struct sdis_scene* scn = NULL; 
@@ -477,7 +477,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       double alpha =
         stardis->boundary[stardis->geometry.triangle[i].bound_id].specular_fraction;
 
-      SDIS(data_create(dev, sizeof(struct interface), ALIGNOF(struct interface), NULL, &data));
+      SDIS(data_create(dev, sizeof(struct intface), ALIGNOF(struct intface), NULL, &data));
       interface_props = sdis_data_get(data);
       if (hc > -1) {
         interface_props->hc = hc;

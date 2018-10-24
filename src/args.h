@@ -19,14 +19,20 @@ struct args{
   char* bc_filename;
   size_t N;
   unsigned nthreads;
-  double probe[4];
+  union {
+    struct { double p[3]; uint64_t t; };
+    double probe[4];
+  };
   enum stardis_mode mode;
   double scale_factor;
   double radiative_temp[2];
   char* camera;
 };
-#define ARGS_DEFAULT__ {NULL, NULL, 10000, SDIS_NTHREADS_DEFAULT, {0,0,0,INF}, PROBE_COMPUTE, 1.0, {300,300}, NULL}
-static const struct args ARGS_DEFAULT = ARGS_DEFAULT__; 
+#define ARGS_DEFAULT__ {\
+  NULL, NULL, 10000, SDIS_NTHREADS_DEFAULT,\
+  { .p={0.0, 0.0, 0.0}, .t=0x7FF0000000000000 /* probe[3]=INF */},\
+  PROBE_COMPUTE, 1.0, {300.0, 300.0}, NULL}
+static const struct args ARGS_DEFAULT = ARGS_DEFAULT__;
 
 static void
 print_help(char* prog)

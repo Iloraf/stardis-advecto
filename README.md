@@ -11,11 +11,19 @@ les notes de version en ci-dessous pour avoir la bonne version du SDK.
 
 # Note de versions
 
+## v0.4
+
+- Conformité C99.
+- Build Windows.
+- Passage à stardis-solver 0.5 ; l'intégration temporelle n'est toutefois pas
+  encore accessible.
+- Passage à cmake
+
 ## v0.3.2
 
 - Ajout de la fonctionnalité solve_probe_boundary. La fonction solve est
   automatiquement selectionnée en fonction de la distance à la primitive la plus
-  proche. Si la distance est inferieur à 2.1 delta, la foncion
+  proche. Si la distance est inférieure à 2.1 delta, la fonction
   solve_probe_boundary sera utilisée.
 - Ajout des conditions limites en flux.
 

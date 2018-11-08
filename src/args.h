@@ -4,6 +4,8 @@
 #define ARGS_H
 
 #include <getopt.h>
+#include <stdlib.h>
+
 #include <rsys/rsys.h>
 #include <rsys/cstr.h>
 #include <sdis_version.h>
@@ -19,10 +21,10 @@ struct args{
   char* bc_filename;
   size_t N;
   unsigned nthreads;
-  union {
-    struct { double p[3]; uint64_t t; };
+  union u {
+    struct pt { double p[3]; uint64_t t; } pt;
     double probe[4];
-  };
+  } u;
   enum stardis_mode mode;
   double scale_factor;
   double radiative_temp[2];
@@ -30,7 +32,7 @@ struct args{
 };
 #define ARGS_DEFAULT__ {\
   NULL, NULL, 10000, SDIS_NTHREADS_DEFAULT,\
-  { .p={0.0, 0.0, 0.0}, .t=0x7FF0000000000000 /* probe[3]=INF */},\
+  { { {0.0, 0.0, 0.0}, 0x7FF0000000000000 /* probe[3]=INF */}},\
   PROBE_COMPUTE, 1.0, {300.0, 300.0}, NULL}
 static const struct args ARGS_DEFAULT = ARGS_DEFAULT__;
 
@@ -105,13 +107,15 @@ parse_args(const int argc, char** argv, struct args* args)
         goto error;
         break;
 
-      case 'n':
-        res = cstr_to_ulong(optarg, &args->N);
-        if (res != RES_OK || args->N <= 0){
+      case 'n': {
+        args->N = strtoull(optarg, NULL, 10);
+        if (args->N <= 0) {
+          res = RES_BAD_ARG;
           fprintf(stderr, "Invalid argument -n %s\n", optarg);
           goto error;
         }
         break;
+      }
 
       case 'b':
         args->bc_filename = optarg;
@@ -123,16 +127,19 @@ parse_args(const int argc, char** argv, struct args* args)
 
       case 't':
         res = cstr_to_uint(optarg, &args->nthreads);
-        if (res != RES_OK || args->nthreads <= 0){
+        if (res != RES_OK
+            || args->nthreads <= 0){
+          res = RES_BAD_ARG;
           fprintf(stderr, "Invalid argument -t %s\n", optarg);
           goto error;
         }
         break;
 
       case 'p':
-        cstr_to_list_double(optarg, ',', args->probe, &len, 4);
-        if(res == RES_OK && len != 4) res = RES_BAD_ARG;
-        if (res != RES_OK){
+        cstr_to_list_double(optarg, ',', args->u.probe, &len, 4);
+        if(len != 4 
+           || res != RES_OK){
+          res = RES_BAD_ARG;
           fprintf(stderr, "Invalid argument -p %s\n", optarg);
           goto error;
         }
@@ -144,7 +151,9 @@ parse_args(const int argc, char** argv, struct args* args)
 
       case 's':
         cstr_to_double(optarg, &args->scale_factor);
-        if (res != RES_OK || args->scale_factor <=0){
+        if (res != RES_OK
+            || args->scale_factor <=0){
+          res = RES_BAD_ARG;
           fprintf(stderr, "Invalid argument -s %s\n", optarg);
           goto error;
         }
@@ -152,10 +161,11 @@ parse_args(const int argc, char** argv, struct args* args)
 
       case 'r':
         cstr_to_list_double(optarg, ',', args->radiative_temp, &len, 2);
-        if(res == RES_OK && len != 2) res = RES_BAD_ARG;
         if (res != RES_OK 
+            || len != 2
             || args->radiative_temp[0] <=0
             || args->radiative_temp[1] <=0){
+          res = RES_BAD_ARG;
           fprintf(stderr, "Invalid argument -r %s\n", optarg);
           goto error;
         }

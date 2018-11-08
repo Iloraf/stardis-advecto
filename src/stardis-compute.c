@@ -55,6 +55,7 @@ fluid_get_calorific_capacity
   (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct fluid* fluid_props = sdis_data_cget(data);
+  (void)vtx;
   return fluid_props->cp;
 }
 
@@ -63,6 +64,7 @@ fluid_get_volumic_mass
   (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct fluid* fluid_props = sdis_data_cget(data);
+  (void)vtx;
   return fluid_props->rho;
 }
 
@@ -73,7 +75,7 @@ fluid_get_temperature
   const struct fluid* fluid_props = sdis_data_cget(data);
   double temperature = 0;
   char* math_expr = fluid_props->temperature;
-  double x, y, z, t;  
+  static double x, y, z, t;  
   /* Store variable names and pointers. */
   te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
   int err;
@@ -106,6 +108,7 @@ solid_get_calorific_capacity
   (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct solid* solid_props = sdis_data_cget(data);
+  (void)vtx;
   return solid_props->cp;
 }
 
@@ -114,6 +117,7 @@ solid_get_thermal_conductivity
   (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct solid* solid_props = sdis_data_cget(data);
+  (void)vtx;
   return solid_props->lambda;
 }
 
@@ -122,6 +126,7 @@ solid_get_volumic_mass
   (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct solid* solid_props = sdis_data_cget(data);
+  (void)vtx;
   return solid_props->rho;
 }
 
@@ -130,6 +135,7 @@ solid_get_delta
   (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct solid* solid_props = sdis_data_cget(data);
+  (void)vtx;
   return solid_props->delta;
 }
 
@@ -156,7 +162,7 @@ solid_get_temperature
     return -1;
   }else{
     char* math_expr = solid_props->temperature;
-    double x, y, z;  
+    static double x, y, z;  
     /* Store variable names and pointers. */
     te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}};
     int err;
@@ -179,7 +185,7 @@ solid_get_power
   double power = 0;
   const struct solid* solid_props = sdis_data_cget(data);
   char* math_expr = solid_props->temperature;
-  double x, y, z, t;  
+  static double x, y, z, t;  
   /* Store variable names and pointers. */
   te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
   int err;
@@ -211,6 +217,7 @@ interface_get_convection_coef
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
+  (void)frag;
   return interface_props->hc;
 }
 
@@ -226,7 +233,7 @@ interface_get_temperature
 
     double temperature = 0;
     char* math_expr = interface_props->temperature;
-    double x, y, z, t;  
+    static double x, y, z, t;  
     /* Store variable names and pointers. */
     te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
     int err;
@@ -255,7 +262,7 @@ interface_get_flux
 
     double flux = 0;
     char* math_expr = interface_props->flux;
-    double x, y, z, t;  
+    static double x, y, z, t;  
     /* Store variable names and pointers. */
     te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
     int err;
@@ -277,6 +284,7 @@ interface_get_emissivity
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
+  (void)frag;
   return interface_props->emissivity;
 }
 
@@ -286,6 +294,7 @@ interface_get_alpha
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
+  (void)frag;
   return interface_props->alpha;
 }
 
@@ -316,7 +325,8 @@ select_probe_type
     delta = mat[triangle[i].medium_front].delta; 
     if (d3_len(dp) < delta){
       *iprim = i;
-      fprintf(stderr,"The probe is very close to the primitive %lu.\n",*iprim );
+      fprintf(stderr,"The probe is very close to the primitive %llu.\n",
+        (long long int)*iprim );
       fprintf(stderr,"So the probe is moved to this primitive at the position: %g %g %g\n",
           SPLIT3(projected_pos));
       d3_set(pos, projected_pos);
@@ -399,7 +409,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   double pos[3] = {0,0,0};
   double time[2] = { 0, 0};
   size_t nfailures;
-  int i = 0;
+  unsigned i = 0;
 
   SDIS(device_create(NULL, NULL, stardis->nthreads, 1, &dev));
 
@@ -418,7 +428,9 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     SDIS(fluid_create(dev, &fluid_shader, data, sa_add(fluid_medium, 1)));
     SDIS(data_ref_put(data));
     if (stardis->boundary[i].hc > -1) {
-      sa_push(bound2fluid, sa_size(fluid_medium)-1);
+      size_t sz = sa_size(fluid_medium) - 1;
+      ASSERT(sz < INT_MAX);
+      sa_push(bound2fluid, (int)sz);
     } else {
       sa_push(bound2fluid, 0);
     }
@@ -558,7 +570,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     time[0] = time[1]  = stardis->probe[3];
     {
       double uv[2] = {0,0};
-      size_t iprim = -1;
+      size_t iprim = SIZE_MAX;
 
       res = select_probe_type(scn,
           stardis->geometry.triangle,
@@ -567,7 +579,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
           &iprim,
           uv);
 
-      if(iprim == -1){
+      if(iprim == SIZE_MAX){
         SDIS(solve_probe(scn,
               stardis->N, 
               pos,

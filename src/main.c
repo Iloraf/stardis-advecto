@@ -11,7 +11,7 @@ int main(int argc, char** argv){
   res_T res = RES_OK;
 
   /* Check proper init for ARGS_DEFAULT */
-  ASSERT(ARGS_DEFAULT.probe[3] == INF);
+  ASSERT(ARGS_DEFAULT.u.probe[3] == INF);
 
   res = parse_args(argc, argv, &args);
   if (res != RES_OK) goto error;

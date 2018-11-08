@@ -70,7 +70,11 @@ char** split_line(char* a_str, const char a_delim)
     while (token)
     {
       assert(idx < count);
+#ifdef COMPILER_CL
+      *(result + idx++) = _strdup(token);
+#else
       *(result + idx++) = strdup(token);
+#endif
       token = strtok(0, delim);
     }
     assert(idx == count - 1);
@@ -194,10 +198,10 @@ error:
 }
 static res_T
 read_vertices
-(struct sstl_desc* desc,
- struct htable_vertex* vertex2id,
- unsigned** id2id,
- struct vertex** vert_list)
+  (struct sstl_desc* desc,
+  struct htable_vertex* vertex2id,
+  unsigned** id2id,
+  struct vertex** vert_list)
 {
   res_T res = RES_OK;
   int vtx_index = 0;
@@ -215,7 +219,10 @@ read_vertices
     if (found_id){
       sa_push(*id2id, *found_id);
     } else {
-      unsigned size = htable_vertex_size_get(vertex2id);
+      size_t sz = htable_vertex_size_get(vertex2id);
+      unsigned size;
+      ASSERT(sz < UINT_MAX);
+      size = (unsigned)sz;
       htable_vertex_set(vertex2id, &vtx, &size);
       sa_push(*vert_list, vtx);
       sa_push(*id2id, size);
@@ -227,15 +234,16 @@ read_vertices
 
 static res_T
 read_triangles
-(int FLAG,
- struct sstl_desc* desc,
- struct htable_triangle* triangle2id,
- unsigned* id2id, char** cl_type,
- const unsigned* id,
- struct triangle** tri_list)
+  (int FLAG,
+  struct sstl_desc* desc,
+  struct htable_triangle* triangle2id,
+  unsigned* id2id, char** cl_type,
+  const unsigned* id,
+  struct triangle** tri_list)
 {
   res_T res = RES_OK;
   int tri_index = 0;
+  (void)cl_type;
   for (tri_index = 0; tri_index < desc->triangles_count; ++tri_index){
     struct triangle tri = NULL_TRIANGLE;
     unsigned *found_id = NULL;
@@ -253,8 +261,12 @@ read_triangles
       if (FLAG==MEDIUM) (*tri_list)[*found_id].medium_back = *id;
       if (FLAG==BOUNDARY) (*tri_list)[*found_id].bound_id = *id;
     } else {
-      unsigned size = htable_triangle_size_get(triangle2id);
+      size_t sz;
+      unsigned size;
       if (FLAG==MEDIUM) tri.medium_front = *id;
+      sz = htable_triangle_size_get(triangle2id);
+      ASSERT(sz < UINT_MAX);
+      size = (unsigned)sz;
       htable_triangle_set(triangle2id, &tri, &size);
       /*printf("triangle  %i %i %i\n  added at index %i\n", SPLIT3(tri.indices), size);*/
       sa_push(*tri_list, tri);
@@ -464,10 +476,10 @@ stardis_init
 
   stardis->N = args->N;
   stardis->nthreads = args->nthreads;
-  stardis->probe[0] = args->probe[0];
-  stardis->probe[1] = args->probe[1];
-  stardis->probe[2] = args->probe[2];
-  stardis->probe[3] = args->probe[3];
+  stardis->probe[0] = args->u.probe[0];
+  stardis->probe[1] = args->u.probe[1];
+  stardis->probe[2] = args->u.probe[2];
+  stardis->probe[3] = args->u.probe[3];
   stardis->scale_factor = args->scale_factor;
   stardis->radiative_temp[0] = args->radiative_temp[0];
   stardis->radiative_temp[1] = args->radiative_temp[1];

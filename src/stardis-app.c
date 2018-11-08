@@ -69,7 +69,7 @@ static char** split_line(char* a_str, const char a_delim)
 
     while (token)
     {
-      assert(idx < count);
+      ASSERT(idx < count);
 #ifdef COMPILER_CL
       *(result + idx++) = _strdup(token);
 #else
@@ -77,7 +77,7 @@ static char** split_line(char* a_str, const char a_delim)
 #endif
       token = strtok(0, delim);
     }
-    assert(idx == count - 1);
+    ASSERT(idx == count - 1);
     *(result + idx) = 0;
   }
 

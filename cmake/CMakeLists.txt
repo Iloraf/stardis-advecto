@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-cmake_minimum_required(VERSION 3.8.2)
+cmake_minimum_required(VERSION 3.0)
 project(stardis-app C)
 
 set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
@@ -74,11 +74,17 @@ endif()
 
 ADD_LIBRARY(tinyexpr STATIC
   ${TINYEXPR_SOURCE_DIR}/tinyexpr.c ${TINYEXPR_SOURCE_DIR}/tinyexpr.h)
+if(CMAKE_COMPILER_IS_GNUCC)
+  set_target_properties(tinyexpr PROPERTIES COMPILE_FLAGS "-std=c99")
+endif()
 
 add_executable(sdis-app
   ${SDIS_FILES_SRC}
   ${SDIS_FILES_INC})
-target_compile_features(sdis-app PUBLIC c_std_11)
+  
+if(CMAKE_COMPILER_IS_GNUCC)
+  set_target_properties(sdis-app PROPERTIES COMPILE_FLAGS "-std=c99")
+endif()
 target_link_libraries(sdis-app Stardis StarSTL RSys tinyexpr ${MATH_LIB})
 if(MSVC)
   target_link_libraries(sdis-app MuslGetopt)
@@ -96,4 +102,3 @@ install(TARGETS sdis-app
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 install(FILES ${SDIS_FILES_DOC} DESTINATION share/doc/stardis-app)
-

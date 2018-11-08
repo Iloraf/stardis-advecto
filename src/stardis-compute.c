@@ -77,7 +77,8 @@ fluid_get_temperature
   char* math_expr = fluid_props->temperature;
   static double x, y, z, t;  
   /* Store variable names and pointers. */
-  te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
+  te_variable vars[] = {{"x", {&x}, TE_VARIABLE,  NULL}, {"y", {&y}, TE_VARIABLE,  NULL},
+    {"z", {&z}, TE_VARIABLE,  NULL}, {"t", {&t}, TE_VARIABLE,  NULL}};
   int err;
     
   /* Compile the expression with variables. */
@@ -164,7 +165,8 @@ solid_get_temperature
     char* math_expr = solid_props->temperature;
     static double x, y, z;  
     /* Store variable names and pointers. */
-    te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}};
+    te_variable vars[] = {{"x", {&x}, TE_VARIABLE,  NULL}, {"y", {&y}, TE_VARIABLE,  NULL},
+                          {"z", {&z}, TE_VARIABLE,  NULL}};
     int err;
     
     /* Compile the expression with variables. */
@@ -187,7 +189,8 @@ solid_get_power
   char* math_expr = solid_props->temperature;
   static double x, y, z, t;  
   /* Store variable names and pointers. */
-  te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
+  te_variable vars[] = {{"x", {&x}, TE_VARIABLE,  NULL}, {"y", {&y}, TE_VARIABLE,  NULL},
+                        {"z", {&z}, TE_VARIABLE,  NULL}, {"t", {&t}, TE_VARIABLE,  NULL}};
   int err;
     
   /* Compile the expression with variables. */
@@ -235,7 +238,8 @@ interface_get_temperature
     char* math_expr = interface_props->temperature;
     static double x, y, z, t;  
     /* Store variable names and pointers. */
-    te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
+    te_variable vars[] = {{"x", {&x}, TE_VARIABLE,  NULL}, {"y", {&y}, TE_VARIABLE,  NULL},
+                          {"z", {&z}, TE_VARIABLE,  NULL}, {"t", {&t}, TE_VARIABLE,  NULL}};
     int err;
 
     /* Compile the expression with variables. */
@@ -264,7 +268,8 @@ interface_get_flux
     char* math_expr = interface_props->flux;
     static double x, y, z, t;  
     /* Store variable names and pointers. */
-    te_variable vars[] = {{"x", &x}, {"y", &y}, {"z", &z}, {"t", &t}};
+    te_variable vars[] = {{"x", {&x}, TE_VARIABLE,  NULL}, {"y", {&y}, TE_VARIABLE,  NULL},
+                          {"z", {&z}, TE_VARIABLE,  NULL}, {"t", {&t}, TE_VARIABLE,  NULL}};
     int err;
 
     /* Compile the expression with variables. */
@@ -478,9 +483,9 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   interface_shader_boundary.back = interface_shader_back;
 
   for (i=0; i<sa_size(stardis->geometry.triangle); ++i){
-    int bound_id = stardis->geometry.triangle[i].bound_id;
+    unsigned bound_id = stardis->geometry.triangle[i].bound_id;
 
-    if (bound_id > -1){  /* boundary interface */
+    if (bound_id != UINT_MAX){  /* boundary interface */
       double hc = stardis->boundary[bound_id].hc;
       char* T = stardis->boundary[bound_id].T;
       char* flux = stardis->boundary[bound_id].flux;

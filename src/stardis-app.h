@@ -42,11 +42,11 @@ eq_vertex(const struct vertex* a, const struct vertex* b)
 struct triangle{
   unsigned indices[3];
   unsigned sids[3];
-  int medium_front;
-  int medium_back;
-  int bound_id;
+  unsigned medium_front;
+  unsigned medium_back;
+  unsigned bound_id;
 };
-#define NULL_TRIANGLE__ {{0, 0, 0}, {0, 0, 0}, -1, -1, -1}
+#define NULL_TRIANGLE__ {{0, 0, 0}, {0, 0, 0},  UINT_MAX,  UINT_MAX, UINT_MAX}
 static const struct triangle NULL_TRIANGLE = NULL_TRIANGLE__;
 
 static char
@@ -153,6 +153,6 @@ extern res_T
 stardis_release(struct stardis* stardis);
 
 extern res_T
-dump_vtk(FILE* output, const struct geometry* geometry, int nbound);
+dump_vtk(FILE* output, const struct geometry* geometry, unsigned nbound);
 
 #endif /*STARDIS-APP_H*/

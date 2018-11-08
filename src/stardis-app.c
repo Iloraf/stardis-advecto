@@ -32,7 +32,7 @@ read_line(char** pb, FILE* stream)
   return b;
 }
 
-char** split_line(char* a_str, const char a_delim)
+static char** split_line(char* a_str, const char a_delim)
 {
   char** result    = 0;
   size_t count     = 0;
@@ -204,7 +204,7 @@ read_vertices
   struct vertex** vert_list)
 {
   res_T res = RES_OK;
-  int vtx_index = 0;
+  unsigned vtx_index = 0;
 
   for (vtx_index = 0; vtx_index < desc->vertices_count; ++vtx_index){
     struct vertex vtx = NULL_VERTEX;
@@ -242,7 +242,7 @@ read_triangles
   struct triangle** tri_list)
 {
   res_T res = RES_OK;
-  int tri_index = 0;
+  unsigned tri_index = 0;
   (void)cl_type;
   for (tri_index = 0; tri_index < desc->triangles_count; ++tri_index){
     struct triangle tri = NULL_TRIANGLE;
@@ -392,7 +392,7 @@ check_consistency
 (struct boundary* boundary, double* probe)
 {
   res_T res = RES_OK;
-  int i = 0;
+  size_t i = 0;
 
   for (i=0; i<sa_size(boundary); ++i){
     if ( boundary[i].T && strchr(boundary[i].T,'t') && probe[3] == INF) {
@@ -504,7 +504,7 @@ error:
 res_T
 stardis_release(struct stardis* stardis)
 {
-  int i = 0;
+  size_t i = 0;
   res_T res = RES_OK;
 
   for (i=0; i<sa_size(stardis->material); ++i){
@@ -533,10 +533,10 @@ res_T
 dump_vtk
 (FILE* output,
  const struct geometry* geometry, 
- int nbound)
+ unsigned nbound)
 {
   res_T res = RES_OK;
-  int i,j = 0;
+  unsigned i,j = 0;
   struct vertex* vtx = geometry->vertex;
   struct triangle* tri = geometry->triangle;
   

@@ -96,26 +96,30 @@ parse_medium_line(char* line, char** stl_filename, struct material* mat)
   strcpy(*stl_filename,tk);
   tk = strtok(NULL," ");
   res = cstr_to_double(tk, &mat->lambda);
-  if (res != RES_OK || mat->lambda <= 0.0) {
-    fprintf(stderr,"invalid lambda\n");
+  if (res != RES_OK || mat->lambda <= 0) {
+    fprintf(stderr, "Invalid lambda: %s\n", tk);
+    res = RES_BAD_ARG;
     goto error;
   }
   tk = strtok(NULL," ");
   res = cstr_to_double(tk, &mat->rho);
-  if (res != RES_OK || mat->rho <= 0.0) {
-    fprintf(stderr,"invalid rho\n");
+  if (res != RES_OK || mat->rho <= 0) {
+    fprintf(stderr, "Invalid rho: %s\n", tk);
+    res = RES_BAD_ARG;
     goto error;
   }
   tk = strtok(NULL," ");
   res = cstr_to_double(tk, &mat->cp);
-  if (res != RES_OK || mat->cp <= 0.0){
-    fprintf(stderr,"invalid cp\n");
+  if (res != RES_OK || mat->cp <= 0){
+    fprintf(stderr, "Invalid cp: %s\n", tk);
+    res = RES_BAD_ARG;
     goto error;
   }
   tk = strtok(NULL," ");
   res = cstr_to_double(tk, &mat->delta);
-  if (res != RES_OK || mat->delta <= 0.0){
-    fprintf(stderr,"invalid delta\n");
+  if (res != RES_OK || mat->delta <= 0){
+    fprintf(stderr, "Invalid delta: %s\n", tk);
+    res = RES_BAD_ARG;
     goto error;
   }
   tk = strtok(NULL,"\"");
@@ -146,15 +150,17 @@ parse_boundary_line(char* line, char** stl_filename, struct boundary* bound)
 
   tk = strtok(NULL," ");
   res = cstr_to_double(tk, &bound->emissivity);
-  if (res != RES_OK || bound->emissivity < 0.0 || bound->emissivity > 1.0){
-    fprintf(stderr,"invalid emissivity\n");
+  if (res != RES_OK || bound->emissivity < 0 || bound->emissivity > 1){
+    fprintf(stderr, "Invalid emissivity: %s\n", tk);
+    res = RES_BAD_ARG;
     goto error;
   }
   tk = strtok(NULL," ");
   res = cstr_to_double(tk, &bound->specular_fraction);
   if (res != RES_OK ||
       bound->specular_fraction < 0.0 || bound->specular_fraction > 1.0){
-    fprintf(stderr,"invalid specular_fraction\n");
+    fprintf(stderr, "Invalid specular_fraction: %s\n", tk);
+    res = RES_BAD_ARG;
     goto error;
   }
 
@@ -162,8 +168,9 @@ parse_boundary_line(char* line, char** stl_filename, struct boundary* bound)
   if (strcmp(tk,"h")==0 || strcmp(tk,"H")==0  ){
     tk = strtok(NULL," ");
     res = cstr_to_double(tk, &bound->hc);
-    if (res != RES_OK ) {
-      fprintf(stderr,"invalid value parameter: %g \n", bound->hc);
+    if (res != RES_OK || bound->hc < 0) {
+      fprintf(stderr, "Invalid value parameter: %s\n", tk);
+      res = RES_BAD_ARG;
       goto error;
     }
 
@@ -341,11 +348,13 @@ geometry_analyse
     struct material mat = NULL_MATERIAL;
 
     res = parse_medium_line(line, &stl_filename, &mat);
+    if (res != RES_OK) goto error;
     sa_push(*material,mat);
 
     /*analyse medium stl*/
     res = read_stl(MEDIUM, geometry->medium_count, &stl_filename,
         &vertex2id, &triangle2id, geometry);
+    if (res != RES_OK) goto error;
 
     geometry->medium_count += 1;
     if (stl_filename) free(stl_filename);
@@ -366,11 +375,13 @@ geometry_analyse
     struct boundary bound = NULL_BOUNDARY;
 
     res = parse_boundary_line(line, &stl_filename, &bound);
+    if (res != RES_OK) goto error;
     sa_push(*boundary,bound);
 
     /*analyse medium stl*/
     res = read_stl(BOUNDARY, geometry->boundary_count, &stl_filename,
         &vertex2id, &triangle2id, geometry);
+    if (res != RES_OK) goto error;
 
     geometry->boundary_count += 1;
     if (stl_filename) free(stl_filename);

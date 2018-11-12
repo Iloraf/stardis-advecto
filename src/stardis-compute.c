@@ -47,7 +47,8 @@ geometry_get_interface
 struct fluid {
   double cp; /* Calorific capacity */
   double rho; /* Volumic mass */
-  char* temperature; 
+  /* TinyExpr stuff to compute temperature */
+  struct te_expr *temperature;
 };
 
 static double
@@ -68,28 +69,34 @@ fluid_get_volumic_mass
   return fluid_props->rho;
 }
 
+res_T
+set_fluid_temperature_fn(struct fluid* fluid, const char* math_expr)
+{
+  te_variable vars[4] = {
+    TE_OFFSET("x", offsetof(struct sdis_rwalk_vertex, P[0])),
+    TE_OFFSET("y", offsetof(struct sdis_rwalk_vertex, P[1])),
+    TE_OFFSET("z", offsetof(struct sdis_rwalk_vertex, P[2])),
+    TE_OFFSET("t", offsetof(struct sdis_rwalk_vertex, time))
+  };
+
+  ASSERT(math_expr);
+  fluid->temperature = te_compile(math_expr, vars, 4, NULL);
+  if(!fluid->temperature) return RES_BAD_ARG;
+  return RES_OK;
+}
+
 static double
 fluid_get_temperature
-  (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
+(const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct fluid* fluid_props = sdis_data_cget(data);
-  double temperature = 0;
-  char* math_expr = fluid_props->temperature;
-  static double x, y, z, t;  
-  /* Store variable names and pointers. */
-  te_variable vars[] = {{"x", {&x}, TE_VARIABLE,  NULL}, {"y", {&y}, TE_VARIABLE,  NULL},
-    {"z", {&z}, TE_VARIABLE,  NULL}, {"t", {&t}, TE_VARIABLE,  NULL}};
-  int err;
-    
-  /* Compile the expression with variables. */
-  te_expr *expr = te_compile(math_expr, vars, 4, &err);
-  x = vtx->P[0];
-  y = vtx->P[1];
-  z = vtx->P[2];
-  t = vtx->time;
-  temperature = te_eval(expr);
-  te_free(expr);
-  return temperature;
+  return te_eval(fluid_props->temperature, vtx);
+}
+
+void release_fluid_data(void* f)
+{
+  struct fluid* fluid = (struct fluid*)f;
+  te_free(fluid->temperature);
 }
 
 /*******************************************************************************
@@ -100,8 +107,9 @@ struct solid {
   double lambda; /* Conductivity */
   double rho; /* Volumic mass */
   double delta; /* Numerical parameter */
-  char* temperature;
-  char* power;
+  /* TinyExpr stuff to compute temperature & power */
+  struct te_expr *t_init;
+  struct te_expr *power;
 };
 
 static double
@@ -153,55 +161,64 @@ solid_get_delta_boundary
 }
 #endif
 
+res_T
+set_solid_temperature_fn(struct solid* solid, const char* math_expr)
+{
+  te_variable vars[4] = {
+    TE_OFFSET("x", offsetof(struct sdis_rwalk_vertex, P[0])),
+    TE_OFFSET("y", offsetof(struct sdis_rwalk_vertex, P[1])),
+    TE_OFFSET("z", offsetof(struct sdis_rwalk_vertex, P[2])),
+    TE_OFFSET("t", offsetof(struct sdis_rwalk_vertex, time))
+  };
+
+  ASSERT(math_expr);
+  solid->t_init = te_compile(math_expr, vars, 4, NULL);
+  if (!solid->t_init) return RES_BAD_ARG;
+  return RES_OK;
+}
+
 static double
 solid_get_temperature
-  (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
+(const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
-  double temperature = 0;
   const struct solid* solid_props = sdis_data_cget(data);
-  if (vtx->time > 0){
+  if (vtx->time > 0) {
     return -1;
-  }else{
-    char* math_expr = solid_props->temperature;
-    static double x, y, z;  
-    /* Store variable names and pointers. */
-    te_variable vars[] = {{"x", {&x}, TE_VARIABLE,  NULL}, {"y", {&y}, TE_VARIABLE,  NULL},
-                          {"z", {&z}, TE_VARIABLE,  NULL}};
-    int err;
-    
-    /* Compile the expression with variables. */
-    te_expr *expr = te_compile(math_expr, vars, 3, &err);
-    x = vtx->P[0];
-    y = vtx->P[1];
-    z = vtx->P[2];
-    temperature = te_eval(expr);
-    te_free(expr);
-    return temperature;
   }
+  return te_eval(solid_props->t_init, vtx);
+}
+
+res_T
+set_solid_power_fn(struct solid* solid, const char* math_expr, int* has)
+{
+  te_variable vars[4] = {
+    TE_OFFSET("x", offsetof(struct sdis_rwalk_vertex, P[0])),
+    TE_OFFSET("y", offsetof(struct sdis_rwalk_vertex, P[1])),
+    TE_OFFSET("z", offsetof(struct sdis_rwalk_vertex, P[2])),
+    TE_OFFSET("t", offsetof(struct sdis_rwalk_vertex, time))
+  };
+
+  ASSERT(math_expr);
+  solid->power = te_compile(math_expr, vars, 4, NULL);
+  if (!solid->power) return RES_BAD_ARG;
+  if(has) /* has power? */
+    *has = !(solid->power->type == TE_CONSTANT && solid->power->v.value == 0);
+  return RES_OK;
 }
 
 static double
 solid_get_power
   (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
-  double power = 0;
   const struct solid* solid_props = sdis_data_cget(data);
-  char* math_expr = solid_props->temperature;
-  static double x, y, z, t;  
-  /* Store variable names and pointers. */
-  te_variable vars[] = {{"x", {&x}, TE_VARIABLE,  NULL}, {"y", {&y}, TE_VARIABLE,  NULL},
-                        {"z", {&z}, TE_VARIABLE,  NULL}, {"t", {&t}, TE_VARIABLE,  NULL}};
-  int err;
-    
-  /* Compile the expression with variables. */
-  te_expr *expr = te_compile(math_expr, vars, 3, &err);
-  x = vtx->P[0];
-  y = vtx->P[1];
-  z = vtx->P[2];
-  t = vtx->time;
-  power = te_eval(expr);
-  te_free(expr);
-  return power;
+  return te_eval(solid_props->power, vtx);
+}
+
+void release_solid_data(void* s)
+{
+  struct solid* solid = (struct solid*)s;
+  te_free(solid->t_init);
+  te_free(solid->power);
 }
 
 /*******************************************************************************
@@ -209,10 +226,11 @@ solid_get_power
  ******************************************************************************/
 struct intface {
   double hc; /* Convection coefficient */
-  char* temperature;
-  char* flux;
   double emissivity;
   double alpha;
+  /* TinyExpr stuff to compute temperature & flux */
+  struct te_expr *temperature;
+  struct te_expr *flux;
 };
 
 static double
@@ -224,34 +242,48 @@ interface_get_convection_coef
   return interface_props->hc;
 }
 
+res_T
+set_interface_temperature_fn(struct intface* intface, const char* math_expr)
+{
+  te_variable vars[4] = {
+    TE_OFFSET("x", offsetof(struct sdis_interface_fragment, P[0])),
+    TE_OFFSET("y", offsetof(struct sdis_interface_fragment, P[1])),
+    TE_OFFSET("z", offsetof(struct sdis_interface_fragment, P[2])),
+    TE_OFFSET("t", offsetof(struct sdis_interface_fragment, time))
+  };
+
+  ASSERT(math_expr);
+  intface->temperature = te_compile(math_expr, vars, 4, NULL);
+  if (!intface->temperature) return RES_BAD_ARG;
+  return RES_OK;
+}
+
 static double
 interface_get_temperature
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
 
-  if (interface_props->temperature == NULL) {
+  if (interface_props->temperature == NULL)
     return -1;
-  } else {
+  
+  return te_eval(interface_props->temperature, frag);
+}
 
-    double temperature = 0;
-    char* math_expr = interface_props->temperature;
-    static double x, y, z, t;  
-    /* Store variable names and pointers. */
-    te_variable vars[] = {{"x", {&x}, TE_VARIABLE,  NULL}, {"y", {&y}, TE_VARIABLE,  NULL},
-                          {"z", {&z}, TE_VARIABLE,  NULL}, {"t", {&t}, TE_VARIABLE,  NULL}};
-    int err;
+res_T
+set_interface_flux_fn(struct intface* intface, const char* math_expr)
+{
+  te_variable vars[4] = {
+    TE_OFFSET("x", offsetof(struct sdis_interface_fragment, P[0])),
+    TE_OFFSET("y", offsetof(struct sdis_interface_fragment, P[1])),
+    TE_OFFSET("z", offsetof(struct sdis_interface_fragment, P[2])),
+    TE_OFFSET("t", offsetof(struct sdis_interface_fragment, time))
+  };
 
-    /* Compile the expression with variables. */
-    te_expr *expr = te_compile(math_expr, vars, 4, &err);
-    x = frag->P[0];
-    y = frag->P[1];
-    z = frag->P[2];
-    t = frag->time;
-    temperature = te_eval(expr);
-    te_free(expr);
-    return temperature;
-  }
+  ASSERT(math_expr);
+  intface->flux = te_compile(math_expr, vars, 4, NULL);
+  if (!intface->flux) return RES_BAD_ARG;
+  return RES_OK;
 }
 
 static double
@@ -260,28 +292,17 @@ interface_get_flux
 {
   const struct intface* interface_props = sdis_data_cget(data);
 
-  if (interface_props->flux == NULL) {
+  if (interface_props->flux == NULL)
     return SDIS_FLUX_NONE;
-  } else {
+  
+  return te_eval(interface_props->flux, frag);
+}
 
-    double flux = 0;
-    char* math_expr = interface_props->flux;
-    static double x, y, z, t;  
-    /* Store variable names and pointers. */
-    te_variable vars[] = {{"x", {&x}, TE_VARIABLE,  NULL}, {"y", {&y}, TE_VARIABLE,  NULL},
-                          {"z", {&z}, TE_VARIABLE,  NULL}, {"t", {&t}, TE_VARIABLE,  NULL}};
-    int err;
-
-    /* Compile the expression with variables. */
-    te_expr *expr = te_compile(math_expr, vars, 4, &err);
-    x = frag->P[0];
-    y = frag->P[1];
-    z = frag->P[2];
-    t = frag->time;
-    flux = te_eval(expr);
-    te_free(expr);
-    return flux;
-  }
+void release_interface_data(void* s)
+{
+  struct intface* intface = (struct intface*)s;
+  te_free(intface->temperature);
+  te_free(intface->flux);
 }
 
 static double
@@ -425,13 +446,18 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
   /* create fluid for each hc boundary */
   for (i=0; i<stardis->geometry.boundary_count; ++i){
-    SDIS(data_create(dev, sizeof(struct fluid), ALIGNOF(struct fluid), NULL, &data));
+    SDIS(data_create(dev, sizeof(struct fluid), ALIGNOF(struct fluid),
+      release_fluid_data, &data));
     fluid_props = sdis_data_get(data); /* Fetch the allocated memory space */
     fluid_props->cp = 0;
     fluid_props->rho = 0;
-    fluid_props->temperature = stardis->boundary[i].T; 
+    res = set_fluid_temperature_fn(fluid_props, stardis->boundary[i].T);
+    if (res != RES_OK) {
+      fprintf(stderr, "Invalid temperature expression: %s\n", stardis->boundary[i].T);
+      goto error;
+    }
     SDIS(fluid_create(dev, &fluid_shader, data, sa_add(fluid_medium, 1)));
-    SDIS(data_ref_put(data));
+    SDIS(data_ref_put(data)); data = NULL;
     if (stardis->boundary[i].hc > -1) {
       size_t sz = sa_size(fluid_medium) - 1;
       ASSERT(sz < INT_MAX);
@@ -450,21 +476,34 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   solid_shader.delta_boundary = solid_get_delta_boundary;
 #endif
   solid_shader.temperature = solid_get_temperature;
-  solid_shader.volumic_power = solid_get_power;
 
   /* Create the solid medium */
   for (i=0; i<stardis->geometry.medium_count; ++i){
-  /* Create and setup the solid physical properties */
-    SDIS(data_create(dev, sizeof(struct solid), ALIGNOF(struct solid), NULL, &data));
+     /* Create and setup the solid physical properties */
+    int has;
+    SDIS(data_create(dev, sizeof(struct solid), ALIGNOF(struct solid), 
+      release_solid_data, &data));
     solid_props = sdis_data_get(data); /* Fetch the allocated memory space */
     solid_props->cp     = stardis->material[i].cp;
     solid_props->lambda = stardis->material[i].lambda;
     solid_props->rho    = stardis->material[i].rho;
     solid_props->delta  = stardis->material[i].delta;
-    solid_props->temperature = stardis->material[i].Tinit;
-    solid_props->temperature = stardis->material[i].power;
+    solid_props->power = NULL; /* just in case we go to error */
+    res = set_solid_temperature_fn(solid_props, stardis->material[i].Tinit);
+    if (res != RES_OK) {
+      fprintf(stderr, "Invalid initial temperature expression: %s\n",
+        stardis->material[i].Tinit);
+      goto error;
+    }
+    res = set_solid_power_fn(solid_props, stardis->material[i].power, &has);
+    if (res != RES_OK) {
+      fprintf(stderr, "Invalid volumic power expression: %s\n",
+        stardis->material[i].power);
+      goto error;
+    }
+    if (has) solid_shader.volumic_power = solid_get_power;
     SDIS(solid_create(dev, &solid_shader, data, sa_add(solid_medium, 1)));
-    SDIS(data_ref_put(data));
+    SDIS(data_ref_put(data)); data = NULL;
   }
 
   /* Setup the interface shader */
@@ -494,18 +533,27 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       double alpha =
         stardis->boundary[stardis->geometry.triangle[i].bound_id].specular_fraction;
 
-      SDIS(data_create(dev, sizeof(struct intface), ALIGNOF(struct intface), NULL, &data));
+      SDIS(data_create(dev, sizeof(struct intface), ALIGNOF(struct intface), 
+        release_interface_data, &data));
       interface_props = sdis_data_get(data);
       if (hc > -1) {
         interface_props->hc = hc;
         interface_props->temperature = NULL;
         interface_props->flux = NULL;
       } else if (T != NULL){
-        interface_props->temperature = T;
         interface_props->flux = NULL;
+        res = set_interface_temperature_fn(interface_props, T);
+        if (res != RES_OK) {
+          fprintf(stderr, "Invalid temperature expression: %s\n", T);
+          goto error;
+        }
       } else if (flux != NULL){
         interface_props->temperature = NULL;
-        interface_props->flux = flux;
+        res = set_interface_flux_fn(interface_props, flux);
+        if (res != RES_OK) {
+          fprintf(stderr, "Invalid flux expression: %s\n", flux);
+          goto error;
+        }
       }
       interface_props->emissivity = emissivity; 
       interface_props->alpha = alpha;
@@ -513,7 +561,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
             solid_medium[stardis->geometry.triangle[i].medium_front],
             fluid_medium[bound2fluid[bound_id]],
             &interface_shader_boundary, data, sa_add(interfaces,1)));
-      SDIS(data_ref_put(data));
+      SDIS(data_ref_put(data)); data = NULL;
 
     } else { /* solid/solid interface */
       SDIS(interface_create(dev,
@@ -621,6 +669,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         (unsigned long)stardis->N);
   }
 
+end:
   for (i=0; i<sa_size(solid_medium); ++i){
     SDIS(medium_ref_put(solid_medium[i]));
   }
@@ -646,4 +695,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   if (dev) SDIS(device_ref_put(dev));
 
   return res;
+error:
+  if(data) SDIS(data_ref_put(data));
+  goto end;
 }

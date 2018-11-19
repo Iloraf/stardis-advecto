@@ -13,23 +13,32 @@
 static inline char*
 read_line(char** pb, FILE* stream)
 {
-  const int chunk = 32;
-  char* b = *pb;
+  const int chunk_sz = 32;
+  char* buf = *pb;
+  size_t idx;
 
-  if(!b) b = sa_add(b, 128);
+  if(!buf) buf = sa_add(buf, 128);
 
   do {
-    if(!fgets(b, (int)sa_size(b), stream)) return NULL;
+    /* Read stream until EOL, EOF or up to sa_size(b) */
+    if(!fgets(buf, (int)sa_size(buf) + 1, stream)) return NULL;
 
     /* Ensure that he whole line is read */
-    while(!strrchr(b, '\n') && !feof(stream)) {
-      fgets(sa_add(b, (size_t)chunk), chunk, stream);
+    while(!strrchr(buf, '\n') && !feof(stream)) {
+      /* Add some room to buffer */
+      char* more = sa_add(buf, (size_t)chunk_sz);
+      /* Continue reading chunk_sz more characters until EOL or EOF */
+      fgets(more, chunk_sz + 1, stream);
     }
-
-    b[strcspn(b, "#\n\r")] = '\0'; /* Rm new line & comments */
-  } while(strspn(b, " \t") == strlen(b)); /* Empty line */
-  *pb = b;
-  return b;
+    /* Search idx of first occurence of comment char or EOL */
+    idx = strcspn(buf, "#\n\r");
+    /* Remove meaningles text */
+    buf[idx] = '\0';
+    /* Find first text */
+    idx = strspn(buf, " \t");
+  } while(buf[idx] == '\0'); /* Skip empty lines */
+  *pb = buf;
+  return buf;
 }
 
 static char** split_line(char* a_str, const char a_delim)

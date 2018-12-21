@@ -20,7 +20,7 @@ int main(int argc, char** argv){
   if (res != RES_OK) goto error;
 
   if (args.mode == DUMP_VTK){
-    res = dump_vtk(stdout, &stardis.geometry, stardis.geometry.boundary_count);
+    res = dump_vtk(stdout, &stardis.geometry);
     if (res != RES_OK) goto error;
     goto exit;
   }
@@ -30,7 +30,11 @@ int main(int argc, char** argv){
 
 exit:
   stardis_release(&stardis);
+  mem_shutdown_proxy_allocator(&stardis.allocator);
   if((memsz = mem_allocated_size()) != 0) {
+    char dump[4096] = { '\0' };
+    MEM_DUMP(&stardis.allocator, dump, sizeof(dump));
+    fprintf(stderr, "%s\n", dump);
     fprintf(stderr, "Memory leaks: %lu Bytes\n", (unsigned long)memsz);
   }
 

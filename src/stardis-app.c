@@ -4,8 +4,14 @@
 #include <string.h>
 #include "stardis-app.h"
 
-#define MEDIUM 0
-#define BOUNDARY 1
+
+#include <rsys/hash_table.h>
+#define HTABLE_NAME descriptions
+#define HTABLE_KEY struct description
+#define HTABLE_DATA unsigned
+#define HTABLE_KEY_FUNCTOR_EQ eq_description
+#define HTABLE_KEY_FUNCTOR_HASH hash_description
+#include <rsys/hash_table.h>
 
 /*******************************************************************************
  *
@@ -93,125 +99,315 @@ static char** split_line(char* a_str, const char a_delim)
   return result;
 }
 
-
-static res_T
-parse_medium_line(char* line, char** stl_filename, struct material* mat)
+#ifdef COMPILER_GCC
+static char*
+_strupr(char* s)
 {
-  char* tk = NULL;
-  res_T res = RES_OK;
-
-  tk = strtok(line," ");
-  *stl_filename = malloc(strlen(tk) + 1);
-  strcpy(*stl_filename,tk);
-  tk = strtok(NULL," ");
-  res = cstr_to_double(tk, &mat->lambda);
-  if (res != RES_OK || mat->lambda <= 0) {
-    fprintf(stderr, "Invalid lambda: %s\n", tk);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  tk = strtok(NULL," ");
-  res = cstr_to_double(tk, &mat->rho);
-  if (res != RES_OK || mat->rho <= 0) {
-    fprintf(stderr, "Invalid rho: %s\n", tk);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  tk = strtok(NULL," ");
-  res = cstr_to_double(tk, &mat->cp);
-  if (res != RES_OK || mat->cp <= 0){
-    fprintf(stderr, "Invalid cp: %s\n", tk);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  tk = strtok(NULL," ");
-  res = cstr_to_double(tk, &mat->delta);
-  if (res != RES_OK || mat->delta <= 0){
-    fprintf(stderr, "Invalid delta: %s\n", tk);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  tk = strtok(NULL,"\"");
-  tk = strtok(NULL,"\"");
-  mat->Tinit = malloc(strlen(tk) + 1);
-  strcpy(mat->Tinit,tk);
-
-  tk = strtok(NULL,"\"");
-  tk = strtok(NULL,"\"");
-  mat->power = malloc(strlen(tk) + 1);
-  strcpy(mat->power,tk);
-
-exit:
-  return res;
-error:
-  goto exit;
+  char* tmp;
+  for (tmp = s; *tmp; ++tmp) *tmp = toupper((unsigned char)*tmp);
+  return s;
 }
+#endif
 
+
+/* Read medium line; should be one of:
+ * SOLID STL_filename lambda rho cp delta "Tinit(x,y,z)" "volumic_power(x,y,z,t)"
+ * FLUID STL_filename rho cp "Tinit(x,y,z)"
+*/
 static res_T
-parse_boundary_line(char* line, char** stl_filename, struct boundary* bound)
+parse_medium_line(char* line, char** stl_filename, struct description* desc)
 {
   char* tk = NULL;
   res_T res = RES_OK;
 
-  tk = strtok(line," ");
-  *stl_filename = malloc(strlen(tk) + 1);
-  strcpy(*stl_filename,tk);
+#define CHK_TOK(tk, x) if(((tk) = (x)) == NULL) goto error
+  CHK_TOK(tk, _strupr(strtok(line, " ")));
+  if (strcmp(tk, "SOLID") == 0) {
+    desc->type = DESC_MAT_SOLID;
 
-  tk = strtok(NULL," ");
-  res = cstr_to_double(tk, &bound->emissivity);
-  if (res != RES_OK || bound->emissivity < 0 || bound->emissivity > 1){
-    fprintf(stderr, "Invalid emissivity: %s\n", tk);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  tk = strtok(NULL," ");
-  res = cstr_to_double(tk, &bound->specular_fraction);
-  if (res != RES_OK ||
-      bound->specular_fraction < 0.0 || bound->specular_fraction > 1.0){
-    fprintf(stderr, "Invalid specular_fraction: %s\n", tk);
-    res = RES_BAD_ARG;
-    goto error;
-  }
+    CHK_TOK(tk, strtok(NULL, " "));
+    *stl_filename = malloc(strlen(tk) + 1);
+    strcpy(*stl_filename, tk);
 
-  tk = strtok(NULL," ");
-  if (strcmp(tk,"h")==0 || strcmp(tk,"H")==0  ){
-    tk = strtok(NULL," ");
-    res = cstr_to_double(tk, &bound->hc);
-    if (res != RES_OK || bound->hc < 0) {
-      fprintf(stderr, "Invalid value parameter: %s\n", tk);
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.solid.lambda);
+    if (res != RES_OK || desc->d.solid.lambda <= 0) {
+      fprintf(stderr, "Invalid lambda: %s\n", tk);
       res = RES_BAD_ARG;
       goto error;
     }
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.solid.rho);
+    if (res != RES_OK || desc->d.solid.rho <= 0) {
+      fprintf(stderr, "Invalid rho: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.solid.cp);
+    if (res != RES_OK || desc->d.solid.cp <= 0) {
+      fprintf(stderr, "Invalid cp: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.solid.delta);
+    if (res != RES_OK || desc->d.solid.delta <= 0) {
+      fprintf(stderr, "Invalid delta: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    CHK_TOK(tk, strtok(NULL, "\""));
+    desc->d.solid.Tinit = malloc(strlen(tk) + 1);
+    strcpy(desc->d.solid.Tinit, tk);
+    CHK_TOK(tk, strtok(NULL, "\""));
 
-    tk = strtok(NULL,"\"");
-    tk = strtok(NULL,"\"");
-    bound->T = malloc(strlen(tk) + 1);
-    strcpy(bound->T,tk);
+    CHK_TOK(tk, strtok(NULL, "\""));
+    desc->d.solid.power = malloc(strlen(tk) + 1);
+    strcpy(desc->d.solid.power, tk);
+  }
+  else if (strcmp(tk, "FLUID") == 0) {
+    desc->type = DESC_MAT_FLUID;
 
-  } else  if (strcmp(tk,"t")==0 || strcmp(tk,"T")==0  ){
+    CHK_TOK(tk, strtok(NULL, " "));
+    *stl_filename = malloc(strlen(tk) + 1);
+    strcpy(*stl_filename, tk);
 
-    tk = strtok(NULL,"\"");
-    tk = strtok(NULL,"\"");
-    bound->T = malloc(strlen(tk) + 1);
-    strcpy(bound->T,tk);
-
-  } else  if (strcmp(tk,"f")==0 || strcmp(tk,"F")==0  ){
-
-    tk = strtok(NULL,"\"");
-    tk = strtok(NULL,"\"");
-    bound->flux = malloc(strlen(tk) + 1);
-    strcpy(bound->flux,tk);
-
-  } else {
-    fprintf(stderr,"unknown boundary type: %s\n", tk);
-    goto error;
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.fluid.rho);
+    if (res != RES_OK || desc->d.fluid.rho <= 0) {
+      fprintf(stderr, "Invalid rho: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.fluid.cp);
+    if (res != RES_OK || desc->d.fluid.cp <= 0) {
+      fprintf(stderr, "Invalid cp: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    CHK_TOK(tk, strtok(NULL, "\""));
+    desc->d.fluid.Tinit = malloc(strlen(tk) + 1);
+    strcpy(desc->d.fluid.Tinit, tk);
+  }
+  else {
+    res = RES_BAD_ARG;
+    printf("Invalid medium type: %s\n", tk);
   }
 
+#undef GET_TOK
 exit:
   return res;
 error:
   goto exit;
 }
+
+/* Read boundary line; should be one of:
+#   H_BOUNDARY_FOR_SOLID STL_filename emissivity specular_fraction hc hc_max "T_env(x,y,z,t)"
+# | H_BOUNDARY_FOR_FLUID STL_filename emissivity specular_fraction hc hc_max "T_env(x,y,z,t)"
+# | T_BOUNDARY_FOR_SOLID STL_filename "T_value(x,y,z,t)"
+# | T_BOUNDARY_FOR_FLUID STL_filename "T_value(x,y,z,t)" hc hc_max
+# | F_BOUNDARY_FOR_SOLID STL_filename "F_value(x,y,z,t)"
+# ; no F_BOUNDARY_FOR_FLUID
+ */
+static res_T
+parse_boundary_line(char* line, char** stl_filename, struct description* desc)
+{
+  char* tk = NULL;
+  int h_solid = 0, h_fluid = 0;
+  int t_solid = 0, t_fluid = 0;
+  int f_solid = 0;
+  int sf_connect = 0;
+  res_T res = RES_OK;
+
+#define CHK_TOK(tk, x) if(((tk) = (x)) == NULL) goto error
+  CHK_TOK(tk, strtok(line, " "));
+  h_solid = (0 == strcmp(tk, "H_BOUNDARY_FOR_SOLID"));
+  if (!h_solid) {
+    h_fluid = (0 == strcmp(tk, "H_BOUNDARY_FOR_FLUID"));
+    if (!h_fluid) {
+      t_solid = (0 == strcmp(tk, "T_BOUNDARY_FOR_SOLID"));
+      if (!t_solid) {
+        t_fluid = (0 == strcmp(tk, "T_BOUNDARY_FOR_FLUID"));
+        if (!t_fluid) {
+          f_solid = (0 == strcmp(tk, "F_BOUNDARY_FOR_SOLID"));
+          if (!f_solid) {
+            sf_connect = (0 == strcmp(tk, "SOLID_FLUID_CONNECTION"));
+          }
+        }
+      }
+    }
+  }
+  if (h_solid || h_fluid) {
+    desc->type = h_solid ? DESC_BOUND_H_FOR_SOLID : DESC_BOUND_H_FOR_FLUID;
+
+    /* The description is parsed the same way for both types */
+    CHK_TOK(tk, strtok(NULL, " "));
+    *stl_filename = malloc(strlen(tk) + 1);
+    strcpy(*stl_filename, tk);
+
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.h_boundary.emissivity);
+    if (res != RES_OK ||
+      desc->d.h_boundary.emissivity < 0 || desc->d.h_boundary.emissivity > 1) {
+      fprintf(stderr, "Invalid emissivity: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    desc->d.h_boundary.has_emissivity = (desc->d.h_boundary.emissivity > 0);
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.h_boundary.specular_fraction);
+    if (res != RES_OK
+      || desc->d.h_boundary.specular_fraction < 0.0
+      || desc->d.h_boundary.specular_fraction > 1.0) {
+      fprintf(stderr, "Invalid specular_fraction: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.h_boundary.hc);
+    if (res != RES_OK || desc->d.h_boundary.hc < 0) {
+      fprintf(stderr, "Invalid hc value: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    desc->d.h_boundary.has_hc = (desc->d.h_boundary.hc > 0);
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.h_boundary.hc_max);
+    if (res != RES_OK
+      || desc->d.h_boundary.hc_max < desc->d.h_boundary.hc
+      || desc->d.h_boundary.hc_max < 0) {
+      fprintf(stderr, "Invalid hc_max value: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    CHK_TOK(tk, strtok(NULL, "\""));
+    desc->d.h_boundary.T = malloc(strlen(tk) + 1);
+    strcpy(desc->d.h_boundary.T, tk);
+  }
+  else if (t_solid || t_fluid) {
+    desc->type = t_solid ? DESC_BOUND_T_FOR_SOLID : DESC_BOUND_T_FOR_FLUID;
+
+    /* This part of the description is parsed the same way for both types */
+    CHK_TOK(tk, strtok(NULL, " "));
+    *stl_filename = malloc(strlen(tk) + 1);
+    strcpy(*stl_filename, tk);
+
+    CHK_TOK(tk, strtok(NULL, "\""));
+    desc->d.t_boundary.T = malloc(strlen(tk) + 1);
+    strcpy(desc->d.t_boundary.T, tk);
+
+    /* Parse hc + hc_max only if fluid */
+    if (t_fluid) {
+      CHK_TOK(tk, strtok(NULL, " "));
+      res = cstr_to_double(tk, &desc->d.t_boundary.hc);
+      if (res != RES_OK || desc->d.t_boundary.hc < 0) {
+        fprintf(stderr, "Invalid hc value: %s\n", tk);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+      desc->d.t_boundary.has_hc = (desc->d.t_boundary.hc > 0);
+      CHK_TOK(tk, strtok(NULL, " "));
+      res = cstr_to_double(tk, &desc->d.t_boundary.hc_max);
+      if (res != RES_OK
+        || desc->d.t_boundary.hc_max < desc->d.t_boundary.hc
+        || desc->d.t_boundary.hc_max < 0) {
+        fprintf(stderr, "Invalid hc_max value: %s\n", tk);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+    }
+    else desc->d.t_boundary.has_hc = 0;
+  }
+  else if (f_solid) {
+    desc->type = DESC_BOUND_F_FOR_SOLID;
+
+    CHK_TOK(tk, strtok(NULL, " "));
+    *stl_filename = malloc(strlen(tk) + 1);
+    strcpy(*stl_filename, tk);
+
+    CHK_TOK(tk, strtok(NULL, "\""));
+    desc->d.f_boundary.flux = malloc(strlen(tk) + 1);
+    strcpy(desc->d.f_boundary.flux, tk);
+
+    /* Optional hc + hc_max */
+    tk = strtok(NULL, " ");
+    if (tk) {
+      res = cstr_to_double(tk, &desc->d.f_boundary.hc);
+      if (res != RES_OK || desc->d.f_boundary.hc < 0) {
+        fprintf(stderr, "Invalid hc value: %s\n", tk);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+      desc->d.f_boundary.has_hc = (desc->d.f_boundary.hc > 0);
+      CHK_TOK(tk, strtok(NULL, " "));
+      res = cstr_to_double(tk, &desc->d.f_boundary.hc_max);
+      if (res != RES_OK
+        || desc->d.f_boundary.hc_max < desc->d.f_boundary.hc
+        || desc->d.f_boundary.hc_max < 0) {
+        fprintf(stderr, "Invalid hc_max value: %s\n", tk);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+    }
+  }
+  else if (sf_connect) {
+    desc->type = DESC_SOLID_FLUID_CONNECT;
+
+    CHK_TOK(tk, strtok(NULL, " "));
+    *stl_filename = malloc(strlen(tk) + 1);
+    strcpy(*stl_filename, tk);
+
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.sf_connect.emissivity);
+    if (res != RES_OK ||
+      desc->d.sf_connect.emissivity < 0 || desc->d.sf_connect.emissivity > 1) {
+      fprintf(stderr, "Invalid emissivity: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    desc->d.sf_connect.has_emissivity = (desc->d.sf_connect.emissivity > 0);
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.sf_connect.specular_fraction);
+    if (res != RES_OK
+      || desc->d.sf_connect.specular_fraction < 0.0
+      || desc->d.sf_connect.specular_fraction > 1.0) {
+      fprintf(stderr, "Invalid specular_fraction: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.sf_connect.hc);
+    if (res != RES_OK || desc->d.sf_connect.hc < 0) {
+      fprintf(stderr, "Invalid hc value: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    desc->d.sf_connect.has_hc = (desc->d.sf_connect.hc > 0);
+    CHK_TOK(tk, strtok(NULL, " "));
+    res = cstr_to_double(tk, &desc->d.h_boundary.hc_max);
+    if (res != RES_OK
+      || desc->d.h_boundary.hc_max < desc->d.h_boundary.hc
+      || desc->d.h_boundary.hc_max < 0) {
+      fprintf(stderr, "Invalid hc_max value: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+  else {
+    printf("Invalid boundary type: %s", tk);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+#undef GET_TOK
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 static res_T
 read_vertices
   (struct sstl_desc* desc,
@@ -248,77 +444,130 @@ read_vertices
   return res;
 }
 
+static int
+indices_to_key(unsigned3 key, const unsigned3 indices)
+{
+  int i, reversed = 0;
+  FOR_EACH(i, 0, 3) key[i] = indices[i];
+  if (key[0] > key[1]) {
+    reversed = !reversed;
+    SWAP(unsigned, key[0], key[1]);
+  }
+  if (key[1] > key[2]) {
+    reversed = !reversed;
+    SWAP(unsigned, key[1], key[2]);
+  }
+  if (key[0] > key[1]) {
+    reversed = !reversed;
+    SWAP(unsigned, key[0], key[1]);
+  }
+  return reversed;
+}
+
 static res_T
 read_triangles
-  (int FLAG,
-  struct sstl_desc* desc,
-  struct htable_triangle* triangle2id,
-  unsigned* id2id, char** cl_type,
-  const unsigned* id,
-  struct triangle** tri_list)
+  (const struct sstl_desc* stl_desc,
+   struct htable_triangle* triangle2id,
+   const unsigned* id2id,
+   const int is_connection,
+   const unsigned desc_id,
+   struct triangle** tri_list)
 {
   res_T res = RES_OK;
   unsigned tri_index = 0;
-  (void)cl_type;
-  for (tri_index = 0; tri_index < desc->triangles_count; ++tri_index){
+  for (tri_index = 0; tri_index < stl_desc->triangles_count; ++tri_index) {
     struct triangle tri = NULL_TRIANGLE;
-    unsigned *found_id = NULL;
+    const unsigned *found_id = NULL;
+    unsigned id;
+    unsigned3 key;
+    int reversed;
+    enum sdis_side current_side = SDIS_FRONT;
+    unsigned* side_desc_ptr = NULL;
 
-    tri.sids[0] = tri.indices[0] = id2id[desc->indices[3*tri_index + 0]];
-    tri.sids[1] = tri.indices[1] = id2id[desc->indices[3*tri_index + 1]];
-    tri.sids[2] = tri.indices[2] = id2id[desc->indices[3*tri_index + 2]];
+    tri.indices[0] = id2id[stl_desc->indices[3*tri_index + 0]];
+    tri.indices[1] = id2id[stl_desc->indices[3*tri_index + 1]];
+    tri.indices[2] = id2id[stl_desc->indices[3*tri_index + 2]];
+    reversed = indices_to_key(key, tri.indices);
 
-    if(tri.sids[0] > tri.sids[1]) SWAP(unsigned, tri.sids[0], tri.sids[1]);
-    if(tri.sids[1] > tri.sids[2]) SWAP(unsigned, tri.sids[1], tri.sids[2]);
-    if(tri.sids[0] > tri.sids[1]) SWAP(unsigned, tri.sids[0], tri.sids[1]);
-    found_id = htable_triangle_find(triangle2id, &tri);
-
-    if (found_id){
-      if (FLAG==MEDIUM) (*tri_list)[*found_id].medium_back = *id;
-      if (FLAG==BOUNDARY) (*tri_list)[*found_id].bound_id = *id;
+    /* Find triangle if already known, or insert it in known list */
+    found_id = htable_triangle_find(triangle2id, &key);
+    if (found_id) {
+      struct triangle* original_tri;
+      int original_reversed;
+      id = *found_id;
+      original_tri = (*tri_list) + id;
+      original_reversed = indices_to_key(key, original_tri->indices);
+      current_side = (reversed == original_reversed) ? SDIS_FRONT : SDIS_BACK;
+      ASSERT(id < sa_size(*tri_list));
     } else {
       size_t sz;
-      unsigned size;
-      if (FLAG==MEDIUM) tri.medium_front = *id;
       sz = htable_triangle_size_get(triangle2id);
+      ASSERT(sz == sa_size(*tri_list));
       ASSERT(sz < UINT_MAX);
-      size = (unsigned)sz;
-      htable_triangle_set(triangle2id, &tri, &size);
-      /*printf("triangle  %i %i %i\n  added at index %i\n", SPLIT3(tri.indices), size);*/
+      id = (unsigned)sz;
+      /* Store tri as described by stl_desc regardless of key order */
+      htable_triangle_set(triangle2id, &key, &id);
       sa_push(*tri_list, tri);
     }
+
+    if (is_connection) {
+      side_desc_ptr = &(*tri_list)[id].connection_description;
+    }
+    else {
+      /* Is the triangle in tri_list reversed wrt stl_desc? */
+      side_desc_ptr = (current_side == SDIS_FRONT) ?
+        &(*tri_list)[id].front_description : &(*tri_list)[id].back_description;
+    }
+    if (*side_desc_ptr != UINT_MAX && *side_desc_ptr != desc_id) {
+      /* Already described with a different description! */
+      fprintf(stderr, "Triangle %s with 2 different descriptions\n",
+        is_connection ? "connection" : "side");
+      return RES_BAD_ARG;
+    }
+    /* Everithing is OK: store description */
+    *side_desc_ptr = desc_id;
   }
   return res;
 }
 
-
 static res_T
 read_stl
-(char FLAG,
- unsigned id,
- char** stl_filename,
- struct htable_vertex* vertex2id,
- struct htable_triangle* triangle2id,
- struct geometry* geometry)
+  (const unsigned desc_id,
+   const int is_connection,
+   const char** stl_filename,
+   struct htable_vertex* vertex2id,
+   struct htable_triangle* triangle2id,
+   struct stardis* stardis)
 {
   res_T res = RES_OK;
   struct sstl* sstl = NULL;
-  struct sstl_desc desc;
+  struct sstl_desc stl_desc;
   unsigned* id2id = NULL;
 
-  SSTL(create(NULL, NULL, 0, &sstl));
+  if (!stl_filename) return RES_BAD_ARG;
 
-  SSTL(load(sstl, *stl_filename));
-  SSTL(get_desc(sstl, &desc));
+  SSTL(create(NULL, &stardis->allocator, 0, &sstl));
 
-  read_vertices(&desc, vertex2id, &id2id, &geometry->vertex);
-  read_triangles(FLAG, &desc, triangle2id, id2id, NULL, &id, &geometry->triangle);
+  res = sstl_load(sstl, *stl_filename);
+  if (res != RES_OK) {
+    printf("Cannot read STL file: %s\n", *stl_filename);
+    goto error;
+  }
+  SSTL(get_desc(sstl, &stl_desc));
+
+  res = read_vertices(&stl_desc, vertex2id, &id2id, &stardis->geometry.vertex);
+  if (res != RES_OK) goto error;
+  res = read_triangles(&stl_desc, triangle2id, id2id, is_connection, desc_id,
+    &stardis->geometry.triangle);
+  if (res != RES_OK) goto error;
+  
+end:
   sa_release(id2id);
-
   SSTL(ref_put(sstl));
   return res;
+error:
+  goto end;
 }
-
 
 /*******************************************************************************
  *
@@ -326,54 +575,67 @@ read_stl
 
 static res_T
 geometry_analyse
-(const char* medium_filename,
- const char* bc_filename,
- struct geometry* geometry,
- struct material** material,
- struct boundary** boundary)
+  (const char* medium_filename,
+   const char* bc_filename,
+   struct stardis* stardis)
 {
   res_T res = RES_OK;
   FILE* input;
   char* line = NULL;
+  unsigned sz = (unsigned)sa_size(stardis->descriptions);
   struct htable_vertex vertex2id;
   struct htable_triangle triangle2id;
+  struct htable_descriptions descriptions;
+  int descriptions_table_initialised = 0;
+  unsigned desc_id;
+  unsigned *p_desc;
+  ASSERT(sz == sa_size(stardis->descriptions));
 
-  /*init geometry*/
-  *geometry = NULL_GEOMETRY;
+  stardis->geometry = NULL_GEOMETRY;
 
-  /*parse medium file*/
+  /* parse medium files */
   input = fopen(medium_filename,"r");
   if (!input){
-    fprintf(stderr,"Can not open %s\n", medium_filename);
+    fprintf(stderr,"Cannot open %s\n", medium_filename);
     res = RES_IO_ERR;
     goto error;
   }
 
-  htable_vertex_init(NULL, &vertex2id);
-  htable_triangle_init(NULL, &triangle2id);
+  htable_vertex_init(&stardis->allocator, &vertex2id);
+  htable_triangle_init(&stardis->allocator, &triangle2id);
+  htable_descriptions_init(&stardis->allocator, &descriptions);
+  descriptions_table_initialised = 1;
   /* loop on media */
   while (read_line(&line, input)){
     char* stl_filename = NULL;
-    struct material mat = NULL_MATERIAL;
+    struct description desc = NULL_DESCRIPTION__;
 
-    res = parse_medium_line(line, &stl_filename, &mat);
-    if (res != RES_OK) goto error;
-    sa_push(*material,mat);
-
-    /*analyse medium stl*/
-    res = read_stl(MEDIUM, geometry->medium_count, &stl_filename,
-        &vertex2id, &triangle2id, geometry);
+    res = parse_medium_line(line, &stl_filename, &desc);
     if (res != RES_OK) goto error;
 
-    geometry->medium_count += 1;
+    /* Deduplicate media: find if the same description already exists */
+    p_desc = htable_descriptions_find(&descriptions, &desc);
+    if (!p_desc) {
+      sa_push(stardis->descriptions, desc);
+      desc_id = sz++;
+      ASSERT(sz == sa_size(stardis->descriptions));
+      /* Register new medium description */
+      htable_descriptions_set(&descriptions, &desc, &desc_id);
+    } else {
+      printf("Duplicate media description found: deduplicated.\n");
+      desc_id = *p_desc;
+    }
+
+    res = read_stl(sz-1, 0, &stl_filename, &vertex2id, &triangle2id, stardis);
     if (stl_filename) free(stl_filename);
+    if (res != RES_OK) goto error;
   }
   fclose(input);
 
-  /*parse boundary file*/
+  /* parse boundary files */
   input = fopen(bc_filename,"r");
   if (!input){
-    fprintf(stderr,"Can not open %s\n", bc_filename);
+    fprintf(stderr,"Cannot open %s\n", bc_filename);
     res = RES_IO_ERR;
     goto error;
   }
@@ -381,48 +643,36 @@ geometry_analyse
   /* loop on boundaries */
   while (read_line(&line, input)){
     char* stl_filename = NULL;
-    struct boundary bound = NULL_BOUNDARY;
+    struct description desc = NULL_DESCRIPTION__;
 
-    res = parse_boundary_line(line, &stl_filename, &bound);
+    res = parse_boundary_line(line, &stl_filename, &desc);
     if (res != RES_OK) goto error;
-    sa_push(*boundary,bound);
-
-    /*analyse medium stl*/
-    res = read_stl(BOUNDARY, geometry->boundary_count, &stl_filename,
-        &vertex2id, &triangle2id, geometry);
-    if (res != RES_OK) goto error;
-
-    geometry->boundary_count += 1;
+    
+    /* Deduplicate media: find if the same description already exists */
+    p_desc = htable_descriptions_find(&descriptions, &desc);
+    if (!p_desc) {
+      sa_push(stardis->descriptions, desc);
+      desc_id = sz++;
+      ASSERT(sz == sa_size(stardis->descriptions));
+      /* Register new boundary description */
+      htable_descriptions_set(&descriptions, &desc, &desc_id);
+    } else {
+      printf("Duplicate boundary description found: deduplicated.\n");
+      desc_id = *p_desc;
+    }
+    
+    res = read_stl(desc_id, 1, &stl_filename, &vertex2id, &triangle2id, stardis);
     if (stl_filename) free(stl_filename);
+    if (res != RES_OK) goto error;
   }
-
   fclose(input);
 
 exit:
+  if(descriptions_table_initialised)
+    htable_descriptions_release(&descriptions);
   htable_vertex_release(&vertex2id);
   htable_triangle_release(&triangle2id);
   sa_release(line);
-  return res;
-error:
-  goto exit;
-}
-
-static res_T
-check_consistency
-(struct boundary* boundary, double* probe)
-{
-  res_T res = RES_OK;
-  size_t i = 0;
-
-  for (i=0; i<sa_size(boundary); ++i){
-    if ( boundary[i].T && strchr(boundary[i].T,'t') && probe[3] == INF) {
-      fprintf(stderr,"Transient boundary condition is inconsistent with INF time of the probe.\n");
-      res = RES_BAD_ARG;
-      goto error;
-    }
-  }
-
-exit:
   return res;
 error:
   goto exit;
@@ -487,11 +737,12 @@ stardis_init
 {
   res_T res = RES_OK;
 
+  res = mem_init_proxy_allocator(&stardis->allocator,
+    &mem_default_allocator);
+  if (res != RES_OK) goto error;
+
   res = geometry_analyse(args->medium_filename,
-      args->bc_filename,
-      &stardis->geometry,
-      &stardis->material,
-      &stardis->boundary);
+      args->bc_filename, stardis);
   if (res != RES_OK) goto error;
 
   stardis->N = args->N;
@@ -504,59 +755,59 @@ stardis_init
   stardis->radiative_temp[0] = args->radiative_temp[0];
   stardis->radiative_temp[1] = args->radiative_temp[1];
 
-  if (args->mode == PROBE_COMPUTE){
-    res = check_consistency(stardis->boundary, stardis->probe);
-    if (res != RES_OK) goto error;
-  }
-
  if (args->mode == IR_COMPUTE){
     res = parse_camera(args->camera, &stardis->camera);
     if (res != RES_OK) goto error;
  }
 
+
 exit:
   return res;
 error:
   goto exit;
 }
 
-
-res_T
+void
 stardis_release(struct stardis* stardis)
 {
   size_t i = 0;
-  res_T res = RES_OK;
 
-  for (i=0; i<sa_size(stardis->material); ++i){
-    free(stardis->material[i].Tinit);
-    free(stardis->material[i].power);
+  for (i=0; i<sa_size(stardis->descriptions); ++i) {
+    struct description* desc = &stardis->descriptions[i];
+    switch (desc->type) {
+    case DESC_MAT_SOLID:
+      free(desc->d.solid.power);
+      free(desc->d.solid.Tinit);
+      break;
+    case DESC_MAT_FLUID:
+      free(desc->d.fluid.Tinit);
+      break;
+    case DESC_BOUND_H_FOR_SOLID:
+    case DESC_BOUND_H_FOR_FLUID:
+      free(desc->d.h_boundary.T);
+      break;
+    case DESC_BOUND_T_FOR_SOLID:
+    case DESC_BOUND_T_FOR_FLUID:
+      free(desc->d.t_boundary.T);
+      break;
+    case DESC_BOUND_F_FOR_SOLID:
+      free(desc->d.f_boundary.flux);
+      break;
+    default: FATAL("Invalid type.\n");
+    }
   }
-  sa_release(stardis->material);
-
-  for (i=0; i<sa_size(stardis->boundary); ++i){
-    free(stardis->boundary[i].T);
-    free(stardis->boundary[i].flux);
-  }
-  sa_release(stardis->boundary);
-
-  res = release_geometry(&stardis->geometry);
-  if (res != RES_OK) goto error;
-
-exit:
-  return res;
-error:
-  goto exit;
+  sa_release(stardis->descriptions);
+  release_geometry(&stardis->geometry);
 }
 
-
+/* TODO: rewrite dump! */
 res_T
 dump_vtk
-(FILE* output,
- const struct geometry* geometry, 
- unsigned nbound)
+  (FILE* output,
+   const struct geometry* geometry)
 {
   res_T res = RES_OK;
-  unsigned i,j = 0;
+  unsigned i;
   struct vertex* vtx = geometry->vertex;
   struct triangle* tri = geometry->triangle;
   
@@ -576,22 +827,15 @@ dump_vtk
     fprintf(output,"3 %i %i %i\n",SPLIT3(tri[i].indices));
   }
   fprintf(output,"\nCELL_DATA %i \n", (int)sa_size(tri));
-  fprintf(output,"SCALARS medium_front float 1\n");
+  fprintf(output,"SCALARS front_description float 1\n");
   fprintf(output,"LOOKUP_TABLE default\n");
-  for (i=0; i<sa_size(tri); ++i){
-    fprintf(output,"%i\n",tri[i].medium_front);
+  for (i=0; i<sa_size(tri); ++i) {
+    fprintf(output,"%i\n",tri[i].front_description);
   }
-  fprintf(output,"SCALARS medium_back float 1\n");
+  fprintf(output,"SCALARS back_description float 1\n");
   fprintf(output,"LOOKUP_TABLE default\n");
-  for (i=0; i<sa_size(tri); ++i){
-    fprintf(output,"%i\n",tri[i].medium_back);
-  }
-  for (j=0; j<nbound; ++j){
-    fprintf(output,"SCALARS bound_id float 1\n");
-    fprintf(output,"LOOKUP_TABLE default\n");
-    for (i=0; i<sa_size(tri); ++i){
-      fprintf(output,"%i\n",tri[i].bound_id);
-    }
+  for (i=0; i<sa_size(tri); ++i) {
+    fprintf(output,"%i\n",tri[i].back_description);
   }
 
 exit:

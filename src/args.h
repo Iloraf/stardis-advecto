@@ -31,7 +31,7 @@ struct args{
   char* camera;
 };
 #define ARGS_DEFAULT__ {\
-  NULL, NULL, 10000, SDIS_NTHREADS_DEFAULT,\
+  NULL, NULL, 10000, 1,\
   { { {0.0, 0.0, 0.0}, 0x7FF0000000000000 /* probe[3]=INF */}},\
   PROBE_COMPUTE, 1.0, {300.0, 300.0}, NULL}
 static const struct args ARGS_DEFAULT = ARGS_DEFAULT__;

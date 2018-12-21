@@ -72,8 +72,15 @@ if(CMAKE_COMPILER_IS_GNUCC)
   set(MATH_LIB m)
 endif()
 
+# Default is right to left pow and log is natural log
+# Build tinyExpr without closure support and with function_1 to function_3 support only
+# (these ones cannot be disabled as predefined functions require them).
+set(TE_DEFAULTS
+  "-DTE_POW_FROM_RIGHT -DTE_NAT_LOG -DTE_WITHOUT_CLOSURES -DTE_WITHOUT_FUNCTION_0 -DTE_MAX_FUNCTION_ARITY=3")
+
 ADD_LIBRARY(tinyexpr STATIC
   ${TINYEXPR_SOURCE_DIR}/tinyexpr.c ${TINYEXPR_SOURCE_DIR}/tinyexpr.h)
+set_target_properties(tinyexpr PROPERTIES COMPILE_FLAGS ${TE_DEFAULTS})
 if(CMAKE_COMPILER_IS_GNUCC)
   set_target_properties(tinyexpr PROPERTIES COMPILE_FLAGS "-std=c99")
 endif()
@@ -91,6 +98,7 @@ if(MSVC)
 endif()
 
 set_target_properties(sdis-app PROPERTIES
+  COMPILE_FLAGS ${TE_DEFAULTS}
   VERSION ${VERSION})
 rcmake_copy_runtime_libraries(sdis-app)
 

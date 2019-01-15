@@ -182,6 +182,15 @@ solid_get_delta_boundary
 #endif
 
 static double
+solid_dont_get_temperature
+(const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
+{
+  (void)vtx; (void)data;
+  ASSERT(0);
+  return 0;
+}
+
+static double
 solid_get_temperature
 (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
@@ -308,12 +317,10 @@ select_probe_type
     if (triangle[i].front_description != UINT_MAX) {
       const struct description *desc = descriptions + triangle[i].front_description;
       if (desc->type == DESC_MAT_SOLID) delta = MMAX(desc->d.solid.delta, delta);
-
     }
     if (triangle[i].back_description != UINT_MAX) {
       const struct description *desc = descriptions + triangle[i].back_description;
       if (desc->type == DESC_MAT_SOLID) delta = MMAX(desc->d.solid.delta, delta);
-
     }
 
     if (d3_len(dp) < delta){
@@ -456,10 +463,10 @@ create_solid
    const double cp,
    const double delta,
    const int t_allowed,
-   const char* t_expr, /* Can be NULL if get_temp is NULL */
+   const char* t_expr, /* Can be NULL if not used by getter */
    const char* power_expr, /* Can be NULL */
    struct sdis_medium*** media_ptr,
-   sdis_medium_getter_T get_temp, /* Can be NULL */
+   sdis_medium_getter_T get_temp,
    int* out_has_power, /* Can be NULL */
    unsigned* out_id)
 {
@@ -470,8 +477,7 @@ create_solid
   res_T res = RES_OK;
 
   ASSERT(dev && lambda >= 0 && rho >= 0 && cp >= 0 && delta > 0
-    && media_ptr && out_id);
-  ASSERT(t_expr || !get_temp);
+    && media_ptr && get_temp && out_id);
   solid_shader.calorific_capacity = solid_get_calorific_capacity;
   solid_shader.thermal_conductivity = solid_get_thermal_conductivity;
   solid_shader.volumic_mass = solid_get_volumic_mass;
@@ -489,7 +495,8 @@ create_solid
   solid_props->rho = rho;
   solid_props->cp = cp;
   solid_props->delta = delta;
-  solid_props->power = NULL; /* just in case we go to error */
+  solid_props->t_init = NULL;
+  solid_props->power = NULL;
   if (t_expr) {
     res = compile_expr_to_fn(&solid_props->t_init, t_expr, t_allowed, NULL);
     if (res != RES_OK) {
@@ -533,6 +540,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   struct sdis_medium** media = NULL;
   struct sdis_interface** interfaces = NULL;
   struct sdis_interface** interf_bytrg = NULL;
+  struct sdis_data* data = NULL;
 
   struct sdis_scene* scn = NULL; 
   struct sdis_estimator* estimator = NULL;
@@ -540,7 +548,9 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   struct sdis_accum_buffer* buf = NULL;
   struct sdis_camera* cam = NULL;
 
-  struct htable_intface htable_interfaces; unsigned int_cpt = 0;
+  struct htable_intface htable_interfaces;
+  int htable_interfaces_initialised = 0;
+  unsigned int_cpt = 0;
   double pos[3] = {0,0,0};
   double time[2] = { 0, 0};
   size_t nfailures;
@@ -563,7 +573,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       break;
     case DESC_BOUND_H_FOR_FLUID:
       /* Create an external solid */
-      res = create_solid(dev, 1, 1, 1, 1, t_allowed, desc->d.h_boundary.T,
+      res = create_solid(dev, INF, 1, 1, 1, t_allowed, desc->d.h_boundary.T,
         NULL, &media, solid_get_temperature, NULL, &desc->d.h_boundary.mat_id);
       if (res != RES_OK) goto error;
       break;
@@ -578,8 +588,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         goto error;
       }
       /* Create an external solid */
-      res = create_solid(dev, 1, 1, 1, 1, t_allowed, NULL, NULL, &media, NULL,
-        NULL, &desc->d.t_boundary.mat_id);
+      res = create_solid(dev, 1, 1, 1, 1, t_allowed, NULL, NULL, &media,
+        solid_dont_get_temperature, NULL, &desc->d.t_boundary.mat_id);
       if (res != RES_OK) goto error;
       break;
     case DESC_BOUND_F_FOR_SOLID:
@@ -634,6 +644,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
   /* Create interfaces */
   htable_intface_init(&stardis->allocator, &htable_interfaces);
+  htable_interfaces_initialised = 1;
   for (i=0; i<sa_size(stardis->geometry.triangle); ++i) {
     struct triangle *trg = stardis->geometry.triangle + i;
     struct int_descs int_descs = INT_DESCS_NULL;
@@ -660,13 +671,11 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     }
     else {
       /* create new interface and register */
-      struct sdis_data* data = NULL;
       struct sdis_interface_shader interface_shader = SDIS_INTERFACE_SHADER_NULL;
       struct intface* interface_props = NULL;
       int front_defined = (fd != UINT_MAX);
       int back_defined = (bd != UINT_MAX);
       int connect_defined = (cd != UINT_MAX);
-      int incoherent = 0;
       int_descs.id = int_cpt++;
 
       SDIS(data_create(dev, sizeof(struct intface), ALIGNOF(struct intface),
@@ -705,17 +714,49 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       }
       if (connect_defined) {
         const struct description* connect = stardis->descriptions + cd;
+        int type_checked = 0;
+        struct sdis_medium* def_medium = NULL;
         unsigned ext_id;
+        if (connect->type == DESC_SOLID_FLUID_CONNECT) {
+          if (solid_count != 1 || fluid_count != 1) {
+            ASSERT(front_defined && back_defined);
+            fprintf(stderr,
+              "Ca only define a DESC_SOLID_FLUID_CONNECT between a fluid and a solid\n");
+            res = RES_BAD_ARG;
+            goto error;
+          }
+        } else {
+          if (front_defined == back_defined) {
+            fprintf(stderr,
+              "Cannot define a boundary between 2 %s regions\n",
+              front_defined ? "defined" : "undefined");
+            res = RES_BAD_ARG;
+            goto error;
+          }
+          def_medium = front_defined ? front_med : back_med;
+        }
         switch (connect->type) {
-        case DESC_BOUND_H_FOR_SOLID:
         case DESC_BOUND_H_FOR_FLUID:
-          /* One among front and back should be defined, the other undefined;
-           * if not will raise an error below */
+          if (sdis_medium_get_type(def_medium) != SDIS_FLUID) {
+            fprintf(stderr,
+              "Can only define a DESC_BOUND_H_FOR_FLUID boundary for a fluid region\n");
+            res = RES_BAD_ARG;
+            goto error;
+          }
+          type_checked = 1;
+          /* fall through */
+        case DESC_BOUND_H_FOR_SOLID:
+          if (!type_checked
+            &&  sdis_medium_get_type(def_medium) != SDIS_SOLID) {
+            fprintf(stderr,
+              "Can only define a DESC_BOUND_H_FOR_SOLID boundary for a solid region\n");
+            res = RES_BAD_ARG;
+            goto error;
+          }
           ext_id = connect->d.h_boundary.mat_id; /* External material id */
           ASSERT(ext_id < sa_size(media));
           ASSERT(sdis_medium_get_type(media[ext_id]) == 
             (connect->type == DESC_BOUND_H_FOR_SOLID ? SDIS_FLUID : SDIS_SOLID));
-          if (front_defined && back_defined) incoherent = 1;
           connection_count++;
           boundary_count++;
           if (front_defined) back_med = media[ext_id];
@@ -723,21 +764,49 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
           interface_shader.convection_coef = interface_get_convection_coef;
           interface_shader.convection_coef_upper_bound = connect->d.h_boundary.hc_max;
           interface_props->hc = connect->d.h_boundary.hc;
-          interface_props->emissivity = connect->d.h_boundary.emissivity;
-          interface_props->alpha = connect->d.h_boundary.specular_fraction;
+          ASSERT(!fluid_side_shader); /* Cause defined medium is solid */
+          if (connect->d.h_boundary.has_emissivity) {
+            fluid_side_shader =
+              front_defined ? &interface_shader.back : &interface_shader.front;
+            fluid_side_shader->emissivity = interface_get_emissivity;
+            interface_props->emissivity = connect->d.h_boundary.emissivity;
+            interface_props->alpha = connect->d.h_boundary.specular_fraction;
+          }
           break;
-        case DESC_BOUND_T_FOR_SOLID:
         case DESC_BOUND_T_FOR_FLUID:
-          /* One among front and back should be defined, the other undefined;
-           * if not will raise an error below */
+          if (sdis_medium_get_type(def_medium) != SDIS_FLUID) {
+            fprintf(stderr,
+              "Can only define a DESC_BOUND_T_FOR_FLUID boundary for a fluid region\n");
+            res = RES_BAD_ARG;
+            goto error;
+          }
+          type_checked = 1;
+          /* fall through */
+        case DESC_BOUND_T_FOR_SOLID:
+          if (!type_checked
+            &&  sdis_medium_get_type(def_medium) != SDIS_SOLID) {
+            fprintf(stderr,
+              "Can only define a DESC_BOUND_T_FOR_SOLID boundary for a solid region\n");
+            res = RES_BAD_ARG;
+            goto error;
+          }
           ext_id = connect->d.t_boundary.mat_id; /* External material id */
           ASSERT(ext_id < sa_size(media));
           ASSERT(sdis_medium_get_type(media[ext_id]) == SDIS_SOLID);
-          if (front_defined && back_defined) incoherent = 1;
           connection_count++;
           boundary_count++;
-          if (front_defined) back_med = media[ext_id];
-          else front_med = media[ext_id];
+          if (front_defined) {
+            back_med = media[ext_id];
+            /* We set the known T inside
+             * TODO: should be outside to allow contact resistances */
+            interface_shader.front.temperature = interface_get_temperature;
+          }
+          else {
+            front_med = media[ext_id];
+            /* We set the known T inside
+             * TODO: should be outside to allow contact resistances */
+            interface_shader.back.temperature = interface_get_temperature;
+          }
           ASSERT(connect->d.t_boundary.te_temperature);
           interface_props->temperature = connect->d.t_boundary.te_temperature;
           if (connect->d.t_boundary.has_hc) {
@@ -748,17 +817,18 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
           }
           break;
         case DESC_BOUND_F_FOR_SOLID:
-          /* One among front and back should be defined, the other undefined;
-           * if not will raise an error below */
+          if (sdis_medium_get_type(def_medium) != SDIS_SOLID) {
+            fprintf(stderr,
+              "Can only define a DESC_BOUND_F_FOR_SOLID boundary for a solid region\n");
+            res = RES_BAD_ARG;
+            goto error;
+          }
           connection_count++;
           /* Reuse same solid for the external side */
           if (front_defined) {
-            ASSERT(!back_defined);
             back_med = front_med;
             interface_shader.front.flux = interface_get_flux;
-          }
-          else {
-            ASSERT(back_defined);
+          } else {
             front_med = back_med;
             interface_shader.back.flux = interface_get_flux;
           }
@@ -791,8 +861,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         || boundary_count ?
           (fluid_count + solid_count != 1) : (fluid_count + solid_count != 2)
         || (solid_fluid_connection_count && (fluid_count != 1 || solid_count != 1)))
-        incoherent = 1;
-      if (incoherent) {
+      {
         /* Incoherent triangle description */
         if(fluid_count == 2)
         fprintf(stderr, "Incoherent triangle description\n");
@@ -819,7 +888,6 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         sa_size(stardis->geometry.vertex), 
         geometry_get_position, &stardis->geometry, &scn);
   if (res != RES_OK) goto error;
-
 
   if (mode == IR_COMPUTE){
    size_t width = (size_t)stardis->camera.img[0];
@@ -912,6 +980,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   }
 
 end:
+  if (data) SDIS(data_ref_put(data));;
+  if(htable_interfaces_initialised) htable_intface_release(&htable_interfaces);
   for (i=0; i<sa_size(media); ++i)
     SDIS(medium_ref_put(media[i]));
   sa_release(media);

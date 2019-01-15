@@ -30,14 +30,14 @@ int main(int argc, char** argv){
 
 exit:
   stardis_release(&stardis);
-  mem_shutdown_proxy_allocator(&stardis.allocator);
-  if((memsz = mem_allocated_size()) != 0) {
+  if((memsz = MEM_ALLOCATED_SIZE(&stardis.allocator)) != 0) {
     char dump[4096] = { '\0' };
     MEM_DUMP(&stardis.allocator, dump, sizeof(dump));
     fprintf(stderr, "%s\n", dump);
     fprintf(stderr, "Memory leaks: %lu Bytes\n", (unsigned long)memsz);
   }
-
+  mem_shutdown_proxy_allocator(&stardis.allocator);
+  CHK(mem_allocated_size() == 0);
   return err;
 error:
   err = -1;

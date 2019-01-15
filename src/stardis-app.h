@@ -452,6 +452,7 @@ hash_t_boundary
   (const struct t_boundary* key,
    const enum description_type type)
 {
+  (void)type;
   ASSERT(type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID);
 #ifdef ARCH_32BITS
   /* 32-bits Fowler/Noll/Vo hash function */

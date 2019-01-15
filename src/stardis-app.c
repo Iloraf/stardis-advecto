@@ -38,7 +38,7 @@ read_line(char** pb, FILE* stream)
     }
     /* Search idx of first occurence of comment char or EOL */
     idx = strcspn(buf, "#\n\r");
-    /* Remove meaningles text */
+    /* Remove meaningless text */
     buf[idx] = '\0';
     /* Find first text */
     idx = strspn(buf, " \t");
@@ -161,14 +161,22 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
       res = RES_BAD_ARG;
       goto exit;
     }
+    /* Depending of the number of spaces before '"' strtok should
+     * be called once or twice */
     CHK_TOK(strtok(NULL, "\""), "Tinit");
+    if(*(tk + strspn(tk, " \t")) == '\0')
+      CHK_TOK(strtok(NULL, "\""), "Tinit");
     desc->d.solid.Tinit = malloc(strlen(tk) + 1);
     strcpy(desc->d.solid.Tinit, tk);
     /* Closing " fot Tinit; can return NULL if line ends just after "Tinit" */
     tk = strtok(NULL, "\"");
 
     /* Volumic Power is optional */
-    tk = strtok(NULL, "\"");
+    if (tk && *(tk + strspn(tk, " \t")) == '\0') {
+      /* Depending of the number of spaces before '"' strtok should
+       * be called once or twice */
+      tk = strtok(NULL, "\"");
+    }
     if (tk) {
       desc->d.solid.power = malloc(strlen(tk) + 1);
       strcpy(desc->d.solid.power, tk);
@@ -195,7 +203,11 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
       res = RES_BAD_ARG;
       goto exit;
     }
+    /* Depending of the number of spaces before '"' strtok should
+     * be called once or twice */
     CHK_TOK(strtok(NULL, "\""), "Tinit");
+    if (*(tk + strspn(tk, " \t")) == '\0')
+      CHK_TOK(strtok(NULL, "\""), "Tinit");
     desc->d.fluid.Tinit = malloc(strlen(tk) + 1);
     strcpy(desc->d.fluid.Tinit, tk);
   }
@@ -292,7 +304,11 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
       res = RES_BAD_ARG;
       goto exit;
     }
+    /* Depending of the number of spaces before '"' strtok should
+     * be called once or twice */
     CHK_TOK(strtok(NULL, "\""), "temperature");
+    if (*(tk + strspn(tk, " \t")) == '\0')
+      CHK_TOK(strtok(NULL, "\""), "temperature");
     desc->d.h_boundary.T = malloc(strlen(tk) + 1);
     strcpy(desc->d.h_boundary.T, tk);
   }
@@ -304,7 +320,11 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
     *stl_filename = malloc(strlen(tk) + 1);
     strcpy(*stl_filename, tk);
 
+    /* Depending of the number of spaces before '"' strtok should
+     * be called once or twice */
     CHK_TOK(strtok(NULL, "\""), "temperature");
+    if (*(tk + strspn(tk, " \t")) == '\0')
+      CHK_TOK(strtok(NULL, "\""), "temperature");
     desc->d.t_boundary.T = malloc(strlen(tk) + 1);
     strcpy(desc->d.t_boundary.T, tk);
 
@@ -337,7 +357,11 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
     *stl_filename = malloc(strlen(tk) + 1);
     strcpy(*stl_filename, tk);
 
+    /* Depending of the number of spaces before '"' strtok should
+     * be called once or twice */
     CHK_TOK(strtok(NULL, "\""), "flux");
+    if (*(tk + strspn(tk, " \t")) == '\0')
+      CHK_TOK(strtok(NULL, "\""), "flux");
     desc->d.f_boundary.flux = malloc(strlen(tk) + 1);
     strcpy(desc->d.f_boundary.flux, tk);
 

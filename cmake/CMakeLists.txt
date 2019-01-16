@@ -68,10 +68,6 @@ rcmake_prepend_path(SDIS_FILES_SRC ${SDIS_SOURCE_DIR})
 rcmake_prepend_path(SDIS_FILES_INC ${SDIS_SOURCE_DIR})
 rcmake_prepend_path(SDIS_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
-if(CMAKE_COMPILER_IS_GNUCC)
-  set(MATH_LIB m)
-endif()
-
 # Default is right to left pow and log is natural log
 # Build tinyExpr without closure support and with function_1 to function_3 support only
 # (these ones cannot be disabled as predefined functions require them).
@@ -80,9 +76,13 @@ set(TE_DEFAULTS
 
 ADD_LIBRARY(tinyexpr STATIC
   ${TINYEXPR_SOURCE_DIR}/tinyexpr.c ${TINYEXPR_SOURCE_DIR}/tinyexpr.h)
-set_target_properties(tinyexpr PROPERTIES COMPILE_FLAGS ${TE_DEFAULTS})
+
 if(CMAKE_COMPILER_IS_GNUCC)
-  set_target_properties(tinyexpr PROPERTIES COMPILE_FLAGS "-std=c99")
+  set_target_properties(tinyexpr PROPERTIES
+    COMPILE_FLAGS "-std=c99 ${TE_DEFAULTS}")
+elseif(MSVC)
+  set_target_properties(tinyexpr PROPERTIES
+    COMPILE_FLAGS ${TE_DEFAULTS})
 endif()
 
 add_executable(sdis-app
@@ -90,16 +90,17 @@ add_executable(sdis-app
   ${SDIS_FILES_INC})
   
 if(CMAKE_COMPILER_IS_GNUCC)
-  set_target_properties(sdis-app PROPERTIES COMPILE_FLAGS "-std=c99")
-endif()
-target_link_libraries(sdis-app Stardis StarSTL RSys tinyexpr ${MATH_LIB})
-if(MSVC)
-  target_link_libraries(sdis-app MuslGetopt)
+  set_target_properties(sdis-app PROPERTIES
+    COMPILE_FLAGS "-std=c99 ${TE_DEFAULTS}"
+    VERSION ${VERSION})
+  target_link_libraries(sdis-app Stardis StarSTL RSys tinyexpr m)
+elseif(MSVC)
+  set_target_properties(sdis-app PROPERTIES
+    COMPILE_FLAGS "${TE_DEFAULTS}"
+    VERSION ${VERSION})
+  target_link_libraries(sdis-app Stardis StarSTL RSys tinyexpr MuslGetopt)
 endif()
 
-set_target_properties(sdis-app PROPERTIES
-  COMPILE_FLAGS ${TE_DEFAULTS}
-  VERSION ${VERSION})
 rcmake_copy_runtime_libraries(sdis-app)
 
 ################################################################################

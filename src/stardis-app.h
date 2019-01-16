@@ -40,7 +40,7 @@ struct vertex{
 #define NULL_VERTEX__ {{0.0 ,0.0 ,0.0}}
 static const struct vertex NULL_VERTEX = NULL_VERTEX__;
 
-static inline char
+static INLINE char
 eq_vertex(const struct vertex* a, const struct vertex* b)
 {
   return (char)f3_eq(a->xyz, b->xyz);
@@ -53,34 +53,36 @@ eq_vertex(const struct vertex* a, const struct vertex* b)
 #define HTABLE_KEY_FUNCTOR_EQ eq_vertex
 #include <rsys/hash_table.h>
 
-typedef unsigned unsigned3[3];
+struct unsigned3 { unsigned data[3]; };
 struct triangle {
-  unsigned3 indices;
+  struct unsigned3 indices;
   unsigned front_description;
   unsigned back_description;
   unsigned connection_description;
 };
-#define NULL_TRIANGLE__ {{0, 0, 0}, UINT_MAX, UINT_MAX, UINT_MAX }
+#define NULL_TRIANGLE__ {{{0, 0, 0}}, UINT_MAX, UINT_MAX, UINT_MAX }
 static const struct triangle NULL_TRIANGLE = NULL_TRIANGLE__;
 
-static char
-eq_indices(const unsigned3* a, const unsigned3* b)
+static INLINE char
+eq_indices(const struct unsigned3* a, const struct unsigned3* b)
 {  
-  return (*a)[0] == (*b)[0] && (*a)[1] == (*b)[1] && (*a)[2] == (*b)[2];
+  return a->data[0] == b->data[0]
+    && a->data[1] == b->data[1]
+    && a->data[2] == b->data[2];
 }
 
-static res_T
-cp_indices(unsigned3* dst, const unsigned3* src)
+static INLINE res_T
+cp_indices(struct unsigned3* dst, const struct unsigned3* src)
 {
   int i;
-  FOR_EACH(i, 0, 3) (*dst)[i] = (*src)[i];
+  FOR_EACH(i, 0, 3) dst->data[i] = src->data[i];
   return RES_OK;
 }
 
 /* Declare the hash table that maps a triangle id to its index */
 #define HTABLE_NAME triangle 
 #define HTABLE_DATA unsigned
-#define HTABLE_KEY unsigned3
+#define HTABLE_KEY struct unsigned3
 #define HTABLE_KEY_FUNCTOR_EQ eq_indices
 #define HTABLE_KEY_FUNCTOR_COPY cp_indices
 #include <rsys/hash_table.h>
@@ -94,7 +96,7 @@ struct geometry {
 #define NULL_GEOMETRY__ {NULL, NULL, NULL, NULL }
 static const struct geometry NULL_GEOMETRY = NULL_GEOMETRY__;
 
-static inline void
+static INLINE void
 release_geometry(struct geometry* geom)
 {
   size_t i;
@@ -709,9 +711,8 @@ struct description {
     struct solid_fluid_connect sf_connect;
   } d;
 };
-#define NULL_DESCRIPTION__  {DESCRIPTION_TYPE_COUNT__ };
 
-static char
+static INLINE char
 eq_description(const struct description* a, const struct description* b)
 {
   if (a->type != b->type) return 0;
@@ -734,7 +735,7 @@ eq_description(const struct description* a, const struct description* b)
   }
 }
 
-static size_t
+static INLINE size_t
 hash_description(const struct description* key)
 {
   switch (key->type) {
@@ -779,7 +780,8 @@ struct stardis {
   struct camera camera;
   struct mem_allocator allocator;
 };
-#define NULL_STARDIS__ {NULL_GEOMETRY__, NULL, 0, 0, {0,0,0,0}, 0, {300,300}, NULL_CAMERA__}
+#define NULL_ALLOCATOR__ {NULL}
+#define NULL_STARDIS__ {NULL_GEOMETRY__, NULL, 0, 0, {0,0,0,0}, 0, {300,300}, NULL_CAMERA__, NULL_ALLOCATOR__}
 static const struct stardis NULL_STARDIS = NULL_STARDIS__;
 
 extern res_T 

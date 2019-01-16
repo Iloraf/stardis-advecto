@@ -86,7 +86,7 @@ print_help(char* prog)
 }
 
 
-static inline res_T
+static INLINE res_T
 parse_args(const int argc, char** argv, struct args* args)
 {
   int opt = 0;

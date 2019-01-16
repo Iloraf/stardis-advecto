@@ -26,9 +26,9 @@ geometry_get_indices
  void* context)
 {
   struct geometry* geom = context;
-  ids[0] = geom->triangle[itri].indices[0];
-  ids[1] = geom->triangle[itri].indices[1];
-  ids[2] = geom->triangle[itri].indices[2];
+  ids[0] = geom->triangle[itri].indices.data[0];
+  ids[1] = geom->triangle[itri].indices.data[1];
+  ids[2] = geom->triangle[itri].indices.data[2];
 }
 
 static void
@@ -113,7 +113,8 @@ fluid_get_tinit
   return te_eval(fluid_props->temperature, vtx);
 }
 
-void release_fluid_data(void* f)
+static void
+release_fluid_data(void* f)
 {
   struct fluid* fluid = (struct fluid*)f;
   te_free(fluid->temperature);
@@ -217,7 +218,8 @@ solid_get_power
   return te_eval(solid_props->power, vtx);
 }
 
-void release_solid_data(void* s)
+static void 
+release_solid_data(void* s)
 {
   struct solid* solid = (struct solid*)s;
   te_free(solid->t_init);
@@ -269,7 +271,8 @@ interface_get_flux
   return te_eval(interface_props->flux, frag);
 }
 
-void release_interface_data(void* s)
+static void 
+release_interface_data(void* s)
 {
   struct intface* intface = (struct intface*)s;
   te_free(intface->temperature);
@@ -285,7 +288,7 @@ interface_get_emissivity
   return interface_props->emissivity;
 }
 
-static double
+static INLINE double
 interface_get_alpha
   (const struct sdis_interface_fragment* frag, struct sdis_data* data)
 {
@@ -376,12 +379,12 @@ dump_image(const struct sdis_accum_buffer* buf)
  ******************************************************************************/
 
 struct int_descs {
-  unsigned front, back, connect;     unsigned id;
+  unsigned front, back, connect;
 };
-#define INT_DESCS_NULL__ { UINT_MAX, UINT_MAX, UINT_MAX };
+#define INT_DESCS_NULL__ { UINT_MAX, UINT_MAX, UINT_MAX }
 static const struct int_descs INT_DESCS_NULL = INT_DESCS_NULL__;
 
-static inline char
+static INLINE char
 eq_desc(const struct int_descs* a, const struct int_descs* b)
 {
   return (char)(a->front == b->front && a->back == b->back
@@ -550,7 +553,6 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
   struct htable_intface htable_interfaces;
   int htable_interfaces_initialised = 0;
-  unsigned int_cpt = 0;
   double pos[3] = {0,0,0};
   double time[2] = { 0, 0};
   size_t nfailures;
@@ -676,7 +678,6 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       int front_defined = (fd != UINT_MAX);
       int back_defined = (bd != UINT_MAX);
       int connect_defined = (cd != UINT_MAX);
-      int_descs.id = int_cpt++;
 
       SDIS(data_create(dev, sizeof(struct intface), ALIGNOF(struct intface),
         release_interface_data, &data));

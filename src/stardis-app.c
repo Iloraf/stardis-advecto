@@ -2,6 +2,7 @@
 
 #define _GNU_SOURCE 1
 #include <string.h>
+#include <ctype.h>
 #include "stardis-app.h"
 
 
@@ -16,7 +17,7 @@
 /*******************************************************************************
  *
  ******************************************************************************/
-static inline char*
+static INLINE char*
 read_line(char** pb, FILE* stream)
 {
   const int chunk_sz = 32;
@@ -103,8 +104,12 @@ static char** split_line(char* a_str, const char a_delim)
 static char*
 _strupr(char* s)
 {
-  char* tmp;
-  for (tmp = s; *tmp; ++tmp) *tmp = toupper((unsigned char)*tmp);
+  char* ptr;
+  for (ptr = s; *ptr; ++ptr) {
+    int tmp = toupper(*ptr);
+    ASSERT(tmp == (char)tmp);
+    *ptr = (char)tmp;
+  }
   return s;
 }
 #endif
@@ -477,21 +482,21 @@ read_vertices
 }
 
 static int
-indices_to_key(unsigned3 key, const unsigned3 indices)
+indices_to_key(struct unsigned3* key, const struct unsigned3* indices)
 {
   int i, reversed = 0;
-  FOR_EACH(i, 0, 3) key[i] = indices[i];
-  if (key[0] > key[1]) {
+  FOR_EACH(i, 0, 3) key->data[i] = indices->data[i];
+  if (key->data[0] > key->data[1]) {
     reversed = !reversed;
-    SWAP(unsigned, key[0], key[1]);
+    SWAP(unsigned, key->data[0], key->data[1]);
   }
-  if (key[1] > key[2]) {
+  if (key->data[1] > key->data[2]) {
     reversed = !reversed;
-    SWAP(unsigned, key[1], key[2]);
+    SWAP(unsigned, key->data[1], key->data[2]);
   }
-  if (key[0] > key[1]) {
+  if (key->data[0] > key->data[1]) {
     reversed = !reversed;
-    SWAP(unsigned, key[0], key[1]);
+    SWAP(unsigned, key->data[0], key->data[1]);
   }
   return reversed;
 }
@@ -511,15 +516,15 @@ read_triangles
     struct triangle tri = NULL_TRIANGLE;
     const unsigned *found_id = NULL;
     unsigned id;
-    unsigned3 key;
+    struct unsigned3 key;
     int reversed;
     enum sdis_side current_side = SDIS_FRONT;
     unsigned* side_desc_ptr = NULL;
 
-    tri.indices[0] = id2id[stl_desc->indices[3*tri_index + 0]];
-    tri.indices[1] = id2id[stl_desc->indices[3*tri_index + 1]];
-    tri.indices[2] = id2id[stl_desc->indices[3*tri_index + 2]];
-    reversed = indices_to_key(key, tri.indices);
+    tri.indices.data[0] = id2id[stl_desc->indices[3*tri_index + 0]];
+    tri.indices.data[1] = id2id[stl_desc->indices[3*tri_index + 1]];
+    tri.indices.data[2] = id2id[stl_desc->indices[3*tri_index + 2]];
+    reversed = indices_to_key(&key, &tri.indices);
 
     /* Find triangle if already known, or insert it in known list */
     found_id = htable_triangle_find(triangle2id, &key);
@@ -528,7 +533,7 @@ read_triangles
       int original_reversed;
       id = *found_id;
       original_tri = (*tri_list) + id;
-      original_reversed = indices_to_key(key, original_tri->indices);
+      original_reversed = indices_to_key(&key, &original_tri->indices);
       current_side = (reversed == original_reversed) ? SDIS_FRONT : SDIS_BACK;
       ASSERT(id < sa_size(*tri_list));
     } else {
@@ -566,7 +571,7 @@ static res_T
 read_stl
   (const unsigned desc_id,
    const int is_connection,
-   const char** stl_filename,
+   char* const* stl_filename,
    struct htable_vertex* vertex2id,
    struct htable_triangle* triangle2id,
    struct stardis* stardis)
@@ -640,8 +645,9 @@ geometry_analyse
   /* loop on media */
   while (read_line(&line, input)){
     char* stl_filename = NULL;
-    struct description desc = NULL_DESCRIPTION__;
-
+    struct description desc;
+    
+    desc.type = DESCRIPTION_TYPE_COUNT__;
     res = parse_medium_line(line, &stl_filename, &desc);
     if (res != RES_OK) goto error;
 
@@ -676,8 +682,9 @@ geometry_analyse
   /* loop on boundaries */
   while (read_line(&line, input)){
     char* stl_filename = NULL;
-    struct description desc = NULL_DESCRIPTION__;
+    struct description desc;
 
+    desc.type = DESCRIPTION_TYPE_COUNT__;
     res = parse_boundary_line(line, &stl_filename, &desc);
     if (res != RES_OK) goto error;
     
@@ -860,7 +867,7 @@ dump_vtk
   }
   fprintf(output,"\nPOLYGONS %i %i\n", (int)sa_size(tri), (int)(4*sa_size(tri)));
   for (i=0; i<sa_size(tri); ++i){
-    fprintf(output,"3 %i %i %i\n",SPLIT3(tri[i].indices));
+    fprintf(output,"3 %i %i %i\n",SPLIT3(tri[i].indices.data));
   }
   fprintf(output,"\nCELL_DATA %i \n", (int)sa_size(tri));
   fprintf(output,"SCALARS front_description float 1\n");

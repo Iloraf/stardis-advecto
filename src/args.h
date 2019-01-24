@@ -30,8 +30,13 @@ struct args{
   double radiative_temp[2];
   char* camera;
 };
+#ifdef NDEBUG
+#define DEFAULT_NTHREADS SDIS_NTHREADS_DEFAULT
+#else
+#define DEFAULT_NTHREADS 1
+#endif
 #define ARGS_DEFAULT__ {\
-  NULL, NULL, 10000, 1,\
+  NULL, NULL, 10000, DEFAULT_NTHREADS,\
   { { {0.0, 0.0, 0.0}, 0x7FF0000000000000 /* probe[3]=INF */}},\
   PROBE_COMPUTE, 1.0, {300.0, 300.0}, NULL}
 static const struct args ARGS_DEFAULT = ARGS_DEFAULT__;

@@ -23,7 +23,7 @@ set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 ################################################################################
 find_package(RCMake 0.4 REQUIRED)
 find_package(RSys 0.6.1 REQUIRED)
-find_package(Stardis 0.5 REQUIRED)
+find_package(Stardis 0.6.1 REQUIRED)
 find_package(StarSTL 0.3 REQUIRED)
 
 set(TINYEXPR_SOURCE_DIR  "${PROJECT_SOURCE_DIR}/../tinyexpr" CACHE PATH "Directory for TinyExpr source files")

@@ -177,6 +177,8 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
     tk = strtok(NULL, "\"");
 
     /* Volumic Power is optional */
+    desc->d.solid.power = NULL;
+    desc->d.solid.has_power = 0;
     if (tk && *(tk + strspn(tk, " \t")) == '\0') {
       /* Depending of the number of spaces before '"' strtok should
        * be called once or twice */
@@ -185,6 +187,8 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
     if (tk) {
       desc->d.solid.power = malloc(strlen(tk) + 1);
       strcpy(desc->d.solid.power, tk);
+      /* Can be changed aftwerwards if compiled to constant 0  */
+      desc->d.solid.has_power = 1;
     }
   }
   else if (strcmp(tk, "FLUID") == 0) {

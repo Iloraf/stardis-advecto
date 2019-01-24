@@ -722,7 +722,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
           if (solid_count != 1 || fluid_count != 1) {
             ASSERT(front_defined && back_defined);
             fprintf(stderr,
-              "Ca only define a DESC_SOLID_FLUID_CONNECT between a fluid and a solid\n");
+              "Can only define a DESC_SOLID_FLUID_CONNECT between a fluid and a solid\n");
             res = RES_BAD_ARG;
             goto error;
           }

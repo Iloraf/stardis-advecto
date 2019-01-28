@@ -857,22 +857,35 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         }
       }
 
-      if(fluid_count == 2
-        || fluid_count + solid_count + connection_count < 2
-        || boundary_count ?
-          (fluid_count + solid_count != 1) : (fluid_count + solid_count != 2)
+      if((fluid_count == 2)
+        || (fluid_count + solid_count + connection_count < 2)
+        || (boundary_count ?
+             (fluid_count + solid_count != 1) : (fluid_count + solid_count != 2))
         || (solid_fluid_connection_count && (fluid_count != 1 || solid_count != 1)))
       {
         /* Incoherent triangle description */
-        if(fluid_count == 2)
-        fprintf(stderr, "Incoherent triangle description\n");
+        fprintf(stderr, "Incoherent triangle description (%u)\n", i);
+        print_trg_as_obj(stderr, stardis->geometry.vertex, trg);
+        fprintf(stderr, "Front: ");
+        if(!front_defined) fprintf(stderr, "undefined\n");
+        else print_description(stderr, &stardis->descriptions[fd]);
+        fprintf(stderr, "Back: ");
+        if (!back_defined) fprintf(stderr, "undefined\n");
+        else print_description(stderr, &stardis->descriptions[bd]);
+        fprintf(stderr, "Connection: ");
+        if (!connect_defined) fprintf(stderr, "undefined\n");
+        else print_description(stderr, &stardis->descriptions[cd]);
         res = RES_BAD_ARG;
         goto error;
       }
 
       res = sdis_interface_create(dev, front_med, back_med,
         &interface_shader, data, &intface);
-      if (res != RES_OK) goto error;
+      if (res != RES_OK) {
+        fprintf(stderr,
+          "Cannot create interface associated to triangle %u\n", i);
+        goto error;
+      }
       SDIS(data_ref_put(data)); data = NULL;
       res = htable_intface_set(&htable_interfaces, &int_descs, &intface);
       if (res != RES_OK) goto error;

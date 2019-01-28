@@ -63,6 +63,19 @@ struct triangle {
 #define NULL_TRIANGLE__ {{{0, 0, 0}}, UINT_MAX, UINT_MAX, UINT_MAX }
 static const struct triangle NULL_TRIANGLE = NULL_TRIANGLE__;
 
+static INLINE void
+print_trg_as_obj
+  (FILE* stream,
+   const struct vertex* vertices,
+   const struct triangle* trg)
+{
+  assert(stream && vertices && trg);
+  fprintf(stream, "v %.8e %.8e %.8e\nv %.8e %.8e %.8e\nv %.8e %.8e %.8e\nf 1 2 3\n",
+    SPLIT3(vertices[trg->indices.data[0]].xyz),
+    SPLIT3(vertices[trg->indices.data[1]].xyz),
+    SPLIT3(vertices[trg->indices.data[2]].xyz));
+}
+
 static INLINE char
 eq_indices(const struct unsigned3* a, const struct unsigned3* b)
 {  
@@ -114,6 +127,15 @@ struct mat_fluid {
   double cp;
   char* Tinit;
 };
+
+static void
+print_fluid(FILE* stream, const struct mat_fluid* f)
+{
+  assert(stream && f);
+  fprintf(stream,
+    "Fluid %u: cp=%g rho=%g Tinit='%s'\n",
+    f->fluid_id, f->cp, f->rho, f->Tinit);
+}
 
 static char
 eq_fluid(const struct mat_fluid* a, const struct mat_fluid* b)
@@ -194,6 +216,16 @@ struct mat_solid {
   char* power;
   int has_power;
 };
+
+static void
+print_solid(FILE* stream, const struct mat_solid* s)
+{
+  assert(stream && s);
+  fprintf(stream,
+    "Solid %u: lambda=%g cp=%g rho=%g delta=%g Tinit='%s' Power='%s'\n",
+    s->solid_id, s->lambda, s->cp, s->rho, s->delta,
+    s->Tinit, (s->has_power ? s->power : "0"));
+}
 
 static char
 eq_solid(const struct mat_solid* a, const struct mat_solid* b)
@@ -312,6 +344,24 @@ struct h_boundary {
   int has_emissivity, has_hc;
 };
 
+static void
+print_h_boundary
+  (FILE* stream,
+   const struct h_boundary* b,
+   const enum description_type type)
+{
+  assert(stream && b
+    && (type == DESC_BOUND_H_FOR_SOLID || type == DESC_BOUND_H_FOR_FLUID));
+  fprintf(stream,
+    "H boundary for %s: emissivity=%g specular_fraction=%g hc=%g hc_max=%g T='%s'\n",
+    (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"),
+    (b->has_emissivity ? b->emissivity : 0),
+    (b->has_emissivity ? b->specular_fraction : 0),
+    (b->has_hc ? b->hc : 0),
+    (b->has_hc ? b->hc_max : 0),
+    (b->T ? b->T : "0"));
+}
+
 static char
 eq_h_boundary
   (const struct h_boundary* a,
@@ -429,6 +479,22 @@ struct t_boundary {
   int has_hc;
 };
 
+static void
+print_t_boundary
+  (FILE* stream,
+   const struct t_boundary* b,
+   const enum description_type type)
+{
+  assert(stream && b
+    && (type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID));
+  fprintf(stream,
+    "T boundary for %s: hc=%g hc_max=%g T='%s'\n",
+    (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
+    (b->has_hc ? b->hc : 0),
+    (b->has_hc ? b->hc_max : 0),
+    (b->T ? b->T : "0"));
+}
+
 static char
 eq_t_boundary
   (const struct t_boundary* a,
@@ -529,6 +595,20 @@ struct f_boundary {
   double hc_max;
   int has_hc;
 };
+
+static void
+print_f_boundary
+  (FILE* stream,
+   const struct f_boundary* b,
+   const enum description_type type)
+{
+  assert(stream && b && type == DESC_BOUND_F_FOR_SOLID);
+  fprintf(stream,
+    "F boundary for SOLID: hc=%g hc_max=%g flux='%s'\n",
+    (b->has_hc ? b->hc : 0),
+    (b->has_hc ? b->hc_max : 0),
+    (b->flux ? b->flux : "0"));
+}
 
 static char
 eq_f_boundary(const struct f_boundary* a, const struct f_boundary* b)
@@ -711,6 +791,34 @@ struct description {
     struct solid_fluid_connect sf_connect;
   } d;
 };
+
+static INLINE void
+print_description
+  (FILE* stream,
+   struct description* desc)
+{
+  ASSERT(stream && desc);
+  switch (desc->type) {
+  case DESC_MAT_SOLID:
+    print_solid(stream, &desc->d.solid);
+    break;
+  case DESC_MAT_FLUID:
+    print_fluid(stream, &desc->d.fluid);
+    break;
+  case DESC_BOUND_T_FOR_SOLID:
+  case DESC_BOUND_T_FOR_FLUID:
+    print_t_boundary(stream, &desc->d.t_boundary, desc->type);
+    break;
+  case DESC_BOUND_H_FOR_SOLID:
+  case DESC_BOUND_H_FOR_FLUID:
+    print_h_boundary(stream, &desc->d.h_boundary, desc->type);
+    break;
+  case DESC_BOUND_F_FOR_SOLID:
+    print_f_boundary(stream, &desc->d.f_boundary, desc->type);
+    break;
+  default: FATAL("Invalid type.\n");
+  }
+}
 
 static INLINE char
 eq_description(const struct description* a, const struct description* b)

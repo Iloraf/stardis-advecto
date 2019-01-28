@@ -30,7 +30,9 @@ int main(int argc, char** argv){
 
 exit:
   stardis_release(&stardis);
-  if((memsz = MEM_ALLOCATED_SIZE(&stardis.allocator)) != 0) {
+  if(stardis.allocator_initialized
+    && (memsz = MEM_ALLOCATED_SIZE(&stardis.allocator)) != 0)
+  {
     char dump[4096] = { '\0' };
     MEM_DUMP(&stardis.allocator, dump, sizeof(dump));
     fprintf(stderr, "%s\n", dump);

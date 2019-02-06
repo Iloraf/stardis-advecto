@@ -69,7 +69,7 @@ print_trg_as_obj
    const struct vertex* vertices,
    const struct triangle* trg)
 {
-  assert(stream && vertices && trg);
+  ASSERT(stream && vertices && trg);
   fprintf(stream, "v %.8e %.8e %.8e\nv %.8e %.8e %.8e\nv %.8e %.8e %.8e\nf 1 2 3\n",
     SPLIT3(vertices[trg->indices.data[0]].xyz),
     SPLIT3(vertices[trg->indices.data[1]].xyz),
@@ -131,7 +131,7 @@ struct mat_fluid {
 static void
 print_fluid(FILE* stream, const struct mat_fluid* f)
 {
-  assert(stream && f);
+  ASSERT(stream && f);
   fprintf(stream,
     "Fluid %u: cp=%g rho=%g Tinit='%s'\n",
     f->fluid_id, f->cp, f->rho, f->Tinit);
@@ -220,7 +220,7 @@ struct mat_solid {
 static void
 print_solid(FILE* stream, const struct mat_solid* s)
 {
-  assert(stream && s);
+  ASSERT(stream && s);
   fprintf(stream,
     "Solid %u: lambda=%g cp=%g rho=%g delta=%g Tinit='%s' Power='%s'\n",
     s->solid_id, s->lambda, s->cp, s->rho, s->delta,
@@ -350,7 +350,7 @@ print_h_boundary
    const struct h_boundary* b,
    const enum description_type type)
 {
-  assert(stream && b
+  ASSERT(stream && b
     && (type == DESC_BOUND_H_FOR_SOLID || type == DESC_BOUND_H_FOR_FLUID));
   fprintf(stream,
     "H boundary for %s: emissivity=%g specular_fraction=%g hc=%g hc_max=%g T='%s'\n",
@@ -485,7 +485,7 @@ print_t_boundary
    const struct t_boundary* b,
    const enum description_type type)
 {
-  assert(stream && b
+  ASSERT(stream && b
     && (type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID));
   fprintf(stream,
     "T boundary for %s: hc=%g hc_max=%g T='%s'\n",
@@ -602,7 +602,7 @@ print_f_boundary
    const struct f_boundary* b,
    const enum description_type type)
 {
-  assert(stream && b && type == DESC_BOUND_F_FOR_SOLID);
+  ASSERT(stream && b && type == DESC_BOUND_F_FOR_SOLID); (void)type;
   fprintf(stream,
     "F boundary for SOLID: hc=%g hc_max=%g flux='%s'\n",
     (b->has_hc ? b->hc : 0),

@@ -454,7 +454,7 @@ read_vertices
   (struct sstl_desc* desc,
   struct htable_vertex* vertex2id,
   unsigned** id2id,
-  struct vertex** vert_list)
+  struct geometry* geometry)
 {
   res_T res = RES_OK;
   unsigned vtx_index = 0;
@@ -466,7 +466,6 @@ read_vertices
     vtx.xyz[0] = desc->vertices[3*vtx_index + 0];
     vtx.xyz[1] = desc->vertices[3*vtx_index + 1];
     vtx.xyz[2] = desc->vertices[3*vtx_index + 2];
-
     found_id = htable_vertex_find(vertex2id, &vtx);
 
     if (found_id){
@@ -477,7 +476,7 @@ read_vertices
       ASSERT(sz < UINT_MAX);
       size = (unsigned)sz;
       htable_vertex_set(vertex2id, &vtx, &size);
-      sa_push(*vert_list, vtx);
+      sa_push(geometry->vertex, vtx);
       sa_push(*id2id, size);
     }
   }
@@ -507,28 +506,48 @@ indices_to_key(struct unsigned3* key, const struct unsigned3* indices)
 
 static res_T
 read_triangles
-  (const struct sstl_desc* stl_desc,
+  (struct sstl_desc* stl_desc,
    struct htable_triangle* triangle2id,
+   const char* stl_filename,
    const unsigned* id2id,
    const int is_connection,
    const unsigned desc_id,
-   struct triangle** tri_list)
+   struct geometry* geometry)
 {
   res_T res = RES_OK;
-  unsigned tri_index = 0;
+  unsigned* packed_indices = NULL;
+  float* packed_normals = NULL;
+  unsigned tri_index = 0, drop_cpt = 0;
   for (tri_index = 0; tri_index < stl_desc->triangles_count; ++tri_index) {
     struct triangle tri = NULL_TRIANGLE;
     const unsigned *found_id = NULL;
-    unsigned id;
+    unsigned i, id;
     struct unsigned3 key;
     int reversed;
+    int drop = 0;
     enum sdis_side current_side = SDIS_FRONT;
     unsigned* side_desc_ptr = NULL;
+    float coord[3][3];
 
-    tri.indices.data[0] = id2id[stl_desc->indices[3*tri_index + 0]];
-    tri.indices.data[1] = id2id[stl_desc->indices[3*tri_index + 1]];
-    tri.indices.data[2] = id2id[stl_desc->indices[3*tri_index + 2]];
+    FOR_EACH(i, 0, 3)
+      tri.indices.data[i] = id2id[stl_desc->indices[3*tri_index + i]];
     reversed = indices_to_key(&key, &tri.indices);
+
+    FOR_EACH(i, 0, 3) {
+      unsigned j;
+      f3_set(coord[i], geometry->vertex[key.data[i]].xyz);
+      FOR_EACH(j, 0, i) {
+        if (f3_eq(coord[i], coord[j])) {
+          drop = 1;
+          drop_cpt++;
+        }
+      }
+    }
+    if (drop) continue;
+    FOR_EACH(i, 0, 3) {
+      sa_push(packed_indices, stl_desc->indices[3 * tri_index + i]);
+      sa_push(packed_normals, stl_desc->normals[3 * tri_index + i]);
+    }
 
     /* Find triangle if already known, or insert it in known list */
     found_id = htable_triangle_find(triangle2id, &key);
@@ -536,38 +555,60 @@ read_triangles
       struct triangle* original_tri;
       int original_reversed;
       id = *found_id;
-      original_tri = (*tri_list) + id;
+      original_tri = geometry->triangle + id;
       original_reversed = indices_to_key(&key, &original_tri->indices);
       current_side = (reversed == original_reversed) ? SDIS_FRONT : SDIS_BACK;
-      ASSERT(id < sa_size(*tri_list));
+      ASSERT(id < sa_size(geometry->triangle));
     } else {
       size_t sz;
       sz = htable_triangle_size_get(triangle2id);
-      ASSERT(sz == sa_size(*tri_list));
+      ASSERT(sz == sa_size(geometry->triangle));
       ASSERT(sz < UINT_MAX);
       id = (unsigned)sz;
       /* Store tri as described by stl_desc regardless of key order */
       htable_triangle_set(triangle2id, &key, &id);
-      sa_push(*tri_list, tri);
+      sa_push(geometry->triangle, tri);
     }
 
     if (is_connection) {
-      side_desc_ptr = &(*tri_list)[id].connection_description;
+      side_desc_ptr = &geometry->triangle[id].connection_description;
     }
     else {
-      /* Is the triangle in tri_list reversed wrt stl_desc? */
+      /* Is the triangle in triangle list reversed wrt stl_desc? */
       side_desc_ptr = (current_side == SDIS_FRONT) ?
-        &(*tri_list)[id].front_description : &(*tri_list)[id].back_description;
+        &geometry->triangle[id].front_description
+        : &geometry->triangle[id].back_description;
     }
     if (*side_desc_ptr != UINT_MAX && *side_desc_ptr != desc_id) {
       /* Already described with a different description! */
-      fprintf(stderr, "Triangle %s with 2 different descriptions\n",
-        is_connection ? "connection" : "side");
+      fprintf(stderr, "Triangle %u %s with 2 different descriptions\n",
+        tri_index,
+        is_connection ? "connection" : (current_side == SDIS_FRONT ? "front" : "back"));
+      print_trg_as_obj(stderr, (const struct vertex*)stl_desc->vertices, &tri);
       return RES_BAD_ARG;
     }
     /* Everithing is OK: store description */
     *side_desc_ptr = desc_id;
   }
+  ASSERT(drop_cpt == 0 || packed_indices != NULL);
+  if (drop_cpt) {
+    fprintf(stderr, "File '%s' includes %u degenerate triangles (dropped)\n",
+      stl_filename, drop_cpt);
+    /* Keep only valid triangles */
+    ASSERT(sa_size(packed_indices) % 3 == 0);
+    ASSERT(sa_size(packed_indices) == sa_size(packed_normals));
+    ASSERT(sa_size(packed_indices) + 3 * drop_cpt == sa_size(stl_desc->indices));
+    /* Don't sa_release stl_desc->indices or stl_desc->normals as they have
+     * their own release mechanism */
+    stl_desc->indices = packed_indices;
+    stl_desc->normals = packed_normals;
+    stl_desc->triangles_count = sa_size(stl_desc->indices) / 3;
+  }
+  else {
+    sa_release(packed_indices);
+    sa_release(packed_normals);
+  }
+
   return res;
 }
 
@@ -596,10 +637,10 @@ read_stl
   }
   SSTL(get_desc(sstl, &stl_desc));
 
-  res = read_vertices(&stl_desc, vertex2id, &id2id, &stardis->geometry.vertex);
+  res = read_vertices(&stl_desc, vertex2id, &id2id, &stardis->geometry);
   if (res != RES_OK) goto error;
-  res = read_triangles(&stl_desc, triangle2id, id2id, is_connection, desc_id,
-    &stardis->geometry.triangle);
+  res = read_triangles(&stl_desc, triangle2id, *stl_filename, id2id, is_connection,
+    desc_id, &stardis->geometry);
   if (res != RES_OK) goto error;
   
 end:

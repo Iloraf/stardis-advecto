@@ -70,7 +70,7 @@ print_trg_as_obj
    const struct triangle* trg)
 {
   ASSERT(stream && vertices && trg);
-  fprintf(stream, "v %.8e %.8e %.8e\nv %.8e %.8e %.8e\nv %.8e %.8e %.8e\nf 1 2 3\n",
+  fprintf(stream, "v %.8f %.8f %.8f\nv %.8f %.8f %.8f\nv %.8f %.8f %.8f\nf 1 2 3\n",
     SPLIT3(vertices[trg->indices.data[0]].xyz),
     SPLIT3(vertices[trg->indices.data[1]].xyz),
     SPLIT3(vertices[trg->indices.data[2]].xyz));

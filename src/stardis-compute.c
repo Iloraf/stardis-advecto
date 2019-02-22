@@ -4,8 +4,16 @@
 #include <sdis.h>
 #include <sdis_version.h>
 #include <rsys/double3.h>
+#include <rsys/dynamic_array_uint.h>
 
 #include <rsys/image.h>
+#include<star/senc.h>
+
+#include <rsys/hash_table.h>
+#define HTABLE_NAME vrtx_rank
+#define HTABLE_DATA unsigned
+#define HTABLE_KEY unsigned
+#include <rsys/hash_table.h>
 
 static void
 geometry_get_position
@@ -534,6 +542,134 @@ end:
 error:
   goto end;
 }
+res_T
+create_edge_file_if
+  (struct sdis_scene* scn,
+   struct mem_allocator* allocator)
+{
+  res_T res = RES_OK;
+  unsigned i, comp, scount, vcount;
+  char name[64];
+  FILE* obj = NULL;
+  struct htable_vrtx_rank ranks;
+  char structs_initialized = 0;
+  struct senc_descriptor* analyze = NULL;
+  struct darray_uint comps;
+  struct darray_uint edges;
+  unsigned cc_count = 0;
+  unsigned *cc, *ee, uimax = UINT_MAX;
+
+  res = sdis_get_scene_analyze(scn, &analyze);
+  if (res != RES_OK) goto error;
+  res = sdis_release_scene_analyze(scn);
+  if (res != RES_OK) goto error;
+  
+  ASSERT(scn && allocator);
+
+  res = senc_descriptor_get_frontier_segments_count(analyze, &scount);
+  if (res != RES_OK) goto error;
+
+  if(scount == 0)
+    /* No edge to exit */
+    return RES_OK;
+
+  fprintf(stderr, "Some frontier edges found: create OBJ files\n");
+
+  htable_vrtx_rank_init(allocator, &ranks);
+  darray_uint_init(allocator, &comps);
+  darray_uint_init(allocator, &edges);
+  structs_initialized = 1;
+
+  /* Exit vertices, with a new numbering scheme */
+  vcount = 0;
+  FOR_EACH(i, 0, scount) {
+    unsigned v, edge[2], rk[2];
+    res = senc_descriptor_get_frontier_segment(analyze, i, edge);
+    if(res != RES_OK) goto error;
+    FOR_EACH(v, 0, 2) {
+      unsigned* p_rank;
+      p_rank = htable_vrtx_rank_find(&ranks, edge + v);
+      if(p_rank) {
+        rk[v] = *p_rank;
+      } else {
+        /* First appearance: allocate a rank and exit it */
+        unsigned rank;
+        size_t tmp = htable_vrtx_rank_size_get(&ranks);
+        ASSERT(tmp < UINT_MAX);
+        rank = (unsigned) tmp;
+        res = htable_vrtx_rank_set(&ranks, edge + v, &rank);
+        if (res != RES_OK) goto error;
+        rk[v] = rank;
+        darray_uint_push_back(&comps, &uimax);
+        darray_uint_push_back(&edges, edge + v);
+        vcount++;
+      }
+      /* Manage components */
+      cc = darray_uint_data_get(&comps);
+      if(cc[rk[0]] != UINT_MAX || cc[rk[1]] != UINT_MAX) {
+        /* If both components known, they must be the same */
+        ASSERT(cc[rk[0]] == UINT_MAX || cc[rk[1]] == UINT_MAX
+          || cc[rk[0]] == cc[rk[1]]);
+        FOR_EACH(v, 0, 2) {
+          unsigned w = 1 - v; /* The other vertex */
+          if (cc[rk[v]] == UINT_MAX) cc[rk[v]] = cc[rk[w]];
+        }
+      } else {
+        /* None are in a know component: create a new one */
+        cc[rk[0]] = cc[rk[1]] = cc_count++;
+      }
+    }
+  }
+
+  /* Exit segments by component using the new numbering scheme */
+  cc = darray_uint_data_get(&comps);
+  ee = darray_uint_data_get(&edges);
+  FOR_EACH(comp, 0, cc_count) {
+    unsigned v;
+    snprintf(name, sizeof(name), "frontier_component_%u.obj", comp);
+    obj = fopen(name, "w");
+    if(!obj) goto error;
+    /* Exit all vertices even unused
+     * (same numbering scheme for all components) */
+    FOR_EACH(v, 0, vcount) {
+      double coord[3];
+      res = senc_descriptor_get_global_vertex(analyze, ee[v], coord);
+      if(res != RES_OK) goto error;
+      fprintf(obj, "v %f %f %f\n", SPLIT3(coord));
+    }
+    FOR_EACH(i, 0, scount) {
+      unsigned edge[2], new_ranks[2];
+      res = senc_descriptor_get_frontier_segment(analyze, i, edge);
+      if(res != RES_OK) goto error;
+      ASSERT(cc[edge[0]] == cc[edge[1]]);
+      if(cc[edge[0]] != comp)
+        /* Segment not in this component */
+        continue;
+      FOR_EACH(v, 0, 2) {
+        unsigned* p_rank;
+        p_rank = htable_vrtx_rank_find(&ranks, edge + v);
+        ASSERT(p_rank && *p_rank < vcount);
+        new_ranks[v] = *p_rank;
+      }
+#define OBJ_IDX(Rank) ((Rank)+1)
+      fprintf(obj, "l %u %u\n", OBJ_IDX(new_ranks[0]), OBJ_IDX(new_ranks[1]));
+#undef OBJ_IDX
+    }
+    fclose(obj); obj = NULL;
+  }
+
+end:
+  if(obj) fclose(obj);
+  if(analyze) senc_descriptor_ref_put(analyze);
+  if(structs_initialized) {
+    htable_vrtx_rank_release(&ranks);
+    darray_uint_release(&comps);
+    darray_uint_release(&edges);
+  }
+  return res;
+error:
+  goto end;
+}
 
 res_T
 stardis_compute(struct stardis* stardis, enum stardis_mode mode)
@@ -901,6 +1037,9 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         geometry_get_indices, geometry_get_interface,
         sa_size(stardis->geometry.vertex), 
         geometry_get_position, &stardis->geometry, &scn);
+  if (res != RES_OK) goto error;
+
+  res = create_edge_file_if(scn, &stardis->allocator);
   if (res != RES_OK) goto error;
 
   if (mode == IR_COMPUTE){

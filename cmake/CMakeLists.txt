@@ -23,6 +23,7 @@ set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 ################################################################################
 find_package(RCMake 0.4 REQUIRED)
 find_package(RSys 0.6.1 REQUIRED)
+find_package(StarEnc 0.2.2 REQUIRED)
 find_package(Stardis 0.6.1 REQUIRED)
 find_package(StarSTL 0.3 REQUIRED)
 
@@ -30,6 +31,7 @@ set(TINYEXPR_SOURCE_DIR  "${PROJECT_SOURCE_DIR}/../tinyexpr" CACHE PATH "Directo
 
 include_directories(
   ${RSys_INCLUDE_DIR}
+  ${StarEnc_INCLUDE_DIR}
   ${Stardis_INCLUDE_DIR}
   ${StarSTL_INCLUDE_DIR}
   ${TINYEXPR_SOURCE_DIR})
@@ -42,7 +44,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${RCMAKE_SOURCE_DIR})
 include(rcmake)
 include(rcmake_runtime)
 
-rcmake_append_runtime_dirs(_runtime_dirs RSys Stardis StarSTL)
+rcmake_append_runtime_dirs(_runtime_dirs RSys Stardis StarEnc StarSTL)
 
 ################################################################################
 # Configure and define targets
@@ -93,12 +95,12 @@ if(CMAKE_COMPILER_IS_GNUCC)
   set_target_properties(sdis-app PROPERTIES
     COMPILE_FLAGS "-std=c99 ${TE_DEFAULTS}"
     VERSION ${VERSION})
-  target_link_libraries(sdis-app Stardis StarSTL RSys tinyexpr m)
+  target_link_libraries(sdis-app Stardis StarEnc StarSTL RSys tinyexpr m)
 elseif(MSVC)
   set_target_properties(sdis-app PROPERTIES
     COMPILE_FLAGS "${TE_DEFAULTS}"
     VERSION ${VERSION})
-  target_link_libraries(sdis-app Stardis StarSTL RSys tinyexpr MuslGetopt)
+  target_link_libraries(sdis-app Stardis StarEnc StarSTL RSys tinyexpr MuslGetopt)
 endif()
 
 rcmake_copy_runtime_libraries(sdis-app)

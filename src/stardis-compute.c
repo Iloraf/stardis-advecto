@@ -559,9 +559,9 @@ create_edge_file_if
   unsigned cc_count = 0;
   unsigned *cc, *ee, uimax = UINT_MAX;
 
-  res = sdis_get_scene_analyze(scn, &analyze);
+  res = sdis_scene_get_analysis(scn, &analyze);
   if (res != RES_OK) goto error;
-  res = sdis_release_scene_analyze(scn);
+  res = sdis_scene_release_analysis(scn);
   if (res != RES_OK) goto error;
   
   ASSERT(scn && allocator);
@@ -1103,6 +1103,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
               stardis->scale_factor,
               stardis->radiative_temp[0], 
               stardis->radiative_temp[1], 
+              SDIS_HEAT_PATH_NONE,
               &estimator));
       } else {
         SDIS(solve_probe_boundary(scn,
@@ -1113,7 +1114,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
               SDIS_FRONT,
               stardis->scale_factor,
               stardis->radiative_temp[0], 
-              stardis->radiative_temp[1], 
+              stardis->radiative_temp[1],
+              SDIS_HEAT_PATH_NONE,
               &estimator));
       }
     }

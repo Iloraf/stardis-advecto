@@ -23,7 +23,7 @@ set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 ################################################################################
 find_package(RCMake 0.4 REQUIRED)
 find_package(RSys 0.6.1 REQUIRED)
-find_package(StarEnc 0.2.2 REQUIRED)
+find_package(StarEnc 0.3 REQUIRED)
 find_package(Stardis 0.6.1 REQUIRED)
 find_package(StarSTL 0.3 REQUIRED)
 

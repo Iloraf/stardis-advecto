@@ -222,7 +222,7 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
   }
   else {
     res = RES_BAD_ARG;
-    printf("Invalid medium type: %s\n", tk);
+    fprintf(stderr, "Invalid medium type: %s\n", tk);
   }
 
 #undef CHK_TOK
@@ -439,7 +439,7 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
     }
   }
   else {
-    printf("Invalid boundary type: %s", tk);
+  fprintf(stderr, "Invalid boundary type: %s", tk);
     res = RES_BAD_ARG;
     goto exit;
   }
@@ -632,7 +632,7 @@ read_stl
 
   res = sstl_load(sstl, *stl_filename);
   if (res != RES_OK) {
-    printf("Cannot read STL file: %s\n", *stl_filename);
+    fprintf(stderr, "Cannot read STL file: %s\n", *stl_filename);
     goto error;
   }
   SSTL(get_desc(sstl, &stl_desc));
@@ -705,7 +705,7 @@ geometry_analyse
       /* Register new medium description */
       htable_descriptions_set(&descriptions, &desc, &desc_id);
     } else {
-      printf("Duplicate media description found: deduplicated.\n");
+      fprintf(stderr, "Duplicate media description found: deduplicated.\n");
       desc_id = *p_desc;
     }
 
@@ -742,7 +742,7 @@ geometry_analyse
       /* Register new boundary description */
       htable_descriptions_set(&descriptions, &desc, &desc_id);
     } else {
-      printf("Duplicate boundary description found: deduplicated.\n");
+      fprintf(stderr, "Duplicate boundary description found: deduplicated.\n");
       desc_id = *p_desc;
     }
     
@@ -842,6 +842,11 @@ stardis_init
   stardis->scale_factor = args->scale_factor;
   stardis->radiative_temp[0] = args->radiative_temp[0];
   stardis->radiative_temp[1] = args->radiative_temp[1];
+  stardis->dump_paths = SDIS_HEAT_PATH_NONE;
+  if (args->dump_paths & DUMP_ERROR)
+    stardis->dump_paths |= SDIS_HEAT_PATH_FAILED;
+  if (args->dump_paths & DUMP_SUCCESS)
+    stardis->dump_paths |= SDIS_HEAT_PATH_SUCCEED;
 
  if (args->mode == IR_COMPUTE){
     res = parse_camera(args->camera, &stardis->camera);

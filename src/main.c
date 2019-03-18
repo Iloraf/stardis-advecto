@@ -15,6 +15,7 @@ int main(int argc, char** argv){
 
   res = parse_args(argc, argv, &args);
   if (res != RES_OK) goto error;
+  if (args.just_help) goto exit;
 
   res = stardis_init(&args, &stardis);
   if (res != RES_OK) goto error;

@@ -16,6 +16,13 @@ enum stardis_mode{
   DUMP_VTK
 };
 
+enum dump_path_type {
+  DUMP_NONE = 0,
+  DUMP_SUCCESS = BIT(0),
+  DUMP_ERROR = BIT(1),
+  DUMP_ALL = DUMP_SUCCESS | DUMP_ERROR,
+};
+
 struct args{
   char* medium_filename;
   char* bc_filename;
@@ -29,6 +36,8 @@ struct args{
   double scale_factor;
   double radiative_temp[2];
   char* camera;
+  enum dump_path_type dump_paths;
+  int just_help;
 };
 #ifdef NDEBUG
 #define DEFAULT_NTHREADS SDIS_NTHREADS_DEFAULT
@@ -38,7 +47,7 @@ struct args{
 #define ARGS_DEFAULT__ {\
   NULL, NULL, 10000, DEFAULT_NTHREADS,\
   { { {0.0, 0.0, 0.0}, 0x7FF0000000000000 /* probe[3]=INF */}},\
-  PROBE_COMPUTE, 1.0, {300.0, 300.0}, NULL}
+  PROBE_COMPUTE, 1.0, {300.0, 300.0}, NULL, DUMP_NONE, 0}
 static const struct args ARGS_DEFAULT = ARGS_DEFAULT__;
 
 static void
@@ -47,7 +56,8 @@ print_help(char* prog)
   printf("stardis-app built-on stardis library version %i.%i.%i\n",
       Stardis_VERSION_MAJOR,Stardis_VERSION_MINOR,Stardis_VERSION_PATCH);
   printf("usage : \n%s -m MEDIUM.txt -b BOUNDARY.txt [-p X,Y,Z,TIME]\n", prog);  
-  printf("[-s SCALE_FACTOR] [-d] [-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n");  
+  printf("[-s SCALE_FACTOR] [-d] [-D {all | error | success}]\n");
+  printf("[-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n");  
   printf("[-r AMBIENT_RAD_TEMP:REFERENCE_TEMP]\n");  
   printf("\n  -h : print this help.\n");
   printf("\nArguments\n");
@@ -70,6 +80,8 @@ print_help(char* prog)
   printf("\n -d :\n");
   printf("    dump geometry in VTK format with medium front/back id and\n");
   printf("    boundary id.\n");
+  printf("\n -D { all | error | success } :\n");
+  printf("    dump paths in VTK format.\n");
   printf("\n -n NUM_OF_REALIZATIONS :\n");
   printf("    number of Monte-Carlo realizations.\n");
   printf("    default value: 10000.\n");
@@ -104,13 +116,12 @@ parse_args(const int argc, char** argv, struct args* args)
     goto error;
   }
 
-  while((opt = getopt(argc, argv, "hn:t:b:m:p:ds:r:R:")) != -1) {
+  while((opt = getopt(argc, argv, "hn:t:b:m:p:dD:s:r:R:")) != -1) {
     switch(opt) {
       case 'h':
         print_help(argv[0]);
-        res = RES_BAD_ARG;
-        goto error;
-        break;
+        args->just_help = 1;
+        goto exit;
 
       case 'n': {
         args->N = strtoull(optarg, NULL, 10);
@@ -152,6 +163,20 @@ parse_args(const int argc, char** argv, struct args* args)
 
       case 'd':
         args->mode = DUMP_VTK;
+        break;
+
+      case 'D':
+        if (0 == strcmp(optarg, "all")) {
+          args->dump_paths = DUMP_ALL;
+        } else if(0 == strcmp(optarg, "error")) {
+          args->dump_paths = DUMP_ERROR;
+        } else if(0 == strcmp(optarg, "success")) {
+          args->dump_paths = DUMP_SUCCESS;
+        } else {
+          res = RES_BAD_ARG;
+          fprintf(stderr, "Invalid argument -D %s\n", optarg);
+          goto error;
+        }
         break;
 
       case 's':

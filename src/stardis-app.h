@@ -888,9 +888,11 @@ struct stardis {
   struct camera camera;
   struct mem_allocator allocator;
   int allocator_initialized;
+  enum sdis_heat_path_flag dump_paths;
 };
 #define NULL_ALLOCATOR__ {NULL}
-#define NULL_STARDIS__ {NULL_GEOMETRY__, NULL, 0, 0, {0,0,0,0}, 0, {300,300}, NULL_CAMERA__, NULL_ALLOCATOR__, 0}
+#define NULL_STARDIS__ {NULL_GEOMETRY__, NULL, 0, 0, {0,0,0,0}, 0,\
+ {300,300}, NULL_CAMERA__, NULL_ALLOCATOR__, 0, SDIS_HEAT_PATH_NONE}
 static const struct stardis NULL_STARDIS = NULL_STARDIS__;
 
 extern res_T 

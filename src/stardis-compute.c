@@ -67,7 +67,7 @@ compile_expr_to_fn
   *f = te_compile(math_expr, vars, t_allowed ? 4 : 3, NULL);
   if (!*f) {
     if (!t_allowed && te_compile(math_expr, vars, 4, NULL))
-      printf("Expression use variable t and should not.\n");
+      fprintf(stderr, "Expression use variable t and should not.\n");
     return RES_BAD_ARG;
   }
   if (is_zero) *is_zero = !((*f)->type == TE_CONSTANT && (*f)->v.value == 0);
@@ -671,6 +671,84 @@ error:
   goto end;
 }
 
+static res_T
+dump_path
+  (const struct sdis_heat_path* path,
+   void* context)
+{
+  FILE* stream = context;
+  enum sdis_heat_path_flag status = SDIS_HEAT_PATH_NONE;
+  size_t i, vcount;
+
+  /* Header */
+  fprintf(stream, "---\n");
+  fprintf(stream, "# vtk DataFile Version 2.0\n");
+  fprintf(stream, "Heat paths\n");
+  fprintf(stream, "ASCII\n");
+  fprintf(stream, "DATASET POLYDATA\n");
+  /* Write path positions */
+  sdis_heat_path_get_vertices_count(path, &vcount);
+  fprintf(stream, "POINTS %lu double\n", (unsigned long)vcount);
+  FOR_EACH(i, 0, vcount) {
+	struct sdis_heat_vertex vtx;
+	CHK(sdis_heat_path_get_vertex(path, i, &vtx) == RES_OK);
+	fprintf(stream, "%g %g %g\n", SPLIT3(vtx.P));
+  }
+  /* Write the segment of the path */
+  fprintf(stream, "LINES %lu %lu\n", 1, (unsigned long)(1 + vcount));
+  fprintf(stream, "%lu", (unsigned long)vcount);
+  FOR_EACH(i, 0, vcount) fprintf(stream, " %lu", (unsigned long)i);
+  fprintf(stream, "\n");
+  fprintf(stream, "POINT_DATA %lu\n", (unsigned long)vcount);
+  /* Write the type of the random walk vertices */
+  fprintf(stream, "SCALARS Vertex_Type float 1\n");
+  fprintf(stream, "LOOKUP_TABLE vertex_type\n");
+  FOR_EACH(i, 0, vcount) {
+	  struct sdis_heat_vertex vtx;
+	  CHK(sdis_heat_path_get_vertex(path, i, &vtx) == RES_OK);
+	  switch (vtx.type) {
+	  case SDIS_HEAT_VERTEX_CONDUCTION: fprintf(stream, "0.0\n"); break;
+	  case SDIS_HEAT_VERTEX_CONVECTION: fprintf(stream, "0.5\n"); break;
+	  case SDIS_HEAT_VERTEX_RADIATIVE:  fprintf(stream, "1.0\n"); break;
+	  default: FATAL("Unreachable code.\n"); break;
+	  }
+  }
+  fprintf(stream, "LOOKUP_TABLE vertex_type 3\n");
+  fprintf(stream, "0.0 1.0 1.0 1.0\n"); /* 0.0 = Magenta: conduction */
+  fprintf(stream, "1.0 1.0 0.0 1.0\n"); /* 0.5 = Yellow: convection */
+  fprintf(stream, "1.0 0.0 1.0 1.0\n"); /* 1.0 = Purple: radiative */
+  /* Write the weights of the random walk vertices */
+  fprintf(stream, "SCALARS Weight double 1\n");
+  fprintf(stream, "LOOKUP_TABLE default\n");
+  FOR_EACH(i, 0, vcount) {
+	  struct sdis_heat_vertex vtx;
+	  CHK(sdis_heat_path_get_vertex(path, i, &vtx) == RES_OK);
+	  fprintf(stream, "%g\n", vtx.weight);
+  }
+  /* Write the time of the random walk vertices */
+  fprintf(stream, "SCALARS Time double 1\n");
+  fprintf(stream, "LOOKUP_TABLE default\n");
+  FOR_EACH(i, 0, vcount) {
+	  struct sdis_heat_vertex vtx;
+	  CHK(sdis_heat_path_get_vertex(path, i, &vtx) == RES_OK);
+	  fprintf(stream, "%g\n", IS_INF(vtx.time) ? FLT_MAX : vtx.time);
+  }
+  /* Write path type */
+  fprintf(stream, "CELL_DATA %lu\n", 1);
+  fprintf(stream, "SCALARS Path_Type float 1\n");
+  fprintf(stream, "LOOKUP_TABLE path_type\n");
+  CHK(sdis_heat_path_get_status(path, &status) == RES_OK);
+  switch (status) {
+  case SDIS_HEAT_PATH_SUCCEED: fprintf(stream, "0.0\n"); break;
+  case SDIS_HEAT_PATH_FAILED: fprintf(stream, "1.0\n"); break;
+  default: FATAL("Unreachable code.\n"); break;
+  }
+  fprintf(stream, "LOOKUP_TABLE path_type 2\n");
+  fprintf(stream, "0.0 0.0 1.0 1.0\n"); /* 0.0 = Blue: success */
+  fprintf(stream, "1.0 0.0 0.0 1.0\n"); /* 1.0 = Red: failure */
+  return RES_OK;
+}
+
 res_T
 stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 {
@@ -1103,7 +1181,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
               stardis->scale_factor,
               stardis->radiative_temp[0], 
               stardis->radiative_temp[1], 
-              SDIS_HEAT_PATH_NONE,
+              stardis->dump_paths,
               &estimator));
       } else {
         SDIS(solve_probe_boundary(scn,
@@ -1115,7 +1193,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
               stardis->scale_factor,
               stardis->radiative_temp[0], 
               stardis->radiative_temp[1],
-              SDIS_HEAT_PATH_NONE,
+              stardis->dump_paths,
               &estimator));
       }
     }
@@ -1132,6 +1210,9 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     printf("#failures: %lu/%lu\n", 
         (unsigned long)nfailures,
         (unsigned long)stardis->N);
+
+	/* Dump paths according to user settings */
+	sdis_estimator_for_each_path(estimator, dump_path, stdout);
   }
 
 end:

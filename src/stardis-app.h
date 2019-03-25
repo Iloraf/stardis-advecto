@@ -122,6 +122,7 @@ release_geometry(struct geometry* geom)
 }
 
 struct mat_fluid {
+  char name[16];
   unsigned fluid_id;
   double rho;
   double cp;
@@ -133,14 +134,15 @@ print_fluid(FILE* stream, const struct mat_fluid* f)
 {
   ASSERT(stream && f);
   fprintf(stream,
-    "Fluid %u: cp=%g rho=%g Tinit='%s'\n",
-    f->fluid_id, f->cp, f->rho, f->Tinit);
+    "Fluid '%s': cp=%g rho=%g Tinit='%s'\n",
+    f->name, f->cp, f->rho, f->Tinit);
 }
 
 static char
 eq_fluid(const struct mat_fluid* a, const struct mat_fluid* b)
 {
-  if (a->fluid_id != b->fluid_id
+  if (strcmp(a->name, b->name)
+    || a->fluid_id != b->fluid_id
     || a->rho != b->rho
     || a->cp != b->cp
     || strcmp(a->Tinit, b->Tinit))
@@ -159,6 +161,10 @@ hash_fluid(const struct mat_fluid* key)
   uint32_t hash = OFFSET32_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV32_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->fluid_id)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->fluid_id)[i]);
     hash = hash * FNV32_PRIME;
@@ -184,6 +190,10 @@ hash_fluid(const struct mat_fluid* key)
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV64_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->fluid_id)) {
     hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->fluid_id)[i]);
     hash = hash * FNV64_PRIME;
@@ -207,6 +217,7 @@ hash_fluid(const struct mat_fluid* key)
 }
 
 struct mat_solid {
+  char name[16];
   unsigned solid_id;
   double lambda;
   double rho;
@@ -222,15 +233,16 @@ print_solid(FILE* stream, const struct mat_solid* s)
 {
   ASSERT(stream && s);
   fprintf(stream,
-    "Solid %u: lambda=%g cp=%g rho=%g delta=%g Tinit='%s' Power='%s'\n",
-    s->solid_id, s->lambda, s->cp, s->rho, s->delta,
+    "Solid '%s': lambda=%g cp=%g rho=%g delta=%g Tinit='%s' Power='%s'\n",
+    s->name, s->lambda, s->cp, s->rho, s->delta,
     s->Tinit, (s->has_power ? s->power : "0"));
 }
 
 static char
 eq_solid(const struct mat_solid* a, const struct mat_solid* b)
 {
-  if (a->solid_id != b->solid_id
+  if (strcmp(a->name, b->name)
+    || a->solid_id != b->solid_id
     || a->lambda != b->lambda
     || a->rho != b->rho
     || a->cp != b->cp
@@ -253,6 +265,10 @@ hash_solid(const struct mat_solid* key)
   uint32_t hash = OFFSET32_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV32_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->solid_id)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->solid_id)[i]);
     hash = hash * FNV32_PRIME;
@@ -295,6 +311,10 @@ hash_solid(const struct mat_solid* key)
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV64_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->solid_id)) {
     hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->solid_id)[i]);
     hash = hash * FNV64_PRIME;
@@ -781,6 +801,7 @@ hash_sf_connect(const struct solid_fluid_connect* key)
 }
 
 struct description {
+  char name[16];
   enum description_type type;
   union d {
     struct mat_fluid fluid;
@@ -791,6 +812,13 @@ struct description {
     struct solid_fluid_connect sf_connect;
   } d;
 };
+
+FINLINE void
+init_description(struct description* desc) {
+  ASSERT(desc);
+  desc->name[0] = '\0';
+  desc->type = DESCRIPTION_TYPE_COUNT__;
+}
 
 static INLINE void
 print_description
@@ -880,19 +908,22 @@ struct stardis {
   struct geometry geometry;
   struct description* descriptions;  /*array of materials and boundaries */
 
+  double probe[4]; /* x,y,z,t of probe when mode is PROBE_COMPUTE */
+  struct camera camera; /* camera when mode is IR_COMPUTE */
+  char medium_name[64]; /* medium name when mode is MEDIUM_COMPUTE */
+
   size_t N; /*number of MC realizations*/
   unsigned nthreads;
-  double probe[4]; /*x,y,z,t of probe*/
   double scale_factor;
   double radiative_temp[2];
-  struct camera camera;
   struct mem_allocator allocator;
   int allocator_initialized;
   enum sdis_heat_path_flag dump_paths;
 };
 #define NULL_ALLOCATOR__ {NULL}
-#define NULL_STARDIS__ {NULL_GEOMETRY__, NULL, 0, 0, {0,0,0,0}, 0,\
- {300,300}, NULL_CAMERA__, NULL_ALLOCATOR__, 0, SDIS_HEAT_PATH_NONE}
+#define NULL_STARDIS__ {NULL_GEOMETRY__, NULL,\
+  {0,0,0,0}, NULL_CAMERA__, "",\
+  0, 0, 0, {300,300}, NULL_ALLOCATOR__, 0, SDIS_HEAT_PATH_NONE}
 static const struct stardis NULL_STARDIS = NULL_STARDIS__;
 
 extern res_T 

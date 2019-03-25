@@ -116,8 +116,8 @@ _strupr(char* s)
 
 
 /* Read medium line; should be one of:
- * SOLID STL_filename lambda rho cp delta "Tinit(x,y,z)" [ "volumic_power(x,y,z,t)" ]
- * FLUID STL_filename rho cp "Tinit(x,y,z)"
+ * SOLID medium_name STL_filename lambda rho cp delta "Tinit(x,y,z)" [ "volumic_power(x,y,z,t)" ]
+ * FLUID medium_name STL_filename rho cp "Tinit(x,y,z)"
 */
 static res_T
 parse_medium_line(char* line, char** stl_filename, struct description* desc)
@@ -133,6 +133,14 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
   CHK_TOK(_strupr(strtok(line, " ")), "medium type");
   if (strcmp(tk, "SOLID") == 0) {
     desc->type = DESC_MAT_SOLID;
+
+    CHK_TOK(strtok(NULL, " "), "medium name");
+    if (strlen(tk) >= sizeof(desc->name)) {
+      fprintf(stderr, "Medium name is too long: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto exit;
+    }
+    strncpy(desc->name, tk, sizeof(desc->name));
 
     CHK_TOK(strtok(NULL, " "), "file name");
     *stl_filename = malloc(strlen(tk) + 1);
@@ -193,6 +201,14 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
   }
   else if (strcmp(tk, "FLUID") == 0) {
     desc->type = DESC_MAT_FLUID;
+
+    CHK_TOK(strtok(NULL, " "), "medium name");
+    if (strlen(tk) >= sizeof(desc->name)) {
+      fprintf(stderr, "Medium name is too long: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto exit;
+    }
+    strncpy(desc->name, tk, sizeof(desc->name));
 
     CHK_TOK(strtok(NULL, " "), "file name");
     *stl_filename = malloc(strlen(tk) + 1);
@@ -692,11 +708,12 @@ geometry_analyse
     char* stl_filename = NULL;
     struct description desc;
     
-    desc.type = DESCRIPTION_TYPE_COUNT__;
+    init_description(&desc);
     res = parse_medium_line(line, &stl_filename, &desc);
     if (res != RES_OK) goto error;
 
-    /* Deduplicate media: find if the same description already exists */
+    /* Deduplicate media: find if the same description already exists
+     * (including name) */
     p_desc = htable_descriptions_find(&descriptions, &desc);
     if (!p_desc) {
       sa_push(stardis->descriptions, desc);
@@ -729,11 +746,12 @@ geometry_analyse
     char* stl_filename = NULL;
     struct description desc;
 
-    desc.type = DESCRIPTION_TYPE_COUNT__;
+    init_description(&desc);
     res = parse_boundary_line(line, &stl_filename, &desc);
     if (res != RES_OK) goto error;
     
-    /* Deduplicate media: find if the same description already exists */
+    /* Deduplicate media: find if the same description already exists
+     * (including name) */
     p_desc = htable_descriptions_find(&descriptions, &desc);
     if (!p_desc) {
       sa_push(stardis->descriptions, desc);
@@ -852,7 +870,9 @@ stardis_init
     res = parse_camera(args->camera, &stardis->camera);
     if (res != RES_OK) goto error;
  }
-
+ else if (args->mode == MEDIUM_COMPUTE) {
+   strcpy(stardis->medium_name, args->medium_name);
+ }
 
 exit:
   return res;

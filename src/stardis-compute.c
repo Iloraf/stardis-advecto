@@ -542,7 +542,8 @@ end:
 error:
   goto end;
 }
-res_T
+
+static res_T
 create_edge_file_if
   (struct sdis_scene* scn,
    struct mem_allocator* allocator)
@@ -695,7 +696,7 @@ dump_path
 	fprintf(stream, "%g %g %g\n", SPLIT3(vtx.P));
   }
   /* Write the segment of the path */
-  fprintf(stream, "LINES %lu %lu\n", 1, (unsigned long)(1 + vcount));
+  fprintf(stream, "LINES %lu %lu\n", 1lu, (unsigned long)(1 + vcount));
   fprintf(stream, "%lu", (unsigned long)vcount);
   FOR_EACH(i, 0, vcount) fprintf(stream, " %lu", (unsigned long)i);
   fprintf(stream, "\n");
@@ -734,7 +735,7 @@ dump_path
 	  fprintf(stream, "%g\n", IS_INF(vtx.time) ? FLT_MAX : vtx.time);
   }
   /* Write path type */
-  fprintf(stream, "CELL_DATA %lu\n", 1);
+  fprintf(stream, "CELL_DATA %lu\n", 1lu);
   fprintf(stream, "SCALARS Path_Type float 1\n");
   fprintf(stream, "LOOKUP_TABLE path_type\n");
   CHK(sdis_heat_path_get_status(path, &status) == RES_OK);
@@ -841,6 +842,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         solid_get_tinit, 
         &stardis->descriptions[i].d.solid.has_power,
         &desc->d.solid.solid_id);
+      strcpy(desc->d.solid.name, desc->name);
       if (res != RES_OK) goto error;
       break;
     case DESC_MAT_FLUID:
@@ -852,6 +854,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         &media,
         fluid_get_tinit,
         &desc->d.fluid.fluid_id);
+      strcpy(desc->d.fluid.name, desc->name);
       if (res != RES_OK) goto error;
       break;
     default: FATAL("Invalid type.\n");
@@ -1120,7 +1123,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   res = create_edge_file_if(scn, &stardis->allocator);
   if (res != RES_OK) goto error;
 
-  if (mode == IR_COMPUTE){
+  if (mode == IR_COMPUTE) {
    size_t width = (size_t)stardis->camera.img[0];
    size_t height = (size_t)stardis->camera.img[1];
 
@@ -1155,65 +1158,103 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     /* Write the image */
     dump_image(buf);
   }
-
-  if (mode == PROBE_COMPUTE){
+  else if (mode == PROBE_COMPUTE) {
+    double uv[2] = { 0,0 };
+    size_t iprim = SIZE_MAX;
     /* Launch the probe simulation */
     pos[0] = stardis->probe[0];
     pos[1] = stardis->probe[1];
     pos[2] = stardis->probe[2];
-    time[0] = time[1]  = stardis->probe[3];
-    {
-      double uv[2] = {0,0};
-      size_t iprim = SIZE_MAX;
+    time[0] = time[1] = stardis->probe[3];
 
-      res = select_probe_type(scn,
-          stardis->geometry.triangle,
-          stardis->descriptions,
-          pos,
-          &iprim,
-          uv);
+    res = select_probe_type(scn,
+      stardis->geometry.triangle,
+      stardis->descriptions,
+      pos,
+      &iprim,
+      uv);
 
-      if(iprim == SIZE_MAX){
-        SDIS(solve_probe(scn,
-              stardis->N, 
-              pos,
-              time, 
-              stardis->scale_factor,
-              stardis->radiative_temp[0], 
-              stardis->radiative_temp[1], 
-              stardis->dump_paths,
-              &estimator));
-      } else {
-        SDIS(solve_probe_boundary(scn,
-              stardis->N,
-              iprim,
-              uv,
-              time,
-              SDIS_FRONT,
-              stardis->scale_factor,
-              stardis->radiative_temp[0], 
-              stardis->radiative_temp[1],
-              stardis->dump_paths,
-              &estimator));
+    if (iprim == SIZE_MAX) {
+      SDIS(solve_probe(scn,
+        stardis->N,
+        pos,
+        time,
+        stardis->scale_factor,
+        stardis->radiative_temp[0],
+        stardis->radiative_temp[1],
+        stardis->dump_paths,
+        &estimator));
+    } else {
+      SDIS(solve_probe_boundary(scn,
+        stardis->N,
+        iprim,
+        uv,
+        time,
+        SDIS_FRONT,
+        stardis->scale_factor,
+        stardis->radiative_temp[0],
+        stardis->radiative_temp[1],
+        stardis->dump_paths,
+        &estimator));
+    }
+  }
+  else if (mode == MEDIUM_COMPUTE) {
+    size_t sz, ii;
+    struct sdis_medium* medium = NULL;
+    /* Find medium */
+    sz = sa_size(stardis->descriptions);
+    FOR_EACH(ii, 0, sz) {
+      struct description* desc = stardis->descriptions + ii;
+      if (desc->type == DESC_MAT_SOLID) {
+        if (0 == strcmp(stardis->medium_name, desc->d.solid.name)) {
+          ASSERT(sa_size(media) > ii);
+          medium = media[ii];
+          break;
+        }
+      }
+      else if (desc->type == DESC_MAT_FLUID) {
+        if (0 == strcmp(stardis->medium_name, desc->d.fluid.name)) {
+          ASSERT(sa_size(media) > ii);
+          medium = media[ii];
+          break;
+        }
       }
     }
+    if (medium == NULL) {
+      /* Not found */
+      fprintf(stderr, "Cannot solve medium %s (unknown medium)\n",
+        stardis->medium_name);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    time[0] = time[1] = stardis->probe[3];
+    SDIS(solve_medium(scn,
+      stardis->N,
+      medium,
+      time,
+      stardis->scale_factor,
+      stardis->radiative_temp[0],
+      stardis->radiative_temp[1],
+      stardis->dump_paths,
+      &estimator));
+   }
+   if (mode == PROBE_COMPUTE || mode == MEDIUM_COMPUTE) {
+     /* Fetch the estimation data */
+     SDIS(estimator_get_temperature(estimator, &temperature));
+       SDIS(estimator_get_failure_count(estimator, &nfailures));
 
-    /* Fetch the estimation data */
-    SDIS(estimator_get_temperature(estimator, &temperature));
-    SDIS(estimator_get_failure_count(estimator, &nfailures));
+       /* Print the results */
+       printf("Temperature at [%g, %g, %g, %g] = %g +/- %g\n",
+         pos[0], pos[1], pos[2], time[0],
+         temperature.E, /* Expected value */
+         temperature.SE); /* Standard error */
+       printf("#failures: %lu/%lu\n",
+       (unsigned long)nfailures,
+         (unsigned long)stardis->N);
 
-    /* Print the results */
-    printf("Temperature at [%g, %g, %g, %g] = %g +/- %g\n",
-        pos[0], pos[1], pos[2], time[0],
-        temperature.E, /* Expected value */
-        temperature.SE); /* Standard error */
-    printf("#failures: %lu/%lu\n", 
-        (unsigned long)nfailures,
-        (unsigned long)stardis->N);
-
-	/* Dump paths according to user settings */
-	sdis_estimator_for_each_path(estimator, dump_path, stdout);
-  }
+     /* Dump paths according to user settings */
+     sdis_estimator_for_each_path(estimator, dump_path, stdout);
+   }
 
 end:
   if (data) SDIS(data_ref_put(data));;

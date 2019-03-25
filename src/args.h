@@ -12,8 +12,14 @@
 
 enum stardis_mode{
   PROBE_COMPUTE,
+  MEDIUM_COMPUTE,
   IR_COMPUTE,
-  DUMP_VTK
+  DUMP_VTK,
+  UNDEF_MODE
+};
+
+static const char MODE_OPTION[UNDEF_MODE] = {
+  'p', 'm', 'R', 'd'
 };
 
 enum dump_path_type {
@@ -26,6 +32,7 @@ enum dump_path_type {
 struct args{
   char* medium_filename;
   char* bc_filename;
+  char* medium_name;
   size_t N;
   unsigned nthreads;
   union u {
@@ -45,9 +52,9 @@ struct args{
 #define DEFAULT_NTHREADS 1
 #endif
 #define ARGS_DEFAULT__ {\
-  NULL, NULL, 10000, DEFAULT_NTHREADS,\
+  NULL, NULL, NULL, 10000, DEFAULT_NTHREADS,\
   { { {0.0, 0.0, 0.0}, 0x7FF0000000000000 /* probe[3]=INF */}},\
-  PROBE_COMPUTE, 1.0, {300.0, 300.0}, NULL, DUMP_NONE, 0}
+  UNDEF_MODE, 1.0, {300.0, 300.0}, NULL, DUMP_NONE, 0}
 static const struct args ARGS_DEFAULT = ARGS_DEFAULT__;
 
 static void
@@ -55,17 +62,19 @@ print_help(char* prog)
 {
   printf("stardis-app built-on stardis library version %i.%i.%i\n",
       Stardis_VERSION_MAJOR,Stardis_VERSION_MINOR,Stardis_VERSION_PATCH);
-  printf("usage : \n%s -m MEDIUM.txt -b BOUNDARY.txt [-p X,Y,Z,TIME]\n", prog);  
-  printf("[-s SCALE_FACTOR] [-d] [-D {all | error | success}]\n");
+  printf("usage : \n%s -M MEDIUM.txt -B BOUNDARY.txt\n", prog);
+  printf("[-p X,Y,Z,TIME | -m medium_name,TIME] | -d \n");
+  printf(" | -R spp = SPP:fov = FOV : up = XUP, YUP, ZUP : pos = X, Y, Z : tgt = XT, YT, ZT : img = WxH]\n");
+  printf("[-s SCALE_FACTOR] [-D {all | error | success}]\n");
   printf("[-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n");  
   printf("[-r AMBIENT_RAD_TEMP:REFERENCE_TEMP]\n");  
   printf("\n  -h : print this help.\n");
   printf("\nArguments\n");
   printf("---------\n");
-  printf("\n  -m MEDIUM.txt :\n");
+  printf("\n  -M MEDIUM.txt :\n");
   printf("     MEDIUM.txt is a text file which contains the description of the\n");
   printf("     media.\n");
-  printf("\n  -b BOUNDARY.txt :\n");
+  printf("\n  -B BOUNDARY.txt :\n");
   printf("     BOUNDARY.txt is a text file which contains the description of the\n");
   printf("     boundary conditions.\n");
   printf("\nOptionnal arguments\n");
@@ -75,6 +84,9 @@ print_help(char* prog)
   printf("    default value: 0.0,0.0,0.0,INF.\n");
   printf("    The probe must be in a medium. If some boundary conditions are\n");
   printf("    time-dependant, TIME can not be INF.\n");
+  printf("\n -m medium_name,TIME :\n");
+  printf("    this is the medium name and the time of the by-medium integration.\n");
+  printf("    If some boundary conditions are time-dependant, TIME can not be INF.\n");
   printf("\n -s SCALE_FACTOR :\n");
   printf("    default value: 1.0.\n");
   printf("\n -d :\n");
@@ -116,7 +128,7 @@ parse_args(const int argc, char** argv, struct args* args)
     goto error;
   }
 
-  while((opt = getopt(argc, argv, "hn:t:b:m:p:dD:s:r:R:")) != -1) {
+  while((opt = getopt(argc, argv, "hn:t:B:M:m:p:dD:s:r:R:")) != -1) {
     switch(opt) {
       case 'h':
         print_help(argv[0]);
@@ -133,11 +145,11 @@ parse_args(const int argc, char** argv, struct args* args)
         break;
       }
 
-      case 'b':
+      case 'B':
         args->bc_filename = optarg;
         break;
 
-      case 'm':
+      case 'M':
         args->medium_filename = optarg;
         break;
 
@@ -152,16 +164,50 @@ parse_args(const int argc, char** argv, struct args* args)
         break;
 
       case 'p':
+        if (args->mode != UNDEF_MODE) {
+          res = RES_BAD_ARG;
+          fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
+            (char)opt, MODE_OPTION[args->mode]);
+          goto error;
+        }
+        args->mode = PROBE_COMPUTE;
         cstr_to_list_double(optarg, ',', args->u.probe, &len, 4);
         if(len != 4 
-           || res != RES_OK){
+           || res != RES_OK) {
           res = RES_BAD_ARG;
           fprintf(stderr, "Invalid argument -p %s\n", optarg);
           goto error;
         }
         break;
 
+      case 'm': {
+        if (args->mode != UNDEF_MODE) {
+          res = RES_BAD_ARG;
+          fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
+            (char)opt, MODE_OPTION[args->mode]);
+          goto error;
+        }
+        args->mode = MEDIUM_COMPUTE;
+        char* ptr = strpbrk(optarg, ",");
+        if (! ptr || ptr == optarg)
+          res = RES_BAD_ARG;
+        else res = cstr_to_double(ptr+1, args->u.probe+3);
+        if (res != RES_OK) {
+          fprintf(stderr, "Invalid argument -m %s\n", optarg);
+          goto error;
+        }
+        *ptr = '\0';
+        args->medium_name = optarg;
+        break;
+      }
+
       case 'd':
+        if (args->mode != UNDEF_MODE) {
+          res = RES_BAD_ARG;
+          fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
+            (char)opt, MODE_OPTION[args->mode]);
+          goto error;
+        }
         args->mode = DUMP_VTK;
         break;
 
@@ -202,6 +248,12 @@ parse_args(const int argc, char** argv, struct args* args)
         break;
 
       case 'R':
+        if (args->mode != UNDEF_MODE) {
+          res = RES_BAD_ARG;
+          fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
+            (char)opt, MODE_OPTION[args->mode]);
+          goto error;
+        }
         args->mode = IR_COMPUTE;
         args->camera = optarg;
         break;

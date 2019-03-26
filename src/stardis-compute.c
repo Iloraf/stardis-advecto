@@ -891,6 +891,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       /* create new interface and register */
       struct sdis_interface_shader interface_shader = SDIS_INTERFACE_SHADER_NULL;
       struct intface* interface_props = NULL;
+      unsigned id;
       int front_defined = (fd != UINT_MAX);
       int back_defined = (bd != UINT_MAX);
       int connect_defined = (cd != UINT_MAX);
@@ -904,12 +905,14 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       if (front_defined) {
         switch (stardis->descriptions[fd].type) {
         case DESC_MAT_SOLID:
+          id = stardis->descriptions[fd].d.solid.solid_id;
           solid_count++;
-          front_med = media[fd];
+          front_med = media[id];
           break;
         case DESC_MAT_FLUID:
           fluid_count++;
-          front_med = media[fd];
+          id = stardis->descriptions[fd].d.fluid.fluid_id;
+          front_med = media[id];
           fluid_side_shader = &interface_shader.front;
           break;
         default: FATAL("Invalid type.\n");
@@ -918,12 +921,14 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       if (back_defined) {
         switch (stardis->descriptions[bd].type) {
         case DESC_MAT_SOLID:
+          id = stardis->descriptions[bd].d.solid.solid_id;
           solid_count++;
-          back_med = media[bd];
+          back_med = media[id];
           break;
         case DESC_MAT_FLUID:
           fluid_count++;
-          back_med = media[bd];
+          id = stardis->descriptions[bd].d.fluid.fluid_id;
+          back_med = media[id];
           fluid_side_shader = &interface_shader.back;
           break;
         default: FATAL("Invalid type.\n");

@@ -760,7 +760,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   struct sdis_interface** interf_bytrg = NULL;
   struct sdis_data* data = NULL;
 
-  struct sdis_scene* scn = NULL; 
+  struct sdis_scene* scn = NULL;
   struct sdis_estimator* estimator = NULL;
   struct sdis_mc temperature;
   struct sdis_accum_buffer* buf = NULL;
@@ -768,8 +768,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
   struct htable_intface htable_interfaces;
   int htable_interfaces_initialised = 0;
-  double pos[3] = {0,0,0};
-  double time[2] = { 0, 0};
+  double pos[3] = { 0,0,0 };
+  double time[2] = { 0, 0 };
   size_t nfailures;
   unsigned i = 0;
   const int t_allowed = stardis->probe[3] < INF; /* Can condition use the variable t? */
@@ -797,7 +797,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     case DESC_BOUND_T_FOR_SOLID:
     case DESC_BOUND_T_FOR_FLUID:
       ASSERT(desc->d.t_boundary.T != NULL);
-      res = compile_expr_to_fn(&desc->d.t_boundary.te_temperature, 
+      res = compile_expr_to_fn(&desc->d.t_boundary.te_temperature,
         desc->d.t_boundary.T, 1, NULL);
       if (res != RES_OK) {
         fprintf(stderr, "Invalid boundary temperature expression: %s\n",
@@ -839,7 +839,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         stardis->descriptions[i].d.solid.Tinit,
         stardis->descriptions[i].d.solid.power,
         &media,
-        solid_get_tinit, 
+        solid_get_tinit,
         &stardis->descriptions[i].d.solid.has_power,
         &desc->d.solid.solid_id);
       strcpy(desc->d.solid.name, desc->name);
@@ -847,7 +847,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       break;
     case DESC_MAT_FLUID:
       res = create_fluid(dev,
-        stardis->descriptions[i].d.fluid.rho, 
+        stardis->descriptions[i].d.fluid.rho,
         stardis->descriptions[i].d.fluid.cp,
         t_allowed,
         stardis->descriptions[i].d.fluid.Tinit,
@@ -864,7 +864,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   /* Create interfaces */
   htable_intface_init(&stardis->allocator, &htable_interfaces);
   htable_interfaces_initialised = 1;
-  for (i=0; i<sa_size(stardis->geometry.triangle); ++i) {
+  for (i = 0; i < sa_size(stardis->geometry.triangle); ++i) {
     struct triangle *trg = stardis->geometry.triangle + i;
     struct int_descs int_descs = INT_DESCS_NULL;
     struct sdis_interface** p_intface;
@@ -887,8 +887,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     p_intface = htable_intface_find(&htable_interfaces, &int_descs);
     if (p_intface) {
       intface = *p_intface;
-    }
-    else {
+    } else {
       /* create new interface and register */
       struct sdis_interface_shader interface_shader = SDIS_INTERFACE_SHADER_NULL;
       struct intface* interface_props = NULL;
@@ -924,8 +923,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
           break;
         case DESC_MAT_FLUID:
           fluid_count++;
-           back_med = media[bd];
-           fluid_side_shader = &interface_shader.back;
+          back_med = media[bd];
+          fluid_side_shader = &interface_shader.back;
           break;
         default: FATAL("Invalid type.\n");
         }
@@ -973,7 +972,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
           }
           ext_id = connect->d.h_boundary.mat_id; /* External material id */
           ASSERT(ext_id < sa_size(media));
-          ASSERT(sdis_medium_get_type(media[ext_id]) == 
+          ASSERT(sdis_medium_get_type(media[ext_id]) ==
             (connect->type == DESC_BOUND_H_FOR_SOLID ? SDIS_FLUID : SDIS_SOLID));
           connection_count++;
           boundary_count++;
@@ -1018,8 +1017,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
             /* We set the known T inside
              * TODO: should be outside to allow contact resistances */
             interface_shader.front.temperature = interface_get_temperature;
-          }
-          else {
+          } else {
             front_med = media[ext_id];
             /* We set the known T inside
              * TODO: should be outside to allow contact resistances */
@@ -1074,17 +1072,17 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         }
       }
 
-      if((fluid_count == 2)
+      if ((fluid_count == 2)
         || (fluid_count + solid_count + connection_count < 2)
         || (boundary_count ?
-             (fluid_count + solid_count != 1) : (fluid_count + solid_count != 2))
+        (fluid_count + solid_count != 1) : (fluid_count + solid_count != 2))
         || (solid_fluid_connection_count && (fluid_count != 1 || solid_count != 1)))
       {
         /* Incoherent triangle description */
         fprintf(stderr, "Incoherent triangle description (%u)\n", i);
         print_trg_as_obj(stderr, stardis->geometry.vertex, trg);
         fprintf(stderr, "Front: ");
-        if(!front_defined) fprintf(stderr, "undefined\n");
+        if (!front_defined) fprintf(stderr, "undefined\n");
         else print_description(stderr, &stardis->descriptions[fd]);
         fprintf(stderr, "Back: ");
         if (!back_defined) fprintf(stderr, "undefined\n");
@@ -1114,46 +1112,44 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   stardis->geometry.interfaces = interfaces;
 
   res = sdis_scene_create(dev,
-        sa_size(stardis->geometry.triangle),
-        geometry_get_indices, geometry_get_interface,
-        sa_size(stardis->geometry.vertex), 
-        geometry_get_position, &stardis->geometry, &scn);
+    sa_size(stardis->geometry.triangle),
+    geometry_get_indices, geometry_get_interface,
+    sa_size(stardis->geometry.vertex),
+    geometry_get_position, &stardis->geometry, &scn);
   if (res != RES_OK) goto error;
 
   res = create_edge_file_if(scn, &stardis->allocator);
   if (res != RES_OK) goto error;
 
   if (mode == IR_COMPUTE) {
-   size_t width = (size_t)stardis->camera.img[0];
-   size_t height = (size_t)stardis->camera.img[1];
+    size_t width = (size_t)stardis->camera.img[0];
+    size_t height = (size_t)stardis->camera.img[1];
 
     /* Setup the camera */
     SDIS(camera_create(dev, &cam));
-    SDIS(camera_set_proj_ratio(cam, (double)width/(double)height));
+    SDIS(camera_set_proj_ratio(cam, (double)width / (double)height));
     SDIS(camera_set_fov(cam, MDEG2RAD(stardis->camera.fov)));
-    SDIS(camera_look_at(cam, 
-          stardis->camera.pos,
-          stardis->camera.tgt,
-          stardis->camera.up));
+    SDIS(camera_look_at(cam,
+      stardis->camera.pos,
+      stardis->camera.tgt,
+      stardis->camera.up));
 
     /* Create the accum buffer */
-    SDIS(accum_buffer_create(dev,
-          width,
-          height,
-          &buf));
+    SDIS(accum_buffer_create(dev, width, height, &buf));
 
     /* Launch the simulation */
-    SDIS(solve_camera(scn, 
-          cam,
-          INF,
-          stardis->scale_factor,
-          stardis->radiative_temp[0], 
-          stardis->radiative_temp[1], 
-          width,
-          height,
-          (size_t)stardis->camera.spp,
-          sdis_accum_buffer_write,
-          buf));
+    res = sdis_solve_camera(scn,
+      cam,
+      INF,
+      stardis->scale_factor,
+      stardis->radiative_temp[0],
+      stardis->radiative_temp[1],
+      width,
+      height,
+      (size_t)stardis->camera.spp,
+      sdis_accum_buffer_write,
+      buf);
+    if (res != RES_OK) goto error;
 
     /* Write the image */
     dump_image(buf);
@@ -1173,9 +1169,10 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       pos,
       &iprim,
       uv);
+    if (res != RES_OK) goto error;
 
     if (iprim == SIZE_MAX) {
-      SDIS(solve_probe(scn,
+      res = sdis_solve_probe(scn,
         stardis->N,
         pos,
         time,
@@ -1183,9 +1180,9 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         stardis->radiative_temp[0],
         stardis->radiative_temp[1],
         stardis->dump_paths,
-        &estimator));
+        &estimator);
     } else {
-      SDIS(solve_probe_boundary(scn,
+      res = sdis_solve_probe_boundary(scn,
         stardis->N,
         iprim,
         uv,
@@ -1195,7 +1192,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         stardis->radiative_temp[0],
         stardis->radiative_temp[1],
         stardis->dump_paths,
-        &estimator));
+        &estimator);
     }
   }
   else if (mode == MEDIUM_COMPUTE) {
@@ -1228,7 +1225,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       goto error;
     }
     time[0] = time[1] = stardis->probe[3];
-    SDIS(solve_medium(scn,
+    res = sdis_solve_medium(scn,
       stardis->N,
       medium,
       time,
@@ -1236,30 +1233,37 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       stardis->radiative_temp[0],
       stardis->radiative_temp[1],
       stardis->dump_paths,
-      &estimator));
-   }
-   if (mode == PROBE_COMPUTE || mode == MEDIUM_COMPUTE) {
-     /* Fetch the estimation data */
-     SDIS(estimator_get_temperature(estimator, &temperature));
-       SDIS(estimator_get_failure_count(estimator, &nfailures));
+      &estimator);
+  }
+  if (res != RES_OK) goto error;
+  if (mode == PROBE_COMPUTE || mode == MEDIUM_COMPUTE) {
+    /* Fetch the estimation data */
+    SDIS(estimator_get_temperature(estimator, &temperature));
+    SDIS(estimator_get_failure_count(estimator, &nfailures));
 
-       /* Print the results */
-       printf("Temperature at [%g, %g, %g, %g] = %g +/- %g\n",
-         pos[0], pos[1], pos[2], time[0],
-         temperature.E, /* Expected value */
-         temperature.SE); /* Standard error */
-       printf("#failures: %lu/%lu\n",
-       (unsigned long)nfailures,
-         (unsigned long)stardis->N);
+    /* Print the results */
+    if (mode == PROBE_COMPUTE)
+      printf("Temperature at t=[%g, %g, %g, %g] = %g +/- %g\n",
+        pos[0], pos[1], pos[2], time[0],
+        temperature.E, /* Expected value */
+        temperature.SE); /* Standard error */
+    else
+      printf("Temperature in medium %s at t=%g = %g +/- %g\n",
+        stardis->medium_name, time[0],
+        temperature.E, /* Expected value */
+        temperature.SE); /* Standard error */
+    printf("#failures: %lu/%lu\n",
+      (unsigned long)nfailures,
+      (unsigned long)stardis->N);
 
-     /* Dump paths according to user settings */
-     sdis_estimator_for_each_path(estimator, dump_path, stdout);
-   }
+    /* Dump paths according to user settings */
+    sdis_estimator_for_each_path(estimator, dump_path, stdout);
+  }
 
 end:
   if (data) SDIS(data_ref_put(data));;
-  if(htable_interfaces_initialised) htable_intface_release(&htable_interfaces);
-  for (i=0; i<sa_size(media); ++i)
+  if (htable_interfaces_initialised) htable_intface_release(&htable_interfaces);
+  for (i = 0; i < sa_size(media); ++i)
     SDIS(medium_ref_put(media[i]));
   sa_release(media);
 

@@ -181,6 +181,7 @@ parse_args(const int argc, char** argv, struct args* args)
         break;
 
       case 'm': {
+        char* ptr;
         if (args->mode != UNDEF_MODE) {
           res = RES_BAD_ARG;
           fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
@@ -188,7 +189,7 @@ parse_args(const int argc, char** argv, struct args* args)
           goto error;
         }
         args->mode = MEDIUM_COMPUTE;
-        char* ptr = strpbrk(optarg, ",");
+        ptr = strpbrk(optarg, ",");
         if (! ptr || ptr == optarg)
           res = RES_BAD_ARG;
         else res = cstr_to_double(ptr+1, args->u.probe+3);

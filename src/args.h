@@ -10,16 +10,17 @@
 #include <rsys/cstr.h>
 #include <sdis_version.h>
 
-enum stardis_mode{
+enum stardis_mode {
   PROBE_COMPUTE,
   MEDIUM_COMPUTE,
+  BOUNDARY_COMPUTE,
   IR_COMPUTE,
   DUMP_VTK,
   UNDEF_MODE
 };
 
 static const char MODE_OPTION[UNDEF_MODE] = {
-  'p', 'm', 'R', 'd'
+  'p', 'm', 'b', 'R', 'd'
 };
 
 enum dump_path_type {
@@ -33,9 +34,10 @@ struct args{
   char* medium_filename;
   char* bc_filename;
   char* medium_name;
+  char* solve_boundary_filename;
   size_t N;
   unsigned nthreads;
-  union u {
+  union u { /* Trick to allow static initialization with INF */
     struct pt { double p[3]; uint64_t t; } pt;
     double probe[4];
   } u;
@@ -52,7 +54,7 @@ struct args{
 #define DEFAULT_NTHREADS 1
 #endif
 #define ARGS_DEFAULT__ {\
-  NULL, NULL, NULL, 10000, DEFAULT_NTHREADS,\
+  NULL, NULL, NULL, NULL, 10000, DEFAULT_NTHREADS,\
   { { {0.0, 0.0, 0.0}, 0x7FF0000000000000 /* probe[3]=INF */}},\
   UNDEF_MODE, 1.0, {300.0, 300.0}, NULL, DUMP_NONE, 0}
 static const struct args ARGS_DEFAULT = ARGS_DEFAULT__;
@@ -62,56 +64,64 @@ print_help(char* prog)
 {
   printf("stardis-app built-on stardis library version %i.%i.%i\n",
       Stardis_VERSION_MAJOR,Stardis_VERSION_MINOR,Stardis_VERSION_PATCH);
-  printf("usage : \n%s -M MEDIUM.txt -B BOUNDARY.txt\n", prog);
-  printf("[-p X,Y,Z,TIME | -m medium_name,TIME] | -d \n");
-  printf(" | -R spp = SPP:fov = FOV : up = XUP, YUP, ZUP : pos = X, Y, Z : tgt = XT, YT, ZT : img = WxH]\n");
-  printf("[-s SCALE_FACTOR] [-D {all | error | success}]\n");
+  printf("usage: \n%s -M MEDIUM.txt -B BOUNDARY.txt\n", prog);
+  printf("[ -p X,Y,Z,TIME | -m MEDIUM_NAME,TIME | -d | -b SURFACE.vtk,TIME\n");
+  printf("  | -R t=TIME:spp=SPP:fov=FOV:up=XUP,YUP,ZUP:pos=X,Y,Z:tgt=XT,YT,ZT:img=WxH ]\n");
+  printf("[-s SCALE_FACTOR] [-D {all | error | success}] -d\n");
   printf("[-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n");  
   printf("[-r AMBIENT_RAD_TEMP:REFERENCE_TEMP]\n");  
-  printf("\n  -h : print this help.\n");
-  printf("\nArguments\n");
+  printf("\n  -h: print this help.\n");
+  printf("\nMandatory arguments\n");
   printf("---------\n");
-  printf("\n  -M MEDIUM.txt :\n");
+  printf("\n  -M MEDIUM.txt:\n");
   printf("     MEDIUM.txt is a text file which contains the description of the\n");
   printf("     media.\n");
-  printf("\n  -B BOUNDARY.txt :\n");
+  printf("\n  -B BOUNDARY.txt:\n");
   printf("     BOUNDARY.txt is a text file which contains the description of the\n");
   printf("     boundary conditions.\n");
-  printf("\nOptionnal arguments\n");
+  printf("\nExclusive arguments\n");
   printf("-------------------\n");
-  printf("\n -p X:Y:Z:TIME :\n");
-  printf("    this is the position and the time of the probe.\n");
-  printf("    default value: 0.0,0.0,0.0,INF.\n");
+  printf("\n -p X:Y:Z:TIME:\n");
+  printf("    compute the temperature at the given probe.\n");
   printf("    The probe must be in a medium. If some boundary conditions are\n");
   printf("    time-dependant, TIME can not be INF.\n");
-  printf("\n -m medium_name,TIME :\n");
-  printf("    this is the medium name and the time of the by-medium integration.\n");
+  printf("\n -m MEDIUM_NAME,TIME:\n");
+  printf("    compute the mean temperature in a given medium at a given time.\n");
   printf("    If some boundary conditions are time-dependant, TIME can not be INF.\n");
-  printf("\n -s SCALE_FACTOR :\n");
-  printf("    default value: 1.0.\n");
-  printf("\n -d :\n");
-  printf("    dump geometry in VTK format with medium front/back id and\n");
+  printf("\n -d:\n");
+  printf("    dump the geometry in VTK format with medium front/back id and\n");
   printf("    boundary id.\n");
-  printf("\n -D { all | error | success } :\n");
-  printf("    dump paths in VTK format.\n");
-  printf("\n -n NUM_OF_REALIZATIONS :\n");
-  printf("    number of Monte-Carlo realizations.\n");
-  printf("    default value: 10000.\n");
-  printf("\n -t NUM_OF_THREADS :\n");
-  printf("    default value: all threads available.\n");
-  printf("\n -r AMBIENT_RAD_TEMP,REFERENCE_TEMP :\n");
-  printf("    Parameters for the radiative transfer.\n");
-  printf("    AMBIENT_RAD_TEMP is the ambient radiative temperature .\n");
-  printf("    REFERENCE_TEMP is the temperature used for the linearization.\n");
-  printf("    of theradiative transfer.\n");
-  printf("\n -R spp=SPP:fov=FOV:up=XUP,YUP,ZUP:pos=X,Y,Z:tgt=XT,YT,ZT:img=WxH :\n");
+  printf("\n -b SURFACE.vtk,TIME:\n");
+  printf("    compute the mean temperature on a given 2D shape at a given time.\n");
+  printf("    Mean temperature is computed on the front sides of the primitives\n");
+  printf("    listed in SURFACE.vtk. These primitives are not added to the geometry,\n");
+  printf("    but must be already known. The shape doesn't need to be connex.\n");
+  printf("    If some boundary conditions are time-dependant, TIME can not be INF.\n");
+  printf("\n -R t=TIME:spp=SPP:fov=FOV:up=XUP,YUP,ZUP:pos=X,Y,Z:tgt=XT,YT,ZT:img=WxH:\n");
   printf("    The infra-red rendering mode.\n");
+  printf("    t is the rendering time (default: INF).\n");
   printf("    spp is the number of samples per pixel (default: 4).\n");
   printf("    fov is the field of view (default: 70 degrees).\n");
   printf("    up is the up direction (default: 0,0,1).\n");
   printf("    pos is the position of camera (default: 1,1,1).\n");
   printf("    tgt is the target (default: 0,0,0).\n");
   printf("    img is the resolution (default: 640x480).\n");
+  printf("\nOptionnal arguments\n");
+  printf("-------------------\n");
+  printf("\n -s SCALE_FACTOR:\n");
+  printf("    default value: 1.0.\n");
+  printf("\n -D { all | error | success }:\n");
+  printf("    dump paths in VTK format.\n");
+  printf("\n -n NUM_OF_REALIZATIONS:\n");
+  printf("    number of Monte-Carlo realizations.\n");
+  printf("    default value: 10000.\n");
+  printf("\n -t NUM_OF_THREADS:\n");
+  printf("    default value: all threads available.\n");
+  printf("\n -r AMBIENT_RAD_TEMP,REFERENCE_TEMP:\n");
+  printf("    Parameters for the radiative transfer.\n");
+  printf("    AMBIENT_RAD_TEMP is the ambient radiative temperature .\n");
+  printf("    REFERENCE_TEMP is the temperature used for the linearization.\n");
+  printf("    of theradiative transfer.\n");
 }
 
 
@@ -128,7 +138,7 @@ parse_args(const int argc, char** argv, struct args* args)
     goto error;
   }
 
-  while((opt = getopt(argc, argv, "hn:t:B:M:m:p:dD:s:r:R:")) != -1) {
+  while((opt = getopt(argc, argv, "hn:t:b:B:M:m:p:dD:s:r:R:")) != -1) {
     switch(opt) {
       case 'h':
         print_help(argv[0]);
@@ -180,6 +190,33 @@ parse_args(const int argc, char** argv, struct args* args)
         }
         break;
 
+      case 'b': {
+        int err = 0;
+        char *ptr;
+        if (args->mode != UNDEF_MODE) {
+          res = RES_BAD_ARG;
+          fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
+            (char)opt, MODE_OPTION[args->mode]);
+          goto error;
+        }
+        args->mode = BOUNDARY_COMPUTE;
+        ptr = strrchr(optarg, ',');
+        /* Single ',' allowed */
+        if (ptr != strchr(optarg, ','))
+          err = 1;
+        else {
+          *ptr = '\0';
+          ptr++;
+          args->solve_boundary_filename = optarg;
+          err = RES_OK != cstr_to_double(ptr, args->u.probe + 3);
+        }
+        if (err) {
+          res = RES_BAD_ARG;
+          fprintf(stderr, "Invalid argument -b %s\n", optarg);
+          goto error;
+        }
+        break;
+      }
       case 'm': {
         char* ptr;
         if (args->mode != UNDEF_MODE) {

@@ -1145,7 +1145,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     /* Launch the simulation */
     res = sdis_solve_camera(scn,
       cam,
-      INF,
+      stardis->camera.u.time,
       stardis->scale_factor,
       stardis->radiative_temp[0],
       stardis->radiative_temp[1],
@@ -1208,14 +1208,14 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     FOR_EACH(ii, 0, sz) {
       struct description* desc = stardis->descriptions + ii;
       if (desc->type == DESC_MAT_SOLID) {
-        if (0 == strcmp(stardis->medium_name, desc->d.solid.name)) {
+        if (0 == strcmp(stardis->solve_name, desc->d.solid.name)) {
           ASSERT(sa_size(media) > ii);
           medium = media[ii];
           break;
         }
       }
       else if (desc->type == DESC_MAT_FLUID) {
-        if (0 == strcmp(stardis->medium_name, desc->d.fluid.name)) {
+        if (0 == strcmp(stardis->solve_name, desc->d.fluid.name)) {
           ASSERT(sa_size(media) > ii);
           medium = media[ii];
           break;
@@ -1225,7 +1225,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     if (medium == NULL) {
       /* Not found */
       fprintf(stderr, "Cannot solve medium %s (unknown medium)\n",
-        stardis->medium_name);
+        stardis->solve_name);
       res = RES_BAD_ARG;
       goto error;
     }
@@ -1239,24 +1239,60 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       stardis->radiative_temp[1],
       stardis->dump_paths,
       &estimator);
+  } else if (mode == BOUNDARY_COMPUTE) {
+    ASSERT(sa_size(stardis->boundary.primitives)
+      == sa_size(stardis->boundary.sides));
+    if (sa_size(stardis->boundary.sides) == 0) {
+      fprintf(stderr, "Cannot solve boundary %s (empty geometry)\n",
+        stardis->solve_name);
+    }
+
+    time[0] = time[1] = stardis->probe[3];
+    res = sdis_solve_boundary(scn,
+      stardis->N,
+      stardis->boundary.primitives,
+      stardis->boundary.sides,
+      sa_size(stardis->boundary.sides),
+      time,
+      stardis->scale_factor,
+      stardis->radiative_temp[0],
+      stardis->radiative_temp[1],
+      stardis->dump_paths,
+      &estimator);
+
+  } else {
+    CHK(0);
   }
   if (res != RES_OK) goto error;
-  if (mode == PROBE_COMPUTE || mode == MEDIUM_COMPUTE) {
+  if (mode == PROBE_COMPUTE
+    || mode == MEDIUM_COMPUTE
+    || mode == BOUNDARY_COMPUTE) {
     /* Fetch the estimation data */
     SDIS(estimator_get_temperature(estimator, &temperature));
     SDIS(estimator_get_failure_count(estimator, &nfailures));
 
     /* Print the results */
-    if (mode == PROBE_COMPUTE)
+    switch (mode) {
+    case PROBE_COMPUTE:
       printf("Temperature at t=[%g, %g, %g, %g] = %g +/- %g\n",
         pos[0], pos[1], pos[2], time[0],
         temperature.E, /* Expected value */
         temperature.SE); /* Standard error */
-    else
+      break;
+    case MEDIUM_COMPUTE:
       printf("Temperature in medium %s at t=%g = %g +/- %g\n",
-        stardis->medium_name, time[0],
+        stardis->solve_name, time[0],
         temperature.E, /* Expected value */
         temperature.SE); /* Standard error */
+      break;
+    case BOUNDARY_COMPUTE:
+      printf("Temperature at boundary %s at t=%g = %g +/- %g\n",
+        stardis->solve_name, time[0],
+        temperature.E, /* Expected value */
+        temperature.SE); /* Standard error */
+      break;
+    default: FATAL("Invalid mode.");
+    }
     printf("#failures: %lu/%lu\n",
       (unsigned long)nfailures,
       (unsigned long)stardis->N);

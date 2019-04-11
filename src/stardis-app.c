@@ -526,9 +526,10 @@ read_triangles
    struct htable_triangle* triangle2id,
    const char* stl_filename,
    const unsigned* id2id,
-   const int is_connection,
+   const enum content_type file_type,
    const unsigned desc_id,
-   struct geometry* geometry)
+   struct geometry* geometry,
+   struct solve_boundary* boundary)
 {
   res_T res = RES_OK;
   unsigned* packed_indices = NULL;
@@ -577,6 +578,14 @@ read_triangles
       ASSERT(id < sa_size(geometry->triangle));
     } else {
       size_t sz;
+      if (file_type == CONTENT_BOUNDARY) {
+        /* Cannot create new geometry! */
+        fprintf(stderr,
+          "Triangle %u from file %s cannot compute temperature on this surface\n"
+          "Not part of the model\n",
+          tri_index, stl_filename);
+        return RES_BAD_ARG;
+      }
       sz = htable_triangle_size_get(triangle2id);
       ASSERT(sz == sa_size(geometry->triangle));
       ASSERT(sz < UINT_MAX);
@@ -586,20 +595,29 @@ read_triangles
       sa_push(geometry->triangle, tri);
     }
 
-    if (is_connection) {
+    switch (file_type) {
+    case CONTENT_CONNECTION:
       side_desc_ptr = &geometry->triangle[id].connection_description;
-    }
-    else {
+      break;
+    case CONTENT_GEOMETRY:
       /* Is the triangle in triangle list reversed wrt stl_desc? */
       side_desc_ptr = (current_side == SDIS_FRONT) ?
         &geometry->triangle[id].front_description
         : &geometry->triangle[id].back_description;
+      break;
+    case CONTENT_BOUNDARY:
+      sa_push(boundary->primitives, id);
+      sa_push(boundary->sides, current_side);
+      continue; /* Next triangle */
+      break;
+    default: FATAL("Invalid type.\n");
     }
     if (*side_desc_ptr != UINT_MAX && *side_desc_ptr != desc_id) {
       /* Already described with a different description! */
       fprintf(stderr, "Triangle %u %s with 2 different descriptions\n",
         tri_index,
-        is_connection ? "connection" : (current_side == SDIS_FRONT ? "front" : "back"));
+        (file_type == CONTENT_CONNECTION
+          ? "connection" : (current_side == SDIS_FRONT ? "front" : "back")));
       print_trg_as_obj(stderr, (const struct vertex*)stl_desc->vertices, &tri);
       return RES_BAD_ARG;
     }
@@ -628,11 +646,11 @@ read_triangles
   return res;
 }
 
-static res_T
+res_T
 read_stl
   (const unsigned desc_id,
-   const int is_connection,
-   char* const* stl_filename,
+   const enum content_type file_type,
+   const char* stl_filename,
    struct htable_vertex* vertex2id,
    struct htable_triangle* triangle2id,
    struct stardis* stardis)
@@ -646,17 +664,17 @@ read_stl
 
   SSTL(create(NULL, &stardis->allocator, 0, &sstl));
 
-  res = sstl_load(sstl, *stl_filename);
+  res = sstl_load(sstl, stl_filename);
   if (res != RES_OK) {
-    fprintf(stderr, "Cannot read STL file: %s\n", *stl_filename);
+    fprintf(stderr, "Cannot read STL file: %s\n", stl_filename);
     goto error;
   }
   SSTL(get_desc(sstl, &stl_desc));
 
   res = read_vertices(&stl_desc, vertex2id, &id2id, &stardis->geometry);
   if (res != RES_OK) goto error;
-  res = read_triangles(&stl_desc, triangle2id, *stl_filename, id2id, is_connection,
-    desc_id, &stardis->geometry);
+  res = read_triangles(&stl_desc, triangle2id, stl_filename, id2id, file_type,
+    desc_id, &stardis->geometry, &stardis->boundary);
   if (res != RES_OK) goto error;
   
 end:
@@ -675,6 +693,7 @@ static res_T
 geometry_analyse
   (const char* medium_filename,
    const char* bc_filename,
+   const char* bound_filename, /* Can be NULL */
    struct stardis* stardis)
 {
   res_T res = RES_OK;
@@ -726,7 +745,8 @@ geometry_analyse
       desc_id = *p_desc;
     }
 
-    res = read_stl(sz-1, 0, &stl_filename, &vertex2id, &triangle2id, stardis);
+    res = read_stl(sz-1, CONTENT_GEOMETRY, stl_filename, &vertex2id,
+      &triangle2id, stardis);
     if (stl_filename) free(stl_filename);
     if (res != RES_OK) goto error;
   }
@@ -764,12 +784,20 @@ geometry_analyse
       desc_id = *p_desc;
     }
     
-    res = read_stl(desc_id, 1, &stl_filename, &vertex2id, &triangle2id, stardis);
+    res = read_stl(desc_id, CONTENT_CONNECTION, stl_filename, &vertex2id,
+      &triangle2id, stardis);
     if (stl_filename) free(stl_filename);
     if (res != RES_OK) goto error;
   }
   fclose(input);
   input = NULL;
+
+  /* Process vtk file describing boundary compute */
+  if (bound_filename) {
+    res = read_stl(0, CONTENT_BOUNDARY, bound_filename, &vertex2id,
+      &triangle2id, stardis);
+    if (res != RES_OK) goto error;
+  }
 
 exit:
   if(input) fclose(input);
@@ -786,7 +814,7 @@ error:
 
 static res_T
 parse_camera
-(char* cam_param, struct camera* cam)
+  (char* cam_param, struct camera* cam)
 {
   char** line = NULL;
   char** opt = NULL;
@@ -801,7 +829,10 @@ parse_camera
     {
       size_t len = 0;
       opt = split_line(line[i],'=');
-      if (strcmp(opt[0],"fov")==0){
+      if (strcmp(opt[0], "t") == 0) {
+        res = cstr_to_double(opt[1], &cam->u.time);
+        if (res != RES_OK) goto error;
+      } else if (strcmp(opt[0],"fov")==0){
         res = cstr_to_double(opt[1], &cam->fov);
         if (res != RES_OK) goto error;
       } else if (strcmp(opt[0],"up")==0) {
@@ -848,7 +879,7 @@ stardis_init
   if (res != RES_OK) goto error;
 
   res = geometry_analyse(args->medium_filename,
-      args->bc_filename, stardis);
+      args->bc_filename, args->solve_boundary_filename, stardis);
   if (res != RES_OK) goto error;
 
   stardis->N = args->N;
@@ -871,7 +902,10 @@ stardis_init
     if (res != RES_OK) goto error;
  }
  else if (args->mode == MEDIUM_COMPUTE) {
-   strcpy(stardis->medium_name, args->medium_name);
+   strcpy(stardis->solve_name, args->medium_name);
+ }
+ else if (args->mode == BOUNDARY_COMPUTE) {
+   strcpy(stardis->solve_name, args->solve_boundary_filename);
  }
 
 exit:
@@ -911,6 +945,8 @@ stardis_release(struct stardis* stardis)
   }
   sa_release(stardis->descriptions);
   release_geometry(&stardis->geometry);
+  sa_release(stardis->boundary.primitives);
+  sa_release(stardis->boundary.sides);
 }
 
 /* TODO: rewrite dump! */

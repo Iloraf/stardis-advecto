@@ -900,9 +900,21 @@ struct camera {
   double fov;
   unsigned spp;
   unsigned img[2];
+  union { /* Trick to allow static initialization with INF */
+    uint64_t t;
+    double time;
+  } u;
 };
-#define NULL_CAMERA__ {{1,1,1},{0,0,0},{0,0,1},30,4,{640,480}} 
+#define NULL_CAMERA__ {\
+  {1,1,1},{0,0,0},{0,0,1},30,4,{640,480},\
+  { 0x7FF0000000000000 } /* time=INF */\
+} 
 static const struct camera NULL_CAMERA = NULL_CAMERA__;
+
+struct solve_boundary {
+  size_t* primitives;
+  enum sdis_side* sides;
+};
 
 struct stardis {
   struct geometry geometry;
@@ -910,7 +922,10 @@ struct stardis {
 
   double probe[4]; /* x,y,z,t of probe when mode is PROBE_COMPUTE */
   struct camera camera; /* camera when mode is IR_COMPUTE */
-  char medium_name[64]; /* medium name when mode is MEDIUM_COMPUTE */
+  char solve_name[64]; /* medium name when mode is MEDIUM_COMPUTE,
+                       boundary file name when BOUNDARY_COMPUTE*/
+  struct solve_boundary boundary; /* Boundary to solve when mode
+                                  is BOUNDARY_COMPUTE */
 
   size_t N; /*number of MC realizations*/
   unsigned nthreads;
@@ -921,10 +936,19 @@ struct stardis {
   enum sdis_heat_path_flag dump_paths;
 };
 #define NULL_ALLOCATOR__ {NULL}
-#define NULL_STARDIS__ {NULL_GEOMETRY__, NULL,\
-  {0,0,0,0}, NULL_CAMERA__, "",\
+#define NULL_STARDIS__ {\
+  NULL_GEOMETRY__, NULL,\
+  {0,0,0,0}, NULL_CAMERA__, "", {NULL,NULL},\
   0, 0, 0, {300,300}, NULL_ALLOCATOR__, 0, SDIS_HEAT_PATH_NONE}
 static const struct stardis NULL_STARDIS = NULL_STARDIS__;
+
+enum content_type {
+  CONTENT_GEOMETRY,
+  CONTENT_CONNECTION,
+  CONTENT_BOUNDARY,
+  CONTENT_TYPES_COUNT
+};
+
 
 extern res_T 
 stardis_init
@@ -934,10 +958,19 @@ stardis_init
 extern res_T
 stardis_compute(struct stardis* stardis, enum stardis_mode mode);
 
-void
+extern void
 stardis_release(struct stardis* stardis);
 
 extern res_T
 dump_vtk(FILE* output, const struct geometry* geometry);
+
+extern res_T
+read_stl
+  (const unsigned desc_id,
+   const enum content_type file_type,
+   const char* stl_filename,
+   struct htable_vertex* vertex2id,
+   struct htable_triangle* triangle2id,
+   struct stardis* stardis);
 
 #endif /*STARDIS-APP_H*/

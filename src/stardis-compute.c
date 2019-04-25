@@ -195,7 +195,9 @@ solid_dont_get_temperature
 (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   (void)vtx; (void)data;
-  ASSERT(0);
+  fflush(stdout);
+  fflush(stderr);
+  FATAL("solid_dont_get_temperature: path went to a non-existing medium\n");
   return 0;
 }
 
@@ -572,7 +574,7 @@ create_edge_file_if
 
   if(scount == 0)
     /* No edge to exit */
-    return RES_OK;
+    goto end;
 
   fprintf(stderr, "Some frontier edges found: create OBJ files\n");
 
@@ -1101,15 +1103,15 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
       res = sdis_interface_create(dev, front_med, back_med,
         &interface_shader, data, &intface);
+      SDIS(data_ref_put(data)); data = NULL;
       if (res != RES_OK) {
         fprintf(stderr,
           "Cannot create interface associated to triangle %u\n", i);
         goto error;
       }
-      SDIS(data_ref_put(data)); data = NULL;
+      sa_push(interfaces, intface);
       res = htable_intface_set(&htable_interfaces, &int_descs, &intface);
       if (res != RES_OK) goto error;
-      sa_push(interfaces, intface);
     }
     sa_push(interf_bytrg, intface);
   }
@@ -1302,7 +1304,16 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   }
 
 end:
-  if (data) SDIS(data_ref_put(data));;
+  if (data) SDIS(data_ref_put(data));
+  if (interfaces) {
+
+    for (i = 0; i < sa_size(interfaces); ++i)
+      SDIS(interface_ref_put(interfaces[i]));
+    sa_release(interfaces);
+    stardis->geometry.interfaces = NULL;
+  }
+  sa_release(interf_bytrg);
+  stardis->geometry.interf_bytrg = NULL;
   if (htable_interfaces_initialised) htable_intface_release(&htable_interfaces);
   for (i = 0; i < sa_size(media); ++i)
     SDIS(medium_ref_put(media[i]));

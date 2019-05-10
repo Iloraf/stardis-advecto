@@ -936,9 +936,11 @@ stardis_release(struct stardis* stardis)
     case DESC_BOUND_T_FOR_SOLID:
     case DESC_BOUND_T_FOR_FLUID:
       free(desc->d.t_boundary.T);
+      te_free(desc->d.t_boundary.te_temperature);
       break;
     case DESC_BOUND_F_FOR_SOLID:
       free(desc->d.f_boundary.flux);
+      te_free(desc->d.f_boundary.te_flux);
       break;
     default: FATAL("Invalid type.\n");
     }

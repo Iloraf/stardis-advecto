@@ -198,7 +198,6 @@ solid_dont_get_temperature
   fflush(stdout);
   fflush(stderr);
   FATAL("solid_dont_get_temperature: path went to a non-existing medium\n");
-  return 0;
 }
 
 static double
@@ -1031,7 +1030,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
             interface_shader.back.temperature = interface_get_temperature;
           }
           ASSERT(connect->d.t_boundary.te_temperature);
-          interface_props->temperature = connect->d.t_boundary.te_temperature;
+          interface_props->temperature
+            = te_duplicate(connect->d.t_boundary.te_temperature);
           if (connect->d.t_boundary.has_hc) {
             ASSERT(connect->type == DESC_BOUND_T_FOR_FLUID);
             interface_shader.convection_coef = interface_get_convection_coef;
@@ -1056,7 +1056,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
             interface_shader.back.flux = interface_get_flux;
           }
           ASSERT(connect->d.f_boundary.te_flux);
-          interface_props->flux = connect->d.f_boundary.te_flux;
+          interface_props->flux = te_duplicate(connect->d.f_boundary.te_flux);
           break;
         case DESC_SOLID_FLUID_CONNECT:
           /* Both front and back should be defined;
@@ -1306,7 +1306,6 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 end:
   if (data) SDIS(data_ref_put(data));
   if (interfaces) {
-
     for (i = 0; i < sa_size(interfaces); ++i)
       SDIS(interface_ref_put(interfaces[i]));
     sa_release(interfaces);

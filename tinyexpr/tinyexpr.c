@@ -133,6 +133,19 @@ static te_expr *new_expr1(const int type, te_expr *p1) {
     return ret;
 }
 
+te_expr* te_duplicate(te_expr* n) {
+  const size_t size = sizeof(te_expr)
+#ifndef TE_WITHOUT_CLOSURES
+    + (IS_CLOSURE(n->type) ? sizeof(void*) : 0);
+#endif
+      ;
+  te_expr* nn;
+  assert(n);
+  nn = malloc(size);
+  memcpy(nn, n, size);
+  return nn;
+}
+
 static te_expr *new_expr2(const int type, te_expr *p1, te_expr *p2) {
     const size_t size = sizeof(te_expr) + sizeof(void*)
 #ifndef TE_WITHOUT_CLOSURES

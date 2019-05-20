@@ -122,7 +122,7 @@ release_geometry(struct geometry* geom)
 }
 
 struct mat_fluid {
-  char name[16];
+  char name[32];
   unsigned fluid_id;
   double rho;
   double cp;
@@ -217,7 +217,7 @@ hash_fluid(const struct mat_fluid* key)
 }
 
 struct mat_solid {
-  char name[16];
+  char name[32];
   unsigned solid_id;
   double lambda;
   double rho;
@@ -355,6 +355,7 @@ hash_solid(const struct mat_solid* key)
 }
 
 struct h_boundary {
+  char name[32];
   unsigned mat_id;
   double emissivity;
   double specular_fraction;
@@ -373,7 +374,8 @@ print_h_boundary
   ASSERT(stream && b
     && (type == DESC_BOUND_H_FOR_SOLID || type == DESC_BOUND_H_FOR_FLUID));
   fprintf(stream,
-    "H boundary for %s: emissivity=%g specular_fraction=%g hc=%g hc_max=%g T='%s'\n",
+    "H boundary %s for %s: emissivity=%g specular_fraction=%g hc=%g hc_max=%g T='%s'\n",
+    b->name,
     (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"),
     (b->has_emissivity ? b->emissivity : 0),
     (b->has_emissivity ? b->specular_fraction : 0),
@@ -388,6 +390,7 @@ eq_h_boundary
    const struct h_boundary* b)
 {
   if (a->mat_id != b->mat_id
+    || strcmp(a->name, b->name)
     || a->specular_fraction != b->specular_fraction
     || strcmp(a->T, b->T)
     || a->has_emissivity != b->has_emissivity
@@ -409,6 +412,10 @@ hash_h_boundary(const struct h_boundary* key)
   uint32_t hash = OFFSET32_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV32_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->mat_id)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
     hash = hash * FNV32_PRIME;
@@ -451,6 +458,10 @@ hash_h_boundary(const struct h_boundary* key)
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV64_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->mat_id)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
     hash = hash * FNV64_PRIME;
@@ -491,6 +502,7 @@ hash_h_boundary(const struct h_boundary* key)
 }
 
 struct t_boundary {
+  char name[32];
   unsigned mat_id;
   char* T;
   struct te_expr* te_temperature;
@@ -508,7 +520,8 @@ print_t_boundary
   ASSERT(stream && b
     && (type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID));
   fprintf(stream,
-    "T boundary for %s: hc=%g hc_max=%g T='%s'\n",
+    "T boundary %s  for %s: hc=%g hc_max=%g T='%s'\n",
+    b->name,
     (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
     (b->has_hc ? b->hc : 0),
     (b->has_hc ? b->hc_max : 0),
@@ -523,6 +536,8 @@ eq_t_boundary
 {
   ASSERT(type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID);
   /* These fields are meaningful  by both types */
+  if (strcmp(a->name, b->name))
+    return 0;
   if (a->mat_id != b->mat_id || strcmp(a->T, b->T))
     return 0;
   if (type != DESC_BOUND_T_FOR_FLUID)
@@ -550,6 +565,10 @@ hash_t_boundary
   uint32_t hash = OFFSET32_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV32_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->mat_id)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
     hash = hash * FNV32_PRIME;
@@ -580,6 +599,10 @@ hash_t_boundary
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV64_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->mat_id)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
     hash = hash * FNV64_PRIME;
@@ -608,6 +631,7 @@ hash_t_boundary
 }
 
 struct f_boundary {
+  char name[32];
   unsigned mat_id;
   char* flux;
   struct te_expr* te_flux;
@@ -624,7 +648,8 @@ print_f_boundary
 {
   ASSERT(stream && b && type == DESC_BOUND_F_FOR_SOLID); (void)type;
   fprintf(stream,
-    "F boundary for SOLID: hc=%g hc_max=%g flux='%s'\n",
+    "F boundary %s for SOLID: hc=%g hc_max=%g flux='%s'\n",
+    b->name,
     (b->has_hc ? b->hc : 0),
     (b->has_hc ? b->hc_max : 0),
     (b->flux ? b->flux : "0"));
@@ -634,6 +659,7 @@ static char
 eq_f_boundary(const struct f_boundary* a, const struct f_boundary* b)
 {
   if (a->mat_id != b->mat_id
+    || strcmp(a->name, b->name)
     || strcmp(a->flux, b->flux)
     || a->has_hc != b->has_hc)
     return 0;
@@ -652,6 +678,10 @@ hash_f_boundary(const struct f_boundary* key)
   uint32_t hash = OFFSET32_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV32_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->mat_id)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
     hash = hash * FNV32_PRIME;
@@ -681,6 +711,10 @@ hash_f_boundary(const struct f_boundary* key)
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV64_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->mat_id)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
     hash = hash * FNV64_PRIME;
@@ -708,6 +742,7 @@ hash_f_boundary(const struct f_boundary* key)
 }
 
 struct solid_fluid_connect {
+  char name[32];
   double emissivity;
   double specular_fraction;
   double hc;
@@ -718,7 +753,8 @@ struct solid_fluid_connect {
 static char
 eq_sf_connect(const struct solid_fluid_connect* a, const struct solid_fluid_connect* b)
 {
-  return (char) (a->emissivity == b->emissivity
+  return (char)(!strcmp(a->name, b->name)
+    && a->emissivity == b->emissivity
     && a->specular_fraction == b->specular_fraction
     && a->hc == b->hc
     && a->hc_max == b->hc_max
@@ -737,6 +773,10 @@ hash_sf_connect(const struct solid_fluid_connect* key)
   uint32_t hash = OFFSET32_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV32_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->emissivity)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->emissivity)[i]);
     hash = hash * FNV32_PRIME;
@@ -770,6 +810,10 @@ hash_sf_connect(const struct solid_fluid_connect* key)
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
+  FOR_EACH(i, 0, sizeof(key->name)) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
+    hash = hash * FNV64_PRIME;
+  }
   FOR_EACH(i, 0, sizeof(key->emissivity)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->emissivity)[i]);
     hash = hash * FNV64_PRIME;
@@ -801,7 +845,6 @@ hash_sf_connect(const struct solid_fluid_connect* key)
 }
 
 struct description {
-  char name[16];
   enum description_type type;
   union d {
     struct mat_fluid fluid;
@@ -816,7 +859,6 @@ struct description {
 FINLINE void
 init_description(struct description* desc) {
   ASSERT(desc);
-  desc->name[0] = '\0';
   desc->type = DESCRIPTION_TYPE_COUNT__;
 }
 

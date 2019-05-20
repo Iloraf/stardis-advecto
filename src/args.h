@@ -11,17 +11,27 @@
 #include <sdis_version.h>
 
 enum stardis_mode {
-  PROBE_COMPUTE,
-  MEDIUM_COMPUTE,
-  BOUNDARY_COMPUTE,
-  IR_COMPUTE,
-  DUMP_VTK,
-  UNDEF_MODE
+  UNDEF_MODE = 0,
+  PROBE_COMPUTE = BIT(0),
+  MEDIUM_COMPUTE = BIT(1),
+  BOUNDARY_COMPUTE = BIT(2),
+  GREEN_MODE = BIT(3),
+  IR_COMPUTE = BIT(4),
+  DUMP_VTK = BIT(5),
+  COMPUTE_MODES = PROBE_COMPUTE | MEDIUM_COMPUTE | BOUNDARY_COMPUTE | IR_COMPUTE | DUMP_VTK
 };
 
-static const char MODE_OPTION[UNDEF_MODE] = {
-  'p', 'm', 'b', 'R', 'd'
-};
+static char mode_option(const enum stardis_mode m) {
+  int found = 0;
+  char res = '?';
+  if (m & PROBE_COMPUTE) { found++; res = 'p'; }
+  if (m & MEDIUM_COMPUTE) { found++; res = 'm'; }
+  if (m & BOUNDARY_COMPUTE) { found++; res = 'b'; }
+  if (m & IR_COMPUTE) { found++; res = 'R'; }
+  if (m & DUMP_VTK) { found++; res = 'd'; }
+  ASSERT(found == 1);
+  return res;
+}
 
 enum dump_path_type {
   DUMP_NONE = 0,
@@ -67,7 +77,7 @@ print_help(char* prog)
   printf("usage: \n%s -M MEDIUM.txt -B BOUNDARY.txt\n", prog);
   printf("[ -p X,Y,Z,TIME | -m MEDIUM_NAME,TIME | -d | -b SURFACE.vtk,TIME\n");
   printf("  | -R t=TIME:spp=SPP:fov=FOV:up=XUP,YUP,ZUP:pos=X,Y,Z:tgt=XT,YT,ZT:img=WxH ]\n");
-  printf("[-s SCALE_FACTOR] [-D {all | error | success}] -d\n");
+  printf("[ -g] [-s SCALE_FACTOR] [-D {all | error | success}] -d\n");
   printf("[-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n");  
   printf("[-r AMBIENT_RAD_TEMP:REFERENCE_TEMP]\n");  
   printf("\n  -h: print this help.\n");
@@ -82,21 +92,21 @@ print_help(char* prog)
   printf("\nExclusive arguments\n");
   printf("-------------------\n");
   printf("\n -p X:Y:Z:TIME:\n");
-  printf("    compute the temperature at the given probe.\n");
+  printf("    Compute the temperature at the given probe.\n");
   printf("    The probe must be in a medium. If some boundary conditions are\n");
-  printf("    time-dependant, TIME can not be INF.\n");
+  printf("    time-dependant, TIME cannot be INF.\n");
   printf("\n -m MEDIUM_NAME,TIME:\n");
-  printf("    compute the mean temperature in a given medium at a given time.\n");
-  printf("    If some boundary conditions are time-dependant, TIME can not be INF.\n");
+  printf("    Compute the mean temperature in a given medium at a given time.\n");
+  printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
   printf("\n -d:\n");
-  printf("    dump the geometry in VTK format with medium front/back id and\n");
+  printf("    Dump the geometry in VTK format with medium front/back id and\n");
   printf("    boundary id.\n");
   printf("\n -b SURFACE.vtk,TIME:\n");
-  printf("    compute the mean temperature on a given 2D shape at a given time.\n");
+  printf("    Compute the mean temperature on a given 2D shape at a given time.\n");
   printf("    Mean temperature is computed on the front sides of the primitives\n");
   printf("    listed in SURFACE.vtk. These primitives are not added to the geometry,\n");
   printf("    but must be already known. The shape doesn't need to be connex.\n");
-  printf("    If some boundary conditions are time-dependant, TIME can not be INF.\n");
+  printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
   printf("\n -R t=TIME:spp=SPP:fov=FOV:up=XUP,YUP,ZUP:pos=X,Y,Z:tgt=XT,YT,ZT:img=WxH:\n");
   printf("    The infra-red rendering mode.\n");
   printf("    t is the rendering time (default: INF).\n");
@@ -108,20 +118,24 @@ print_help(char* prog)
   printf("    img is the resolution (default: 640x480).\n");
   printf("\nOptionnal arguments\n");
   printf("-------------------\n");
+  printf("\n -g:\n");
+  printf("    Compute the green function.\n");
+  printf("    Must be used in conjonction with one the -p, -m or -b options.\n");
+  printf("    Provided TIME is silently ignored.\n");
   printf("\n -s SCALE_FACTOR:\n");
   printf("    default value: 1.0.\n");
   printf("\n -D { all | error | success }:\n");
   printf("    dump paths in VTK format.\n");
   printf("\n -n NUM_OF_REALIZATIONS:\n");
-  printf("    number of Monte-Carlo realizations.\n");
+  printf("    Number of Monte-Carlo realizations.\n");
   printf("    default value: 10000.\n");
   printf("\n -t NUM_OF_THREADS:\n");
-  printf("    default value: all threads available.\n");
+  printf("    Number of threads; default value is all threads available.\n");
   printf("\n -r AMBIENT_RAD_TEMP,REFERENCE_TEMP:\n");
   printf("    Parameters for the radiative transfer.\n");
   printf("    AMBIENT_RAD_TEMP is the ambient radiative temperature .\n");
-  printf("    REFERENCE_TEMP is the temperature used for the linearization.\n");
-  printf("    of theradiative transfer.\n");
+  printf("    REFERENCE_TEMP is the temperature used for the linearization\n");
+  printf("    of the radiative transfer.\n");
 }
 
 
@@ -138,12 +152,16 @@ parse_args(const int argc, char** argv, struct args* args)
     goto error;
   }
 
-  while((opt = getopt(argc, argv, "hn:t:b:B:M:m:p:dD:s:r:R:")) != -1) {
+  while((opt = getopt(argc, argv, "hgn:t:b:B:M:m:p:dD:s:r:R:")) != -1) {
     switch(opt) {
       case 'h':
         print_help(argv[0]);
         args->just_help = 1;
         goto exit;
+
+      case 'g':
+        args->mode |= GREEN_MODE;
+        break;
 
       case 'n': {
         args->N = strtoull(optarg, NULL, 10);
@@ -174,13 +192,13 @@ parse_args(const int argc, char** argv, struct args* args)
         break;
 
       case 'p':
-        if (args->mode != UNDEF_MODE) {
+        if (args->mode & COMPUTE_MODES) {
           res = RES_BAD_ARG;
           fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
-            (char)opt, MODE_OPTION[args->mode]);
+            (char)opt, mode_option(args->mode));
           goto error;
         }
-        args->mode = PROBE_COMPUTE;
+        args->mode |= PROBE_COMPUTE;
         cstr_to_list_double(optarg, ',', args->u.probe, &len, 4);
         if(len != 4 
            || res != RES_OK) {
@@ -193,13 +211,13 @@ parse_args(const int argc, char** argv, struct args* args)
       case 'b': {
         int err = 0;
         char *ptr;
-        if (args->mode != UNDEF_MODE) {
+        if (args->mode & COMPUTE_MODES) {
           res = RES_BAD_ARG;
           fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
-            (char)opt, MODE_OPTION[args->mode]);
+            (char)opt, mode_option(args->mode));
           goto error;
         }
-        args->mode = BOUNDARY_COMPUTE;
+        args->mode |= BOUNDARY_COMPUTE;
         ptr = strrchr(optarg, ',');
         /* Single ',' allowed */
         if (ptr != strchr(optarg, ','))
@@ -219,13 +237,13 @@ parse_args(const int argc, char** argv, struct args* args)
       }
       case 'm': {
         char* ptr;
-        if (args->mode != UNDEF_MODE) {
+        if (args->mode & COMPUTE_MODES) {
           res = RES_BAD_ARG;
           fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
-            (char)opt, MODE_OPTION[args->mode]);
+            (char)opt, mode_option(args->mode));
           goto error;
         }
-        args->mode = MEDIUM_COMPUTE;
+        args->mode |= MEDIUM_COMPUTE;
         ptr = strpbrk(optarg, ",");
         if (! ptr || ptr == optarg)
           res = RES_BAD_ARG;
@@ -240,13 +258,13 @@ parse_args(const int argc, char** argv, struct args* args)
       }
 
       case 'd':
-        if (args->mode != UNDEF_MODE) {
+        if (args->mode & COMPUTE_MODES) {
           res = RES_BAD_ARG;
           fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
-            (char)opt, MODE_OPTION[args->mode]);
+            (char)opt, mode_option(args->mode));
           goto error;
         }
-        args->mode = DUMP_VTK;
+        args->mode |= DUMP_VTK;
         break;
 
       case 'D':
@@ -286,13 +304,13 @@ parse_args(const int argc, char** argv, struct args* args)
         break;
 
       case 'R':
-        if (args->mode != UNDEF_MODE) {
+        if (args->mode & COMPUTE_MODES) {
           res = RES_BAD_ARG;
           fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
-            (char)opt, MODE_OPTION[args->mode]);
+            (char)opt, mode_option(args->mode));
           goto error;
         }
-        args->mode = IR_COMPUTE;
+        args->mode |= IR_COMPUTE;
         args->camera = optarg;
         break;
     }

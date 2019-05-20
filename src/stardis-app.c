@@ -135,12 +135,12 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
     desc->type = DESC_MAT_SOLID;
 
     CHK_TOK(strtok(NULL, " "), "medium name");
-    if (strlen(tk) >= sizeof(desc->name)) {
+    if (strlen(tk) >= sizeof(desc->d.solid.name)) {
       fprintf(stderr, "Medium name is too long: %s\n", tk);
       res = RES_BAD_ARG;
       goto exit;
     }
-    strncpy(desc->name, tk, sizeof(desc->name));
+    strncpy(desc->d.solid.name, tk, sizeof(desc->d.solid.name));
 
     CHK_TOK(strtok(NULL, " "), "file name");
     *stl_filename = malloc(strlen(tk) + 1);
@@ -177,8 +177,9 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
     /* Depending of the number of spaces before '"' strtok should
      * be called once or twice */
     CHK_TOK(strtok(NULL, "\""), "Tinit");
-    if(*(tk + strspn(tk, " \t")) == '\0')
+    if (*(tk + strspn(tk, " \t")) == '\0') {
       CHK_TOK(strtok(NULL, "\""), "Tinit");
+    }
     desc->d.solid.Tinit = malloc(strlen(tk) + 1);
     strcpy(desc->d.solid.Tinit, tk);
     /* Closing " fot Tinit; can return NULL if line ends just after "Tinit" */
@@ -203,12 +204,12 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
     desc->type = DESC_MAT_FLUID;
 
     CHK_TOK(strtok(NULL, " "), "medium name");
-    if (strlen(tk) >= sizeof(desc->name)) {
+    if (strlen(tk) >= sizeof(desc->d.fluid.name)) {
       fprintf(stderr, "Medium name is too long: %s\n", tk);
       res = RES_BAD_ARG;
       goto exit;
     }
-    strncpy(desc->name, tk, sizeof(desc->name));
+    strncpy(desc->d.fluid.name, tk, sizeof(desc->d.fluid.name));
 
     CHK_TOK(strtok(NULL, " "), "file name");
     *stl_filename = malloc(strlen(tk) + 1);
@@ -231,8 +232,9 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
     /* Depending of the number of spaces before '"' strtok should
      * be called once or twice */
     CHK_TOK(strtok(NULL, "\""), "Tinit");
-    if (*(tk + strspn(tk, " \t")) == '\0')
+    if (*(tk + strspn(tk, " \t")) == '\0') {
       CHK_TOK(strtok(NULL, "\""), "Tinit");
+    }
     desc->d.fluid.Tinit = malloc(strlen(tk) + 1);
     strcpy(desc->d.fluid.Tinit, tk);
   }
@@ -247,12 +249,13 @@ exit:
 }
 
 /* Read boundary line; should be one of:
-#   H_BOUNDARY_FOR_SOLID STL_filename emissivity specular_fraction hc hc_max "T_env(x,y,z,t)"
-# | H_BOUNDARY_FOR_FLUID STL_filename emissivity specular_fraction hc hc_max "T_env(x,y,z,t)"
-# | T_BOUNDARY_FOR_SOLID STL_filename "T_value(x,y,z,t)"
-# | T_BOUNDARY_FOR_FLUID STL_filename "T_value(x,y,z,t)" hc hc_max
-# | F_BOUNDARY_FOR_SOLID STL_filename "F_value(x,y,z,t)"
+#   H_BOUNDARY_FOR_SOLID Boundary_name STL_filename emissivity specular_fraction hc hc_max "T_env(x,y,z,t)"
+# | H_BOUNDARY_FOR_FLUID Boundary_name STL_filename emissivity specular_fraction hc hc_max "T_env(x,y,z,t)"
+# | T_BOUNDARY_FOR_SOLID Boundary_name STL_filename "T_value(x,y,z,t)"
+# | T_BOUNDARY_FOR_FLUID Boundary_name STL_filename "T_value(x,y,z,t)" hc hc_max
+# | F_BOUNDARY_FOR_SOLID Boundary_name STL_filename "F_value(x,y,z,t)"
 # ; no F_BOUNDARY_FOR_FLUID
+# | SOLID_FLUID_CONNECTION Connection_name STL_filename emissivity specular_fraction hc hc_max
  */
 static res_T
 parse_boundary_line(char* line, char** stl_filename, struct description* desc)
@@ -286,8 +289,17 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
       }
     }
   }
+
   if (h_solid || h_fluid) {
     desc->type = h_solid ? DESC_BOUND_H_FOR_SOLID : DESC_BOUND_H_FOR_FLUID;
+
+    CHK_TOK(strtok(NULL, " "), "boundary name");
+    if (strlen(tk) >= sizeof(desc->d.h_boundary.name)) {
+      fprintf(stderr, "Boundary name is too long: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto exit;
+    }
+    strncpy(desc->d.h_boundary.name, tk, sizeof(desc->d.h_boundary.name));
 
     /* The description is parsed the same way for both types */
     CHK_TOK(strtok(NULL, " "), "file name");
@@ -332,13 +344,22 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
     /* Depending of the number of spaces before '"' strtok should
      * be called once or twice */
     CHK_TOK(strtok(NULL, "\""), "temperature");
-    if (*(tk + strspn(tk, " \t")) == '\0')
+    if (*(tk + strspn(tk, " \t")) == '\0') {
       CHK_TOK(strtok(NULL, "\""), "temperature");
+    }
     desc->d.h_boundary.T = malloc(strlen(tk) + 1);
     strcpy(desc->d.h_boundary.T, tk);
   }
   else if (t_solid || t_fluid) {
     desc->type = t_solid ? DESC_BOUND_T_FOR_SOLID : DESC_BOUND_T_FOR_FLUID;
+
+    CHK_TOK(strtok(NULL, " "), "boundary name");
+    if (strlen(tk) >= sizeof(desc->d.t_boundary.name)) {
+      fprintf(stderr, "Boundary name is too long: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto exit;
+    }
+    strncpy(desc->d.t_boundary.name, tk, sizeof(desc->d.t_boundary.name));
 
     /* This part of the description is parsed the same way for both types */
     CHK_TOK(strtok(NULL, " "), "file name");
@@ -348,8 +369,9 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
     /* Depending of the number of spaces before '"' strtok should
      * be called once or twice */
     CHK_TOK(strtok(NULL, "\""), "temperature");
-    if (*(tk + strspn(tk, " \t")) == '\0')
+    if (*(tk + strspn(tk, " \t")) == '\0') {
       CHK_TOK(strtok(NULL, "\""), "temperature");
+    }
     desc->d.t_boundary.T = malloc(strlen(tk) + 1);
     strcpy(desc->d.t_boundary.T, tk);
 
@@ -378,6 +400,14 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
   else if (f_solid) {
     desc->type = DESC_BOUND_F_FOR_SOLID;
 
+    CHK_TOK(strtok(NULL, " "), "boundary name");
+    if (strlen(tk) >= sizeof(desc->d.f_boundary.name)) {
+      fprintf(stderr, "Boundary name is too long: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto exit;
+    }
+    strncpy(desc->d.f_boundary.name, tk, sizeof(desc->d.f_boundary.name));
+
     CHK_TOK(strtok(NULL, " "), "file name");
     *stl_filename = malloc(strlen(tk) + 1);
     strcpy(*stl_filename, tk);
@@ -385,8 +415,9 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
     /* Depending of the number of spaces before '"' strtok should
      * be called once or twice */
     CHK_TOK(strtok(NULL, "\""), "flux");
-    if (*(tk + strspn(tk, " \t")) == '\0')
+    if (*(tk + strspn(tk, " \t")) == '\0') {
       CHK_TOK(strtok(NULL, "\""), "flux");
+    }
     desc->d.f_boundary.flux = malloc(strlen(tk) + 1);
     strcpy(desc->d.f_boundary.flux, tk);
 
@@ -413,6 +444,14 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
   }
   else if (sf_connect) {
     desc->type = DESC_SOLID_FLUID_CONNECT;
+
+    CHK_TOK(strtok(NULL, " "), "boundary name");
+    if (strlen(tk) >= sizeof(desc->d.sf_connect.name)) {
+      fprintf(stderr, "Boundary name is too long: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto exit;
+    }
+    strncpy(desc->d.sf_connect.name, tk, sizeof(desc->d.sf_connect.name));
 
     CHK_TOK(strtok(NULL, " "), "file name");
     *stl_filename = malloc(strlen(tk) + 1);
@@ -453,8 +492,7 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
       res = RES_BAD_ARG;
       goto exit;
     }
-  }
-  else {
+  } else {
   fprintf(stderr, "Invalid boundary type: %s", tk);
     res = RES_BAD_ARG;
     goto exit;
@@ -897,14 +935,14 @@ stardis_init
   if (args->dump_paths & DUMP_SUCCESS)
     stardis->dump_paths |= SDIS_HEAT_PATH_SUCCEED;
 
- if (args->mode == IR_COMPUTE){
+ if (args->mode & IR_COMPUTE){
     res = parse_camera(args->camera, &stardis->camera);
     if (res != RES_OK) goto error;
  }
- else if (args->mode == MEDIUM_COMPUTE) {
+ else if (args->mode & MEDIUM_COMPUTE) {
    strcpy(stardis->solve_name, args->medium_name);
  }
- else if (args->mode == BOUNDARY_COMPUTE) {
+ else if (args->mode & BOUNDARY_COMPUTE) {
    strcpy(stardis->solve_name, args->solve_boundary_filename);
  }
 

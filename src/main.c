@@ -20,7 +20,7 @@ int main(int argc, char** argv){
   res = stardis_init(&args, &stardis);
   if (res != RES_OK) goto error;
 
-  if (args.mode == DUMP_VTK) {
+  if (args.mode & DUMP_VTK) {
     res = dump_vtk(stdout, &stardis.geometry);
     if (res != RES_OK) goto error;
     goto exit;

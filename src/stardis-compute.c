@@ -15,6 +15,13 @@
 #define HTABLE_KEY unsigned
 #include <rsys/hash_table.h>
 
+/* A type to limit variable use in tinyexpr expressions */
+enum var_prohibited_t {
+  ALL_VARS_ALLOWED = 0,
+  T_PROHIBITED = BIT(1),
+  XYZ_PROHIBITED = BIT(2)
+};
+
 static void
 geometry_get_position
 (const size_t ivert, 
@@ -53,7 +60,7 @@ static res_T
 compile_expr_to_fn
   (struct te_expr** f,
    const char* math_expr,
-   const int t_allowed,
+   const enum var_prohibited_t prohibited,
    int* is_zero)
 {
   te_variable vars[4] = {
@@ -62,12 +69,15 @@ compile_expr_to_fn
     TE_DEF_OFFSET("z", offsetof(struct sdis_rwalk_vertex, P[2])),
     TE_DEF_OFFSET("t", offsetof(struct sdis_rwalk_vertex, time))
   };
-
+  int fst = 0, lst = 4;
   ASSERT(math_expr);
-  *f = te_compile(math_expr, vars, t_allowed ? 4 : 3, NULL);
+  if (prohibited & XYZ_PROHIBITED) fst = 3;
+  if(prohibited & T_PROHIBITED) lst = 3;
+  *f = te_compile(math_expr, vars+fst, lst-fst, NULL);
   if (!*f) {
-    if (!t_allowed && te_compile(math_expr, vars, 4, NULL))
-      fprintf(stderr, "Expression use variable t and should not.\n");
+    if ((prohibited != ALL_VARS_ALLOWED)
+      && te_compile(math_expr, vars, 4, NULL))
+      fprintf(stderr, "Expression %s use a probibited variable.\n", math_expr);
     return RES_BAD_ARG;
   }
   if (is_zero) *is_zero = !((*f)->type == TE_CONSTANT && (*f)->v.value == 0);
@@ -80,8 +90,13 @@ compile_expr_to_fn
 struct fluid {
   double cp; /* Calorific capacity */
   double rho; /* Volumic mass */
+  /* Compute mode */
+  int is_green, is_outside;
+  double t0;
   /* TinyExpr stuff to compute temperature */
   struct te_expr *temperature;
+  /* ID */
+  unsigned id;
 };
 
 static double
@@ -115,7 +130,7 @@ fluid_get_tinit
 (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct fluid* fluid_props = sdis_data_cget(data);
-  if(vtx->time > 0) {
+  if (fluid_props->is_green || vtx->time > fluid_props->t0) {
     return -1;
   }
   return te_eval(fluid_props->temperature, vtx);
@@ -136,9 +151,14 @@ struct solid {
   double lambda; /* Conductivity */
   double rho; /* Volumic mass */
   double delta; /* Numerical parameter */
+  /* Compute mode */
+  int is_green, is_outside;
+  double t0;
   /* TinyExpr stuff to compute temperature & power */
   struct te_expr *t_init;
   struct te_expr *power;
+  /* ID */
+  unsigned id;
 };
 
 static double
@@ -213,7 +233,7 @@ solid_get_tinit
 (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct solid* solid_props = sdis_data_cget(data);
-  if (vtx->time > 0) {
+  if (solid_props->is_green || vtx->time > solid_props->t0) {
     return -1;
   }
   return te_eval(solid_props->t_init, vtx);
@@ -245,6 +265,8 @@ struct intface {
   /* TinyExpr stuff to compute temperature & flux */
   struct te_expr *temperature;
   struct te_expr *flux;
+  /* IDs */
+  unsigned front_boundary_id, back_boundary_id;
 };
 
 static double
@@ -426,7 +448,9 @@ create_fluid
   (struct sdis_device* dev,
    const double rho,
    const double cp,
-   const int t_allowed,
+   const enum var_prohibited_t prohibited,
+   const int is_green,
+   const int is_outside,
    const char* t_expr,
    struct sdis_medium*** media_ptr,
    sdis_medium_getter_T get_temp,
@@ -445,10 +469,17 @@ create_fluid
   res = sdis_data_create(dev, sizeof(struct fluid), ALIGNOF(struct fluid),
     release_fluid_data, &data);
   if (res != RES_OK) goto error;
+
+  sz = sa_size(*media_ptr);
+  ASSERT(sz < INT_MAX);
   fluid_props = sdis_data_get(data); /* Fetch the allocated memory space */
   fluid_props->cp = cp;
   fluid_props->rho = rho;
-  res = compile_expr_to_fn(&fluid_props->temperature, t_expr, t_allowed, NULL);
+  fluid_props->is_green = is_green;
+  fluid_props->is_outside = is_outside;
+  fluid_props->t0 = 0;
+  fluid_props->id = (unsigned)sz;
+  res = compile_expr_to_fn(&fluid_props->temperature, t_expr, prohibited, NULL);
   if (res != RES_OK) {
     fprintf(stderr, "Invalid initial temperature expression: %s\n",
       t_expr);
@@ -456,9 +487,7 @@ create_fluid
   }
   res = sdis_fluid_create(dev, &fluid_shader, data, sa_add(*media_ptr, 1));
   if (res != RES_OK) goto error;
-  sz = sa_size(*media_ptr) - 1;
-  ASSERT(sz < INT_MAX);
-  *out_id = (unsigned)sz;
+  *out_id = fluid_props->id;
 
 end:
   if (data) SDIS(data_ref_put(data));
@@ -474,7 +503,9 @@ create_solid
    const double rho,
    const double cp,
    const double delta,
-   const int t_allowed,
+   const enum var_prohibited_t prohibited,
+   const int is_green,
+   const int is_outside,
    const char* t_expr, /* Can be NULL if not used by getter */
    const char* power_expr, /* Can be NULL */
    struct sdis_medium*** media_ptr,
@@ -502,6 +533,8 @@ create_solid
     release_solid_data, &data);
   if (res != RES_OK) goto error;
 
+  sz = sa_size(*media_ptr);
+  ASSERT(sz < INT_MAX);
   solid_props = sdis_data_get(data); /* Fetch the allocated memory space */
   solid_props->lambda = lambda;
   solid_props->rho = rho;
@@ -509,8 +542,12 @@ create_solid
   solid_props->delta = delta;
   solid_props->t_init = NULL;
   solid_props->power = NULL;
+  solid_props->is_green = is_green;
+  solid_props->is_outside = is_outside;
+  solid_props->t0 = 0;
+  solid_props->id = (unsigned)sz;
   if (t_expr) {
-    res = compile_expr_to_fn(&solid_props->t_init, t_expr, t_allowed, NULL);
+    res = compile_expr_to_fn(&solid_props->t_init, t_expr, prohibited, NULL);
     if (res != RES_OK) {
       fprintf(stderr, "Invalid initial temperature expression: %s\n",
         t_expr);
@@ -533,9 +570,7 @@ create_solid
   }
   res = sdis_solid_create(dev, &solid_shader, data, sa_add(*media_ptr, 1));
   if (res != RES_OK) goto error;
-  sz = sa_size(*media_ptr) - 1;
-  ASSERT(sz < INT_MAX);
-  *out_id = (unsigned)sz;
+  *out_id = solid_props->id;
 
 end:
   if (data) SDIS(data_ref_put(data));
@@ -751,6 +786,188 @@ dump_path
   return RES_OK;
 }
 
+static res_T
+print_power_term
+  (struct sdis_medium* mdm,
+   const double power_term,
+   void* ctx)
+{
+  struct sdis_data* data = NULL;
+  enum sdis_medium_type type;
+  unsigned id;
+  struct description* desc = ctx;
+
+  CHK(mdm && ctx);
+
+  data = sdis_medium_get_data(mdm);
+  type = sdis_medium_get_type(mdm);
+
+  switch (type) {
+  case SDIS_FLUID: {
+    FATAL("Unexpected power term in fluid");
+#if 0
+    struct fluid* d__ = sdis_data_get(data);
+    id = d__->id;
+    desc = (struct description*)ctx + id;
+    ASSERT(id == desc->d.fluid.fluid_id);
+    printf("\tF\t%u\t%g", id, power_term);
+    break;
+#endif
+  }
+  case SDIS_SOLID: {
+    struct solid* d__ = sdis_data_get(data);
+    id = d__->id;
+    desc = (struct description*)ctx + id;
+    ASSERT(id == desc->d.solid.solid_id);
+    printf("\tS\t%u\t%g", id, power_term);
+    break;
+  }
+  default: FATAL("Unreachable code.\n"); break;
+  }
+  return RES_OK;
+}
+
+static res_T
+print_flux_term
+  (struct sdis_interface* interf,
+   const enum sdis_side side,
+   const double flux_term,
+   void* ctx)
+{
+  struct sdis_data* data = NULL;
+  struct intface* d__;
+  unsigned id;
+  struct description* desc;
+
+  CHK(interf && ctx);
+
+  data = sdis_interface_get_data(interf);
+  d__ = sdis_data_get(data);
+  id = (side == SDIS_FRONT) ? d__->front_boundary_id : d__->back_boundary_id;
+  desc = (struct description*)ctx + id;
+
+  switch (desc->type) {
+  case DESC_BOUND_T_FOR_SOLID:
+  case DESC_BOUND_T_FOR_FLUID:
+  case DESC_BOUND_H_FOR_SOLID:
+  case DESC_BOUND_H_FOR_FLUID:
+    FATAL("Cannot have a flux term here.\n"); break;
+  case DESC_BOUND_F_FOR_SOLID:
+    ASSERT(id == desc->d.f_boundary.mat_id);
+    printf("\t%u\t%g", id, flux_term);
+    break;
+  default: FATAL("Unreachable code.\n"); break;
+  }
+  return RES_OK;
+}
+
+static res_T
+print_sample
+  (struct sdis_green_path* path,
+   void* ctx)
+{
+  struct sdis_point pt = SDIS_POINT_NULL;
+  struct sdis_data* data = NULL;
+  enum sdis_medium_type type;
+  struct description* desc;
+  unsigned id;
+  size_t pcount, fcount;
+  res_T res = RES_OK;
+  CHK(path && ctx);
+
+  res = sdis_green_path_get_limit_point(path, &pt);
+  if (res != RES_OK) goto error;
+
+
+  /* For each path, prints:
+   * # end #power_terms #flux_terms power_term_1  ... power_term_n flux_term_1 ... flux_term_n
+   * with:
+   * - end = end_type end_id; end_type = T | H | X | R | F | S
+   * - power_term_i = power_type_i power_id_i factor_i
+   * - flux_term_i = flux_id_i factor_i
+   */
+
+  switch (pt.type) {
+  case SDIS_FRAGMENT: {
+    struct intface* d__;
+    data = sdis_interface_get_data(pt.data.itfrag.intface);
+    d__ = sdis_data_get(data);
+    id = (pt.data.itfrag.fragment.side == SDIS_FRONT)
+      ? d__->front_boundary_id : d__->back_boundary_id;
+    ASSERT(id != UINT_MAX);
+    desc = (struct description*)ctx + id;
+    switch (desc->type) {
+    case DESC_BOUND_T_FOR_SOLID:
+    case DESC_BOUND_T_FOR_FLUID:
+      ASSERT(id == desc->d.t_boundary.mat_id);
+      printf("T\t%u", id);
+      break;
+    case DESC_BOUND_H_FOR_SOLID:
+    case DESC_BOUND_H_FOR_FLUID:
+      ASSERT(id == desc->d.h_boundary.mat_id);
+      printf("H\t%u", id);
+      break;
+    case DESC_BOUND_F_FOR_SOLID:
+      ASSERT(id == desc->d.f_boundary.mat_id);
+      printf("X\t%u", id);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
+    }
+    break;
+  }
+  case SDIS_VERTEX:
+    type = sdis_medium_get_type(pt.data.mdmvert.medium);
+    data = sdis_medium_get_data(pt.data.mdmvert.medium);
+    if (pt.data.mdmvert.vertex.P[0] == INF) {
+      /* Radiative output */
+      printf("R %u", (unsigned)sa_size(ctx));
+    }
+    else if (type == SDIS_FLUID) {
+      struct fluid* d__ = sdis_data_get(data);
+      id = d__->id;
+      desc = (struct description*)ctx + id;
+      ASSERT(id == desc->d.fluid.fluid_id);
+      if (d__->is_outside)
+        /* If outside the model and in a fluid with known temperature,
+         * its a fluid attached to a H boundary */
+        printf("H\t%u", id);
+      /* In a standard fluid with known temperature */
+      else printf("F\t%u", id);
+
+    } else {
+      struct solid* d__ = sdis_data_get(data);
+      ASSERT(type == SDIS_SOLID);
+      id = d__->id;
+      desc = (struct description*)ctx + id;
+      ASSERT(id == desc->d.solid.solid_id);
+      desc = (struct description*)ctx + id;
+      ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
+      printf("S\t%u", id);
+    }
+    break;
+  default: FATAL("Unreachable code.\n"); break;
+  }
+
+  res = sdis_green_function_get_power_terms_count(path, &pcount);
+  if (res != RES_OK) goto error;
+
+  res = sdis_green_function_get_flux_terms_count(path, &fcount);
+  if (res != RES_OK) goto error;
+
+  printf("\t%zu\t%zu", pcount, fcount);
+
+  res = sdis_green_path_for_each_power_term(path, print_power_term, ctx);
+  if (res != RES_OK) goto error;
+
+  res = sdis_green_path_for_each_flux_term(path, print_flux_term, ctx);
+  if (res != RES_OK) goto error;
+
+  printf("\n");
+
+error:
+  return res;
+}
+
 res_T
 stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 {
@@ -772,8 +989,9 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   double pos[3] = { 0,0,0 };
   double time[2] = { 0, 0 };
   size_t nfailures;
+  size_t smed_count = 0, fmed_count = 0,
+    tbound_count = 0, hbound_count = 0, fbound_count = 0, sfconnect_count = 0;
   unsigned i = 0;
-  const int t_allowed = stardis->probe[3] < INF; /* Can condition use the variable t? */
 
   res = sdis_device_create(NULL, &stardis->allocator, stardis->nthreads, 1, &dev);
   if (res != RES_OK) goto error;
@@ -781,22 +999,31 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   /* Create media and property holders found in descriptions */
   for (i = 0; i < sa_size(stardis->descriptions); ++i) {
     struct description* desc = stardis->descriptions + i;
+    /* Base prohibition; additional restrictions apply for media */
+    enum var_prohibited_t prohibited =
+      ((stardis->probe[3] < INF) | (mode & GREEN_MODE))
+      ? T_PROHIBITED : ALL_VARS_ALLOWED;
 
     switch (desc->type) {
     case DESC_BOUND_H_FOR_SOLID:
       /* Create an external fluid */
-      res = create_fluid(dev, 1, 1, t_allowed, desc->d.h_boundary.T, &media,
-        fluid_get_temperature, &desc->d.h_boundary.mat_id);
+      hbound_count++;
+      res = create_fluid(dev, 1, 1, prohibited, (mode & GREEN_MODE), 1,
+        desc->d.h_boundary.T, &media, fluid_get_temperature,
+        &desc->d.h_boundary.mat_id);
       if (res != RES_OK) goto error;
       break;
     case DESC_BOUND_H_FOR_FLUID:
       /* Create an external solid */
-      res = create_solid(dev, INF, 1, 1, 1, t_allowed, desc->d.h_boundary.T,
-        NULL, &media, solid_get_temperature, NULL, &desc->d.h_boundary.mat_id);
+      hbound_count++;
+      res = create_solid(dev, INF, 1, 1, 1, prohibited, (mode & GREEN_MODE), 1,
+        desc->d.h_boundary.T, NULL, &media, solid_get_temperature, NULL,
+        &desc->d.h_boundary.mat_id);
       if (res != RES_OK) goto error;
       break;
     case DESC_BOUND_T_FOR_SOLID:
     case DESC_BOUND_T_FOR_FLUID:
+      tbound_count++;
       ASSERT(desc->d.t_boundary.T != NULL);
       res = compile_expr_to_fn(&desc->d.t_boundary.te_temperature,
         desc->d.t_boundary.T, 1, NULL);
@@ -806,11 +1033,13 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         goto error;
       }
       /* Create an external solid */
-      res = create_solid(dev, 1, 1, 1, 1, t_allowed, NULL, NULL, &media,
-        solid_dont_get_temperature, NULL, &desc->d.t_boundary.mat_id);
+      res = create_solid(dev, 1, 1, 1, 1, prohibited, (mode & GREEN_MODE), 1,
+        NULL, NULL, &media, solid_dont_get_temperature, NULL,
+        &desc->d.t_boundary.mat_id);
       if (res != RES_OK) goto error;
       break;
     case DESC_BOUND_F_FOR_SOLID:
+      fbound_count++;
       ASSERT(desc->d.f_boundary.flux != NULL);
       res = compile_expr_to_fn(&desc->d.f_boundary.te_flux,
         desc->d.f_boundary.flux, 1, NULL);
@@ -820,42 +1049,48 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         goto error;
       }
       /* Create an external solid */
-      res = create_solid(dev, 1, 1, 1, 1, t_allowed, NULL, NULL, &media, NULL,
-        NULL, &desc->d.f_boundary.mat_id);
+      res = create_solid(dev, 1, 1, 1, 1, prohibited, (mode & GREEN_MODE), 1,
+        NULL, NULL, &media, solid_dont_get_temperature, NULL,
+        &desc->d.f_boundary.mat_id);
       if (res != RES_OK) goto error;
       break;
     case DESC_SOLID_FLUID_CONNECT:
+      sfconnect_count++;
       ASSERT(desc->d.sf_connect.specular_fraction >= 0
         && desc->d.sf_connect.specular_fraction <= 1);
       ASSERT(desc->d.sf_connect.emissivity >= 0);
       ASSERT(desc->d.sf_connect.hc >= 0);
       break;
     case DESC_MAT_SOLID:
+      smed_count++;
+      if (mode & GREEN_MODE) prohibited |= T_PROHIBITED | XYZ_PROHIBITED;
       res = create_solid(dev,
         stardis->descriptions[i].d.solid.lambda,
         stardis->descriptions[i].d.solid.rho,
         stardis->descriptions[i].d.solid.cp,
         stardis->descriptions[i].d.solid.delta,
-        t_allowed,
+        prohibited,
+        (mode & GREEN_MODE), 0,
         stardis->descriptions[i].d.solid.Tinit,
         stardis->descriptions[i].d.solid.power,
         &media,
         solid_get_tinit,
         &stardis->descriptions[i].d.solid.has_power,
         &desc->d.solid.solid_id);
-      strcpy(desc->d.solid.name, desc->name);
       if (res != RES_OK) goto error;
       break;
     case DESC_MAT_FLUID:
+      fmed_count++;
+      if (mode & GREEN_MODE) prohibited |= T_PROHIBITED | XYZ_PROHIBITED;
       res = create_fluid(dev,
         stardis->descriptions[i].d.fluid.rho,
         stardis->descriptions[i].d.fluid.cp,
-        t_allowed,
+        prohibited,
+        (mode & GREEN_MODE), 0,
         stardis->descriptions[i].d.fluid.Tinit,
         &media,
         fluid_get_tinit,
         &desc->d.fluid.fluid_id);
-      strcpy(desc->d.fluid.name, desc->name);
       if (res != RES_OK) goto error;
       break;
     default: FATAL("Invalid type.\n");
@@ -902,6 +1137,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       interface_props = sdis_data_get(data);
       interface_props->temperature = NULL;
       interface_props->flux = NULL;
+      interface_props->front_boundary_id = UINT_MAX;
+      interface_props->back_boundary_id = UINT_MAX;
 
       if (front_defined) {
         switch (stardis->descriptions[fd].type) {
@@ -957,6 +1194,9 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
             goto error;
           }
           def_medium = front_defined ? front_med : back_med;
+          if (front_defined)
+            interface_props->front_boundary_id = cd;
+          else interface_props->back_boundary_id = cd;
         }
         switch (connect->type) {
         case DESC_BOUND_H_FOR_FLUID:
@@ -1128,60 +1368,327 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   res = create_edge_file_if(scn, &stardis->allocator);
   if (res != RES_OK) goto error;
 
-  if (mode == IR_COMPUTE) {
-    size_t width = (size_t)stardis->camera.img[0];
-    size_t height = (size_t)stardis->camera.img[1];
+  if (mode & GREEN_MODE) {
+    struct sdis_green_function* green = NULL;
+    size_t ok_count, failed_count;
+    ASSERT((mode & PROBE_COMPUTE)
+      || (mode & BOUNDARY_COMPUTE) || (mode & MEDIUM_COMPUTE));
 
-    /* Setup the camera */
-    SDIS(camera_create(dev, &cam));
-    SDIS(camera_set_proj_ratio(cam, (double)width / (double)height));
-    SDIS(camera_set_fov(cam, MDEG2RAD(stardis->camera.fov)));
-    SDIS(camera_look_at(cam,
-      stardis->camera.pos,
-      stardis->camera.tgt,
-      stardis->camera.up));
+    if (mode & PROBE_COMPUTE) {
+      double uv[2] = { 0,0 };
+      size_t iprim = SIZE_MAX;
+      /* Launch the probe simulation */
+      pos[0] = stardis->probe[0];
+      pos[1] = stardis->probe[1];
+      pos[2] = stardis->probe[2];
 
-    /* Create the accum buffer */
-    SDIS(accum_buffer_create(dev, width, height, &buf));
-
-    /* Launch the simulation */
-    res = sdis_solve_camera(scn,
-      cam,
-      stardis->camera.u.time,
-      stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
-      width,
-      height,
-      (size_t)stardis->camera.spp,
-      sdis_accum_buffer_write,
-      buf);
-    if (res != RES_OK) goto error;
-
-    /* Write the image */
-    dump_image(buf);
-  }
-  else if (mode == PROBE_COMPUTE) {
-    double uv[2] = { 0,0 };
-    size_t iprim = SIZE_MAX;
-    /* Launch the probe simulation */
-    pos[0] = stardis->probe[0];
-    pos[1] = stardis->probe[1];
-    pos[2] = stardis->probe[2];
-    time[0] = time[1] = stardis->probe[3];
-
-    res = select_probe_type(scn,
-      stardis->geometry.triangle,
-      stardis->descriptions,
-      pos,
-      &iprim,
-      uv);
-    if (res != RES_OK) goto error;
-
-    if (iprim == SIZE_MAX) {
-      res = sdis_solve_probe(scn,
-        stardis->N,
+      res = select_probe_type(scn,
+        stardis->geometry.triangle,
+        stardis->descriptions,
         pos,
+        &iprim,
+        uv);
+      if (res != RES_OK) goto error;
+
+      if (iprim == SIZE_MAX) {
+        res = sdis_solve_probe_green_function(scn,
+          stardis->N,
+          pos,
+          stardis->scale_factor,
+          stardis->radiative_temp[0],
+          stardis->radiative_temp[1],
+          &green);
+      } else {
+        res = sdis_solve_probe_boundary_green_function(scn,
+          stardis->N,
+          iprim,
+          uv,
+          SDIS_FRONT,
+          stardis->scale_factor,
+          stardis->radiative_temp[0],
+          stardis->radiative_temp[1],
+          &green);
+      }
+    }
+    else if (mode & BOUNDARY_COMPUTE) {
+      ASSERT(sa_size(stardis->boundary.primitives)
+        == sa_size(stardis->boundary.sides));
+      if (sa_size(stardis->boundary.sides) == 0) {
+        fprintf(stderr, "Cannot solve boundary %s (empty geometry)\n",
+          stardis->solve_name);
+      }
+
+      res = sdis_solve_boundary_green_function(scn,
+        stardis->N,
+        stardis->boundary.primitives,
+        stardis->boundary.sides,
+        sa_size(stardis->boundary.sides),
+        stardis->scale_factor,
+        stardis->radiative_temp[0],
+        stardis->radiative_temp[1],
+        &green);
+    }
+    else if (mode & MEDIUM_COMPUTE) {
+      size_t sz, ii;
+      struct sdis_medium* medium = NULL;
+      /* Find medium */
+      sz = sa_size(stardis->descriptions);
+      FOR_EACH(ii, 0, sz) {
+        struct description* desc = stardis->descriptions + ii;
+        if (desc->type == DESC_MAT_SOLID) {
+          if (0 == strcmp(stardis->solve_name, desc->d.solid.name)) {
+            ASSERT(sa_size(media) > ii);
+            medium = media[ii];
+            break;
+          }
+        }
+        else if (desc->type == DESC_MAT_FLUID) {
+          if (0 == strcmp(stardis->solve_name, desc->d.fluid.name)) {
+            ASSERT(sa_size(media) > ii);
+            medium = media[ii];
+            break;
+          }
+        }
+      }
+      if (medium == NULL) {
+        /* Not found */
+        fprintf(stderr, "Cannot solve medium %s (unknown medium)\n",
+          stardis->solve_name);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+      res = sdis_solve_medium_green_function(scn,
+        stardis->N,
+        medium,
+        stardis->scale_factor,
+        stardis->radiative_temp[0],
+        stardis->radiative_temp[1],
+        &green);
+    }
+    if (res != RES_OK) goto error;
+
+    /* Output the green function */
+    CHK(sdis_green_function_get_invalid_paths_count(green, &failed_count) == RES_OK);
+    CHK(sdis_green_function_get_paths_count(green, &ok_count) == RES_OK);
+
+    /* Output counts */
+    printf("---BEGIN GREEN---\n");
+    printf("# #solids #fluids #t_boundaries #h_boundaries #f_boundaries #ok #failures\n");
+    printf("%zu %zu %zu %zu %zu %zu %zu\n",
+      smed_count, fmed_count,
+      tbound_count, hbound_count, fbound_count,
+      ok_count, failed_count);
+
+    /* List Media */
+    if (smed_count) {
+      printf("# Solids\n");
+      printf("# ID Name lambda rho cp power\n");
+      FOR_EACH(i, 0, (unsigned)sa_size(stardis->descriptions)) {
+        struct description* desc = stardis->descriptions + i;
+        struct mat_solid* sl;
+        if (desc->type != DESC_MAT_SOLID) continue;
+        sl = &desc->d.solid;
+        printf("%u\t%s\t%g\t%g\t%g\t%s\n",
+          i, sl->name, sl->lambda, sl->rho, sl->cp, (sl->has_power ? sl->power : "0"));
+      }
+    }
+    if (fmed_count) {
+      printf("# Fluids\n");
+      printf("# ID Name rho cp\n");
+      FOR_EACH(i, 0, sa_size(stardis->descriptions)) {
+        struct description* desc = stardis->descriptions + i;
+        struct mat_fluid* fl;
+        fl = &desc->d.fluid;
+        printf("%u\t%s\t%g\t%g\n", i, fl->name, fl->rho, fl->cp);
+      }
+    }
+
+    /* List Boundaries */
+    if (tbound_count) {
+      printf("# T Boundaries\n");
+      printf("# ID Name temperature\n");
+      FOR_EACH(i, 0, sa_size(stardis->descriptions)) {
+        struct description* desc = stardis->descriptions + i;
+        struct t_boundary* bd;
+        if (desc->type != DESC_BOUND_T_FOR_SOLID
+          && desc->type != DESC_BOUND_T_FOR_FLUID) continue;
+        bd = &desc->d.t_boundary;
+        printf("%u\t%s\t%s\n", i, bd->name, bd->T);
+      }
+    }
+    if (hbound_count) {
+      printf("# H Boundaries\n");
+      printf("# ID Name emissivity specular_fraction hc hc_max T_env\n");
+      FOR_EACH(i, 0, sa_size(stardis->descriptions)) {
+        struct description* desc = stardis->descriptions + i;
+        struct h_boundary* bd;
+        if (desc->type != DESC_BOUND_H_FOR_SOLID
+          && desc->type != DESC_BOUND_H_FOR_FLUID) continue;
+        bd = &desc->d.h_boundary;
+        printf("%u\t%s\t%g\t%g\t%g\t%g\t%s\n",
+          i, bd->name, (bd->has_emissivity ? bd->emissivity : 0),
+          (bd->has_emissivity ? bd->specular_fraction : 0),
+          (bd->has_hc ? bd->hc : 0), (bd->has_hc ? bd->hc_max : 0), bd->T);
+      }
+    }
+    if (fbound_count) {
+      printf("# F Boundaries\n");
+      printf("# ID Name hc hc_max\n");
+      FOR_EACH(i, 0, sa_size(stardis->descriptions)) {
+        struct description* desc = stardis->descriptions + i;
+        struct f_boundary* bd;
+        if (desc->type != DESC_BOUND_F_FOR_SOLID) continue;
+        bd = &desc->d.f_boundary;
+        printf("%u\t%s\t%g\t%g\n",
+          i, bd->name, (bd->has_hc ? bd->hc : 0), (bd->has_hc ? bd->hc_max : 0));
+      }
+    }
+
+    /* Radiative Temperatures */
+    printf("# Radiative Temperatures\n");
+    printf("# ID Rad_Temp Lin_Temp\n");
+    printf("%u\t%g\t%g\n", (unsigned)sa_size(stardis->descriptions),
+      stardis->radiative_temp[0], stardis->radiative_temp[1]);
+
+    printf("# Samples\n");
+    printf("# end #power_terms #flux_terms power_term_1 ... power_term_n flux_term_1 ... flux_term_n\n");
+    printf("# end = end_type end_id; end_type = T | H | X | R | F | S\n");
+    printf("# power_term_i = power_type_i power_id_i factor_i\n");
+    printf("# flux_term_i = flux_id_i factor_i\n");
+    sdis_green_function_for_each_path(green, print_sample, stardis->descriptions);
+
+    printf("---END GREEN---\n");
+
+    CHK(sdis_green_function_ref_put(green) == RES_OK);
+  } else {
+    if (mode & IR_COMPUTE) {
+      size_t width = (size_t)stardis->camera.img[0];
+      size_t height = (size_t)stardis->camera.img[1];
+
+      /* Setup the camera */
+      SDIS(camera_create(dev, &cam));
+      SDIS(camera_set_proj_ratio(cam, (double)width / (double)height));
+      SDIS(camera_set_fov(cam, MDEG2RAD(stardis->camera.fov)));
+      SDIS(camera_look_at(cam,
+        stardis->camera.pos,
+        stardis->camera.tgt,
+        stardis->camera.up));
+
+      /* Create the accum buffer */
+      SDIS(accum_buffer_create(dev, width, height, &buf));
+
+      /* Launch the simulation */
+      res = sdis_solve_camera(scn,
+        cam,
+        stardis->camera.u.time,
+        stardis->scale_factor,
+        stardis->radiative_temp[0],
+        stardis->radiative_temp[1],
+        width,
+        height,
+        (size_t)stardis->camera.spp,
+        sdis_accum_buffer_write,
+        buf);
+      if (res != RES_OK) goto error;
+
+      /* Write the image */
+      dump_image(buf);
+    }
+    else if (mode & PROBE_COMPUTE) {
+      double uv[2] = { 0,0 };
+      size_t iprim = SIZE_MAX;
+      /* Launch the probe simulation */
+      pos[0] = stardis->probe[0];
+      pos[1] = stardis->probe[1];
+      pos[2] = stardis->probe[2];
+      time[0] = time[1] = stardis->probe[3];
+
+      res = select_probe_type(scn,
+        stardis->geometry.triangle,
+        stardis->descriptions,
+        pos,
+        &iprim,
+        uv);
+      if (res != RES_OK) goto error;
+
+      if (iprim == SIZE_MAX) {
+        res = sdis_solve_probe(scn,
+          stardis->N,
+          pos,
+          time,
+          stardis->scale_factor,
+          stardis->radiative_temp[0],
+          stardis->radiative_temp[1],
+          stardis->dump_paths,
+          &estimator);
+      } else {
+        res = sdis_solve_probe_boundary(scn,
+          stardis->N,
+          iprim,
+          uv,
+          time,
+          SDIS_FRONT,
+          stardis->scale_factor,
+          stardis->radiative_temp[0],
+          stardis->radiative_temp[1],
+          stardis->dump_paths,
+          &estimator);
+      }
+    }
+    else if (mode & MEDIUM_COMPUTE) {
+      size_t sz, ii;
+      struct sdis_medium* medium = NULL;
+      /* Find medium */
+      sz = sa_size(stardis->descriptions);
+      FOR_EACH(ii, 0, sz) {
+        struct description* desc = stardis->descriptions + ii;
+        if (desc->type == DESC_MAT_SOLID) {
+          if (0 == strcmp(stardis->solve_name, desc->d.solid.name)) {
+            ASSERT(sa_size(media) > ii);
+            medium = media[ii];
+            break;
+          }
+        }
+        else if (desc->type == DESC_MAT_FLUID) {
+          if (0 == strcmp(stardis->solve_name, desc->d.fluid.name)) {
+            ASSERT(sa_size(media) > ii);
+            medium = media[ii];
+            break;
+          }
+        }
+      }
+      if (medium == NULL) {
+        /* Not found */
+        fprintf(stderr, "Cannot solve medium %s (unknown medium)\n",
+          stardis->solve_name);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+      time[0] = time[1] = stardis->probe[3];
+      res = sdis_solve_medium(scn,
+        stardis->N,
+        medium,
+        time,
+        stardis->scale_factor,
+        stardis->radiative_temp[0],
+        stardis->radiative_temp[1],
+        stardis->dump_paths,
+        &estimator);
+    }
+    else if (mode & BOUNDARY_COMPUTE) {
+      ASSERT(sa_size(stardis->boundary.primitives)
+        == sa_size(stardis->boundary.sides));
+      if (sa_size(stardis->boundary.sides) == 0) {
+        fprintf(stderr, "Cannot solve boundary %s (empty geometry)\n",
+          stardis->solve_name);
+      }
+
+      time[0] = time[1] = stardis->probe[3];
+      res = sdis_solve_boundary(scn,
+        stardis->N,
+        stardis->boundary.primitives,
+        stardis->boundary.sides,
+        sa_size(stardis->boundary.sides),
         time,
         stardis->scale_factor,
         stardis->radiative_temp[0],
@@ -1189,118 +1696,45 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         stardis->dump_paths,
         &estimator);
     } else {
-      res = sdis_solve_probe_boundary(scn,
-        stardis->N,
-        iprim,
-        uv,
-        time,
-        SDIS_FRONT,
-        stardis->scale_factor,
-        stardis->radiative_temp[0],
-        stardis->radiative_temp[1],
-        stardis->dump_paths,
-        &estimator);
+      CHK(0);
     }
-  }
-  else if (mode == MEDIUM_COMPUTE) {
-    size_t sz, ii;
-    struct sdis_medium* medium = NULL;
-    /* Find medium */
-    sz = sa_size(stardis->descriptions);
-    FOR_EACH(ii, 0, sz) {
-      struct description* desc = stardis->descriptions + ii;
-      if (desc->type == DESC_MAT_SOLID) {
-        if (0 == strcmp(stardis->solve_name, desc->d.solid.name)) {
-          ASSERT(sa_size(media) > ii);
-          medium = media[ii];
-          break;
-        }
+    if (res != RES_OK) goto error;
+    if (mode & PROBE_COMPUTE
+      || mode & MEDIUM_COMPUTE
+      || mode & BOUNDARY_COMPUTE) {
+      /* Fetch the estimation data */
+      SDIS(estimator_get_temperature(estimator, &temperature));
+      SDIS(estimator_get_failure_count(estimator, &nfailures));
+
+      /* Print the results */
+      switch (mode) {
+      case PROBE_COMPUTE:
+        printf("Temperature at t=[%g, %g, %g, %g] = %g +/- %g\n",
+          pos[0], pos[1], pos[2], time[0],
+          temperature.E, /* Expected value */
+          temperature.SE); /* Standard error */
+        break;
+      case MEDIUM_COMPUTE:
+        printf("Temperature in medium %s at t=%g = %g +/- %g\n",
+          stardis->solve_name, time[0],
+          temperature.E, /* Expected value */
+          temperature.SE); /* Standard error */
+        break;
+      case BOUNDARY_COMPUTE:
+        printf("Temperature at boundary %s at t=%g = %g +/- %g\n",
+          stardis->solve_name, time[0],
+          temperature.E, /* Expected value */
+          temperature.SE); /* Standard error */
+        break;
+      default: FATAL("Invalid mode.");
       }
-      else if (desc->type == DESC_MAT_FLUID) {
-        if (0 == strcmp(stardis->solve_name, desc->d.fluid.name)) {
-          ASSERT(sa_size(media) > ii);
-          medium = media[ii];
-          break;
-        }
-      }
-    }
-    if (medium == NULL) {
-      /* Not found */
-      fprintf(stderr, "Cannot solve medium %s (unknown medium)\n",
-        stardis->solve_name);
-      res = RES_BAD_ARG;
-      goto error;
-    }
-    time[0] = time[1] = stardis->probe[3];
-    res = sdis_solve_medium(scn,
-      stardis->N,
-      medium,
-      time,
-      stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
-      stardis->dump_paths,
-      &estimator);
-  } else if (mode == BOUNDARY_COMPUTE) {
-    ASSERT(sa_size(stardis->boundary.primitives)
-      == sa_size(stardis->boundary.sides));
-    if (sa_size(stardis->boundary.sides) == 0) {
-      fprintf(stderr, "Cannot solve boundary %s (empty geometry)\n",
-        stardis->solve_name);
-    }
+      printf("#failures: %lu/%lu\n",
+        (unsigned long)nfailures,
+        (unsigned long)stardis->N);
 
-    time[0] = time[1] = stardis->probe[3];
-    res = sdis_solve_boundary(scn,
-      stardis->N,
-      stardis->boundary.primitives,
-      stardis->boundary.sides,
-      sa_size(stardis->boundary.sides),
-      time,
-      stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
-      stardis->dump_paths,
-      &estimator);
-
-  } else {
-    CHK(0);
-  }
-  if (res != RES_OK) goto error;
-  if (mode == PROBE_COMPUTE
-    || mode == MEDIUM_COMPUTE
-    || mode == BOUNDARY_COMPUTE) {
-    /* Fetch the estimation data */
-    SDIS(estimator_get_temperature(estimator, &temperature));
-    SDIS(estimator_get_failure_count(estimator, &nfailures));
-
-    /* Print the results */
-    switch (mode) {
-    case PROBE_COMPUTE:
-      printf("Temperature at t=[%g, %g, %g, %g] = %g +/- %g\n",
-        pos[0], pos[1], pos[2], time[0],
-        temperature.E, /* Expected value */
-        temperature.SE); /* Standard error */
-      break;
-    case MEDIUM_COMPUTE:
-      printf("Temperature in medium %s at t=%g = %g +/- %g\n",
-        stardis->solve_name, time[0],
-        temperature.E, /* Expected value */
-        temperature.SE); /* Standard error */
-      break;
-    case BOUNDARY_COMPUTE:
-      printf("Temperature at boundary %s at t=%g = %g +/- %g\n",
-        stardis->solve_name, time[0],
-        temperature.E, /* Expected value */
-        temperature.SE); /* Standard error */
-      break;
-    default: FATAL("Invalid mode.");
+      /* Dump paths according to user settings */
+      sdis_estimator_for_each_path(estimator, dump_path, stdout);
     }
-    printf("#failures: %lu/%lu\n",
-      (unsigned long)nfailures,
-      (unsigned long)stardis->N);
-
-    /* Dump paths according to user settings */
-    sdis_estimator_for_each_path(estimator, dump_path, stdout);
   }
 
 end:

@@ -371,34 +371,77 @@ select_probe_type
 }
 
 static void
-dump_image(const struct sdis_accum_buffer* buf)
+dump_image(const struct sdis_estimator_buffer* buf)
 {
-  struct sdis_accum_buffer_layout layout = SDIS_ACCUM_BUFFER_LAYOUT_NULL;
+  size_t definition[2];
   double* temps = NULL;
-  const struct sdis_accum* accums = NULL;
   size_t ix, iy;
 
   CHK(buf != NULL);
-  CHK(sdis_accum_buffer_get_layout(buf, &layout) == RES_OK);
+  CHK(sdis_estimator_buffer_get_definition(buf, definition) == RES_OK);
 
-  temps = mem_alloc(layout.width*layout.height*sizeof(double));
+  temps = mem_alloc(definition[0] * definition[1] *sizeof(double));
   CHK(temps != NULL);
 
   /* Compute the per pixel temperature */
-  CHK(sdis_accum_buffer_map(buf, &accums) == RES_OK);
   fprintf(stdout,"# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET STRUCTURED_POINTS\n");
-  fprintf(stdout,"DIMENSIONS %i %i 1\n", (int)layout.width, (int)layout.height);
+  fprintf(stdout,"DIMENSIONS %zu %zu 1\n", definition[0], definition[1]);
   fprintf(stdout,"ORIGIN 0 0 0\n");
   fprintf(stdout,"SPACING 1 1 1\n");
-  fprintf(stdout,"POINT_DATA %i\n", (int)layout.width*(int)layout.height);
-  fprintf(stdout,"SCALARS temperature float 1\n");
+  fprintf(stdout,"POINT_DATA %zu\n", definition[0] * definition[1]);
+  fprintf(stdout,"SCALARS temperature_estimate float 1\n");
   fprintf(stdout,"LOOKUP_TABLE default\n");
-  FOR_EACH(iy, 0, layout.height) {
-    const struct sdis_accum* row_accums = accums + (layout.height - 1 - iy) * layout.width;
-    double* row = temps + iy * layout.width;
-    FOR_EACH(ix, 0, layout.width) {
-      row[ix] = row_accums[ix].sum_weights / (double)row_accums[ix].nweights;
-      fprintf(stdout,"%f\n",row[ix]);
+  FOR_EACH(iy, 0, definition[1]) {
+    FOR_EACH(ix, 0, definition[0]) {
+      const struct sdis_estimator* estimator;
+      struct sdis_mc T;
+      CHK(sdis_estimator_buffer_at(buf, ix, iy, &estimator) == RES_OK);
+      CHK(sdis_estimator_get_temperature(estimator, &T) == RES_OK);
+      fprintf(stdout,"%f\n", T.E);
+    }
+  }
+  fprintf(stdout, "SCALARS temperature_std_dev float 1\n");
+  fprintf(stdout, "LOOKUP_TABLE default\n");
+  FOR_EACH(iy, 0, definition[1]) {
+    FOR_EACH(ix, 0, definition[0]) {
+      const struct sdis_estimator* estimator;
+      struct sdis_mc T;
+      CHK(sdis_estimator_buffer_at(buf, ix, iy, &estimator) == RES_OK);
+      CHK(sdis_estimator_get_temperature(estimator, &T) == RES_OK);
+      fprintf(stdout, "%f\n", T.SE);
+    }
+  }
+  fprintf(stdout, "SCALARS computation_time float 1\n");
+  fprintf(stdout, "LOOKUP_TABLE default\n");
+  FOR_EACH(iy, 0, definition[1]) {
+    FOR_EACH(ix, 0, definition[0]) {
+      const struct sdis_estimator* estimator;
+      struct sdis_mc time;
+      CHK(sdis_estimator_buffer_at(buf, ix, iy, &estimator) == RES_OK);
+      CHK(sdis_estimator_get_realisation_time(estimator, &time) == RES_OK);
+      fprintf(stdout, "%f\n", time.E);
+    }
+  }
+  fprintf(stdout, "SCALARS computation_time_std_dev float 1\n");
+  fprintf(stdout, "LOOKUP_TABLE default\n");
+  FOR_EACH(iy, 0, definition[1]) {
+    FOR_EACH(ix, 0, definition[0]) {
+      const struct sdis_estimator* estimator;
+      struct sdis_mc time;
+      CHK(sdis_estimator_buffer_at(buf, ix, iy, &estimator) == RES_OK);
+      CHK(sdis_estimator_get_realisation_time(estimator, &time) == RES_OK);
+      fprintf(stdout, "%f\n", time.SE);
+    }
+  }
+  fprintf(stdout, "SCALARS temperature_failures_count int 1\n");
+  fprintf(stdout, "LOOKUP_TABLE default\n");
+  FOR_EACH(iy, 0, definition[1]) {
+    FOR_EACH(ix, 0, definition[0]) {
+      const struct sdis_estimator* estimator;
+      size_t nfails;
+      CHK(sdis_estimator_buffer_at(buf, ix, iy, &estimator) == RES_OK);
+      CHK(sdis_estimator_get_failure_count(estimator, &nfails) == RES_OK);
+      fprintf(stdout, "%zu\n", nfails);
     }
   }
   mem_rm(temps);
@@ -981,7 +1024,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   struct sdis_scene* scn = NULL;
   struct sdis_estimator* estimator = NULL;
   struct sdis_mc temperature;
-  struct sdis_accum_buffer* buf = NULL;
+  struct sdis_estimator_buffer* buf = NULL;
   struct sdis_camera* cam = NULL;
 
   struct htable_intface htable_interfaces;
@@ -1574,21 +1617,19 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         stardis->camera.tgt,
         stardis->camera.up));
 
-      /* Create the accum buffer */
-      SDIS(accum_buffer_create(dev, width, height, &buf));
-
       /* Launch the simulation */
+      time[0] = time[1] = stardis->camera.u.time;
       res = sdis_solve_camera(scn,
         cam,
-        stardis->camera.u.time,
+        time,
         stardis->scale_factor,
         stardis->radiative_temp[0],
         stardis->radiative_temp[1],
         width,
         height,
         (size_t)stardis->camera.spp,
-        sdis_accum_buffer_write,
-        buf);
+        stardis->dump_paths,
+        &buf);
       if (res != RES_OK) goto error;
 
       /* Write the image */
@@ -1753,7 +1794,7 @@ end:
   sa_release(media);
 
   if (cam) SDIS(camera_ref_put(cam));
-  if (buf) SDIS(accum_buffer_ref_put(buf));
+  if (buf) SDIS(estimator_buffer_ref_put(buf));
   if (estimator) SDIS(estimator_ref_put(estimator));
   if (scn) SDIS(scene_ref_put(scn));
   if (dev) SDIS(device_ref_put(dev));

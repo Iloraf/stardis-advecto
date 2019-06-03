@@ -1330,12 +1330,12 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
             goto error;
           }
           connection_count++;
-          /* Reuse same solid for the external side */
+          boundary_count++;
           if (front_defined) {
-            back_med = front_med;
+            back_med = media[connect->d.f_boundary.mat_id];
             interface_shader.front.flux = interface_get_flux;
           } else {
-            front_med = back_med;
+            front_med = media[connect->d.f_boundary.mat_id];
             interface_shader.back.flux = interface_get_flux;
           }
           ASSERT(connect->d.f_boundary.te_flux);

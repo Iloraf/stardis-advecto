@@ -18,7 +18,8 @@ enum stardis_mode {
   GREEN_MODE = BIT(3),
   IR_COMPUTE = BIT(4),
   DUMP_VTK = BIT(5),
-  COMPUTE_MODES = PROBE_COMPUTE | MEDIUM_COMPUTE | BOUNDARY_COMPUTE | IR_COMPUTE | DUMP_VTK
+  PROBE_COMPUTE_ON_INTERFACE = BIT(6),
+  COMPUTE_MODES = PROBE_COMPUTE | MEDIUM_COMPUTE | BOUNDARY_COMPUTE | IR_COMPUTE | DUMP_VTK | PROBE_COMPUTE_ON_INTERFACE
 };
 
 static char mode_option(const enum stardis_mode m) {
@@ -29,6 +30,7 @@ static char mode_option(const enum stardis_mode m) {
   if (m & BOUNDARY_COMPUTE) { found++; res = 'b'; }
   if (m & IR_COMPUTE) { found++; res = 'R'; }
   if (m & DUMP_VTK) { found++; res = 'd'; }
+  if (m & PROBE_COMPUTE_ON_INTERFACE) { found++; res = 'P'; }
   ASSERT(found == 1);
   return res;
 }
@@ -93,8 +95,12 @@ print_help(char* prog)
   printf("-------------------\n");
   printf("\n -p X:Y:Z:TIME:\n");
   printf("    Compute the temperature at the given probe.\n");
-  printf("    The probe must be in a medium. If some boundary conditions are\n");
-  printf("    time-dependant, TIME cannot be INF.\n");
+  printf("    The probe must be in a medium.\n");
+  printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
+  printf("\n -P X:Y:Z:TIME:\n");
+  printf("    Compute the temperature at the given probe on an interface.\n");
+  printf("    The probe must be in a medium and is moved to the closest interface.\n");
+  printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
   printf("\n -m MEDIUM_NAME,TIME:\n");
   printf("    Compute the mean temperature in a given medium at a given time.\n");
   printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
@@ -152,8 +158,14 @@ parse_args(const int argc, char** argv, struct args* args)
     goto error;
   }
 
-  while((opt = getopt(argc, argv, "hgn:t:b:B:M:m:p:dD:s:r:R:")) != -1) {
+  opterr = 0; /* No default error messages */
+  while((opt = getopt(argc, argv, "hgn:t:b:B:M:m:p:P:dD:s:r:R:")) != -1) {
     switch(opt) {
+      case '?': /* Unreconised option */
+        res = RES_BAD_ARG;
+        fprintf(stderr, "Invalid option -%c\n", optopt);
+        goto error;
+
       case 'h':
         print_help(argv[0]);
         args->just_help = 1;
@@ -164,12 +176,13 @@ parse_args(const int argc, char** argv, struct args* args)
         break;
 
       case 'n': {
-        args->N = strtoull(optarg, NULL, 10);
-        if (args->N <= 0) {
+        long long n = strtoll(optarg, NULL, 10);
+        if (n <= 0 || n > SIZE_MAX) {
           res = RES_BAD_ARG;
-          fprintf(stderr, "Invalid argument -n %s\n", optarg);
+          fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
           goto error;
         }
+        args->N = n;
         break;
       }
 
@@ -186,7 +199,7 @@ parse_args(const int argc, char** argv, struct args* args)
         if (res != RES_OK
             || args->nthreads <= 0){
           res = RES_BAD_ARG;
-          fprintf(stderr, "Invalid argument -t %s\n", optarg);
+          fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
           goto error;
         }
         break;
@@ -200,10 +213,31 @@ parse_args(const int argc, char** argv, struct args* args)
         }
         args->mode |= PROBE_COMPUTE;
         cstr_to_list_double(optarg, ',', args->u.probe, &len, 4);
-        if(len != 4 
-           || res != RES_OK) {
+        if (len != 4
+          || res != RES_OK
+          || args->u.probe[3] < 0)
+        {
           res = RES_BAD_ARG;
-          fprintf(stderr, "Invalid argument -p %s\n", optarg);
+          fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
+          goto error;
+        }
+        break;
+
+      case 'P':
+        if (args->mode & COMPUTE_MODES) {
+          res = RES_BAD_ARG;
+          fprintf(stderr, "Cannot specify multiple modes: -%c and -%c\n",
+            (char)opt, mode_option(args->mode));
+          goto error;
+        }
+        args->mode |= PROBE_COMPUTE_ON_INTERFACE;
+        cstr_to_list_double(optarg, ',', args->u.probe, &len, 4);
+        if(len != 4 
+           || res != RES_OK
+           || args->u.probe[3] < 0)
+        {
+          res = RES_BAD_ARG;
+          fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
           goto error;
         }
         break;
@@ -220,21 +254,22 @@ parse_args(const int argc, char** argv, struct args* args)
         args->mode |= BOUNDARY_COMPUTE;
         ptr = strrchr(optarg, ',');
         /* Single ',' allowed */
-        if (ptr != strchr(optarg, ','))
+        if (!ptr || ptr != strchr(optarg, ','))
           err = 1;
         else {
           *ptr = '\0';
           ptr++;
           args->solve_boundary_filename = optarg;
-          err = RES_OK != cstr_to_double(ptr, args->u.probe + 3);
+          err = (RES_OK != cstr_to_double(ptr, args->u.probe + 3) || args->u.probe[3] < 0);
         }
         if (err) {
           res = RES_BAD_ARG;
-          fprintf(stderr, "Invalid argument -b %s\n", optarg);
+          fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
           goto error;
         }
         break;
       }
+
       case 'm': {
         char* ptr;
         if (args->mode & COMPUTE_MODES) {
@@ -249,7 +284,7 @@ parse_args(const int argc, char** argv, struct args* args)
           res = RES_BAD_ARG;
         else res = cstr_to_double(ptr+1, args->u.probe+3);
         if (res != RES_OK) {
-          fprintf(stderr, "Invalid argument -m %s\n", optarg);
+          fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
           goto error;
         }
         *ptr = '\0';
@@ -276,7 +311,7 @@ parse_args(const int argc, char** argv, struct args* args)
           args->dump_paths = DUMP_SUCCESS;
         } else {
           res = RES_BAD_ARG;
-          fprintf(stderr, "Invalid argument -D %s\n", optarg);
+          fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
           goto error;
         }
         break;
@@ -286,7 +321,7 @@ parse_args(const int argc, char** argv, struct args* args)
         if (res != RES_OK
             || args->scale_factor <=0){
           res = RES_BAD_ARG;
-          fprintf(stderr, "Invalid argument -s %s\n", optarg);
+          fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
           goto error;
         }
         break;
@@ -298,7 +333,7 @@ parse_args(const int argc, char** argv, struct args* args)
             || args->radiative_temp[0] <=0
             || args->radiative_temp[1] <=0){
           res = RES_BAD_ARG;
-          fprintf(stderr, "Invalid argument -r %s\n", optarg);
+          fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
           goto error;
         }
         break;

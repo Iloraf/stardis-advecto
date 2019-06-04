@@ -4,6 +4,7 @@
 #include <sdis.h>
 #include <sdis_version.h>
 #include <rsys/double3.h>
+#include <rsys/double2.h>
 #include <rsys/dynamic_array_uint.h>
 
 #include <rsys/image.h>
@@ -332,41 +333,110 @@ static res_T
 select_probe_type
   (const struct sdis_scene* scn, 
    const struct triangle* triangle,
+   const struct vertex* vertex,
    const struct description* descriptions,
+   const int on_interface,
    double pos[3], 
    size_t* iprim, 
    double uv[2])
 {
   res_T res = RES_OK;
-  size_t i = 0;
+  double min_d = DBL_MAX, min_delta = DBL_MAX, new_pos[3], tmp_uv[2], min_uv[2];
+  const struct description *min_desc = NULL;
+  size_t i = 0, found = SIZE_MAX;
+  enum description_type min_type = DESCRIPTION_TYPE_COUNT__;
 
   for (i = 0; i < sa_size(triangle); ++i) {
-    double delta = 0, dp[3], projected_pos[3];
-    res = sdis_scene_boundary_project_position(scn, i, pos, uv);
-    if (res != RES_OK) return res;
-    res = sdis_scene_get_boundary_position(scn, i, uv, projected_pos);
-    if (res != RES_OK) return res;
-    d3_sub(dp, pos, projected_pos);
+    const struct triangle* tr = triangle + i;
+    double dp[3], d, projected_pos[3], nn[3];
+    float v0[3], v1[3], v2[3], e1[3], e2[3], n[3];
+    const struct description *desc = NULL;
+    enum sdis_side s;
 
-    if (triangle[i].front_description != UINT_MAX) {
-      const struct description *desc = descriptions + triangle[i].front_description;
-      if (desc->type == DESC_MAT_SOLID) delta = MMAX(desc->d.solid.delta, delta);
-    }
-    if (triangle[i].back_description != UINT_MAX) {
-      const struct description *desc = descriptions + triangle[i].back_description;
-      if (desc->type == DESC_MAT_SOLID) delta = MMAX(desc->d.solid.delta, delta);
-    }
+    res = sdis_scene_boundary_project_position(scn, i, pos, tmp_uv);
+    if (res != RES_OK) return res;
+    res = sdis_scene_get_boundary_position(scn, i, tmp_uv, projected_pos);
+    if (res != RES_OK) return res;
+    d3_sub(dp, projected_pos, pos);
+    d = d3_len(dp);
 
-    if (d3_len(dp) < delta){
-      *iprim = i;
-      fprintf(stderr,"The probe is very close to the primitive %llu.\n",
-        (long long int)*iprim );
-      fprintf(stderr,"So the probe is moved to this primitive at the position: %g %g %g\n",
-          SPLIT3(projected_pos));
-      d3_set(pos, projected_pos);
+    if (d == 0) {
+      /* Best possible match */
+      found = i;
+      fprintf(stderr,
+        "The probe is on the primitive %llu.\n", (long long int)*iprim);
       break;
     }
+    if (d >= min_d) {
+      /* No improvement */
+      continue;
+    }
+    min_d = d;
+    d2_set(min_uv, tmp_uv);
+
+    /* Find side */
+    f3_set(v0, vertex[tr->indices.data[0]].xyz);
+    f3_set(v1, vertex[tr->indices.data[1]].xyz);
+    f3_set(v2, vertex[tr->indices.data[2]].xyz);
+    f3_sub(e1, v1, v0);
+    f3_sub(e2, v2, v0);
+    f3_cross(n, e1, e2);
+
+    /* Stardis solver convention is triangle normal is back side */
+    d3_set_f3(nn, n);
+    s = (d3_dot(nn, dp) < 0) ? SDIS_BACK : SDIS_FRONT;
+
+    if (s == SDIS_FRONT) {
+      if (tr->front_description != UINT_MAX) {
+        desc = descriptions + tr->front_description;
+      }
+    } else {
+      if (tr->back_description != UINT_MAX) {
+        desc = descriptions + tr->back_description;
+      }
+    }
+
+    min_desc = desc;
+    if (!desc) continue;
+
+    min_type = desc->type;
+    if (desc->type == DESC_MAT_SOLID) {
+      found = i;
+      min_delta = desc->d.solid.delta;
+      d3_set(new_pos, projected_pos);
+    }
   }
+
+  if (!min_desc) {
+    /* Don't manage pos is outside the model
+     * but very close and could be considered on the boundary */
+    fprintf(stderr, "The probe is outside the model.\n");
+    return RES_BAD_ARG;
+  }
+
+  if (on_interface) {
+    *iprim = found;
+    if (min_type == DESC_MAT_FLUID)
+      fprintf(stderr, "Probe was on a fluid.\n");
+    fprintf(stderr, "The probe is moved to %g,%g,%g (primitive %llu)\n",
+      SPLIT3(new_pos), (long long int)*iprim);
+    if (min_type == DESC_MAT_SOLID && min_d > min_delta)
+      fprintf(stderr, "WARNING: The probe move is %.1f delta long.\n", min_d / min_delta);
+    d3_set(pos, new_pos);
+    d2_set(uv, min_uv);
+  } else {
+    if (min_type == DESC_MAT_FLUID)
+      fprintf(stderr,
+        "The probe is in a fluid: computing fluid temperature, not using a specific position.\n");
+    if (min_type == DESC_MAT_SOLID && min_d < min_delta) {
+      fprintf(stderr,
+        "WARNING: The probe is very close to the primitive %llu (%.1f delta).\n",
+        (long long int)found, min_d / min_delta);
+      fprintf(stderr,
+        "To have this probe moved on the closest interface use -P instead of -p\n");
+    }
+  }
+
   return res;
 }
 
@@ -1427,7 +1497,9 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
       res = select_probe_type(scn,
         stardis->geometry.triangle,
+        stardis->geometry.vertex,
         stardis->descriptions,
+        (mode & PROBE_COMPUTE_ON_INTERFACE),
         pos,
         &iprim,
         uv);
@@ -1646,7 +1718,9 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
       res = select_probe_type(scn,
         stardis->geometry.triangle,
+        stardis->geometry.vertex,
         stardis->descriptions,
+        (mode & PROBE_COMPUTE_ON_INTERFACE),
         pos,
         &iprim,
         uv);
@@ -1748,7 +1822,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       SDIS(estimator_get_failure_count(estimator, &nfailures));
 
       /* Print the results */
-      switch (mode) {
+      switch (mode & COMPUTE_MODES) {
       case PROBE_COMPUTE:
         printf("Temperature at t=[%g, %g, %g, %g] = %g +/- %g\n",
           pos[0], pos[1], pos[2], time[0],

@@ -1648,14 +1648,14 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     }
     if (fbound_count) {
       printf("# F Boundaries\n");
-      printf("# ID Name hc hc_max\n");
+      printf("# ID Name flux\n");
       FOR_EACH(i, 0, sa_size(stardis->descriptions)) {
         struct description* desc = stardis->descriptions + i;
         struct f_boundary* bd;
         if (desc->type != DESC_BOUND_F_FOR_SOLID) continue;
         bd = &desc->d.f_boundary;
-        printf("%u\t%s\t%g\t%g\n",
-          i, bd->name, (bd->has_hc ? bd->hc : 0), (bd->has_hc ? bd->hc_max : 0));
+        printf("%u\t%s\t%s\n",
+          i, bd->name, bd->flux);
       }
     }
 

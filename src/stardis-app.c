@@ -420,27 +420,6 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
     }
     desc->d.f_boundary.flux = malloc(strlen(tk) + 1);
     strcpy(desc->d.f_boundary.flux, tk);
-
-    /* hc and hc_max are optional */
-    tk = strtok(NULL, " ");
-    if (tk) {
-      res = cstr_to_double(tk, &desc->d.f_boundary.hc);
-      if (res != RES_OK || desc->d.f_boundary.hc < 0) {
-        fprintf(stderr, "Invalid hc value: %s\n", tk);
-        res = RES_BAD_ARG;
-        goto exit;
-      }
-      desc->d.f_boundary.has_hc = (desc->d.f_boundary.hc > 0);
-      CHK_TOK(strtok(NULL, " "), "hc max");
-      res = cstr_to_double(tk, &desc->d.f_boundary.hc_max);
-      if (res != RES_OK
-        || desc->d.f_boundary.hc_max < desc->d.f_boundary.hc
-        || desc->d.f_boundary.hc_max < 0) {
-        fprintf(stderr, "Invalid hc_max value: %s\n", tk);
-        res = RES_BAD_ARG;
-        goto exit;
-      }
-    }
   }
   else if (sf_connect) {
     desc->type = DESC_SOLID_FLUID_CONNECT;

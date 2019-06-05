@@ -635,9 +635,6 @@ struct f_boundary {
   unsigned mat_id;
   char* flux;
   struct te_expr* te_flux;
-  double hc;
-  double hc_max;
-  int has_hc;
 };
 
 static void
@@ -648,23 +645,17 @@ print_f_boundary
 {
   ASSERT(stream && b && type == DESC_BOUND_F_FOR_SOLID); (void)type;
   fprintf(stream,
-    "F boundary %s for SOLID: hc=%g hc_max=%g flux='%s'\n",
+    "F boundary %s for SOLID: flux='%s'\n",
     b->name,
-    (b->has_hc ? b->hc : 0),
-    (b->has_hc ? b->hc_max : 0),
     (b->flux ? b->flux : "0"));
 }
 
 static char
 eq_f_boundary(const struct f_boundary* a, const struct f_boundary* b)
 {
-  if (a->mat_id != b->mat_id
-    || strcmp(a->name, b->name)
-    || strcmp(a->flux, b->flux)
-    || a->has_hc != b->has_hc)
-    return 0;
-  if (a->has_hc && (a->hc != b->hc || a->hc_max != b->hc_max)) return 0;
-  return 1;
+  return (a->mat_id == b->mat_id
+    && 0 == strcmp(a->name, b->name)
+    && 0 == strcmp(a->flux, b->flux));
 }
 
 static size_t
@@ -686,20 +677,8 @@ hash_f_boundary(const struct f_boundary* key)
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
     hash = hash * FNV32_PRIME;
   }
-  FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc_max)[i]);
-    hash = hash * FNV32_PRIME;
-  }
   FOR_EACH(i, 0, strlen(key->flux) * sizeof(*key->flux)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)key->flux)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_hc)[i]);
     hash = hash * FNV32_PRIME;
   }
   return hash;
@@ -719,20 +698,8 @@ hash_f_boundary(const struct f_boundary* key)
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
     hash = hash * FNV64_PRIME;
   }
-  FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc_max)[i]);
-    hash = hash * FNV64_PRIME;
-  }
   FOR_EACH(i, 0, strlen(key->flux) * sizeof(*key->flux)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)key->flux)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_hc)[i]);
     hash = hash * FNV64_PRIME;
   }
   return hash;

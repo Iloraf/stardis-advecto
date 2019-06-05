@@ -1,8 +1,8 @@
+#!/usr/bin/perl
 use strict;
 use warnings;
 
 use Excel::Writer::XLSX;
-
 use Data::Dumper;
 
 #
@@ -158,20 +158,19 @@ if ($counts[$fbounds_rk] > 0) {
     die "Unexpected content found ($line)!" unless ($line eq "# F Boundaries");
     $line = <STDIN>;
     chomp $line;
-    die "Unexpected content found ($line)!" unless ($line eq "# ID Name temperature");
+    die "Unexpected content found ($line)!" unless ($line eq "# ID Name flux");
     for (my $b = 0; $b < $counts[$fbounds_rk] ; $b++) {
         $line = <STDIN>;
         chomp $line;
         my @tmp = split("\t", $line);
-        die "Wrong number of values!" unless (scalar(@tmp) == 4);
+        die "Wrong number of values!" unless (scalar(@tmp) == 3);
         die "Wrong ID" unless ($tmp[0] >= 0) && (! defined $seen_id_types[$tmp[0]]);
         $seen_id_types[$tmp[0]] = 'X';
         my %new_elt = (
             ID=>$tmp[0],
             NAME=>$tmp[1],
-            HC=>$tmp[2],
-            HC_MAX=>$tmp[3]
-            );
+            FLUX=>$tmp[2]
+        );
         push @f_boundaries, \%new_elt;
     }
 }
@@ -281,8 +280,8 @@ die "Unexpected content in file" unless ($line eq "---END GREEN---");
 binmode( STDOUT );
 my $workbook = Excel::Writer::XLSX->new( \*STDOUT );
 $workbook->set_properties(
-    title    => 'This is an example spreadsheet',
-    author   => 'Méso-Star',
+    title    => 'Green calculator',
+    author   => 'meso-star.com',
     comments => 'Created with Perl, Excel::Writer::XLSX and Stardis-app Post-Process',
     );
 
@@ -300,11 +299,18 @@ $unlocked->set_locked(0);
 my $model_current_line = 0;
 my @id_end_cells;
 my @id_pw_cells;
+my @id_fx_cells;
+my @cpt_end_cells;
+my @cpt_pw_cells;
+my @cpt_fx_cells;
+my @name_end_cells;
+my @name_pw_cells;
+my @name_fx_cells;
 
 # One sheet for all but samples
 my $model = $workbook->add_worksheet('Model');
 $model->protect(); # Cannot edit cells unless unlocked
-$model->set_column(0, 5, 20); # Column 0 to 5: width = 20
+$model->set_column(0, 5, 24); # Column 0 to 5: width = 24
 
 # Create table for solids
 if($counts[$solids_rk] > 0) {
@@ -315,7 +321,8 @@ if($counts[$solids_rk] > 0) {
        my $solid = $solids[$s];
        my $temp = $solid->{TEMP};
        my $pw = $solid->{POWER};
-       $model->write($model_current_line, 0, $solid->{NAME}, $locked);
+       my $name = $solid->{NAME};
+       $model->write($model_current_line, 0, $name, $locked);
        $model->write_number($model_current_line, 1, $temp, ($temp >= 0) ? $unlocked : $locked);
        $model->write_number($model_current_line, 2, $solid->{LAMBDA}, $locked);
        $model->write_number($model_current_line, 3, $solid->{RHO}, $locked);
@@ -324,8 +331,16 @@ if($counts[$solids_rk] > 0) {
        $model_current_line++;
        my $id = $solid->{ID};
        die "Inconsistency!" unless ($id >= 0) && (defined $seen_id_types[$id]) && ($seen_id_types[$id] eq 'S');
-       $id_end_cells[$id] = ($temp >= 0) ? "B$model_current_line" : 'Error';
+       die "Inconsistency!" unless (!defined $id_end_cells[$id]) && (!defined $cpt_end_cells[$id]) &&  (!defined $name_end_cells[$id]);
+       die "Inconsistency!" unless (!defined $id_pw_cells[$id]) && (!defined $cpt_pw_cells[$id]) &&  (!defined $name_pw_cells[$id]);
+       if  ($temp >= 0) {
+           $id_end_cells[$id] = "B$model_current_line";
+           $cpt_end_cells[$id] = 0;
+           $name_end_cells[$id] = "$name.Imposed_Temperature";
+       }
        $id_pw_cells[$id] = "F$model_current_line";
+       $cpt_pw_cells[$id] = 0;
+       $name_pw_cells[$id] = "$name.Volumic_Power";
    }
    $model_current_line++;
 }
@@ -339,7 +354,8 @@ if($counts[$fluids_rk] > 0) {
        my $fluid = $fluids[$f];
        my $temp = $fluid->{TEMP};
        my $pw =  $fluid->{POWER};
-       $model->write($model_current_line, 0, $fluid->{NAME}, $locked);
+       my $name = $fluid->{NAME};
+       $model->write($model_current_line, 0, $name, $locked);
        $model->write_number($model_current_line, 1, $temp, ($temp >= 0) ? $unlocked : $locked);
        $model->write_number($model_current_line, 2, $fluid->{RHO}, $locked);
        $model->write_number($model_current_line, 3, $fluid->{CP}, $locked);
@@ -347,8 +363,16 @@ if($counts[$fluids_rk] > 0) {
        $model_current_line++;
        my $id = $fluid->{ID};
        die "Inconsistency!" unless ($id >= 0) && (defined $seen_id_types[$id]) && ($seen_id_types[$id] eq 'F');
-       $id_end_cells[$id] = ($temp >= 0) ? "B$model_current_line" : 'Error';
+       die "Inconsistency!" unless (!defined $id_end_cells[$id]) && (!defined $cpt_end_cells[$id]) &&  (!defined $name_end_cells[$id]);
+       die "Inconsistency!" unless (!defined $id_pw_cells[$id]) && (!defined $cpt_pw_cells[$id]) &&  (!defined $name_pw_cells[$id]);
+       if  ($temp >= 0) {
+           $id_end_cells[$id] = "B$model_current_line";
+           $cpt_end_cells[$id] = 0;
+           $name_end_cells[$id] = "$name.Imposed_Temperature";
+       }
        $id_pw_cells[$id] = "E$model_current_line";
+       $cpt_pw_cells[$id] = 0;
+       $name_pw_cells[$id] = "$name.Volumic_Power";
    }
    $model_current_line++;
 }
@@ -361,25 +385,30 @@ if($counts[$tbounds_rk] > 0) {
    for(my $b = 0; $b < $counts[$tbounds_rk] ; $b++) {
        my $tbound = $t_boundaries[$b];
        my $temp = $tbound->{TEMP};
-       $model->write($model_current_line, 0, $tbound->{NAME}, $locked);
+       my $name = $tbound->{NAME};
+       $model->write($model_current_line, 0, $name, $locked);
        $model->write_number($model_current_line, 1, $temp, ($temp >= 0) ? $unlocked : $locked);
        $model_current_line++;
        my $id = $tbound->{ID};
        die "Inconsistency!" unless ($id >= 0) && (defined $seen_id_types[$id]) && ($seen_id_types[$id] eq 'T');
-       $id_end_cells[$id]= "B$model_current_line";
-       $id_pw_cells[$id] = "Error";
+       die "Inconsistency!" unless (!defined $id_end_cells[$id]) && (!defined $cpt_end_cells[$id]) &&  (!defined $name_end_cells[$id]);
+       $id_end_cells[$id] = "B$model_current_line";
+       $cpt_end_cells[$id] = 0;
+       $name_end_cells[$id] = "$name.Temperature";
+       # No volumic power at boundaries!
    }
    $model_current_line++;
 }
 
 # Create table for H boundaries
 if($counts[$hbounds_rk] > 0) {
-   my @hbound_colnames = ('H Boundary Name', 'Emissivity', 'Specular Fraction', 'Hc', 'Hc_max', 'T_env');
+   my @hbound_colnames = ('H Boundary Name', 'Emissivity', 'Specular Fraction', 'Hc', 'Hc Max', 'Environment Temperature');
    $model->write($model_current_line, 0, \@hbound_colnames, $title);
    $model_current_line++;
    for(my $b = 0; $b < $counts[$hbounds_rk] ; $b++) {
        my $hbound = $h_boundaries[$b];
-       $model->write($model_current_line, 0, $hbound->{NAME}, $locked);
+       my $name = $hbound->{NAME};
+       $model->write($model_current_line, 0, $name, $locked);
        $model->write_number($model_current_line, 1, $hbound->{EMISSIVITY}, $locked);
        $model->write_number($model_current_line, 2, $hbound->{SPEC_FRACTION}, $locked);
        $model->write_number($model_current_line, 3, $hbound->{HC}, $locked);
@@ -388,27 +417,34 @@ if($counts[$hbounds_rk] > 0) {
        $model_current_line++;
        my $id = $hbound->{ID};
        die "Inconsistency!" unless ($id >= 0) && (defined $seen_id_types[$id]) && ($seen_id_types[$id] eq 'H');
-       $id_end_cells[$id]= "F$model_current_line";
-       $id_pw_cells[$id] = "Error"; # No volumic power at boundaries!
+       die "Inconsistency!" unless (!defined $id_end_cells[$id]) && (!defined $cpt_end_cells[$id]) &&  (!defined $name_end_cells[$id]);
+       $id_end_cells[$id] = "F$model_current_line";
+       $cpt_end_cells[$id] = 0;
+       $name_end_cells[$id] = "$name.Environment_Temperature";
+       # No volumic power at boundaries!
    }
    $model_current_line++;
 }
 
 # Create table for F boundaries
 if($counts[$fbounds_rk] > 0) {
-   my @fbound_colnames = ('F Boundary Name', 'hc', 'hc_max');
+   my @fbound_colnames = ('F Boundary Name', 'Flux');
    $model->write($model_current_line, 0, \@fbound_colnames, $title);
    $model_current_line++;
    for(my $b = 0; $b < $counts[$fbounds_rk] ; $b++) {
        my $fbound = $f_boundaries[$b];
-       $model->write($model_current_line, 0, $fbound->{NAME}, $locked);
-       $model->write_number($model_current_line, 1, $fbound->{HC}, $locked);
-       $model->write_number($model_current_line, 2, $fbound->{HC_MAX}, $locked);
+       my $name = $fbound->{NAME};
+       $model->write($model_current_line, 0, $name, $locked);
+       $model->write_number($model_current_line, 1, $fbound->{FLUX}, $unlocked);
        $model_current_line++;
        my $id = $fbound->{ID};
        die "Inconsistency!" unless ($id >= 0) && (defined $seen_id_types[$id]) && ($seen_id_types[$id] eq 'X');
-       $id_end_cells[$id]= "Error"; # Cannot end at F boundaries
-       $id_pw_cells[$id] = "Error"; # No volumic power at boundaries!
+       die "Inconsistency!" unless (!defined $id_fx_cells[$id]) && (!defined $cpt_fx_cells[$id]) &&  (!defined $name_fx_cells[$id]);
+       $id_fx_cells[$id] = "B$model_current_line";
+       $cpt_fx_cells[$id] = 0;
+       $name_fx_cells[$id] = "$name.Flux";
+       # Cannot end at F boundaries
+       # No volumic power at boundaries!
    }
    $model_current_line++;
 }
@@ -421,8 +457,11 @@ if($counts[$fbounds_rk] > 0) {
    $model->write_number($model_current_line, 0, $radiative_temp, $unlocked);
    $model->write_number($model_current_line, 1, $linear_temp, $locked);
    $model_current_line++;
+   die "Inconsistency!" unless (!defined $id_end_cells[$rad_temp_id]) && (!defined $cpt_end_cells[$rad_temp_id]) &&  (!defined $name_end_cells[$rad_temp_id]);
    $id_end_cells[$rad_temp_id]= "A$model_current_line";
-   $id_pw_cells[$rad_temp_id] = "Error"; # No volumic power at infinity!
+   $cpt_end_cells[$rad_temp_id] = 0;
+   $name_end_cells[$rad_temp_id] = 'Radiative_Temperature';
+   # No volumic power at infinity!
    $model_current_line++;
 }
 
@@ -456,25 +495,61 @@ if($counts[$ok_rk] > 0) {
            print STDERR "END TYPES: @seen_id_types\n";
            die "Invalid ID!" ;
        }
-       unless ($id_end_cells[$end_id] ne 'Error') {
+       unless ((defined $id_end_cells[$end_id]) && (defined $cpt_end_cells[$end_id])) {
            print STDERR "Sample: ", Dumper($sample);
            print STDERR "END ID: $end_id\n";
            print STDERR "END END CELLS: @id_end_cells\n";
            die "Inconsistency!"
        }
        my $formula = "=Model!$id_end_cells[$end_id]";
+       $cpt_end_cells[$end_id] += 1;
        for(my $n = 0; $n < $pw_count; $n++) {
            my $ty = @$pw_types[$n];
            my $id = @$pw_ids[$n];
            my $fc = @$pw_factors[$n];
            die "Invalid ID ($id)!" unless ($id >= 0) && (defined $seen_id_types[$id]) && ($seen_id_types[$id] eq $ty);
-           die "Inconsistency!" unless ($id_pw_cells[$id] ne 'Error');
+           die "Inconsistency!" unless (defined $id_pw_cells[$id]) && ($fc > 0);
            $formula = $formula."+Model!$id_pw_cells[$id]*$fc";
+           $cpt_pw_cells[$id] += $fc;
+       }
+       for(my $n = 0; $n < $fx_count; $n++) {
+           my $id = @$fx_ids[$n];
+           my $fc = @$fx_factors[$n];
+           die "Invalid ID ($id)!" unless ($id >= 0) && (defined $seen_id_types[$id]);
+           die "Inconsistency!" unless (defined $id_fx_cells[$id]) && ($fc > 0);
+           $formula = $formula."+Model!$id_fx_cells[$id]*$fc";
+           $cpt_fx_cells[$id] += $fc;
        }
        $green->write_formula($samples_current_line, 0, $formula, $locked);
        $samples_current_line++;
    }
 }
+
+# Create the polynom for temperature
+my $sep ="";
+my $poly = "T = ";
+for (my $n = 0; $n < scalar(@cpt_end_cells); $n++) {
+    if (defined $cpt_end_cells[$n] && $cpt_end_cells[$n] != 0) {
+        my $w = $cpt_end_cells[$n] / $counts[$ok_rk];
+        $poly .= $sep . $w . " * $name_end_cells[$n]";
+        $sep = " + ";
+    }
+}
+for(my $n = 0; $n < scalar(@cpt_pw_cells); $n++) {
+    if (defined $cpt_pw_cells[$n] && $cpt_pw_cells[$n] != 0) {
+        my $w = $cpt_pw_cells[$n] / $counts[$ok_rk];
+        $poly .= $sep . $w . " * $name_pw_cells[$n]";
+        $sep = " + ";
+    }
+}
+for(my $n = 0; $n < scalar(@cpt_fx_cells); $n++) {
+    if (defined $cpt_fx_cells[$n] && $cpt_fx_cells[$n] != 0) {
+        my $w = $cpt_fx_cells[$n] / $counts[$ok_rk];
+        $poly .= $sep . $w . " * $name_fx_cells[$n]";
+        $sep = " + ";
+    }
+}
+
 
 # The MC Estimator and STDERR table
 my @result_colnames = ('Estimate', 'Sigma');
@@ -483,10 +558,8 @@ $model_current_line++;
 $model->write_formula($model_current_line, 0, "AVERAGE(Samples!A2:A$samples_current_line)", $locked);
 $model->write_formula($model_current_line, 1, "STDEV(Samples!A2:A$samples_current_line)/SQRT($samples_current_line-1)", $locked);
 $model_current_line++;
+$model->write_comment($model_current_line, 0, $poly, start_row => $model_current_line, visible => 1, x_scale => 6);
 
 $workbook->close();
 
-
-#print "Read $line\n";
-#print Dumper(@samples);
-#print $fluids[0]->{ID};
+print STDERR "$poly\n";

@@ -1033,7 +1033,7 @@ print_sample
     data = sdis_medium_get_data(pt.data.mdmvert.medium);
     if (pt.data.mdmvert.vertex.P[0] == INF) {
       /* Radiative output */
-      printf("R %u", (unsigned)sa_size(ctx));
+      printf("R\t%u", (unsigned)sa_size(ctx));
     }
     else if (type == SDIS_FLUID) {
       struct fluid* d__ = sdis_data_get(data);

@@ -130,10 +130,20 @@ fluid_get_volumic_mass
 
 static double
 fluid_get_temperature
-(const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
+  (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct fluid* fluid_props = sdis_data_cget(data);
   return te_eval(fluid_props->temperature, vtx);
+}
+
+static double
+fluid_dont_get_temperature
+  (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
+{
+  (void)vtx; (void)data;
+  fflush(stdout);
+  fflush(stderr);
+  FATAL("fluid_dont_get_temperature: path went to a non-existing medium\n");
 }
 
 static double
@@ -585,7 +595,7 @@ create_fluid
   size_t sz;
   res_T res = RES_OK;
 
-  ASSERT(dev && rho >= 0 && cp >= 0 && t_expr && media_ptr && out_id);
+  ASSERT(dev && rho >= 0 && cp >= 0 && media_ptr && out_id);
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
   fluid_shader.volumic_mass = fluid_get_volumic_mass;
   fluid_shader.temperature = get_temp;
@@ -598,15 +608,19 @@ create_fluid
   fluid_props = sdis_data_get(data); /* Fetch the allocated memory space */
   fluid_props->cp = cp;
   fluid_props->rho = rho;
+  fluid_props->temperature = NULL;
   fluid_props->is_green = is_green;
   fluid_props->is_outside = is_outside;
   fluid_props->t0 = 0;
   fluid_props->id = (unsigned)sz;
-  res = compile_expr_to_fn(&fluid_props->temperature, t_expr, prohibited, NULL);
-  if (res != RES_OK) {
-    fprintf(stderr, "Invalid initial temperature expression: %s\n",
-      t_expr);
-    goto error;
+
+  if (t_expr) {
+    res = compile_expr_to_fn(&fluid_props->temperature, t_expr, prohibited, NULL);
+    if (res != RES_OK) {
+      fprintf(stderr, "Invalid initial temperature expression: %s\n",
+        t_expr);
+      goto error;
+    }
   }
   res = sdis_fluid_create(dev, &fluid_shader, data, sa_add(*media_ptr, 1));
   if (res != RES_OK) goto error;
@@ -1117,6 +1131,11 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   struct sdis_estimator_buffer* buf = NULL;
   struct sdis_camera* cam = NULL;
 
+  struct sdis_medium* dummy_fluid = NULL;
+  unsigned dummy_fluid_id = UINT_MAX;
+  struct sdis_medium* dummy_solid = NULL;
+  unsigned dummy_solid_id = UINT_MAX;
+
   struct htable_intface htable_interfaces;
   int htable_interfaces_initialised = 0;
   double pos[3] = { 0,0,0 };
@@ -1139,8 +1158,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
 
     switch (desc->type) {
     case DESC_BOUND_H_FOR_SOLID:
-      /* Create an external fluid */
       hbound_count++;
+      /* Create an external fluid */
       res = create_fluid(dev, 1, 1, prohibited, (mode & GREEN_MODE), 1,
         desc->d.h_boundary.T, &media, fluid_get_temperature,
         &desc->d.h_boundary.mat_id);
@@ -1155,6 +1174,27 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       if (res != RES_OK) goto error;
       break;
     case DESC_BOUND_T_FOR_SOLID:
+      tbound_count++;
+      ASSERT(desc->d.t_boundary.T != NULL);
+      res = compile_expr_to_fn(&desc->d.t_boundary.te_temperature,
+        desc->d.t_boundary.T, 1, NULL);
+      if (res != RES_OK) {
+        fprintf(stderr, "Invalid boundary temperature expression: %s\n",
+          desc->d.t_boundary.T);
+        goto error;
+      }
+      if (dummy_fluid) {
+        /* Reuse external dummy fluid */
+        desc->d.t_boundary.mat_id = dummy_fluid_id;
+      } else {
+        /* Create dummy fluid */
+        res = create_fluid(dev, 1, 1, prohibited, (mode & GREEN_MODE), 1, NULL,
+          &media, fluid_dont_get_temperature, &desc->d.t_boundary.mat_id);
+        if (res != RES_OK) goto error;
+        dummy_fluid = sa_last(media);
+        dummy_fluid_id = desc->d.t_boundary.mat_id;
+      }
+      break;
     case DESC_BOUND_T_FOR_FLUID:
       tbound_count++;
       ASSERT(desc->d.t_boundary.T != NULL);
@@ -1162,14 +1202,21 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         desc->d.t_boundary.T, 1, NULL);
       if (res != RES_OK) {
         fprintf(stderr, "Invalid boundary temperature expression: %s\n",
-          desc->d.h_boundary.T);
+          desc->d.t_boundary.T);
         goto error;
       }
-      /* Create an external solid */
-      res = create_solid(dev, 1, 1, 1, 1, prohibited, (mode & GREEN_MODE), 1,
-        NULL, NULL, &media, solid_dont_get_temperature, NULL,
-        &desc->d.t_boundary.mat_id);
-      if (res != RES_OK) goto error;
+      if (dummy_solid) {
+        /* Reuse external dummy solid */
+        desc->d.t_boundary.mat_id = dummy_solid_id;
+      } else {
+        /* Create dummy solid */
+        res = create_solid(dev, 1, 1, 1, 1, prohibited, (mode & GREEN_MODE), 1,
+          NULL, NULL, &media, solid_dont_get_temperature, NULL,
+          &desc->d.t_boundary.mat_id);
+        if (res != RES_OK) goto error;
+        dummy_solid = sa_last(media);
+        dummy_solid_id = desc->d.t_boundary.mat_id;
+      }
       break;
     case DESC_BOUND_F_FOR_SOLID:
       fbound_count++;
@@ -1178,14 +1225,20 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         desc->d.f_boundary.flux, 1, NULL);
       if (res != RES_OK) {
         fprintf(stderr, "Invalid boundary flux expression: %s\n",
-          desc->d.h_boundary.T);
+          desc->d.f_boundary.flux);
         goto error;
       }
-      /* Create an external solid */
-      res = create_solid(dev, 1, 1, 1, 1, prohibited, (mode & GREEN_MODE), 1,
-        NULL, NULL, &media, solid_dont_get_temperature, NULL,
-        &desc->d.f_boundary.mat_id);
-      if (res != RES_OK) goto error;
+      if (dummy_fluid) {
+        /* Reuse external dummy fluid */
+        desc->d.f_boundary.mat_id = dummy_fluid_id;
+      } else {
+        /* Create dummy fluid */
+        res = create_fluid(dev, 1, 1, prohibited, (mode & GREEN_MODE), 1, NULL,
+          &media, fluid_dont_get_temperature, &desc->d.f_boundary.mat_id);
+        if (res != RES_OK) goto error;
+        dummy_fluid = sa_last(media);
+        dummy_fluid_id = desc->d.f_boundary.mat_id;
+      }
       break;
     case DESC_SOLID_FLUID_CONNECT:
       sfconnect_count++;
@@ -1219,7 +1272,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         stardis->descriptions[i].d.fluid.rho,
         stardis->descriptions[i].d.fluid.cp,
         prohibited,
-        (mode & GREEN_MODE), 0,
+        (mode & GREEN_MODE),
+        0,
         stardis->descriptions[i].d.fluid.Tinit,
         &media,
         fluid_get_tinit,

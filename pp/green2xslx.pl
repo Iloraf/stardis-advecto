@@ -556,10 +556,12 @@ my @result_colnames = ('Estimate', 'Sigma');
 $model->write($model_current_line, 0, \@result_colnames, $title);
 $model_current_line++;
 $model->write_formula($model_current_line, 0, "AVERAGE(Samples!A2:A$samples_current_line)", $locked);
-$model->write_formula($model_current_line, 1, "STDEV(Samples!A2:A$samples_current_line)/SQRT($samples_current_line-1)", $locked);
+# Here we use STDEVP (Standard dev for a entire population) to remains coherent with stardis-solver
+# One could consider STDEV (Standard dev for a sampling of the population) more appropriate
+$model->write_formula($model_current_line, 1, "STDEVP(Samples!A2:A$samples_current_line)/SQRT($samples_current_line-1)", $locked);
 $model_current_line++;
-$model->write_comment($model_current_line, 0, $poly, start_row => $model_current_line, visible => 1, x_scale => 6);
 
+$model->write_string($model_current_line, 0, $poly);
 $workbook->close();
 
 print STDERR "$poly\n";

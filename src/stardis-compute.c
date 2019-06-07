@@ -16,6 +16,16 @@
 #define HTABLE_KEY unsigned
 #include <rsys/hash_table.h>
 
+#define HTABLE_NAME weigth
+#define HTABLE_DATA double
+#define HTABLE_KEY unsigned
+#include <rsys/hash_table.h>
+
+struct w_ctx {
+  struct description* desc;
+  struct htable_weigth weigths;
+};
+
 /* A type to limit variable use in tinyexpr expressions */
 enum var_prohibited_t {
   ALL_VARS_ALLOWED = 0,
@@ -908,8 +918,8 @@ print_power_term
   struct sdis_data* data = NULL;
   enum sdis_medium_type type;
   unsigned id;
-  struct description* desc = ctx;
-
+  struct w_ctx* w_ctx = ctx;
+  (void)w_ctx;
   CHK(mdm && ctx);
 
   data = sdis_medium_get_data(mdm);
@@ -930,8 +940,7 @@ print_power_term
   case SDIS_SOLID: {
     struct solid* d__ = sdis_data_get(data);
     id = d__->id;
-    desc = (struct description*)ctx + id;
-    ASSERT(id == desc->d.solid.solid_id);
+    ASSERT(id == w_ctx->desc[id].d.solid.solid_id);
     printf("\tS\t%u\t%g", id, power_term);
     break;
   }
@@ -941,7 +950,7 @@ print_power_term
 }
 
 static res_T
-print_flux_term
+get_flux_terms
   (struct sdis_interface* interf,
    const enum sdis_side side,
    const double flux_term,
@@ -950,28 +959,35 @@ print_flux_term
   struct sdis_data* data = NULL;
   struct intface* d__;
   unsigned id;
-  struct description* desc;
+  struct w_ctx* w_ctx = ctx;
+  res_T res = RES_OK;
 
   CHK(interf && ctx);
 
   data = sdis_interface_get_data(interf);
   d__ = sdis_data_get(data);
   id = (side == SDIS_FRONT) ? d__->front_boundary_id : d__->back_boundary_id;
-  desc = (struct description*)ctx + id;
 
-  switch (desc->type) {
+  switch (w_ctx->desc[id].type) {
   case DESC_BOUND_T_FOR_SOLID:
   case DESC_BOUND_T_FOR_FLUID:
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
     FATAL("Cannot have a flux term here.\n"); break;
-  case DESC_BOUND_F_FOR_SOLID:
-    ASSERT(id == desc->d.f_boundary.mat_id);
-    printf("\t%u\t%g", id, flux_term);
+  case DESC_BOUND_F_FOR_SOLID: {
+    double* w;
+    ASSERT(id == w_ctx->desc[id].d.f_boundary.mat_id);
+    w = htable_weigth_find(&w_ctx->weigths, &id);
+    if (w)
+      *w += flux_term;
+    else {
+      res = htable_weigth_set(&w_ctx->weigths, &id, &flux_term);
+    }
     break;
+  }
   default: FATAL("Unreachable code.\n"); break;
   }
-  return RES_OK;
+  return res;
 }
 
 static res_T
@@ -982,9 +998,10 @@ print_sample
   struct sdis_point pt = SDIS_POINT_NULL;
   struct sdis_data* data = NULL;
   enum sdis_medium_type type;
-  struct description* desc;
+  struct htable_weigth_iterator it, end;
   unsigned id;
   size_t pcount, fcount;
+  struct w_ctx* w_ctx = ctx;
   res_T res = RES_OK;
   CHK(path && ctx);
 
@@ -1008,20 +1025,19 @@ print_sample
     id = (pt.data.itfrag.fragment.side == SDIS_FRONT)
       ? d__->front_boundary_id : d__->back_boundary_id;
     ASSERT(id != UINT_MAX);
-    desc = (struct description*)ctx + id;
-    switch (desc->type) {
+    switch (w_ctx->desc[id].type) {
     case DESC_BOUND_T_FOR_SOLID:
     case DESC_BOUND_T_FOR_FLUID:
-      ASSERT(id == desc->d.t_boundary.mat_id);
+      ASSERT(id == w_ctx->desc[id].d.t_boundary.mat_id);
       printf("T\t%u", id);
       break;
     case DESC_BOUND_H_FOR_SOLID:
     case DESC_BOUND_H_FOR_FLUID:
-      ASSERT(id == desc->d.h_boundary.mat_id);
+      ASSERT(id == w_ctx->desc[id].d.h_boundary.mat_id);
       printf("H\t%u", id);
       break;
     case DESC_BOUND_F_FOR_SOLID:
-      ASSERT(id == desc->d.f_boundary.mat_id);
+      ASSERT(id == w_ctx->desc[id].d.f_boundary.mat_id);
       printf("X\t%u", id);
       break;
     default: FATAL("Unreachable code.\n"); break;
@@ -1033,13 +1049,12 @@ print_sample
     data = sdis_medium_get_data(pt.data.mdmvert.medium);
     if (pt.data.mdmvert.vertex.P[0] == INF) {
       /* Radiative output */
-      printf("R\t%u", (unsigned)sa_size(ctx));
+      printf("R\t%u", (unsigned)sa_size(w_ctx->desc));
     }
     else if (type == SDIS_FLUID) {
       struct fluid* d__ = sdis_data_get(data);
       id = d__->id;
-      desc = (struct description*)ctx + id;
-      ASSERT(id == desc->d.fluid.fluid_id);
+      ASSERT(id == w_ctx->desc[id].d.fluid.fluid_id);
       if (d__->is_outside)
         /* If outside the model and in a fluid with known temperature,
          * its a fluid attached to a H boundary */
@@ -1051,9 +1066,7 @@ print_sample
       struct solid* d__ = sdis_data_get(data);
       ASSERT(type == SDIS_SOLID);
       id = d__->id;
-      desc = (struct description*)ctx + id;
-      ASSERT(id == desc->d.solid.solid_id);
-      desc = (struct description*)ctx + id;
+      ASSERT(id == w_ctx->desc[id].d.solid.solid_id);
       ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
       printf("S\t%u", id);
     }
@@ -1064,17 +1077,24 @@ print_sample
   res = sdis_green_function_get_power_terms_count(path, &pcount);
   if (res != RES_OK) goto error;
 
-  res = sdis_green_function_get_flux_terms_count(path, &fcount);
+  htable_weigth_clear(&w_ctx->weigths);
+  res = sdis_green_path_for_each_flux_term(path, get_flux_terms, w_ctx);
   if (res != RES_OK) goto error;
+  fcount = htable_weigth_size_get(&w_ctx->weigths);
 
   printf("\t%zu\t%zu", pcount, fcount);
 
   res = sdis_green_path_for_each_power_term(path, print_power_term, ctx);
   if (res != RES_OK) goto error;
 
-  res = sdis_green_path_for_each_flux_term(path, print_flux_term, ctx);
-  if (res != RES_OK) goto error;
-
+  htable_weigth_begin(&w_ctx->weigths, &it);
+  htable_weigth_end(&w_ctx->weigths, &end);
+  while (!htable_weigth_iterator_eq(&it, &end)) {
+    double* w = htable_weigth_iterator_data_get(&it);
+    unsigned* k = htable_weigth_iterator_key_get(&it);
+    printf("\t%u\t%g", *k, *w);
+    htable_weigth_iterator_next(&it);
+  }
   printf("\n");
 
 error:
@@ -1484,6 +1504,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   if (mode & GREEN_MODE) {
     struct sdis_green_function* green = NULL;
     size_t ok_count, failed_count;
+    struct w_ctx w_ctx;
     ASSERT((mode & PROBE_COMPUTE)
       || (mode & BOUNDARY_COMPUTE) || (mode & MEDIUM_COMPUTE));
 
@@ -1670,7 +1691,14 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     printf("# end = end_type end_id; end_type = T | H | X | R | F | S\n");
     printf("# power_term_i = power_type_i power_id_i factor_i\n");
     printf("# flux_term_i = flux_id_i factor_i\n");
-    sdis_green_function_for_each_path(green, print_sample, stardis->descriptions);
+
+    w_ctx.desc = stardis->descriptions;
+    htable_weigth_init(NULL, &w_ctx.weigths);
+
+    res = sdis_green_function_for_each_path(green, print_sample, &w_ctx);
+    htable_weigth_release(&w_ctx.weigths);
+    if (res != RES_OK) goto error;
+
 
     printf("---END GREEN---\n");
 

@@ -1514,7 +1514,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       {
         /* Incoherent triangle description */
         fprintf(stderr, "Incoherent triangle description (%u)\n", i);
-        print_trg_as_obj(stderr, stardis->geometry.vertex, trg);
+        print_trg_as_obj(stderr, stardis->geometry.vertex, trg->indices.data);
         fprintf(stderr, "Front: ");
         if (!front_defined) fprintf(stderr, "undefined\n");
         else print_description(stderr, &stardis->descriptions[fd]);

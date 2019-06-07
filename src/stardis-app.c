@@ -631,11 +631,12 @@ read_triangles
     }
     if (*side_desc_ptr != UINT_MAX && *side_desc_ptr != desc_id) {
       /* Already described with a different description! */
-      fprintf(stderr, "Triangle %u %s with 2 different descriptions\n",
+      fprintf(stderr, "Triangle %u %s from file %s with 2 different descriptions\n",
         tri_index,
         (file_type == CONTENT_CONNECTION
-          ? "connection" : (current_side == SDIS_FRONT ? "front" : "back")));
-      print_trg_as_obj(stderr, (const struct vertex*)stl_desc->vertices, &tri);
+          ? "connection" : (current_side == SDIS_FRONT ? "front" : "back")),
+        stl_filename);
+      print_trg_as_obj(stderr, (const struct vertex*)stl_desc->vertices, stl_desc->indices + (3 * tri_index));
       return RES_BAD_ARG;
     }
     /* Everithing is OK: store description */

@@ -67,13 +67,13 @@ static INLINE void
 print_trg_as_obj
   (FILE* stream,
    const struct vertex* vertices,
-   const struct triangle* trg)
+   const unsigned* indices)
 {
-  ASSERT(stream && vertices && trg);
+  ASSERT(stream && vertices && indices);
   fprintf(stream, "v %.8f %.8f %.8f\nv %.8f %.8f %.8f\nv %.8f %.8f %.8f\nf 1 2 3\n",
-    SPLIT3(vertices[trg->indices.data[0]].xyz),
-    SPLIT3(vertices[trg->indices.data[1]].xyz),
-    SPLIT3(vertices[trg->indices.data[2]].xyz));
+    SPLIT3(vertices[indices[0]].xyz),
+    SPLIT3(vertices[indices[1]].xyz),
+    SPLIT3(vertices[indices[2]].xyz));
 }
 
 static INLINE char

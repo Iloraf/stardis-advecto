@@ -133,6 +133,7 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
   CHK_TOK(_strupr(strtok(line, " ")), "medium type");
   if (strcmp(tk, "SOLID") == 0) {
     desc->type = DESC_MAT_SOLID;
+    desc->d.solid = NULL_SOLID;
 
     CHK_TOK(strtok(NULL, " "), "medium name");
     if (strlen(tk) >= sizeof(desc->d.solid.name)) {
@@ -186,8 +187,6 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
     tk = strtok(NULL, "\"");
 
     /* Volumic Power is optional */
-    desc->d.solid.power = NULL;
-    desc->d.solid.has_power = 0;
     if (tk && *(tk + strspn(tk, " \t")) == '\0') {
       /* Depending of the number of spaces before '"' strtok should
        * be called once or twice */
@@ -202,6 +201,7 @@ parse_medium_line(char* line, char** stl_filename, struct description* desc)
   }
   else if (strcmp(tk, "FLUID") == 0) {
     desc->type = DESC_MAT_FLUID;
+    desc->d.fluid = NULL_FLUID;
 
     CHK_TOK(strtok(NULL, " "), "medium name");
     if (strlen(tk) >= sizeof(desc->d.fluid.name)) {
@@ -292,6 +292,7 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
 
   if (h_solid || h_fluid) {
     desc->type = h_solid ? DESC_BOUND_H_FOR_SOLID : DESC_BOUND_H_FOR_FLUID;
+    desc->d.h_boundary = NULL_HBOUND;
 
     CHK_TOK(strtok(NULL, " "), "boundary name");
     if (strlen(tk) >= sizeof(desc->d.h_boundary.name)) {
@@ -352,6 +353,7 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
   }
   else if (t_solid || t_fluid) {
     desc->type = t_solid ? DESC_BOUND_T_FOR_SOLID : DESC_BOUND_T_FOR_FLUID;
+    desc->d.t_boundary = NULL_TBOUND;
 
     CHK_TOK(strtok(NULL, " "), "boundary name");
     if (strlen(tk) >= sizeof(desc->d.t_boundary.name)) {
@@ -399,6 +401,7 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
   }
   else if (f_solid) {
     desc->type = DESC_BOUND_F_FOR_SOLID;
+    desc->d.f_boundary = NULL_FBOUND;
 
     CHK_TOK(strtok(NULL, " "), "boundary name");
     if (strlen(tk) >= sizeof(desc->d.f_boundary.name)) {
@@ -423,6 +426,7 @@ parse_boundary_line(char* line, char** stl_filename, struct description* desc)
   }
   else if (sf_connect) {
     desc->type = DESC_SOLID_FLUID_CONNECT;
+    desc->d.sf_connect = NULL_SFCONNECT;
 
     CHK_TOK(strtok(NULL, " "), "boundary name");
     if (strlen(tk) >= sizeof(desc->d.sf_connect.name)) {
@@ -508,7 +512,8 @@ read_vertices
       unsigned size;
       ASSERT(sz < UINT_MAX);
       size = (unsigned)sz;
-      htable_vertex_set(vertex2id, &vtx, &size);
+      res = htable_vertex_set(vertex2id, &vtx, &size);
+      if (res != RES_OK) return res;
       sa_push(geometry->vertex, vtx);
       sa_push(*id2id, size);
     }
@@ -608,7 +613,8 @@ read_triangles
       ASSERT(sz < UINT_MAX);
       id = (unsigned)sz;
       /* Store tri as described by stl_desc regardless of key order */
-      htable_triangle_set(triangle2id, &key, &id);
+      res = htable_triangle_set(triangle2id, &key, &id);
+      if (res != RES_OK) goto error;
       sa_push(geometry->triangle, tri);
     }
 
@@ -659,9 +665,17 @@ read_triangles
   else {
     sa_release(packed_indices);
     sa_release(packed_normals);
+    packed_indices = NULL;
+    packed_normals = NULL;
   }
 
+end:
+  sa_release(packed_indices);
+  sa_release(packed_normals);
+
   return res;
+  error:
+    goto end;
 }
 
 res_T
@@ -757,7 +771,8 @@ geometry_analyse
       desc_id = sz++;
       ASSERT(sz == sa_size(stardis->descriptions));
       /* Register new medium description */
-      htable_descriptions_set(&descriptions, &desc, &desc_id);
+      res = htable_descriptions_set(&descriptions, &desc, &desc_id);
+      if (res != RES_OK) goto error;
     } else {
       fprintf(stderr, "Duplicate media description found: deduplicated.\n");
       desc_id = *p_desc;
@@ -796,7 +811,8 @@ geometry_analyse
       desc_id = sz++;
       ASSERT(sz == sa_size(stardis->descriptions));
       /* Register new boundary description */
-      htable_descriptions_set(&descriptions, &desc, &desc_id);
+      res = htable_descriptions_set(&descriptions, &desc, &desc_id);
+      if (res != RES_OK) goto error;
     } else {
       fprintf(stderr, "Duplicate boundary description found: deduplicated.\n");
       desc_id = *p_desc;

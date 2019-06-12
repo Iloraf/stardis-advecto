@@ -1442,7 +1442,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
           }
           ext_id = connect->d.t_boundary.mat_id; /* External material id */
           ASSERT(ext_id < sa_size(media));
-          ASSERT(sdis_medium_get_type(media[ext_id]) == SDIS_SOLID);
+          ASSERT(sdis_medium_get_type(media[ext_id]) == SDIS_FLUID);
           connection_count++;
           boundary_count++;
           if (front_defined) {

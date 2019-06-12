@@ -1559,10 +1559,10 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     struct sdis_green_function* green = NULL;
     size_t ok_count, failed_count;
     struct w_ctx w_ctx;
-    ASSERT((mode & PROBE_COMPUTE)
+    ASSERT((mode & PROBE_COMPUTE) || (mode & PROBE_COMPUTE_ON_INTERFACE)
       || (mode & BOUNDARY_COMPUTE) || (mode & MEDIUM_COMPUTE));
 
-    if (mode & PROBE_COMPUTE) {
+    if (mode & PROBE_COMPUTE || mode & PROBE_COMPUTE_ON_INTERFACE) {
       double uv[2] = { 0,0 };
       size_t iprim = SIZE_MAX;
       /* Launch the probe simulation */
@@ -1789,7 +1789,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       /* Write the image */
       dump_image(buf);
     }
-    else if (mode & PROBE_COMPUTE) {
+    else if (mode & PROBE_COMPUTE || mode & PROBE_COMPUTE_ON_INTERFACE) {
       double uv[2] = { 0,0 };
       size_t iprim = SIZE_MAX;
       /* Launch the probe simulation */
@@ -1897,6 +1897,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
     }
     if (res != RES_OK) goto error;
     if (mode & PROBE_COMPUTE
+      || mode & PROBE_COMPUTE_ON_INTERFACE
       || mode & MEDIUM_COMPUTE
       || mode & BOUNDARY_COMPUTE) {
       /* Fetch the estimation data */
@@ -1906,6 +1907,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       /* Print the results */
       switch (mode & COMPUTE_MODES) {
       case PROBE_COMPUTE:
+      case PROBE_COMPUTE_ON_INTERFACE:
         printf("Temperature at t=[%g, %g, %g, %g] = %g +/- %g\n",
           pos[0], pos[1], pos[2], time[0],
           temperature.E, /* Expected value */

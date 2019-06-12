@@ -176,8 +176,9 @@ parse_args(const int argc, char** argv, struct args* args)
         break;
 
       case 'n': {
-        long long n = strtoll(optarg, NULL, 10);
-        if (n <= 0 || n > SIZE_MAX) {
+        unsigned long n;
+        res = cstr_to_ulong(optarg, &n);
+        if (res != RES_OK || n == 0) {
           res = RES_BAD_ARG;
           fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
           goto error;

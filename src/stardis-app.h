@@ -129,7 +129,7 @@ struct mat_fluid {
   char* Tinit;
 };
 #define NULL_FLUID__ { "", UINT_MAX, 0, 0, 0}
-static struct mat_fluid NULL_FLUID = NULL_FLUID__;
+static const struct mat_fluid NULL_FLUID = NULL_FLUID__;
 
 static void
 print_fluid(FILE* stream, const struct mat_fluid* f)
@@ -230,7 +230,7 @@ struct mat_solid {
   int has_power;
 };
 #define NULL_SOLID__ { "", UINT_MAX, 0, 0, 0, 0, NULL, NULL, 0}
-static struct mat_solid NULL_SOLID = NULL_SOLID__;
+static const struct mat_solid NULL_SOLID = NULL_SOLID__;
 
 static void
 print_solid(FILE* stream, const struct mat_solid* s)
@@ -369,7 +369,7 @@ struct h_boundary {
   int has_emissivity, has_hc;
 };
 #define NULL_HBOUND__ { "", UINT_MAX, 0, 0, 0, 0, NULL, 0, 0}
-static struct h_boundary NULL_HBOUND = NULL_HBOUND__;
+static const struct h_boundary NULL_HBOUND = NULL_HBOUND__;
 
 static void
 print_h_boundary
@@ -517,7 +517,7 @@ struct t_boundary {
   int has_hc;
 };
 #define NULL_TBOUND__ { "", UINT_MAX, NULL, NULL, 0, 0, 0}
-static struct t_boundary NULL_TBOUND = NULL_TBOUND__;
+static const struct t_boundary NULL_TBOUND = NULL_TBOUND__;
 
 static void
 print_t_boundary
@@ -645,7 +645,7 @@ struct f_boundary {
   struct te_expr* te_flux;
 };
 #define NULL_FBOUND__ { "", UINT_MAX, NULL, NULL}
-static struct f_boundary NULL_FBOUND = NULL_FBOUND__;
+static const struct f_boundary NULL_FBOUND = NULL_FBOUND__;
 
 static void
 print_f_boundary
@@ -727,7 +727,7 @@ struct solid_fluid_connect {
   int has_emissivity, has_hc;
 };
 #define NULL_SFCONNECT__ { "", 0, 0, 0, 0, 0, 0}
-static struct solid_fluid_connect NULL_SFCONNECT = NULL_SFCONNECT__;
+static const struct solid_fluid_connect NULL_SFCONNECT = NULL_SFCONNECT__;
 
 static char
 eq_sf_connect(const struct solid_fluid_connect* a, const struct solid_fluid_connect* b)

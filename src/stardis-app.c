@@ -959,9 +959,11 @@ stardis_release(struct stardis* stardis)
     case DESC_MAT_SOLID:
       free(desc->d.solid.power);
       free(desc->d.solid.Tinit);
+      free(desc->d.solid.Temp);
       break;
     case DESC_MAT_FLUID:
       free(desc->d.fluid.Tinit);
+      free(desc->d.fluid.Temp);
       break;
     case DESC_BOUND_H_FOR_SOLID:
     case DESC_BOUND_H_FOR_FLUID:

@@ -127,17 +127,20 @@ struct mat_fluid {
   double rho;
   double cp;
   char* Tinit;
+  char* Temp;
 };
-#define NULL_FLUID__ { "", UINT_MAX, 0, 0, 0}
+#define NULL_FLUID__ { "", UINT_MAX, 0, 0, NULL, NULL }
 static const struct mat_fluid NULL_FLUID = NULL_FLUID__;
 
 static void
 print_fluid(FILE* stream, const struct mat_fluid* f)
 {
   ASSERT(stream && f);
-  fprintf(stream,
-    "Fluid '%s': cp=%g rho=%g Tinit='%s'\n",
-    f->name, f->cp, f->rho, f->Tinit);
+  fprintf(stream, "Fluid '%s': cp=%g rho=%g",
+    f->name, f->cp, f->rho);
+  if (f->Tinit) fprintf(stream, " Tinit='%s'", f->Tinit);
+  if (f->Temp) fprintf(stream, " Temp='%s'", f->Temp);
+  fprintf(stream, "\n");
 }
 
 static char
@@ -147,7 +150,8 @@ eq_fluid(const struct mat_fluid* a, const struct mat_fluid* b)
     || a->fluid_id != b->fluid_id
     || a->rho != b->rho
     || a->cp != b->cp
-    || strcmp(a->Tinit, b->Tinit))
+    || strcmp(a->Tinit, b->Tinit)
+    || strcmp(a->Temp, b->Temp))
     return 0;
   return 1;
 }
@@ -179,8 +183,16 @@ hash_fluid(const struct mat_fluid* key)
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->cp)[i]);
     hash = hash * FNV32_PRIME;
   }
-  FOR_EACH(i, 0, strlen(key->Tinit) * sizeof(*key->Tinit)) {
+  hash = hash ^ (uint32_t)((unsigned char)(key->Tinit == 0));
+  hash = hash * FNV32_PRIME;
+  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit) * sizeof(*key->Tinit) : 0) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Tinit)[i]);
+    hash = hash * FNV32_PRIME;
+  }
+  hash = hash ^ (uint32_t)((unsigned char)(key->Temp == 0));
+  hash = hash * FNV32_PRIME;
+  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Temp)[i]);
     hash = hash * FNV32_PRIME;
   }
   return hash;
@@ -208,8 +220,16 @@ hash_fluid(const struct mat_fluid* key)
     hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->cp)[i]);
     hash = hash * FNV64_PRIME;
   }
-  FOR_EACH(i, 0, strlen(key->Tinit)*sizeof(*key->Tinit)) {
+  hash = hash ^ (uint64_t)((unsigned char)(key->Tinit == 0));
+  hash = hash * FNV64_PRIME;
+  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit)*sizeof(*key->Tinit) : 0) {
     hash = hash ^ (uint64_t)((unsigned char) ((const char*)key->Tinit)[i]);
+    hash = hash * FNV64_PRIME;
+  }
+  hash = hash ^ (uint64_t)((unsigned char)(key->Temp == 0));
+  hash = hash * FNV64_PRIME;
+  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)key->Temp)[i]);
     hash = hash * FNV64_PRIME;
   }
   return hash;
@@ -226,10 +246,11 @@ struct mat_solid {
   double cp;
   double delta;
   char* Tinit;
+  char* Temp;
   char* power;
   int has_power;
 };
-#define NULL_SOLID__ { "", UINT_MAX, 0, 0, 0, 0, NULL, NULL, 0}
+#define NULL_SOLID__ { "", UINT_MAX, 0, 0, 0, 0, NULL, NULL, NULL, 0}
 static const struct mat_solid NULL_SOLID = NULL_SOLID__;
 
 static void
@@ -237,9 +258,12 @@ print_solid(FILE* stream, const struct mat_solid* s)
 {
   ASSERT(stream && s);
   fprintf(stream,
-    "Solid '%s': lambda=%g cp=%g rho=%g delta=%g Tinit='%s' Power='%s'\n",
+    "Solid '%s': lambda=%g cp=%g rho=%g delta=%g Power='%s'",
     s->name, s->lambda, s->cp, s->rho, s->delta,
-    s->Tinit, (s->has_power ? s->power : "0"));
+    (s->has_power ? s->power : "0"));
+  if (s->Tinit) fprintf(stream, " Tinit='%s'", s->Tinit);
+  if (s->Temp) fprintf(stream, " Temp='%s'", s->Temp);
+  fprintf(stream, "\n");
 }
 
 static char
@@ -252,6 +276,7 @@ eq_solid(const struct mat_solid* a, const struct mat_solid* b)
     || a->cp != b->cp
     || a->delta != b->delta
     || strcmp(a->Tinit, b->Tinit)
+    || strcmp(a->Temp, b->Temp)
     || a->has_power != b->has_power)
     return 0;
   if (a->has_power && a->power != b->power) return 0;
@@ -292,9 +317,17 @@ hash_solid(const struct mat_solid* key)
   FOR_EACH(i, 0, sizeof(key->delta)) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->delta)[i]);
     hash = hash * FNV32_PRIME;
-}
-  FOR_EACH(i, 0, strlen(key->Tinit) * sizeof(*key->Tinit)) {
+  }
+  hash = hash ^ (uint32_t)((unsigned char)(key->Tinit == 0));
+  hash = hash * FNV32_PRIME;
+  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit) * sizeof(*key->Tinit) : 0) {
     hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Tinit)[i]);
+    hash = hash * FNV32_PRIME;
+  }
+  hash = hash ^ (uint32_t)((unsigned char)(key->Temp == 0));
+  hash = hash * FNV32_PRIME;
+  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Temp)[i]);
     hash = hash * FNV32_PRIME;
   }
   FOR_EACH(i, 0, sizeof(key->has_power)) {
@@ -339,8 +372,16 @@ hash_solid(const struct mat_solid* key)
     hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->delta)[i]);
     hash = hash * FNV64_PRIME;
   }
-  FOR_EACH(i, 0, strlen(key->Tinit) * sizeof(*key->Tinit)) {
+  hash = hash ^ (uint64_t)((unsigned char)(key->Tinit == 0));
+  hash = hash * FNV64_PRIME;
+  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit) * sizeof(*key->Tinit) : 0) {
     hash = hash ^ (uint64_t)((unsigned char)((const char*)key->Tinit)[i]);
+    hash = hash * FNV64_PRIME;
+  }
+  hash = hash ^ (uint64_t)((unsigned char)(key->Temp == 0));
+  hash = hash * FNV64_PRIME;
+  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)key->Temp)[i]);
     hash = hash * FNV64_PRIME;
   }
   FOR_EACH(i, 0, sizeof(key->has_power)) {

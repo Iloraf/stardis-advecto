@@ -29,15 +29,16 @@ struct w_ctx {
 /* A type to limit variable use in tinyexpr expressions */
 enum var_prohibited_t {
   ALL_VARS_ALLOWED = 0,
-  T_PROHIBITED = BIT(1),
-  XYZ_PROHIBITED = BIT(2)
+  T_PROHIBITED = BIT(4),
+  XYZ_PROHIBITED = BIT(5),
+  NO_VAR_ALLOWED = T_PROHIBITED | XYZ_PROHIBITED
 };
 
 static void
 geometry_get_position
-(const size_t ivert, 
- double pos[3],
- void* context)
+  (const size_t ivert, 
+   double pos[3],
+   void* context)
 {
   struct geometry* geom = context;
   pos[0] = geom->vertex[ivert].xyz[0];
@@ -47,9 +48,9 @@ geometry_get_position
 
 static void
 geometry_get_indices
-(const size_t itri,
- size_t ids[3],
- void* context)
+  (const size_t itri,
+   size_t ids[3],
+   void* context)
 {
   struct geometry* geom = context;
   ids[0] = geom->triangle[itri].indices.data[0];
@@ -59,9 +60,9 @@ geometry_get_indices
 
 static void
 geometry_get_interface
-(const size_t itri, 
- struct sdis_interface** interf, 
- void* context)
+  (const size_t itri, 
+   struct sdis_interface** interf, 
+   void* context)
 {
   struct geometry* geom = context;
   *interf = geom->interf_bytrg[itri];
@@ -71,7 +72,7 @@ static res_T
 compile_expr_to_fn
   (struct te_expr** f,
    const char* math_expr,
-   const enum var_prohibited_t prohibited,
+   const int prohibited,
    int* is_zero)
 {
   te_variable vars[4] = {
@@ -82,13 +83,22 @@ compile_expr_to_fn
   };
   int fst = 0, lst = 4;
   ASSERT(math_expr);
+  ASSERT(prohibited == (prohibited & NO_VAR_ALLOWED)); /* Use only defined flags */
   if (prohibited & XYZ_PROHIBITED) fst = 3;
   if(prohibited & T_PROHIBITED) lst = 3;
   *f = te_compile(math_expr, vars+fst, lst-fst, NULL);
   if (!*f) {
     if ((prohibited != ALL_VARS_ALLOWED)
       && te_compile(math_expr, vars, 4, NULL))
-      fprintf(stderr, "Expression %s use a probibited variable.\n", math_expr);
+      fprintf(stderr, "Expression %s use a probibited variable ", math_expr);
+    if (prohibited == NO_VAR_ALLOWED)
+      fprintf(stderr, "(no variable allowed)\n");
+    else if (prohibited == XYZ_PROHIBITED)
+      fprintf(stderr, "(xyz prohibited)\n");
+    else {
+      ASSERT(prohibited == T_PROHIBITED);
+      fprintf(stderr, "(t prohibited)\n");
+    }
     return RES_BAD_ARG;
   }
   if (is_zero) *is_zero = !((*f)->type == TE_CONSTANT && (*f)->v.value == 0);
@@ -99,13 +109,15 @@ compile_expr_to_fn
  * Fluid data
  ******************************************************************************/
 struct fluid {
+  char name[32];
   double cp; /* Calorific capacity */
   double rho; /* Volumic mass */
   /* Compute mode */
   int is_green, is_outside;
   double t0;
   /* TinyExpr stuff to compute temperature */
-  struct te_expr *temperature;
+  struct te_expr *temp;
+  struct te_expr *t_init;
   /* ID */
   unsigned id;
 };
@@ -133,41 +145,47 @@ fluid_get_temperature
   (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct fluid* fluid_props = sdis_data_cget(data);
-  return te_eval(fluid_props->temperature, vtx);
-}
-
-static double
-fluid_dont_get_temperature
-  (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
-{
-  (void)vtx; (void)data;
-  fflush(stdout);
-  fflush(stderr);
-  FATAL("fluid_dont_get_temperature: path went to a non-existing medium\n");
-}
-
-static double
-fluid_get_tinit
-(const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
-{
-  const struct fluid* fluid_props = sdis_data_cget(data);
-  if (fluid_props->is_green || vtx->time > fluid_props->t0) {
-    return -1;
+  char msg[128];
+  ASSERT(fluid_props->t_init || fluid_props->temp);
+  if (vtx->time <= fluid_props->t0) {
+    if (!fluid_props->t_init) {
+      if (fluid_props->name[0])
+        sprintf(msg,
+          "fluid_get_temperature: getting undefined Tinit (fluid '%s')\n",
+          fluid_props->name);
+      else
+        sprintf(msg, "fluid_get_temperature: getting undefined Tinit\n");
+      FATAL(msg);
+    }
+    if (fluid_props->is_green) {
+      if (fluid_props->name[0])
+        sprintf(msg,
+          "fluid_get_temperature: getting Tinit in green mode (fluid '%s')\n",
+          fluid_props->name);
+      else
+        sprintf(msg, "fluid_get_temperature: getting Tinit in green mode\n");
+      FATAL(msg);
+    }
+    return te_eval(fluid_props->t_init, vtx);
   }
-  return te_eval(fluid_props->temperature, vtx);
+  if (fluid_props->temp)
+    return te_eval(fluid_props->temp, vtx);
+  else return -1;
 }
 
 static void
 release_fluid_data(void* f)
 {
   struct fluid* fluid = (struct fluid*)f;
-  te_free(fluid->temperature);
+  te_free(fluid->t_init);
+  te_free(fluid->temp);
 }
 
 /*******************************************************************************
  * Solid data
  ******************************************************************************/
 struct solid {
+  char name[32];
   double cp; /* Calorific capacity */
   double lambda; /* Conductivity */
   double rho; /* Volumic mass */
@@ -176,6 +194,7 @@ struct solid {
   int is_green, is_outside;
   double t0;
   /* TinyExpr stuff to compute temperature & power */
+  struct te_expr *temp;
   struct te_expr *t_init;
   struct te_expr *power;
   /* ID */
@@ -232,32 +251,35 @@ solid_get_delta_boundary
 #endif
 
 static double
-solid_dont_get_temperature
-(const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
-{
-  (void)vtx; (void)data;
-  fflush(stdout);
-  fflush(stderr);
-  FATAL("solid_dont_get_temperature: path went to a non-existing medium\n");
-}
-
-static double
 solid_get_temperature
 (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct solid* solid_props = sdis_data_cget(data);
-  return te_eval(solid_props->t_init, vtx);
-}
-
-static double
-solid_get_tinit
-(const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
-{
-  const struct solid* solid_props = sdis_data_cget(data);
-  if (solid_props->is_green || vtx->time > solid_props->t0) {
-    return -1;
+  char msg[128];
+  ASSERT(solid_props->t_init || solid_props->temp);
+  if (vtx->time <= solid_props->t0) {
+    if (!solid_props->t_init) {
+      if (solid_props->name[0])
+        sprintf(msg,
+          "solid_get_temperature: getting undefined Tinit (solid '%s')\n",
+          solid_props->name);
+      else
+        sprintf(msg, "solid_get_temperature: getting undefined Tinit\n");
+      FATAL(msg);
+    }
+    if (solid_props->is_green) {
+      if (solid_props->name[0])
+        sprintf(msg,
+          "solid_get_temperature: getting Tinit in green mode (solid '%s')\n",
+          solid_props->name);
+      else
+        sprintf(msg, "solid_get_temperature: getting Tinit in green mode\n");
+      FATAL(msg);
+    }
   }
-  return te_eval(solid_props->t_init, vtx);
+  if (solid_props->temp)
+    return te_eval(solid_props->t_init, vtx);
+  else return -1;
 }
 
 static double
@@ -579,26 +601,28 @@ hash_desc(struct int_descs const* key)
 static res_T
 create_fluid
   (struct sdis_device* dev,
+   const char* name,
    const double rho,
    const double cp,
-   const enum var_prohibited_t prohibited,
    const int is_green,
    const int is_outside,
+   const char* tinit_expr,
    const char* t_expr,
    struct sdis_medium*** media_ptr,
-   sdis_medium_getter_T get_temp,
    unsigned* out_id)
 {
+  res_T res = RES_OK;
   struct sdis_fluid_shader fluid_shader = SDIS_FLUID_SHADER_NULL;
   struct sdis_data* data = NULL;
   struct fluid* fluid_props;
   size_t sz;
-  res_T res = RES_OK;
+  /* Could be less restrictive if green output included positions/dates */
+  int prohibited = is_green ? NO_VAR_ALLOWED : ALL_VARS_ALLOWED;
 
   ASSERT(dev && rho >= 0 && cp >= 0 && media_ptr && out_id);
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
   fluid_shader.volumic_mass = fluid_get_volumic_mass;
-  fluid_shader.temperature = get_temp;
+  fluid_shader.temperature = fluid_get_temperature;
   res = sdis_data_create(dev, sizeof(struct fluid), ALIGNOF(struct fluid),
     release_fluid_data, &data);
   if (res != RES_OK) goto error;
@@ -606,18 +630,30 @@ create_fluid
   sz = sa_size(*media_ptr);
   ASSERT(sz < INT_MAX);
   fluid_props = sdis_data_get(data); /* Fetch the allocated memory space */
+  if (name) strncpy(fluid_props->name, name, sizeof(fluid_props->name));
+  else fluid_props->name[0] = '\0';
   fluid_props->cp = cp;
   fluid_props->rho = rho;
-  fluid_props->temperature = NULL;
+  fluid_props->t_init = NULL;
+  fluid_props->temp = NULL;
   fluid_props->is_green = is_green;
   fluid_props->is_outside = is_outside;
   fluid_props->t0 = 0;
   fluid_props->id = (unsigned)sz;
 
-  if (t_expr) {
-    res = compile_expr_to_fn(&fluid_props->temperature, t_expr, prohibited, NULL);
+  if (tinit_expr) {
+    res = compile_expr_to_fn(&fluid_props->t_init, tinit_expr,
+      prohibited | T_PROHIBITED, NULL);
     if (res != RES_OK) {
       fprintf(stderr, "Invalid initial temperature expression: %s\n",
+        t_expr);
+      goto error;
+    }
+  }
+  if (t_expr) {
+    res = compile_expr_to_fn(&fluid_props->temp, t_expr, prohibited, NULL);
+    if (res != RES_OK) {
+      fprintf(stderr, "Invalid temperature expression: %s\n",
         t_expr);
       goto error;
     }
@@ -636,28 +672,30 @@ error:
 static res_T
 create_solid
   (struct sdis_device* dev,
+   const char* name,
    const double lambda,
    const double rho,
    const double cp,
    const double delta,
-   const enum var_prohibited_t prohibited,
    const int is_green,
    const int is_outside,
+   const char* tinit_expr, /* Can be NULL if not used by getter */
    const char* t_expr, /* Can be NULL if not used by getter */
    const char* power_expr, /* Can be NULL */
    struct sdis_medium*** media_ptr,
-   sdis_medium_getter_T get_temp,
    int* out_has_power, /* Can be NULL */
    unsigned* out_id)
 {
+  res_T res = RES_OK;
   struct sdis_solid_shader solid_shader = SDIS_SOLID_SHADER_NULL;
   struct sdis_data* data = NULL;
   struct solid* solid_props;
   size_t sz;
-  res_T res = RES_OK;
+  /* Could be less restrictive if green output included positions/dates */
+  int prohibited = is_green ? NO_VAR_ALLOWED : ALL_VARS_ALLOWED;
 
   ASSERT(dev && lambda >= 0 && rho >= 0 && cp >= 0 && delta > 0
-    && media_ptr && get_temp && out_id);
+    && media_ptr && out_id);
   solid_shader.calorific_capacity = solid_get_calorific_capacity;
   solid_shader.thermal_conductivity = solid_get_thermal_conductivity;
   solid_shader.volumic_mass = solid_get_volumic_mass;
@@ -665,7 +703,7 @@ create_solid
 #if Stardis_VERSION_MINOR == 3
   solid_shader.delta_boundary = solid_get_delta_boundary;
 #endif
-  solid_shader.temperature = get_temp;
+  solid_shader.temperature = solid_get_temperature;
   res = sdis_data_create(dev, sizeof(struct solid), ALIGNOF(struct solid),
     release_solid_data, &data);
   if (res != RES_OK) goto error;
@@ -673,27 +711,39 @@ create_solid
   sz = sa_size(*media_ptr);
   ASSERT(sz < INT_MAX);
   solid_props = sdis_data_get(data); /* Fetch the allocated memory space */
+  if (name) strncpy(solid_props->name, name, sizeof(solid_props->name));
+  else solid_props->name[0] = '\0';
   solid_props->lambda = lambda;
   solid_props->rho = rho;
   solid_props->cp = cp;
   solid_props->delta = delta;
   solid_props->t_init = NULL;
+  solid_props->temp = NULL;
   solid_props->power = NULL;
   solid_props->is_green = is_green;
   solid_props->is_outside = is_outside;
   solid_props->t0 = 0;
   solid_props->id = (unsigned)sz;
-  if (t_expr) {
-    res = compile_expr_to_fn(&solid_props->t_init, t_expr, prohibited, NULL);
+  if (tinit_expr) {
+    res = compile_expr_to_fn(&solid_props->t_init, tinit_expr,
+      prohibited | T_PROHIBITED, NULL);
     if (res != RES_OK) {
       fprintf(stderr, "Invalid initial temperature expression: %s\n",
         t_expr);
       goto error;
     }
   }
+  if (t_expr) {
+    res = compile_expr_to_fn(&solid_props->temp, t_expr, prohibited, NULL);
+    if (res != RES_OK) {
+      fprintf(stderr, "Invalid temperature expression: %s\n",
+        t_expr);
+      goto error;
+    }
+  }
   if (power_expr) {
     int has_power;
-    res = compile_expr_to_fn(&solid_props->power, power_expr, 1, &has_power);
+    res = compile_expr_to_fn(&solid_props->power, power_expr, prohibited, &has_power);
     if (res != RES_OK) {
       fprintf(stderr, "Invalid volumic power expression: %s\n",
         power_expr);
@@ -1151,33 +1201,29 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
   /* Create media and property holders found in descriptions */
   for (i = 0; i < sa_size(stardis->descriptions); ++i) {
     struct description* desc = stardis->descriptions + i;
-    /* Base prohibition; additional restrictions apply for media */
-    enum var_prohibited_t prohibited =
-      ((stardis->probe[3] < INF) | (mode & GREEN_MODE))
-      ? T_PROHIBITED : ALL_VARS_ALLOWED;
+    /* Could be less restrictive if green output included positions/dates */
+    int prohibited = (mode & GREEN_MODE) ? NO_VAR_ALLOWED : ALL_VARS_ALLOWED;
 
     switch (desc->type) {
     case DESC_BOUND_H_FOR_SOLID:
       hbound_count++;
-      /* Create an external fluid */
-      res = create_fluid(dev, 1, 1, prohibited, (mode & GREEN_MODE), 1,
-        desc->d.h_boundary.T, &media, fluid_get_temperature,
-        &desc->d.h_boundary.mat_id);
+      /* Create an external fluid with bound temp as fluid temp */
+      res = create_fluid(dev, NULL, 1, 1, (mode & GREEN_MODE), 1, NULL,
+        desc->d.h_boundary.T, &media, &desc->d.h_boundary.mat_id);
       if (res != RES_OK) goto error;
       break;
     case DESC_BOUND_H_FOR_FLUID:
-      /* Create an external solid */
+      /* Create an external solid with bound temp as solid temp */
       hbound_count++;
-      res = create_solid(dev, INF, 1, 1, 1, prohibited, (mode & GREEN_MODE), 1,
-        desc->d.h_boundary.T, NULL, &media, solid_get_temperature, NULL,
-        &desc->d.h_boundary.mat_id);
+      res = create_solid(dev, NULL, INF, 1, 1, 1, (mode & GREEN_MODE), 1, NULL,
+        desc->d.h_boundary.T, NULL, &media, NULL, &desc->d.h_boundary.mat_id);
       if (res != RES_OK) goto error;
       break;
     case DESC_BOUND_T_FOR_SOLID:
       tbound_count++;
       ASSERT(desc->d.t_boundary.T != NULL);
       res = compile_expr_to_fn(&desc->d.t_boundary.te_temperature,
-        desc->d.t_boundary.T, 1, NULL);
+        desc->d.t_boundary.T, prohibited, NULL);
       if (res != RES_OK) {
         fprintf(stderr, "Invalid boundary temperature expression: %s\n",
           desc->d.t_boundary.T);
@@ -1188,8 +1234,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         desc->d.t_boundary.mat_id = dummy_fluid_id;
       } else {
         /* Create dummy fluid */
-        res = create_fluid(dev, 1, 1, prohibited, (mode & GREEN_MODE), 1, NULL,
-          &media, fluid_dont_get_temperature, &desc->d.t_boundary.mat_id);
+        res = create_fluid(dev, NULL, 1, 1, (mode & GREEN_MODE), 1, NULL,
+          NULL, &media, &desc->d.t_boundary.mat_id);
         if (res != RES_OK) goto error;
         dummy_fluid = sa_last(media);
         dummy_fluid_id = desc->d.t_boundary.mat_id;
@@ -1199,7 +1245,7 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       tbound_count++;
       ASSERT(desc->d.t_boundary.T != NULL);
       res = compile_expr_to_fn(&desc->d.t_boundary.te_temperature,
-        desc->d.t_boundary.T, 1, NULL);
+        desc->d.t_boundary.T, prohibited, NULL);
       if (res != RES_OK) {
         fprintf(stderr, "Invalid boundary temperature expression: %s\n",
           desc->d.t_boundary.T);
@@ -1210,9 +1256,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         desc->d.t_boundary.mat_id = dummy_solid_id;
       } else {
         /* Create dummy solid */
-        res = create_solid(dev, 1, 1, 1, 1, prohibited, (mode & GREEN_MODE), 1,
-          NULL, NULL, &media, solid_dont_get_temperature, NULL,
-          &desc->d.t_boundary.mat_id);
+        res = create_solid(dev, NULL, 1, 1, 1, 1, (mode & GREEN_MODE), 1, NULL,
+          NULL, NULL, &media, NULL, &desc->d.t_boundary.mat_id);
         if (res != RES_OK) goto error;
         dummy_solid = sa_last(media);
         dummy_solid_id = desc->d.t_boundary.mat_id;
@@ -1233,8 +1278,8 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
         desc->d.f_boundary.mat_id = dummy_fluid_id;
       } else {
         /* Create dummy fluid */
-        res = create_fluid(dev, 1, 1, prohibited, (mode & GREEN_MODE), 1, NULL,
-          &media, fluid_dont_get_temperature, &desc->d.f_boundary.mat_id);
+        res = create_fluid(dev, NULL, 1, 1, (mode & GREEN_MODE), 1, NULL, NULL,
+          &media, &desc->d.f_boundary.mat_id);
         if (res != RES_OK) goto error;
         dummy_fluid = sa_last(media);
         dummy_fluid_id = desc->d.f_boundary.mat_id;
@@ -1249,36 +1294,36 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode)
       break;
     case DESC_MAT_SOLID:
       smed_count++;
-      if (mode & GREEN_MODE) prohibited |= T_PROHIBITED | XYZ_PROHIBITED;
       res = create_solid(dev,
+        stardis->descriptions[i].d.solid.name,
         stardis->descriptions[i].d.solid.lambda,
         stardis->descriptions[i].d.solid.rho,
         stardis->descriptions[i].d.solid.cp,
         stardis->descriptions[i].d.solid.delta,
-        prohibited,
-        (mode & GREEN_MODE), 0,
+        (mode & GREEN_MODE),
+        0,
         stardis->descriptions[i].d.solid.Tinit,
+        stardis->descriptions[i].d.solid.Temp,
         stardis->descriptions[i].d.solid.power,
         &media,
-        solid_get_tinit,
         &stardis->descriptions[i].d.solid.has_power,
         &desc->d.solid.solid_id);
       if (res != RES_OK) goto error;
       break;
     case DESC_MAT_FLUID:
       fmed_count++;
-      if (mode & GREEN_MODE) prohibited |= T_PROHIBITED | XYZ_PROHIBITED;
       res = create_fluid(dev,
+        stardis->descriptions[i].d.fluid.name,
         stardis->descriptions[i].d.fluid.rho,
         stardis->descriptions[i].d.fluid.cp,
-        prohibited,
         (mode & GREEN_MODE),
         0,
         stardis->descriptions[i].d.fluid.Tinit,
+        stardis->descriptions[i].d.fluid.Temp,
         &media,
-        fluid_get_tinit,
         &desc->d.fluid.fluid_id);
       if (res != RES_OK) goto error;
+
       break;
     default: FATAL("Invalid type.\n");
     }

@@ -147,7 +147,7 @@ fluid_get_temperature
   const struct fluid* fluid_props = sdis_data_cget(data);
   char msg[128];
   ASSERT(fluid_props->t_init || fluid_props->temp);
-  if (vtx->time <= fluid_props->t0) {
+  if (!fluid_props->is_green && vtx->time <= fluid_props->t0) {
     if (!fluid_props->t_init) {
       if (fluid_props->name[0])
         sprintf(msg,
@@ -155,15 +155,6 @@ fluid_get_temperature
           fluid_props->name);
       else
         sprintf(msg, "fluid_get_temperature: getting undefined Tinit\n");
-      FATAL(msg);
-    }
-    if (fluid_props->is_green) {
-      if (fluid_props->name[0])
-        sprintf(msg,
-          "fluid_get_temperature: getting Tinit in green mode (fluid '%s')\n",
-          fluid_props->name);
-      else
-        sprintf(msg, "fluid_get_temperature: getting Tinit in green mode\n");
       FATAL(msg);
     }
     return te_eval(fluid_props->t_init, vtx);
@@ -252,12 +243,12 @@ solid_get_delta_boundary
 
 static double
 solid_get_temperature
-(const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
+  (const struct sdis_rwalk_vertex* vtx, struct sdis_data* data)
 {
   const struct solid* solid_props = sdis_data_cget(data);
   char msg[128];
   ASSERT(solid_props->t_init || solid_props->temp);
-  if (vtx->time <= solid_props->t0) {
+  if (!solid_props->is_green && vtx->time <= solid_props->t0) {
     if (!solid_props->t_init) {
       if (solid_props->name[0])
         sprintf(msg,
@@ -265,15 +256,6 @@ solid_get_temperature
           solid_props->name);
       else
         sprintf(msg, "solid_get_temperature: getting undefined Tinit\n");
-      FATAL(msg);
-    }
-    if (solid_props->is_green) {
-      if (solid_props->name[0])
-        sprintf(msg,
-          "solid_get_temperature: getting Tinit in green mode (solid '%s')\n",
-          solid_props->name);
-      else
-        sprintf(msg, "solid_get_temperature: getting Tinit in green mode\n");
       FATAL(msg);
     }
   }

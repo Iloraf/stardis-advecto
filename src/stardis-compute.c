@@ -147,21 +147,23 @@ fluid_get_temperature
   const struct fluid* fluid_props = sdis_data_cget(data);
   char msg[128];
   ASSERT(fluid_props->t_init || fluid_props->temp);
-  if (!fluid_props->is_green && vtx->time <= fluid_props->t0) {
-    if (!fluid_props->t_init) {
-      if (fluid_props->name[0])
-        sprintf(msg,
-          "fluid_get_temperature: getting undefined Tinit (fluid '%s')\n",
-          fluid_props->name);
-      else
-        sprintf(msg, "fluid_get_temperature: getting undefined Tinit\n");
-      FATAL(msg);
-    }
-    return te_eval(fluid_props->t_init, vtx);
+  if (fluid_props->is_green || vtx->time > fluid_props->t0) {
+    /* Always use temp for Green mode, regardless of time */
+    if (fluid_props->temp)
+      return te_eval(fluid_props->temp, vtx);
+    else return -1;
   }
-  if (fluid_props->temp)
-    return te_eval(fluid_props->temp, vtx);
-  else return -1;
+  /* Time is t0: use t_init */
+  if (fluid_props->t_init)
+    return te_eval(fluid_props->t_init, vtx);
+  /* Must have had t_init defined: error! */
+  if (fluid_props->name[0])
+    sprintf(msg,
+      "fluid_get_temperature: getting undefined Tinit (fluid '%s')\n",
+      fluid_props->name);
+  else
+    sprintf(msg, "fluid_get_temperature: getting undefined Tinit\n");
+  FATAL(msg);
 }
 
 static void
@@ -248,20 +250,23 @@ solid_get_temperature
   const struct solid* solid_props = sdis_data_cget(data);
   char msg[128];
   ASSERT(solid_props->t_init || solid_props->temp);
-  if (!solid_props->is_green && vtx->time <= solid_props->t0) {
-    if (!solid_props->t_init) {
-      if (solid_props->name[0])
-        sprintf(msg,
-          "solid_get_temperature: getting undefined Tinit (solid '%s')\n",
-          solid_props->name);
-      else
-        sprintf(msg, "solid_get_temperature: getting undefined Tinit\n");
-      FATAL(msg);
-    }
+  if (solid_props->is_green || vtx->time > solid_props->t0) {
+    /* Always use temp for Green mode, regardless of time */
+    if (solid_props->temp)
+      return te_eval(solid_props->temp, vtx);
+    else return -1;
   }
-  if (solid_props->temp)
+  /* Time is t0: use t_init */
+  if (solid_props->t_init)
     return te_eval(solid_props->t_init, vtx);
-  else return -1;
+  /* Must have had t_init defined: error! */
+  if (solid_props->name[0])
+    sprintf(msg,
+      "solid_get_temperature: getting undefined Tinit (solid '%s')\n",
+      solid_props->name);
+  else
+    sprintf(msg, "solid_get_temperature: getting undefined Tinit\n");
+  FATAL(msg);
 }
 
 static double

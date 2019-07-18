@@ -3,6 +3,8 @@
 #ifndef STARDIS_APP_H
 #define STARDIS_APP_H
 
+#include "stardis-parsing.h"
+
 #include <star/sstl.h>
 #include <rsys/rsys.h>
 #include <rsys/float3.h>
@@ -10,7 +12,6 @@
 #include <rsys/hash_table.h>
 #include <sdis.h>
 #include <tinyexpr.h>
-#include "args.h"
 
 #define FREE_AARRAY(ARRAY) if (ARRAY) {\
   int i = 0; \
@@ -62,19 +63,6 @@ struct triangle {
 };
 #define NULL_TRIANGLE__ {{{0, 0, 0}}, UINT_MAX, UINT_MAX, UINT_MAX }
 static const struct triangle NULL_TRIANGLE = NULL_TRIANGLE__;
-
-static INLINE void
-print_trg_as_obj
-  (FILE* stream,
-   const struct vertex* vertices,
-   const unsigned* indices)
-{
-  ASSERT(stream && vertices && indices);
-  fprintf(stream, "v %.8f %.8f %.8f\nv %.8f %.8f %.8f\nv %.8f %.8f %.8f\nf 1 2 3\n",
-    SPLIT3(vertices[indices[0]].xyz),
-    SPLIT3(vertices[indices[1]].xyz),
-    SPLIT3(vertices[indices[2]].xyz));
-}
 
 static INLINE char
 eq_indices(const struct unsigned3* a, const struct unsigned3* b)
@@ -159,44 +147,6 @@ eq_fluid(const struct mat_fluid* a, const struct mat_fluid* b)
 static size_t
 hash_fluid(const struct mat_fluid* key)
 {
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->fluid_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->fluid_id)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->rho)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->rho)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->cp)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->cp)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  hash = hash ^ (uint32_t)((unsigned char)(key->Tinit == 0));
-  hash = hash * FNV32_PRIME;
-  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit) * sizeof(*key->Tinit) : 0) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Tinit)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  hash = hash ^ (uint32_t)((unsigned char)(key->Temp == 0));
-  hash = hash * FNV32_PRIME;
-  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Temp)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
     (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
@@ -233,9 +183,6 @@ hash_fluid(const struct mat_fluid* key)
     hash = hash * FNV64_PRIME;
   }
   return hash;
-#else
-#error "Unexpected architecture"
-#endif
 }
 
 struct mat_solid {
@@ -286,61 +233,6 @@ eq_solid(const struct mat_solid* a, const struct mat_solid* b)
 static size_t
 hash_solid(const struct mat_solid* key)
 {
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->solid_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->solid_id)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->lambda)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->lambda)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->rho)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->rho)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->cp)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->cp)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->delta)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->delta)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  hash = hash ^ (uint32_t)((unsigned char)(key->Tinit == 0));
-  hash = hash * FNV32_PRIME;
-  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit) * sizeof(*key->Tinit) : 0) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Tinit)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  hash = hash ^ (uint32_t)((unsigned char)(key->Temp == 0));
-  hash = hash * FNV32_PRIME;
-  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Temp)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_power)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_power)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  if (!key->has_power) return hash;
-  FOR_EACH(i, 0, strlen(key->Tinit) * sizeof(*key->power)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) key->power)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
     (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
@@ -394,9 +286,6 @@ hash_solid(const struct mat_solid* key)
     hash = hash * FNV64_PRIME;
   }
   return hash;
-#else
-#error "Unexpected architecture"
-#endif
 }
 
 struct h_boundary {
@@ -451,53 +340,6 @@ eq_h_boundary
 static size_t
 hash_h_boundary(const struct h_boundary* key)
 {
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->mat_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->emissivity)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->specular_fraction)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->specular_fraction)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, strlen(key->T) * sizeof(*key->T)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->T)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_emissivity)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->has_hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  if (!key->has_hc) return hash;
-  FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->hc_max)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
     (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
@@ -543,9 +385,6 @@ hash_h_boundary(const struct h_boundary* key)
     hash = hash * FNV64_PRIME;
   }
   return hash;
-#else
-#error "Unexpected architecture"
-#endif
 }
 
 struct t_boundary {
@@ -606,41 +445,6 @@ hash_t_boundary
 {
   (void)type;
   ASSERT(type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID);
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->mat_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->has_hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, strlen(key->T) * sizeof(*key->T)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) key->T)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  if (!key->has_hc) return hash;
-  FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc_max)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
     (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
@@ -674,9 +478,6 @@ hash_t_boundary
     hash = hash * FNV64_PRIME;
   }
   return hash;
-#else
-#error "Unexpected architecture"
-#endif
 }
 
 struct f_boundary {
@@ -712,28 +513,6 @@ eq_f_boundary(const struct f_boundary* a, const struct f_boundary* b)
 static size_t
 hash_f_boundary(const struct f_boundary* key)
 {
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->mat_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, strlen(key->flux) * sizeof(*key->flux)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->flux)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
     (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
@@ -754,9 +533,6 @@ hash_f_boundary(const struct f_boundary* key)
     hash = hash * FNV64_PRIME;
   }
   return hash;
-#else
-#error "Unexpected architecture"
-#endif
 }
 
 struct solid_fluid_connect {
@@ -785,44 +561,6 @@ eq_sf_connect(const struct solid_fluid_connect* a, const struct solid_fluid_conn
 static size_t
 hash_sf_connect(const struct solid_fluid_connect* key)
 {
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->emissivity)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->specular_fraction)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->specular_fraction)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc_max)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_emissivity)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
     (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
@@ -859,9 +597,6 @@ hash_sf_connect(const struct solid_fluid_connect* key)
     hash = hash * FNV64_PRIME;
   }
   return hash;
-#else
-#error "Unexpected architecture"
-#endif
 }
 
 struct description {
@@ -885,7 +620,7 @@ init_description(struct description* desc) {
 static INLINE void
 print_description
   (FILE* stream,
-   struct description* desc)
+   const struct description* desc)
 {
   ASSERT(stream && desc);
   switch (desc->type) {
@@ -1022,17 +757,5 @@ stardis_compute(struct stardis* stardis, enum stardis_mode mode);
 
 extern void
 stardis_release(struct stardis* stardis);
-
-extern res_T
-dump_vtk(FILE* output, const struct geometry* geometry);
-
-extern res_T
-read_stl
-  (const unsigned desc_id,
-   const enum content_type file_type,
-   const char* stl_filename,
-   struct htable_vertex* vertex2id,
-   struct htable_triangle* triangle2id,
-   struct stardis* stardis);
 
 #endif /*STARDIS-APP_H*/

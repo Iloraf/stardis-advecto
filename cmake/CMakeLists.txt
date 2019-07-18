@@ -57,11 +57,21 @@ set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 set(SDIS_FILES_SRC
   stardis-app.c
   stardis-compute.c
+  stardis-fluid.c
+  stardis-intface.c
+  stardis-output.c
+  stardis-parsing.c
+  stardis-solid.c
   main.c)
 
 set(SDIS_FILES_INC
   stardis-app.h
-  args.h)
+  stardis-compute.h
+  stardis-fluid.h
+  stardis-intface.h
+  stardis-output.h
+  stardis-parsing.h
+  stardis-solid.h)
 
 set(SDIS_FILES_DOC COPYING README.md)
 

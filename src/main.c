@@ -1,12 +1,16 @@
 /* Copyright (C) 2018 |Meso|Star> (contact@meso-star.com) */
 
 #include "stardis-app.h"
+#include "stardis-output.h"
+
+#if !defined(ARCH_64BITS)
+#error "Please write the_version of hash functions needed by the current arch"
+#endif
 
 int main(int argc, char** argv){
 
   struct args args = ARGS_DEFAULT;
   struct stardis stardis = NULL_STARDIS;
-  size_t memsz = 0;
   int err = 0;
   res_T res = RES_OK;
 
@@ -25,21 +29,15 @@ int main(int argc, char** argv){
     if (res != RES_OK) goto error;
     goto exit;
   }
-
-  res =  stardis_compute(&stardis, args.mode);
-  if (res != RES_OK) goto error;
+  else if (args.mode & COMPUTE_MODES) {
+    res = stardis_compute(&stardis, args.mode);
+    if (res != RES_OK) goto error;
+  } else {
+    fprintf(stderr, "Unknown mode: %c.\n", mode_option(args.mode));
+  }
 
 exit:
   stardis_release(&stardis);
-  if(stardis.allocator_initialized
-    && (memsz = MEM_ALLOCATED_SIZE(&stardis.allocator)) != 0)
-  {
-    char dump[4096] = { '\0' };
-    MEM_DUMP(&stardis.allocator, dump, sizeof(dump));
-    fprintf(stderr, "%s\n", dump);
-    fprintf(stderr, "Memory leaks: %lu Bytes\n", (unsigned long)memsz);
-  }
-  mem_shutdown_proxy_allocator(&stardis.allocator);
   CHK(mem_allocated_size() == 0);
   return err;
 error:

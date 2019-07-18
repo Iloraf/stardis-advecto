@@ -587,8 +587,7 @@ compute_boundary
    enum stardis_mode mode)
 {
   res_T res = RES_OK;
-  double time[2], pos[3], uv[2] = { 0,0 };
-  size_t iprim = SIZE_MAX;
+  double time[2], pos[3];
   struct sdis_green_function* green = NULL;
   struct sdis_estimator* estimator = NULL;
 
@@ -603,8 +602,6 @@ compute_boundary
   }
 
   d3_set(pos, stardis->probe);
-  res = select_probe_type(scn, stardis, 0, pos, &iprim, uv);
-  if (res != RES_OK) goto error;
 
   if (mode & GREEN_MODE) {
     ASSERT(iprim == SIZE_MAX);

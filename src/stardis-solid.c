@@ -5,6 +5,8 @@
 #include <tinyexpr.h>
 #include<rsys/stretchy_array.h>
 
+#include <limits.h>
+
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
@@ -195,8 +197,7 @@ create_solid
     }
     if (out_has_power) *out_has_power = has_power;
     if (has_power) solid_shader.volumic_power = solid_get_power;
-  }
-  else {
+  } else {
     if (out_has_power) *out_has_power = 0;
   }
   res = sdis_solid_create(dev, &solid_shader, data, sa_add(*media_ptr, 1));

@@ -117,8 +117,7 @@ create_intface
   p_intface = htable_intface_find(htable_interfaces, &int_descs);
   if (p_intface) {
     intface = *p_intface;
-  }
-  else {
+  } else {
     /* create new interface and register */
     struct sdis_interface_shader interface_shader = SDIS_INTERFACE_SHADER_NULL;
     struct intface* interface_props = NULL;
@@ -180,8 +179,7 @@ create_intface
           res = RES_BAD_ARG;
           goto error;
         }
-      }
-      else {
+      } else {
         if (front_defined == back_defined) {
           fprintf(stderr,
             "Cannot define a boundary between 2 %s regions\n",
@@ -228,6 +226,7 @@ create_intface
           fluid_side_shader =
             front_defined ? &interface_shader.back : &interface_shader.front;
           fluid_side_shader->emissivity = interface_get_emissivity;
+          fluid_side_shader->specular_fraction = interface_get_alpha;
           interface_props->emissivity = connect->d.h_boundary.emissivity;
           interface_props->alpha = connect->d.h_boundary.specular_fraction;
         }
@@ -259,8 +258,7 @@ create_intface
           /* We set the known T inside
            * TODO: should be outside to allow contact resistances */
           interface_shader.front.temperature = interface_get_temperature;
-        }
-        else {
+        } else {
           front_med = media[ext_id];
           /* We set the known T inside
            * TODO: should be outside to allow contact resistances */
@@ -288,8 +286,7 @@ create_intface
         if (front_defined) {
           back_med = media[connect->d.f_boundary.mat_id];
           interface_shader.front.flux = interface_get_flux;
-        }
-        else {
+        } else {
           front_med = media[connect->d.f_boundary.mat_id];
           interface_shader.back.flux = interface_get_flux;
         }
@@ -309,6 +306,7 @@ create_intface
         }
         if (connect->d.sf_connect.has_emissivity) {
           fluid_side_shader->emissivity = interface_get_emissivity;
+          fluid_side_shader->specular_fraction = interface_get_alpha;
           interface_props->emissivity = connect->d.sf_connect.emissivity;
           interface_props->alpha = connect->d.sf_connect.specular_fraction;
         }

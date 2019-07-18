@@ -102,7 +102,7 @@ get_flux_terms
   return res;
 }
 
-res_T
+static res_T
 dump_path
   (const struct sdis_heat_path* path,
    void* context)
@@ -120,7 +120,7 @@ dump_path
   fprintf(stream, "DATASET POLYDATA\n");
   /* Write path positions */
   sdis_heat_path_get_vertices_count(path, &vcount);
-  fprintf(stream, "POINTS %lu double\n", (unsigned long)vcount);
+  fprintf(stream, "POINTS %zu double\n", vcount);
   FOR_EACH(i, 0, vcount) {
     struct sdis_heat_vertex vtx;
     res = sdis_heat_path_get_vertex(path, i, &vtx);
@@ -128,11 +128,11 @@ dump_path
     fprintf(stream, "%g %g %g\n", SPLIT3(vtx.P));
   }
   /* Write the segment of the path */
-  fprintf(stream, "LINES %lu %lu\n", 1lu, (unsigned long)(1 + vcount));
-  fprintf(stream, "%lu", (unsigned long)vcount);
-  FOR_EACH(i, 0, vcount) fprintf(stream, " %lu", (unsigned long)i);
+  fprintf(stream, "LINES %u %zu\n", 1u, 1 + vcount);
+  fprintf(stream, "%zu", vcount);
+  FOR_EACH(i, 0, vcount) fprintf(stream, " %zu", i);
   fprintf(stream, "\n");
-  fprintf(stream, "POINT_DATA %lu\n", (unsigned long)vcount);
+  fprintf(stream, "POINT_DATA %zu\n", vcount);
   /* Write the type of the random walk vertices */
   fprintf(stream, "SCALARS Vertex_Type float 1\n");
   fprintf(stream, "LOOKUP_TABLE vertex_type\n");
@@ -170,7 +170,7 @@ dump_path
     fprintf(stream, "%g\n", IS_INF(vtx.time) ? FLT_MAX : vtx.time);
   }
   /* Write path type */
-  fprintf(stream, "CELL_DATA %lu\n", 1lu);
+  fprintf(stream, "CELL_DATA %u\n", 1u);
   fprintf(stream, "SCALARS Path_Type float 1\n");
   fprintf(stream, "LOOKUP_TABLE path_type\n");
   res = sdis_heat_path_get_status(path, &status);
@@ -264,9 +264,7 @@ print_sample
         printf("H\t%u", id);
       /* In a standard fluid with known temperature */
       else printf("F\t%u", id);
-
-    }
-    else {
+    } else {
       struct solid* d__ = sdis_data_get(data);
       ASSERT(type == SDIS_SOLID);
       id = d__->id;
@@ -384,7 +382,7 @@ dump_image
       fprintf(stdout, "%f\n", time.SE);
     }
   }
-  fprintf(stdout, "SCALARS temperature_failures_count int 1\n");
+  fprintf(stdout, "SCALARS temperature_failures_count unsigned_long_long 1\n");
   fprintf(stdout, "LOOKUP_TABLE default\n");
   FOR_EACH(iy, 0, definition[1]) {
     FOR_EACH(ix, 0, definition[0]) {
@@ -577,8 +575,7 @@ create_edge_file_if
       p_rank = htable_vrtx_rank_find(&ranks, edge + v);
       if (p_rank) {
         rk[v] = *p_rank;
-      }
-      else {
+      } else {
         /* First appearance: allocate a rank and exit it */
         unsigned rank;
         size_t tmp = htable_vrtx_rank_size_get(&ranks);
@@ -601,8 +598,7 @@ create_edge_file_if
           unsigned w = 1 - v; /* The other vertex */
           if (cc[rk[v]] == UINT_MAX) cc[rk[v]] = cc[rk[w]];
         }
-      }
-      else {
+      } else {
         /* None are in a know component: create a new one */
         cc[rk[0]] = cc[rk[1]] = cc_count++;
       }
@@ -661,7 +657,7 @@ error:
 
 res_T
 print_single_MC_result
-  (const enum stardis_mode mode,
+  (const int mode,
    struct sdis_estimator* estimator,
    struct stardis* stardis)
 {
@@ -700,13 +696,9 @@ print_single_MC_result
     break;
   default: FATAL("Invalid mode.");
   }
-  printf("#failures: %lu/%lu\n",
-    (unsigned long)nfailures,
-    (unsigned long)stardis->N);
+  printf("#failures: %zu/%zu\n", nfailures, stardis->N);
   if (nfailures)
-    fprintf(stderr, "#failures: %lu/%lu\n",
-      (unsigned long)nfailures,
-      (unsigned long)stardis->N);
+    fprintf(stderr, "#failures: %zu/%zu\n", nfailures, stardis->N);
 
   /* Dump paths according to user settings */
   res = sdis_estimator_for_each_path(estimator, dump_path, stdout);
@@ -717,48 +709,117 @@ error:
   goto end;
 }
 
-/* TODO: rewrite dump! */
-res_T
+void
 dump_vtk
-  (FILE* output,
-   const struct geometry* geometry)
+  (const struct geometry* geometry)
 {
-  res_T res = RES_OK;
-  unsigned i;
-  struct vertex* vtx = geometry->vertex;
-  struct triangle* tri = geometry->triangle;
+  size_t i;
+  struct vertex* vtx;
+  struct triangle* tri;
 
-  if (!output) {
-    fprintf(stderr, "Invalid output file to dump vtk.\n");
-    res = RES_BAD_ARG;
-    goto error;
-  }
+  ASSERT(geometry);
 
-  fprintf(output, "# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET POLYDATA\n");
-  fprintf(output, "POINTS %i float\n\n", (int)sa_size(vtx));
+  vtx = geometry->vertex;
+  tri = geometry->triangle;
+
+  printf("# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET POLYDATA\n");
+  printf("POINTS %zu float\n\n", sa_size(vtx));
   for (i = 0; i < sa_size(vtx); ++i) {
-    fprintf(output, "%f %f %f\n", SPLIT3(vtx[i].xyz));
+    printf("%f %f %f\n", SPLIT3(vtx[i].xyz));
   }
-  fprintf(output, "\nPOLYGONS %i %i\n", (int)sa_size(tri), (int)(4 * sa_size(tri)));
+  printf("\nPOLYGONS %zu %zu\n", sa_size(tri), 4 * sa_size(tri));
   for (i = 0; i < sa_size(tri); ++i) {
-    fprintf(output, "3 %i %i %i\n", SPLIT3(tri[i].indices.data));
+    printf("3 %u %u %u\n", SPLIT3(tri[i].indices.data));
   }
-  fprintf(output, "\nCELL_DATA %i \n", (int)sa_size(tri));
-  fprintf(output, "SCALARS front_description float 1\n");
-  fprintf(output, "LOOKUP_TABLE default\n");
+  printf("\nCELL_DATA %zu\n", sa_size(tri));
+  printf("SCALARS front_description long_long_int 1\n");
+  printf("LOOKUP_TABLE default\n");
   for (i = 0; i < sa_size(tri); ++i) {
-    fprintf(output, "%i\n", tri[i].front_description);
+    printf("%lld\n", (long long int)tri[i].front_description);
   }
-  fprintf(output, "SCALARS back_description float 1\n");
-  fprintf(output, "LOOKUP_TABLE default\n");
+  printf("SCALARS back_description long_long_int 1\n");
+  printf("LOOKUP_TABLE default\n");
   for (i = 0; i < sa_size(tri); ++i) {
-    fprintf(output, "%i\n", tri[i].back_description);
+    printf("%lld\n", (long long int)tri[i].back_description);
+  }
+}
+
+void
+dump_map
+  (const struct stardis* stardis,
+   struct sdis_estimator** estimators)
+{
+  size_t i, last_v = 0;
+  size_t* idx;
+  struct vertex* vtx;
+  struct triangle* tri;
+
+  ASSERT(stardis);
+
+  idx = stardis->boundary.primitives;
+  vtx = stardis->geometry.vertex;
+  tri = stardis->geometry.triangle;
+
+  /* Find last used vertex */
+  for (i = 0; i < sa_size(idx); ++i) {
+    size_t t = idx[i];
+    last_v = MMAX(MMAX(last_v, tri[t].indices.data[0]),
+      MMAX(tri[t].indices.data[1], tri[t].indices.data[2]));
   }
 
-exit:
-  return res;
-error:
-  goto exit;
+  /* Dump vertices up to last_v, even unused ones, to avoid reindexing */
+  printf("# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET POLYDATA\n");
+  printf("POINTS %zu float\n\n", last_v + 1);
+  for (i = 0; i <= last_v; ++i) {
+    printf("%f %f %f\n", SPLIT3(vtx[i].xyz));
+  }
+  /* Dump only primitives in boundary */
+  printf("\nPOLYGONS %zu %zu\n", sa_size(idx), 4 * sa_size(idx));
+  for (i = 0; i < sa_size(idx); ++i) {
+    size_t t = idx[i];
+    printf("3 %u %u %u\n", SPLIT3(tri[t].indices.data));
+  }
+  printf("\nCELL_DATA %zu\n", sa_size(idx));
+  printf("SCALARS temperature_estimate float 1\n");
+  printf("LOOKUP_TABLE default\n");
+  for (i = 0; i < sa_size(idx); ++i) {
+    const struct sdis_estimator* estimator = estimators[i];
+    struct sdis_mc T;
+    SDIS(estimator_get_temperature(estimator, &T));
+    printf("%f\n", T.E);
+  }
+  printf("SCALARS temperature_std_dev float 1\n");
+  printf("LOOKUP_TABLE default\n");
+  for (i = 0; i < sa_size(idx); ++i) {
+    const struct sdis_estimator* estimator = estimators[i];
+    struct sdis_mc T;
+    SDIS(estimator_get_temperature(estimator, &T));
+    printf("%f\n", T.SE);
+  }
+  printf("SCALARS temperature_failures_count unsigned_long_long 1\n");
+  printf("LOOKUP_TABLE default\n");
+  for (i = 0; i < sa_size(idx); ++i) {
+    const struct sdis_estimator* estimator = estimators[i];
+    size_t nfails;
+    SDIS(estimator_get_failure_count(estimator, &nfails));
+    printf("%zu\n", nfails);
+  }
+  printf("SCALARS computation_time_estimate float 1\n");
+  printf("LOOKUP_TABLE default\n");
+  for (i = 0; i < sa_size(idx); ++i) {
+    const struct sdis_estimator* estimator = estimators[i];
+    struct sdis_mc time;
+    SDIS(estimator_get_realisation_time(estimator, &time));
+    printf("%f\n", time.E);
+  }
+  printf("SCALARS computation_time_std_dev float 1\n");
+  printf("LOOKUP_TABLE default\n");
+  for (i = 0; i < sa_size(idx); ++i) {
+    const struct sdis_estimator* estimator = estimators[i];
+    struct sdis_mc time;
+    SDIS(estimator_get_realisation_time(estimator, &time));
+    printf("%f\n", time.SE);
+  }
 }
 
 void

@@ -17,13 +17,14 @@ enum stardis_mode {
   MEDIUM_COMPUTE = BIT(2),
   BOUNDARY_COMPUTE = BIT(3),
   IR_COMPUTE = BIT(4),
+  MAP_COMPUTE = BIT(5),
   DUMP_VTK = BIT(6),
   GREEN_MODE = BIT(7),
 
   GREEN_COMPATIBLE_MODES = PROBE_COMPUTE | PROBE_COMPUTE_ON_INTERFACE | MEDIUM_COMPUTE
   | BOUNDARY_COMPUTE,
 
-  COMPUTE_MODES = GREEN_COMPATIBLE_MODES | IR_COMPUTE,
+  COMPUTE_MODES = GREEN_COMPATIBLE_MODES | IR_COMPUTE | MAP_COMPUTE,
 
   NON_COMPUTE_MODES = UNDEF_MODE | DUMP_VTK | GREEN_MODE,
 
@@ -79,10 +80,6 @@ extern void
 print_multiple_modes
   (FILE* stream,
    const int modes);
-
-extern void
-print_version
-  ();
 
 extern void
 print_help

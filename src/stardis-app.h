@@ -13,6 +13,8 @@
 #include <sdis.h>
 #include <tinyexpr.h>
 
+#include <limits.h>
+
 #define FREE_AARRAY(ARRAY) if (ARRAY) {\
   int i = 0; \
   for (i=0; *(ARRAY+i);i++){\
@@ -746,16 +748,18 @@ enum content_type {
   CONTENT_TYPES_COUNT
 };
 
-
 extern res_T 
 stardis_init
   (const struct args* args,
    struct stardis* stardis);
 
 extern res_T
-stardis_compute(struct stardis* stardis, enum stardis_mode mode);
+stardis_compute
+  (struct stardis* stardis,
+   const int mode);
 
 extern void
-stardis_release(struct stardis* stardis);
+stardis_release
+  (struct stardis* stardis);
 
 #endif /*STARDIS-APP_H*/

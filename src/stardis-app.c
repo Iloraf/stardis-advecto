@@ -11,9 +11,7 @@
 #define HTABLE_KEY_FUNCTOR_HASH hash_description
 #include <rsys/hash_table.h>
 
-#define _GNU_SOURCE 1
 #include <string.h>
-#include <ctype.h>
 
 /*******************************************************************************
  * Local Functions
@@ -239,8 +237,7 @@ read_triangles
     stl_desc->indices = packed_indices;
     stl_desc->normals = packed_normals;
     stl_desc->triangles_count = sa_size(stl_desc->indices) / 3;
-  }
-  else {
+  } else {
     sa_release(packed_indices);
     sa_release(packed_normals);
     packed_indices = NULL;
@@ -272,13 +269,13 @@ read_stl
 
   ASSERT(stl_filename && vertex2id && triangle2id && stardis);
 
-  if (!stl_filename) return RES_BAD_ARG;
-
-  SSTL(create(NULL, &stardis->allocator, 0, &sstl));
+  res = sstl_create(NULL, &stardis->allocator, 0, &sstl);
+  if (res != RES_OK) goto error;
 
   res = sstl_load(sstl, stl_filename);
   if (res != RES_OK) {
-    fprintf(stderr, "Cannot read STL file: %s\n", stl_filename);
+    if (res == RES_IO_ERR)
+      fprintf(stderr, "Cannot read STL file: %s\n", stl_filename);
     goto error;
   }
   SSTL(get_desc(sstl, &stl_desc));
@@ -406,7 +403,7 @@ geometry_analyse
   fclose(input);
   input = NULL;
 
-  /* Process vtk file describing boundary compute */
+  /* Process STL file describing boundary compute */
   if (bound_filename) {
     res = read_stl(0, CONTENT_BOUNDARY, bound_filename, &vertex2id,
       &triangle2id, stardis);
@@ -470,7 +467,7 @@ stardis_init
  else if (args->mode & MEDIUM_COMPUTE) {
    strcpy(stardis->solve_name, args->medium_name);
  }
- else if (args->mode & BOUNDARY_COMPUTE) {
+ else if (args->mode & (BOUNDARY_COMPUTE | MAP_COMPUTE)) {
    strcpy(stardis->solve_name, args->solve_boundary_filename);
  }
 
@@ -534,7 +531,7 @@ stardis_release(struct stardis* stardis)
     char dump[4096] = { '\0' };
     MEM_DUMP(&stardis->allocator, dump, sizeof(dump));
     fprintf(stderr, "%s\n", dump);
-    fprintf(stderr, "Memory leaks: %lu Bytes\n", (unsigned long)memsz);
+    fprintf(stderr, "Memory leaks: %zu Bytes\n", memsz);
   }
   if (stardis->allocator_initialized) {
     mem_shutdown_proxy_allocator(&stardis->allocator);

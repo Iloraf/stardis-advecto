@@ -42,9 +42,7 @@ main
   if (res != RES_OK) goto error;
 
   if (args.mode & DUMP_VTK) {
-    res = dump_vtk(stdout, &stardis.geometry);
-    if (res != RES_OK) goto error;
-    goto exit;
+    dump_vtk(&stardis.geometry);
   }
   else if (args.mode & COMPUTE_MODES) {
     res = stardis_compute(&stardis, args.mode);

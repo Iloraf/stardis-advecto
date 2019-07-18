@@ -226,8 +226,7 @@ create_holder
     if (dummies->dummy_fluid) {
       /* Reuse external dummy fluid */
       description->d.t_boundary.mat_id = dummies->dummy_fluid_id;
-    }
-    else {
+    } else {
       /* Create dummy fluid */
       res = create_fluid(dev, NULL, 1, 1, is_green, 1, NULL,
         NULL, media, &description->d.t_boundary.mat_id);
@@ -249,8 +248,7 @@ create_holder
     if (dummies->dummy_solid) {
       /* Reuse external dummy solid */
       description->d.t_boundary.mat_id = dummies->dummy_solid_id;
-    }
-    else {
+    } else {
       /* Create dummy solid */
       res = create_solid(dev, NULL, 1, 1, 1, 1, is_green, 1, NULL,
         NULL, NULL, media, NULL, &description->d.t_boundary.mat_id);
@@ -272,8 +270,7 @@ create_holder
     if (dummies->dummy_fluid) {
       /* Reuse external dummy fluid */
       description->d.f_boundary.mat_id = dummies->dummy_fluid_id;
-    }
-    else {
+    } else {
       /* Create dummy fluid */
       res = create_fluid(dev, NULL, 1, 1, is_green, 1, NULL, NULL,
         media, &description->d.f_boundary.mat_id);
@@ -392,7 +389,7 @@ compute_probe_on_interface
   (struct sdis_scene* scn,
    const struct counts* counts,
    struct stardis* stardis,
-   enum stardis_mode mode)
+   const int mode)
 {
   res_T res = RES_OK;
   double time[2], pos[3], uv[2] = { 0,0 };
@@ -451,7 +448,7 @@ compute_camera
   (struct sdis_device* dev,
    struct sdis_scene* scn,
    const struct stardis* stardis,
-   const enum stardis_mode mode)
+   const int mode)
 {
   res_T res = RES_OK;
   double time[2];
@@ -509,7 +506,7 @@ compute_medium
   (struct sdis_scene* scn,
    struct sdis_medium** media,
    struct stardis* stardis,
-   enum stardis_mode mode)
+   const int mode)
 {
   res_T res = RES_OK;
   double time[2];
@@ -584,7 +581,7 @@ compute_boundary
   (struct sdis_scene* scn,
    const struct counts* counts,
    struct stardis* stardis,
-   enum stardis_mode mode)
+   const int mode)
 {
   res_T res = RES_OK;
   double time[2], pos[3];
@@ -604,7 +601,6 @@ compute_boundary
   d3_set(pos, stardis->probe);
 
   if (mode & GREEN_MODE) {
-    ASSERT(iprim == SIZE_MAX);
     res = sdis_solve_boundary_green_function(scn,
       stardis->N,
       stardis->boundary.primitives,
@@ -619,7 +615,6 @@ compute_boundary
       stardis->radiative_temp);
     if (res != RES_OK) goto error;
   } else {
-    ASSERT(iprim == SIZE_MAX);
     d2_splat(time, stardis->probe[3]);
     res = sdis_solve_boundary(scn,
       stardis->N,
@@ -638,6 +633,64 @@ compute_boundary
   }
 end:
   if (estimator) SDIS(estimator_ref_put(estimator));
+  if (green) SDIS(green_function_ref_put(green));
+  return res;
+error:
+  goto end;
+}
+
+static res_T
+compute_map
+  (struct sdis_scene* scn,
+   struct stardis* stardis,
+   const int mode)
+{
+  res_T res = RES_OK;
+  double time[2], pos[3];
+  struct sdis_green_function* green = NULL;
+  struct sdis_estimator** estimators = NULL;
+  size_t p;
+
+  ASSERT(scn && stardis && (mode & MAP_COMPUTE)
+    && !(mode & GREEN_MODE));
+  (void)mode;
+
+  /* FIXME: MOVE TO BOUNDARY SETTING */
+  ASSERT(sa_size(stardis->boundary.primitives)
+    == sa_size(stardis->boundary.sides));
+  if (sa_size(stardis->boundary.sides) == 0) {
+    fprintf(stderr, "Cannot solve boundary %s (empty geometry)\n",
+      stardis->solve_name);
+  }
+
+  d3_set(pos, stardis->probe);
+  d2_splat(time, stardis->probe[3]);
+
+  sa_add(estimators, sa_size(stardis->boundary.sides));
+
+  FOR_EACH(p, 0, sa_size(stardis->boundary.sides)) {
+    res = sdis_solve_boundary(scn,
+      stardis->N,
+      stardis->boundary.primitives + p,
+      stardis->boundary.sides + p,
+      1,
+      time,
+      stardis->scale_factor,
+      stardis->radiative_temp[0],
+      stardis->radiative_temp[1],
+      stardis->dump_paths,
+      estimators + p);
+    if (res != RES_OK) goto error;
+  }
+  dump_map(stardis, estimators);
+
+end:
+  if (estimators) {
+    FOR_EACH(p, 0, sa_size(stardis->boundary.sides)) {
+      SDIS(estimator_ref_put(estimators[p]));
+    }
+    sa_release(estimators);
+  }
   if (green) SDIS(green_function_ref_put(green));
   return res;
 error:
@@ -692,7 +745,7 @@ compile_expr_to_fn
 res_T
 stardis_compute
   (struct stardis* stardis,
-   enum stardis_mode mode)
+   const int mode)
 {
   res_T res = RES_OK;
   struct sdis_device* dev = NULL;
@@ -703,10 +756,17 @@ stardis_compute
   int htable_interfaces_initialised = 0;
   struct counts counts = COUNTS_NULL;
   unsigned i = 0;
+  int verbose;
 
-  ASSERT(stardis);
+  ASSERT(stardis && (mode & COMPUTE_MODES));
 
-  res = sdis_device_create(NULL, &stardis->allocator, stardis->nthreads, 1, &dev);
+#ifdef NDEBUG
+  verbose = 0;
+#else
+  verbose = 1;
+#endif
+
+  res = sdis_device_create(NULL, &stardis->allocator, stardis->nthreads, verbose, &dev);
   if (res != RES_OK) goto error;
 
   /* Create media and property holders found in descriptions */
@@ -748,6 +808,8 @@ stardis_compute
     res = compute_medium(scn, media, stardis, mode);
   else if (mode & BOUNDARY_COMPUTE)
     res = compute_boundary(scn, &counts, stardis, mode);
+  else if (mode & MAP_COMPUTE)
+    res = compute_map(scn, stardis, mode);
   else FATAL("Unknown mode.\n");
   if (res != RES_OK) goto error;
 

@@ -13,7 +13,6 @@
 
 struct te_expr;
 struct stardis;
-enum stardis_mode;
 
 struct counts {
   size_t smed_count, fmed_count, tbound_count, hbound_count,
@@ -42,6 +41,6 @@ compile_expr_to_fn
 extern res_T
 stardis_compute
   (struct stardis* stardis,
-   enum stardis_mode mode);
+   const int mode);
 
 #endif

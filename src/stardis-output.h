@@ -14,7 +14,6 @@ struct counts;
 struct description;
 struct sdis_scene;
 struct mem_allocator;
-enum stardis_mode;
 struct sdis_estimator;
 struct stardis;
 struct geometry;
@@ -43,15 +42,18 @@ create_edge_file_if
 
 extern res_T
 print_single_MC_result
-  (const enum stardis_mode mode,
+  (const int mode,
    struct sdis_estimator* estimator,
    struct stardis* stardis);
 
-/* TODO: rewrite dump! */
-extern res_T
+extern void
 dump_vtk
-  (FILE* output,
-   const struct geometry* geometry);
+  (const struct geometry* geometry);
+
+extern void
+dump_map
+  (const struct stardis* stardis,
+   struct sdis_estimator** estimators);
 
 extern void
 print_trg_as_obj

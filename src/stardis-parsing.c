@@ -1,3 +1,4 @@
+#define _GNU_SOURCE 1
 #include "stardis-parsing.h"
 #include "stardis-app.h"
 #include "stardis-version.h"
@@ -8,10 +9,27 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
+#include <string.h>
 
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
+
+#ifdef COMPILER_GCC
+static char*
+_strupr
+  (char* s)
+{
+  char* ptr;
+  for (ptr = s; *ptr; ++ptr) {
+    int tmp = toupper(*ptr);
+    ASSERT(tmp == (char)tmp);
+    *ptr = (char)tmp;
+  }
+  return s;
+}
+#endif
 
 static char**
 split_line
@@ -70,20 +88,14 @@ split_line
   return result;
 }
 
-#ifdef COMPILER_GCC
-static char*
-_strupr
-  (char* s)
+static void
+print_version
+  ()
 {
-  char* ptr;
-  for (ptr = s; *ptr; ++ptr) {
-    int tmp = toupper(*ptr);
-    ASSERT(tmp == (char)tmp);
-    *ptr = (char)tmp;
-  }
-  return s;
+  printf("stardis-app version %i.%i.%i built on stardis library version %i.%i.%i\n",
+    StardisApp_VERSION_MAJOR, StardisApp_VERSION_MINOR, StardisApp_VERSION_PATCH,
+    Stardis_VERSION_MAJOR, Stardis_VERSION_MINOR, Stardis_VERSION_PATCH);
 }
-#endif
 
 /*******************************************************************************
  * Public Functions
@@ -100,6 +112,7 @@ mode_option
   if (m & MEDIUM_COMPUTE) { found++; res = 'm'; }
   if (m & BOUNDARY_COMPUTE) { found++; res = 's'; }
   if (m & IR_COMPUTE) { found++; res = 'R'; }
+  if (m & MAP_COMPUTE) { found++; res = 'S'; }
   if (m & DUMP_VTK) { found++; res = 'd'; }
   ASSERT(found == 1);
   return res;
@@ -110,7 +123,7 @@ void print_multiple_modes
    const int modes)
 {
   int b = 0, fst = 1;
-  enum stardis_mode m = UNDEF_MODE;
+  int m = UNDEF_MODE;
   ASSERT(stream);
   do {
     m = BIT(b++);
@@ -122,15 +135,6 @@ void print_multiple_modes
 }
 
 void
-print_version
-  ()
-{
-  printf("stardis-app version %i.%i.%i built on stardis library version %i.%i.%i\n",
-    StardisApp_VERSION_MAJOR, StardisApp_VERSION_MINOR, StardisApp_VERSION_PATCH,
-    Stardis_VERSION_MAJOR, Stardis_VERSION_MINOR, Stardis_VERSION_PATCH);
-}
-
-void
 print_help
   (char* prog)
 {
@@ -138,7 +142,7 @@ print_help
   print_version();
   printf("\nusage: \n%s -M MEDIUM.txt -B BOUNDARY.txt\n", prog);
   printf("[ -p X,Y,Z,TIME | -m MEDIUM_NAME,TIME | -d \n");
-  printf("  | -s SURFACE.vtk,TIME\n");
+  printf("  | -s SURFACE.vtk,TIME | -S SURFACE.vtk,TIME\n");
   printf("  | -R t=TIME:spp=SPP:fov=FOV:up=XUP,YUP,ZUP:pos=X,Y,Z:tgt=XT,YT,ZT:img=WxH ]\n");
   printf("[ -g] [-f SCALE_FACTOR] [-D {all | error | success}] -d\n");
   printf("[-n NUM_OF_REALIZATIONS] [-t NUM_OF_THREADS]\n");
@@ -168,6 +172,12 @@ print_help
   printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
   printf("\n -s SURFACE.vtk,TIME:\n");
   printf("    Compute the mean temperature on a given 2D shape at a given time.\n");
+  printf("    Mean temperature is computed on the front sides of the primitives\n");
+  printf("    listed in SURFACE.vtk. These primitives are not added to the geometry,\n");
+  printf("    but must be already known. The shape doesn't need to be connex.\n");
+  printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
+  printf("\n -S SURFACE.vtk,TIME:\n");
+  printf("    Compute by-primitives mean temperature on a given 2D shape at a given time.\n");
   printf("    Mean temperature is computed on the front sides of the primitives\n");
   printf("    listed in SURFACE.vtk. These primitives are not added to the geometry,\n");
   printf("    but must be already known. The shape doesn't need to be connex.\n");
@@ -226,7 +236,7 @@ parse_args
   }
 
   opterr = 0; /* No default error messages */
-  while ((opt = getopt(argc, argv, "hvgn:t:b:B:M:m:p:P:dD:s:S:f:r:R:")) != -1) {
+  while ((opt = getopt(argc, argv, "hvgn:t:B:M:m:p:P:dD:s:S:f:r:R:")) != -1) {
     switch (opt) {
     case '?': /* Unreconised option */
       res = RES_BAD_ARG;
@@ -252,7 +262,7 @@ parse_args
       res = cstr_to_ulong(optarg, &n);
       if (res != RES_OK || n == 0) {
         res = RES_BAD_ARG;
-        fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
+        fprintf(stderr, "Invalid argument for option -%c: %s\n", opt, optarg);
         goto error;
       }
       args->N = n;
@@ -272,7 +282,7 @@ parse_args
       if (res != RES_OK
         || args->nthreads <= 0) {
         res = RES_BAD_ARG;
-        fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
+        fprintf(stderr, "Invalid argument for option -%c: %s\n", opt, optarg);
         goto error;
       }
       break;
@@ -291,7 +301,7 @@ parse_args
         || args->u.probe[3] < 0)
       {
         res = RES_BAD_ARG;
-        fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
+        fprintf(stderr, "Invalid argument for option -%c: %s\n", opt, optarg);
         goto error;
       }
       break;
@@ -310,12 +320,13 @@ parse_args
         || args->u.probe[3] < 0)
       {
         res = RES_BAD_ARG;
-        fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
+        fprintf(stderr, "Invalid argument for option -%c: %s\n", opt, optarg);
         goto error;
       }
       break;
 
-    case 's':{
+    case 's':
+    case 'S': {
       int err = 0;
       char *ptr;
       if (args->mode & EXCLUSIVE_MODES) {
@@ -324,7 +335,7 @@ parse_args
           (char)opt, mode_option(args->mode));
         goto error;
       }
-      args->mode |= BOUNDARY_COMPUTE;
+      args->mode |= (opt == 's' ? BOUNDARY_COMPUTE : MAP_COMPUTE);
       ptr = strrchr(optarg, ',');
       /* Single ',' allowed */
       if (!ptr || ptr != strchr(optarg, ','))
@@ -337,7 +348,7 @@ parse_args
       }
       if (err) {
         res = RES_BAD_ARG;
-        fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
+        fprintf(stderr, "Invalid argument for option -%c: %s\n", opt, optarg);
         goto error;
       }
       break;
@@ -357,7 +368,7 @@ parse_args
         res = RES_BAD_ARG;
       else res = cstr_to_double(ptr + 1, args->u.probe + 3);
       if (res != RES_OK) {
-        fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
+        fprintf(stderr, "Invalid argument for option -%c: %s\n", opt, optarg);
         goto error;
       }
       *ptr = '\0';
@@ -384,10 +395,9 @@ parse_args
       }
       else if (0 == strcmp(optarg, "success")) {
         args->dump_paths = DUMP_SUCCESS;
-      }
-      else {
+      } else {
         res = RES_BAD_ARG;
-        fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
+        fprintf(stderr, "Invalid argument for option -%c: %s\n", opt, optarg);
         goto error;
       }
       break;
@@ -397,7 +407,7 @@ parse_args
       if (res != RES_OK
         || args->scale_factor <= 0) {
         res = RES_BAD_ARG;
-        fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
+        fprintf(stderr, "Invalid argument for option -%c: %s\n", opt, optarg);
         goto error;
       }
       break;
@@ -409,7 +419,7 @@ parse_args
         || args->radiative_temp[0] <= 0
         || args->radiative_temp[1] <= 0) {
         res = RES_BAD_ARG;
-        fprintf(stderr, "Invalid argument -%c %s\n", opt, optarg);
+        fprintf(stderr, "Invalid argument for option -%c: %s\n", opt, optarg);
         goto error;
       }
       break;
@@ -643,8 +653,7 @@ parse_medium_line
     }
     desc->d.fluid.Tinit = malloc(strlen(tk) + 1);
     strcpy(desc->d.fluid.Tinit, tk);
-  }
-  else {
+  } else {
     res = RES_BAD_ARG;
     fprintf(stderr, "Invalid medium type: %s\n", tk);
   }
@@ -886,8 +895,7 @@ parse_boundary_line
       res = RES_BAD_ARG;
       goto exit;
     }
-  }
-  else {
+  } else {
     fprintf(stderr, "Invalid boundary type: %s", tk);
     res = RES_BAD_ARG;
     goto exit;

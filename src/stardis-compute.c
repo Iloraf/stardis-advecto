@@ -633,7 +633,7 @@ create_fluid
       prohibited | T_PROHIBITED, NULL);
     if (res != RES_OK) {
       fprintf(stderr, "Invalid initial temperature expression: %s\n",
-        t_expr);
+        tinit_expr);
       goto error;
     }
   }
@@ -716,7 +716,7 @@ create_solid
       prohibited | T_PROHIBITED, NULL);
     if (res != RES_OK) {
       fprintf(stderr, "Invalid initial temperature expression: %s\n",
-        t_expr);
+        tinit_expr);
       goto error;
     }
   }

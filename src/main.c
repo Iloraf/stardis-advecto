@@ -1,14 +1,22 @@
 /* Copyright (C) 2018 |Meso|Star> (contact@meso-star.com) */
 
 #include "stardis-app.h"
+#include "stardis-parsing.h"
 #include "stardis-output.h"
 
+#include <rsys/rsys.h>
+
+#include <stdio.h>
+
 #if !defined(ARCH_64BITS)
-#error "Please write the_version of hash functions needed by the current arch"
+#error "Please write hash functions for the current arch"
 #endif
 
-int main(int argc, char** argv){
-
+int
+main
+  (int argc,
+   char** argv)
+{
   struct args args = ARGS_DEFAULT;
   struct stardis stardis = NULL_STARDIS;
   int err = 0;
@@ -20,6 +28,15 @@ int main(int argc, char** argv){
   res = parse_args(argc, argv, &args);
   if (res != RES_OK) goto error;
   if (args.just_help) goto exit;
+
+  if (args.mode == UNDEF_MODE) {
+    fprintf(stderr, "Nothing to do.\n"
+      "One of the following options should be used:");
+    print_multiple_modes(stderr, EXCLUSIVE_MODES);
+    fprintf(stderr, "\n"
+      "Use the -h option to get help.\n");
+    goto exit;
+  }
 
   res = stardis_init(&args, &stardis);
   if (res != RES_OK) goto error;

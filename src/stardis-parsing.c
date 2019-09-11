@@ -140,7 +140,7 @@ print_help
 {
   ASSERT(prog);
   print_version();
-  printf("\nusage: \n%s -M MEDIUM.txt -B BOUNDARY.txt\n", prog);
+  printf("\nUsage: \n%s -M MEDIUM.txt -B BOUNDARY.txt\n", prog);
   printf("[ -p X,Y,Z,TIME | -m MEDIUM_NAME,TIME | -d \n");
   printf("  | -s SURFACE.vtk,TIME | -S SURFACE.vtk,TIME\n");
   printf("  | -R t=TIME:spp=SPP:fov=FOV:up=XUP,YUP,ZUP:pos=X,Y,Z:tgt=XT,YT,ZT:img=WxH ]\n");
@@ -438,7 +438,7 @@ parse_args
   }
   
   if (args->mode & GREEN_MODE
-    && (args->mode != (args->mode & GREEN_COMPATIBLE_MODES)))
+    && (args->mode != (args->mode & (GREEN_MODE | GREEN_COMPATIBLE_MODES))))
   {
     fprintf(stderr, "Option -g can only be used in conjunction with:");
     print_multiple_modes(stderr, GREEN_COMPATIBLE_MODES);

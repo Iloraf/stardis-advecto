@@ -662,13 +662,13 @@ print_single_MC_result
    struct stardis* stardis)
 {
   res_T res = RES_OK;
-  struct sdis_mc temperature;
+  struct sdis_mc result;
   size_t nfailures;
 
   ASSERT(estimator && stardis);
 
   /* Fetch the estimation data */
-  res = sdis_estimator_get_temperature(estimator, &temperature);
+  res = sdis_estimator_get_temperature(estimator, &result);
   if (res != RES_OK) goto error;
   res = sdis_estimator_get_failure_count(estimator, &nfailures);
   if (res != RES_OK) goto error;
@@ -679,20 +679,26 @@ print_single_MC_result
   case PROBE_COMPUTE_ON_INTERFACE:
     printf("Temperature at [%g, %g, %g], t=%g = %g +/- %g\n",
       SPLIT4(stardis->probe),
-      temperature.E, /* Expected value */
-      temperature.SE); /* Standard error */
+      result.E, /* Expected value */
+      result.SE); /* Standard error */
     break;
   case MEDIUM_COMPUTE:
     printf("Temperature in medium %s at t=%g = %g +/- %g\n",
       stardis->solve_name, stardis->probe[3],
-      temperature.E, /* Expected value */
-      temperature.SE); /* Standard error */
+      result.E, /* Expected value */
+      result.SE); /* Standard error */
     break;
   case BOUNDARY_COMPUTE:
     printf("Temperature at boundary %s at t=%g = %g +/- %g\n",
       stardis->solve_name, stardis->probe[3],
-      temperature.E, /* Expected value */
-      temperature.SE); /* Standard error */
+      result.E, /* Expected value */
+      result.SE); /* Standard error */
+    break;
+  case FLUX_BOUNDARY_COMPUTE:
+    printf("Flux at boundary %s at t=%g = %g +/- %g\n",
+      stardis->solve_name, stardis->probe[3],
+      result.E, /* Expected value */
+      result.SE); /* Standard error */
     break;
   default: FATAL("Invalid mode.");
   }

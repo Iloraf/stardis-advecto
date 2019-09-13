@@ -159,27 +159,34 @@ print_help
   printf("     boundary conditions.\n");
   printf("\nExclusive arguments\n");
   printf("-------------------\n");
-  printf("\n -p X:Y:Z:TIME:\n");
+  printf("\n -p X,Y,Z:TIME:\n");
   printf("    Compute the temperature at the given probe.\n");
   printf("    The probe must be in a medium.\n");
   printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
-  printf("\n -P X:Y:Z:TIME:\n");
+  printf("\n -P X,Y,Z:TIME:\n");
   printf("    Compute the temperature at the given probe on an interface.\n");
   printf("    The probe must be in a medium and is moved to the closest interface.\n");
   printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
   printf("\n -m MEDIUM_NAME,TIME:\n");
   printf("    Compute the mean temperature in a given medium at a given time.\n");
   printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
-  printf("\n -s SURFACE.vtk,TIME:\n");
+  printf("\n -s SURFACE.stl,TIME:\n");
   printf("    Compute the mean temperature on a given 2D shape at a given time.\n");
   printf("    Mean temperature is computed on the front sides of the primitives\n");
-  printf("    listed in SURFACE.vtk. These primitives are not added to the geometry,\n");
+  printf("    listed in SURFACE.stl. These primitives are not added to the geometry,\n");
   printf("    but must be already known. The shape doesn't need to be connex.\n");
   printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
-  printf("\n -S SURFACE.vtk,TIME:\n");
+  printf("\n -S SURFACE.stl,TIME:\n");
   printf("    Compute by-primitives mean temperature on a given 2D shape at a given time.\n");
   printf("    Mean temperature is computed on the front sides of the primitives\n");
-  printf("    listed in SURFACE.vtk. These primitives are not added to the geometry,\n");
+  printf("    listed in SURFACE.stl. These primitives are not added to the geometry,\n");
+  printf("    but must be already known. The shape doesn't need to be connex.\n");
+  printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
+  printf("\n -F SURFACE.stl,TIME:\n");
+  printf("    Compute the mean flux on a given 2D shape at a given time.\n");
+  printf("    Mean flux is computed on the primitives listed in SURFACE.stl and is\n");
+  printf("    accounted positive, at the primitive scale, when going from the front\n");
+  printf("    side to the back side. These primitives are not added to the geometry,\n");
   printf("    but must be already known. The shape doesn't need to be connex.\n");
   printf("    If some boundary conditions are time-dependant, TIME cannot be INF.\n");
   printf("\n -R t=TIME:spp=SPP:fov=FOV:up=XUP,YUP,ZUP:pos=X,Y,Z:tgt=XT,YT,ZT:img=WxH:\n");
@@ -236,7 +243,7 @@ parse_args
   }
 
   opterr = 0; /* No default error messages */
-  while ((opt = getopt(argc, argv, "hvgn:t:B:M:m:p:P:dD:s:S:f:r:R:")) != -1) {
+  while ((opt = getopt(argc, argv, "hvgn:t:B:M:m:p:P:dD:s:S:F:f:r:R:")) != -1) {
     switch (opt) {
     case '?': /* Unreconised option */
       res = RES_BAD_ARG;
@@ -326,7 +333,8 @@ parse_args
       break;
 
     case 's':
-    case 'S': {
+    case 'S':
+    case 'F': {
       int err = 0;
       char *ptr;
       if (args->mode & EXCLUSIVE_MODES) {
@@ -335,7 +343,17 @@ parse_args
           (char)opt, mode_option(args->mode));
         goto error;
       }
-      args->mode |= (opt == 's' ? BOUNDARY_COMPUTE : MAP_COMPUTE);
+      switch (opt) {
+      case 's':
+        args->mode |= BOUNDARY_COMPUTE;
+        break;
+      case 'S':
+        args->mode |= MAP_COMPUTE;
+        break;
+      case 'F':
+        args->mode |= FLUX_BOUNDARY_COMPUTE;
+        break;
+      }
       ptr = strrchr(optarg, ',');
       /* Single ',' allowed */
       if (!ptr || ptr != strchr(optarg, ','))

@@ -593,7 +593,7 @@ compute_boundary
   /* FIXME: MOVE TO BOUNDARY SETTING */
   ASSERT(sa_size(stardis->boundary.primitives)
     == sa_size(stardis->boundary.sides));
-  if (sa_size(stardis->boundary.sides) == 0) {
+  if (sa_size(stardis->boundary.primitives) == 0) {
     fprintf(stderr, "Cannot solve boundary %s (empty geometry)\n",
       stardis->solve_name);
   }
@@ -605,7 +605,7 @@ compute_boundary
       stardis->N,
       stardis->boundary.primitives,
       stardis->boundary.sides,
-      sa_size(stardis->boundary.sides),
+      sa_size(stardis->boundary.primitives),
       stardis->scale_factor,
       stardis->radiative_temp[0],
       stardis->radiative_temp[1],
@@ -620,7 +620,7 @@ compute_boundary
       stardis->N,
       stardis->boundary.primitives,
       stardis->boundary.sides,
-      sa_size(stardis->boundary.sides),
+      sa_size(stardis->boundary.primitives),
       time,
       stardis->scale_factor,
       stardis->radiative_temp[0],
@@ -631,6 +631,48 @@ compute_boundary
     res = print_single_MC_result(mode, estimator, stardis);
     if (res != RES_OK) goto error;
   }
+end:
+  if (estimator) SDIS(estimator_ref_put(estimator));
+  if (green) SDIS(green_function_ref_put(green));
+  return res;
+error:
+  goto end;
+}
+
+static res_T
+compute_flux_boundary
+  (struct sdis_scene* scn,
+   const struct counts* counts,
+   struct stardis* stardis,
+   const int mode)
+{
+  res_T res = RES_OK;
+  double time[2], pos[3];
+  struct sdis_green_function* green = NULL;
+  struct sdis_estimator* estimator = NULL;
+
+  ASSERT(scn && counts && stardis && (mode & FLUX_BOUNDARY_COMPUTE));
+
+  /* FIXME: MOVE TO BOUNDARY SETTING */
+  if (sa_size(stardis->boundary.primitives) == 0) {
+    fprintf(stderr, "Cannot solve boundary %s (empty geometry)\n",
+      stardis->solve_name);
+  }
+
+  d3_set(pos, stardis->probe);
+  d2_splat(time, stardis->probe[3]);
+  res = sdis_solve_boundary_flux(scn,
+    stardis->N,
+    stardis->boundary.primitives,
+    sa_size(stardis->boundary.primitives),
+    time,
+    stardis->scale_factor,
+    stardis->radiative_temp[0],
+    stardis->radiative_temp[1],
+    &estimator);
+  if (res != RES_OK) goto error;
+  res = print_single_MC_result(mode, estimator, stardis);
+  if (res != RES_OK) goto error;
 end:
   if (estimator) SDIS(estimator_ref_put(estimator));
   if (green) SDIS(green_function_ref_put(green));
@@ -658,7 +700,7 @@ compute_map
   /* FIXME: MOVE TO BOUNDARY SETTING */
   ASSERT(sa_size(stardis->boundary.primitives)
     == sa_size(stardis->boundary.sides));
-  if (sa_size(stardis->boundary.sides) == 0) {
+  if (sa_size(stardis->boundary.primitives) == 0) {
     fprintf(stderr, "Cannot solve boundary %s (empty geometry)\n",
       stardis->solve_name);
   }
@@ -666,9 +708,9 @@ compute_map
   d3_set(pos, stardis->probe);
   d2_splat(time, stardis->probe[3]);
 
-  sa_add(estimators, sa_size(stardis->boundary.sides));
+  sa_add(estimators, sa_size(stardis->boundary.primitives));
 
-  FOR_EACH(p, 0, sa_size(stardis->boundary.sides)) {
+  FOR_EACH(p, 0, sa_size(stardis->boundary.primitives)) {
     res = sdis_solve_boundary(scn,
       stardis->N,
       stardis->boundary.primitives + p,
@@ -686,7 +728,7 @@ compute_map
 
 end:
   if (estimators) {
-    FOR_EACH(p, 0, sa_size(stardis->boundary.sides)) {
+    FOR_EACH(p, 0, sa_size(stardis->boundary.primitives)) {
       SDIS(estimator_ref_put(estimators[p]));
     }
     sa_release(estimators);
@@ -808,6 +850,8 @@ stardis_compute
     res = compute_medium(scn, media, stardis, mode);
   else if (mode & BOUNDARY_COMPUTE)
     res = compute_boundary(scn, &counts, stardis, mode);
+  else if (mode & FLUX_BOUNDARY_COMPUTE)
+    res = compute_flux_boundary(scn, &counts, stardis, mode);
   else if (mode & MAP_COMPUTE)
     res = compute_map(scn, stardis, mode);
   else FATAL("Unknown mode.\n");

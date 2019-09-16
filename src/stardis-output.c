@@ -694,12 +694,36 @@ print_single_MC_result
       result.E, /* Expected value */
       result.SE); /* Standard error */
     break;
-  case FLUX_BOUNDARY_COMPUTE:
-    printf("Flux at boundary %s at t=%g = %g +/- %g\n",
+  case FLUX_BOUNDARY_COMPUTE: {
+    enum sdis_estimator_type type;
+    sdis_estimator_get_type(estimator, &type);
+    if (res != RES_OK) goto error;
+    ASSERT(type == SDIS_ESTIMATOR_FLUX);
+
+    printf("Temperature at boundary %s at t=%g = %g +/- %g\n",
+      stardis->solve_name, stardis->probe[3],
+      result.E, /* Expected value */
+      result.SE); /* Standard error */
+    res = sdis_estimator_get_convective_flux(estimator, &result);
+    if (res != RES_OK) goto error;
+    printf("Convective flux at boundary %s at t=%g = %g +/- %g\n",
+      stardis->solve_name, stardis->probe[3],
+      result.E, /* Expected value */
+      result.SE); /* Standard error */
+    res = sdis_estimator_get_radiative_flux(estimator, &result);
+    if (res != RES_OK) goto error;
+    printf("Radiative flux at boundary %s at t=%g = %g +/- %g\n",
+      stardis->solve_name, stardis->probe[3],
+      result.E, /* Expected value */
+      result.SE); /* Standard error */
+    res = sdis_estimator_get_total_flux(estimator, &result);
+    if (res != RES_OK) goto error;
+    printf("Total flux Flux at boundary %s at t=%g = %g +/- %g\n",
       stardis->solve_name, stardis->probe[3],
       result.E, /* Expected value */
       result.SE); /* Standard error */
     break;
+  }
   default: FATAL("Invalid mode.");
   }
   printf("#failures: %zu/%zu\n", nfailures, stardis->N);

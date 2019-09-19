@@ -230,7 +230,7 @@ parse_args
    char** argv,
    struct args* args)
 {
-  int opt = 0;
+  int opt = 0, n_used = 0;
   size_t len = 0;
   res_T res = RES_OK;
 
@@ -273,6 +273,7 @@ parse_args
         goto error;
       }
       args->N = n;
+      n_used = 1;
       break;
     }
 
@@ -477,6 +478,13 @@ parse_args
     goto error;
   }
 
+  if (args->mode & IR_COMPUTE && n_used) {
+    fprintf(stderr, "The -n option has no effect in rendering mode;"
+      " use rendering's SPP suboption instead.\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
 exit:
   return res;
 error:
@@ -504,33 +512,39 @@ parse_camera
     {
       size_t len = 0;
       opt = split_line(line[i], '=');
-      if (strcmp(opt[0], "t") == 0) {
+      _strupr(opt[0]);
+      if (strcmp(opt[0], "T") == 0) {
         res = cstr_to_double(opt[1], &cam->u.time);
         if (res != RES_OK) goto error;
       }
-      else if (strcmp(opt[0], "fov") == 0) {
+      else if (strcmp(opt[0], "FOV") == 0) {
         res = cstr_to_double(opt[1], &cam->fov);
         if (res != RES_OK) goto error;
       }
-      else if (strcmp(opt[0], "up") == 0) {
+      else if (strcmp(opt[0], "UP") == 0) {
         res = cstr_to_list_double(opt[1], ',', cam->up, &len, 3);
         if (res != RES_OK || len != 3) goto error;
       }
-      else if (strcmp(opt[0], "tgt") == 0) {
+      else if (strcmp(opt[0], "TGT") == 0) {
         res = cstr_to_list_double(opt[1], ',', cam->tgt, &len, 3);
         if (res != RES_OK || len != 3) goto error;
       }
-      else if (strcmp(opt[0], "pos") == 0) {
+      else if (strcmp(opt[0], "POS") == 0) {
         res = cstr_to_list_double(opt[1], ',', cam->pos, &len, 3);
         if (res != RES_OK || len != 3) goto error;
       }
-      else if (strcmp(opt[0], "img") == 0) {
+      else if (strcmp(opt[0], "IMG") == 0) {
         res = cstr_to_list_uint(opt[1], 'x', cam->img, &len, 2);
         if (res != RES_OK || len != 2) goto error;
       }
-      else if (strcmp(opt[0], "spp") == 0) {
+      else if (strcmp(opt[0], "SPP") == 0) {
         res = cstr_to_uint(opt[1], &cam->spp);
         if (res != RES_OK) goto error;
+      } else {
+        fprintf(stderr, "Warning: unexpected option for rendering mode: %s.\n",
+          opt[0]);
+        res = RES_BAD_ARG;
+        goto error;
       }
     }
   }
@@ -541,6 +555,7 @@ exit:
 
     return res;
 error:
+  fprintf(stderr, "Use the -h option to get help.\n");
   goto exit;
 }
 

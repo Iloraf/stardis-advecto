@@ -208,13 +208,13 @@ print_help
   printf("    Can only be used in conjonction with one these options:");
   print_multiple_modes(stdout, GREEN_COMPATIBLE_MODES); printf("\n");
   printf("    Provided TIME is silently ignored.\n");
-  printf("\n -f SCALE_FACTOR:\n");
-  printf("    default value: 1.0.\n");
+  printf("\n -f SCALE_FACTOR.\n");
+  printf("    Default value: 1.0.\n");
   printf("\n -D { all | error | success }:\n");
   printf("    dump paths in VTK format.\n");
   printf("\n -n NUM_OF_REALIZATIONS:\n");
   printf("    Number of Monte-Carlo realizations.\n");
-  printf("    default value: 10000.\n");
+  printf("    Default value: 10000.\n");
   printf("\n -t NUM_OF_THREADS:\n");
   printf("    Number of threads; default value is all threads available.\n");
   printf("\n -r AMBIENT_RAD_TEMP,REFERENCE_TEMP:\n");
@@ -222,6 +222,7 @@ print_help
   printf("    AMBIENT_RAD_TEMP is the ambient radiative temperature .\n");
   printf("    REFERENCE_TEMP is the temperature used for the linearization\n");
   printf("    of the radiative transfer.\n");
+  printf("    Default values: 300 and 300.\n");
 }
 
 res_T

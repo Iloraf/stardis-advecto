@@ -642,7 +642,6 @@ error:
 static res_T
 compute_flux_boundary
   (struct sdis_scene* scn,
-   const struct counts* counts,
    struct stardis* stardis,
    const int mode)
 {
@@ -651,7 +650,7 @@ compute_flux_boundary
   struct sdis_green_function* green = NULL;
   struct sdis_estimator* estimator = NULL;
 
-  ASSERT(scn && counts && stardis && (mode & FLUX_BOUNDARY_COMPUTE));
+  ASSERT(scn && stardis && (mode & FLUX_BOUNDARY_COMPUTE));
 
   /* FIXME: MOVE TO BOUNDARY SETTING */
   if (sa_size(stardis->boundary.primitives) == 0) {
@@ -848,7 +847,7 @@ stardis_compute
   else if (mode & BOUNDARY_COMPUTE)
     res = compute_boundary(scn, &counts, stardis, mode);
   else if (mode & FLUX_BOUNDARY_COMPUTE)
-    res = compute_flux_boundary(scn, &counts, stardis, mode);
+    res = compute_flux_boundary(scn, stardis, mode);
   else if (mode & MAP_COMPUTE)
     res = compute_map(scn, stardis, mode);
   else FATAL("Unknown mode.\n");

@@ -798,15 +798,9 @@ stardis_compute
   int htable_interfaces_initialised = 0;
   struct counts counts = COUNTS_NULL;
   unsigned i = 0;
-  int verbose;
+  int verbose = 1;
 
   ASSERT(stardis && (mode & COMPUTE_MODES));
-
-#ifdef NDEBUG
-  verbose = 0;
-#else
-  verbose = 1;
-#endif
 
   res = sdis_device_create(NULL, &stardis->allocator, stardis->nthreads, verbose, &dev);
   if (res != RES_OK) goto error;
@@ -833,7 +827,10 @@ stardis_compute
     geometry_get_indices, geometry_get_interface,
     sa_size(stardis->geometry.vertex),
     geometry_get_position, &stardis->geometry, &scn);
-  if (res != RES_OK) goto error;
+  if(res != RES_OK) {
+    fprintf(stderr, "%s: could not setup the scene!\n", __FUNCTION__);
+    goto error;
+  }
 
   /* If the scene has holes dump them */
   res = create_edge_file_if(scn, &stardis->allocator);
@@ -855,7 +852,10 @@ stardis_compute
   else if (mode & MAP_COMPUTE)
     res = compute_map(scn, stardis, mode);
   else FATAL("Unknown mode.\n");
-  if (res != RES_OK) goto error;
+  if(res != RES_OK) {
+    fprintf(stderr, "%s: computation failed!\n", __FUNCTION__);
+    goto error;
+  }
 
 end:
   if (htable_interfaces_initialised)

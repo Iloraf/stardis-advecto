@@ -9,6 +9,10 @@
 #define HTABLE_DATA unsigned
 #define HTABLE_KEY_FUNCTOR_EQ eq_description
 #define HTABLE_KEY_FUNCTOR_HASH hash_description
+#define HTABLE_KEY_FUNCTOR_INIT init_description
+#define HTABLE_KEY_FUNCTOR_COPY cp_description
+#define HTABLE_KEY_FUNCTOR_RELEASE release_description
+#define HTABLE_KEY_FUNCTOR_COPY_AND_RELEASE cp_release_description
 #include <rsys/hash_table.h>
 
 #include <string.h>
@@ -341,7 +345,7 @@ geometry_analyse
     char* stl_filename = NULL;
     struct description desc;
     
-    init_description(&desc);
+    init_description(&stardis->allocator, &desc);
     res = parse_medium_line(line, &stl_filename, &desc);
     if (res != RES_OK) goto error;
 
@@ -381,7 +385,7 @@ geometry_analyse
     char* stl_filename = NULL;
     struct description desc;
 
-    init_description(&desc);
+    init_description(&stardis->allocator, &desc);
     res = parse_boundary_line(line, &stl_filename, &desc);
     if (res != RES_OK) goto error;
     
@@ -497,41 +501,8 @@ stardis_release(struct stardis* stardis)
   }
   sa_release(stardis->geometry.interf_bytrg);
   stardis->geometry.interf_bytrg = NULL;
-  for (i=0; i<sa_size(stardis->descriptions); ++i) {
-    struct description* desc = &stardis->descriptions[i];
-    switch (desc->type) {
-    case DESC_MAT_SOLID:
-      free(desc->d.solid.power);
-      free(desc->d.solid.Tinit);
-      free(desc->d.solid.Temp);
-      break;
-    case DESC_MAT_FLUID:
-      free(desc->d.fluid.Tinit);
-      free(desc->d.fluid.Temp);
-      break;
-    case DESC_BOUND_H_FOR_SOLID:
-    case DESC_BOUND_H_FOR_FLUID:
-      free(desc->d.h_boundary.T);
-      break;
-    case DESC_BOUND_T_FOR_SOLID:
-    case DESC_BOUND_T_FOR_FLUID:
-      free(desc->d.t_boundary.T);
-      te_free(desc->d.t_boundary.te_temperature);
-      break;
-    case DESC_BOUND_F_FOR_SOLID:
-      free(desc->d.f_boundary.flux);
-      te_free(desc->d.f_boundary.te_flux);
-      break;
-    case DESC_SOLID_FLUID_CONNECT:
-      break;
-    default: {
-      char msg[1024];
-      snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
-        __FUNCTION__, __FILE__, __LINE__);
-      FATAL(msg);
-    }
-    }
-  }
+  for (i=0; i<sa_size(stardis->descriptions); ++i)
+    release_description(stardis->descriptions + i);
   sa_release(stardis->descriptions);
   release_geometry(&stardis->geometry);
   sa_release(stardis->boundary.primitives);

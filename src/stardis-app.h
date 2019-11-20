@@ -146,6 +146,48 @@ eq_fluid(const struct mat_fluid* a, const struct mat_fluid* b)
   return 1;
 }
 
+static FINLINE res_T
+cp_fluid(struct mat_fluid* dst, const struct mat_fluid* src)
+{
+  strcpy(dst->name, src->name);
+  dst->fluid_id = src->fluid_id;
+  dst->rho = src->rho;
+  dst->cp = src->cp;
+  if (!src->Tinit) dst->Tinit = NULL;
+  else {
+    dst->Tinit = malloc(sizeof(src->Tinit) + 1);
+    if (!dst->Tinit) return RES_MEM_ERR;
+    strcpy(dst->Tinit, src->Tinit);
+  }
+  if (!src->Temp) dst->Temp = NULL;
+  else {
+    dst->Temp = malloc(sizeof(src->Temp) + 1);
+    if (!dst->Temp) return RES_MEM_ERR;
+    strcpy(dst->Temp, src->Temp);
+  }
+  return RES_OK;
+}
+
+static FINLINE res_T
+cp_release_fluid(struct mat_fluid* dst, struct mat_fluid* src)
+{
+  strcpy(dst->name, src->name);
+  dst->fluid_id = src->fluid_id;
+  dst->rho = src->rho;
+  dst->cp = src->cp;
+  dst->Tinit = src->Tinit; src->Tinit = NULL;
+  dst->Temp = src->Temp; src->Temp = NULL;
+  return RES_OK;
+}
+
+static FINLINE res_T
+release_fluid(struct mat_fluid* a)
+{
+  free(a->Tinit);
+  free(a->Temp);
+  return RES_OK;
+}
+
 static size_t
 hash_fluid(const struct mat_fluid* key)
 {
@@ -230,6 +272,62 @@ eq_solid(const struct mat_solid* a, const struct mat_solid* b)
     return 0;
   if (a->has_power && a->power != b->power) return 0;
   return 1;
+}
+
+static FINLINE res_T
+cp_solid(struct mat_solid* dst, const struct mat_solid* src)
+{
+  strcpy(dst->name, src->name);
+  dst->solid_id = src->solid_id;
+  dst->lambda = src->lambda;
+  dst->rho = src->rho;
+  dst->cp = src->cp;
+  dst->delta = src->delta;
+  if (!src->Tinit) dst->Tinit = NULL;
+  else {
+    dst->Tinit = malloc(sizeof(src->Tinit) + 1);
+    if (!dst->Tinit) return RES_MEM_ERR;
+    strcpy(dst->Tinit, src->Tinit);
+  }
+  if (!src->Temp) dst->Temp = NULL;
+  else {
+    dst->Temp = malloc(sizeof(src->Temp) + 1);
+    if (!dst->Temp) return RES_MEM_ERR;
+    strcpy(dst->Temp, src->Temp);
+  }
+  dst->has_power = src->has_power;
+  if (!src->power) dst->power = NULL;
+  else {
+    dst->power = malloc(sizeof(src->power) + 1);
+    if (!dst->power) return RES_MEM_ERR;
+    strcpy(dst->power, src->power);
+  }
+  return RES_OK;
+}
+
+static FINLINE res_T
+cp_release_solid(struct mat_solid* dst, struct mat_solid* src)
+{
+  strcpy(dst->name, src->name);
+  dst->solid_id = src->solid_id;
+  dst->lambda = src->lambda;
+  dst->rho = src->rho;
+  dst->cp = src->cp;
+  dst->delta = src->delta;
+  dst->Tinit = src->Tinit; src->Tinit = NULL;
+  dst->Temp = src->Temp; src->Temp = NULL;
+  dst->has_power = src->has_power;
+  dst->power = src->power; src->power = NULL;
+  return RES_OK;
+}
+
+static FINLINE res_T
+release_solid(struct mat_solid* a)
+{
+  free(a->power);
+  free(a->Tinit);
+  free(a->Temp);
+  return RES_OK;
 }
 
 static size_t
@@ -339,6 +437,48 @@ eq_h_boundary
   return 1;
 }
 
+static FINLINE res_T
+cp_h_boundary(struct h_boundary* dst, const struct h_boundary* src)
+{
+  strcpy(dst->name, src->name);
+  dst->mat_id = src->mat_id;
+  dst->specular_fraction = src->specular_fraction;
+  if (!src->T) dst->T = NULL;
+  else {
+    dst->T = malloc(sizeof(src->T) + 1);
+    if (!dst->T) return RES_MEM_ERR;
+    strcpy(dst->T, src->T);
+  }
+  dst->has_emissivity = src->has_emissivity;
+  dst->has_hc = src->has_hc;
+  dst->emissivity = src->emissivity;
+  dst->hc_max = src->hc_max;
+  dst->hc = src->hc;
+  return RES_OK;
+}
+
+static FINLINE res_T
+cp_release_h_boundary(struct h_boundary* dst, struct h_boundary* src)
+{
+  strcpy(dst->name, src->name);
+  dst->mat_id = src->mat_id;
+  dst->specular_fraction = src->specular_fraction;
+  dst->T = src->T; src->T = NULL;
+  dst->has_emissivity = src->has_emissivity;
+  dst->has_hc = src->has_hc;
+  dst->emissivity = src->emissivity;
+  dst->hc_max = src->hc_max;
+  dst->hc = src->hc;
+  return RES_OK;
+}
+
+static FINLINE res_T
+release_h_boundary(struct h_boundary* a)
+{
+  free(a->T);
+  return RES_OK;
+}
+
 static size_t
 hash_h_boundary(const struct h_boundary* key)
 {
@@ -440,6 +580,49 @@ eq_t_boundary
   return 1;
 }
 
+static FINLINE res_T
+cp_t_boundary(struct t_boundary* dst, const struct t_boundary* src)
+{
+  strcpy(dst->name, src->name);
+  dst->mat_id = src->mat_id;
+  if (!src->T) dst->T = NULL;
+  else {
+    dst->T = malloc(sizeof(src->T) + 1);
+    if (!dst->T) return RES_MEM_ERR;
+    strcpy(dst->T, src->T);
+  }
+  dst->has_hc = src->has_hc;
+  dst->hc_max = src->hc_max;
+  dst->hc = src->hc;
+  if (!src->te_temperature) dst->te_temperature = NULL;
+  else {
+    dst->te_temperature = te_duplicate(src->te_temperature);
+    if (!dst->te_temperature) return RES_MEM_ERR;
+  }
+  return RES_OK;
+}
+
+static FINLINE res_T
+cp_release_t_boundary(struct t_boundary* dst, struct t_boundary* src)
+{
+  strcpy(dst->name, src->name);
+  dst->mat_id = src->mat_id;
+  dst->T = src->T; src->T = NULL;
+  dst->has_hc = src->has_hc;
+  dst->hc_max = src->hc_max;
+  dst->hc = src->hc;
+  dst->te_temperature = src->te_temperature; src->te_temperature = NULL;
+  return RES_OK;
+}
+
+static FINLINE res_T
+release_t_boundary(struct t_boundary* a)
+{
+  free(a->T);
+  te_free(a->te_temperature);
+  return RES_OK;
+}
+
 static size_t
 hash_t_boundary
   (const struct t_boundary* key,
@@ -512,6 +695,44 @@ eq_f_boundary(const struct f_boundary* a, const struct f_boundary* b)
     && 0 == strcmp(a->flux, b->flux));
 }
 
+static FINLINE res_T
+cp_f_boundary(struct f_boundary* dst, const struct f_boundary* src)
+{
+  strcpy(dst->name, src->name);
+  dst->mat_id = src->mat_id;
+  if (!src->flux) dst->flux = NULL;
+  else {
+    dst->flux = malloc(sizeof(src->flux) + 1);
+    if (!dst->flux) return RES_MEM_ERR;
+    strcpy(dst->flux, src->flux);
+  }
+  if (!src->te_flux) dst->te_flux = NULL;
+  else {
+    dst->te_flux = te_duplicate(src->te_flux);
+    if (!dst->te_flux) return RES_MEM_ERR;
+  }
+  return RES_OK;
+}
+
+static FINLINE res_T
+cp_release_f_boundary(struct f_boundary* dst, struct f_boundary* src)
+{
+  strcpy(dst->name, src->name);
+  dst->mat_id = src->mat_id;
+  dst->flux = malloc(sizeof(src->flux) + 1);
+  dst->flux = src->flux; src->flux = NULL;
+  dst->te_flux = src->te_flux; src->te_flux = NULL;
+  return RES_OK;
+}
+
+static FINLINE res_T
+release_f_boundary(struct f_boundary* a)
+{
+  free(a->flux);
+  te_free(a->te_flux);
+  return RES_OK;
+}
+
 static size_t
 hash_f_boundary(const struct f_boundary* key)
 {
@@ -558,6 +779,32 @@ eq_sf_connect(const struct solid_fluid_connect* a, const struct solid_fluid_conn
     && a->hc_max == b->hc_max
     && a->has_emissivity == b->has_emissivity
     && a->has_hc == b->has_hc);
+}
+
+static FINLINE res_T
+cp_sf_connect(struct solid_fluid_connect* dst, const struct solid_fluid_connect* src)
+{
+  strcpy(dst->name, src->name);
+  dst->specular_fraction = src->specular_fraction;
+  dst->has_emissivity = src->has_emissivity;
+  dst->has_hc = src->has_hc;
+  dst->emissivity = src->emissivity;
+  dst->hc_max = src->hc_max;
+  dst->hc = src->hc;
+  return RES_OK;
+}
+
+static FINLINE res_T
+cp_release_sf_connect(struct solid_fluid_connect* dst, struct solid_fluid_connect* src)
+{
+  return cp_sf_connect(dst, src);
+}
+
+static FINLINE res_T
+release_sf_connect(struct solid_fluid_connect* a)
+{
+  (void)a;
+  return RES_OK;
 }
 
 static size_t
@@ -613,12 +860,6 @@ struct description {
   } d;
 };
 
-FINLINE void
-init_description(struct description* desc) {
-  ASSERT(desc);
-  desc->type = DESCRIPTION_TYPE_COUNT__;
-}
-
 static INLINE void
 print_description
   (FILE* stream,
@@ -671,6 +912,104 @@ eq_description(const struct description* a, const struct description* b)
     return eq_f_boundary(&a->d.f_boundary, &b->d.f_boundary);
   case DESC_SOLID_FLUID_CONNECT:
     return eq_sf_connect(&a->d.sf_connect, &b->d.sf_connect);
+  default: {
+    char msg[1024];
+    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
+      __FUNCTION__, __FILE__, __LINE__);
+    FATAL(msg);
+  }
+  }
+}
+
+static FINLINE res_T
+init_description(struct mem_allocator* alloc, struct description* key)
+{
+  (void)alloc;
+  key->type = DESCRIPTION_TYPE_COUNT__;
+  return RES_OK;
+}
+
+static FINLINE res_T
+cp_description(struct description* dst, const struct description* src)
+{
+  ASSERT(src && dst);
+  dst->type = src->type;
+  switch (dst->type) {
+  case DESC_MAT_SOLID:
+    return cp_solid(&dst->d.solid, &src->d.solid);
+  case DESC_MAT_FLUID:
+    return cp_fluid(&dst->d.fluid, &src->d.fluid);
+  case DESC_BOUND_H_FOR_SOLID:
+  case DESC_BOUND_H_FOR_FLUID:
+    return cp_h_boundary(&dst->d.h_boundary, &src->d.h_boundary);
+  case DESC_BOUND_T_FOR_SOLID:
+  case DESC_BOUND_T_FOR_FLUID:
+    return cp_t_boundary(&dst->d.t_boundary, &src->d.t_boundary);
+  case DESC_BOUND_F_FOR_SOLID:
+    return cp_f_boundary(&dst->d.f_boundary, &src->d.f_boundary);
+  case DESC_SOLID_FLUID_CONNECT:
+    return cp_sf_connect(&dst->d.sf_connect, &src->d.sf_connect);
+  default: {
+    char msg[1024];
+    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
+      __FUNCTION__, __FILE__, __LINE__);
+    FATAL(msg);
+  }
+  }
+}
+
+static FINLINE res_T
+cp_release_description(struct description* dst, struct description* src)
+{
+  ASSERT(src && dst);
+  dst->type = src->type;
+  switch (dst->type) {
+  case DESC_MAT_SOLID:
+    return cp_release_solid(&dst->d.solid, &src->d.solid);
+  case DESC_MAT_FLUID:
+    return cp_release_fluid(&dst->d.fluid, &src->d.fluid);
+  case DESC_BOUND_H_FOR_SOLID:
+  case DESC_BOUND_H_FOR_FLUID:
+    return cp_release_h_boundary(&dst->d.h_boundary, &src->d.h_boundary);
+  case DESC_BOUND_T_FOR_SOLID:
+  case DESC_BOUND_T_FOR_FLUID:
+    return cp_release_t_boundary(&dst->d.t_boundary, &src->d.t_boundary);
+  case DESC_BOUND_F_FOR_SOLID:
+    return cp_release_f_boundary(&dst->d.f_boundary, &src->d.f_boundary);
+  case DESC_SOLID_FLUID_CONNECT:
+    return cp_release_sf_connect(&dst->d.sf_connect, &src->d.sf_connect);
+  case DESCRIPTION_TYPE_COUNT__:
+    return RES_OK;
+  default: {
+    char msg[1024];
+    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
+      __FUNCTION__, __FILE__, __LINE__);
+    FATAL(msg);
+  }
+  }
+}
+
+static FINLINE res_T
+release_description(struct description* a)
+{
+  ASSERT(a);
+  switch (a->type) {
+  case DESC_MAT_SOLID:
+    return release_solid(&a->d.solid);
+  case DESC_MAT_FLUID:
+    return release_fluid(&a->d.fluid);
+  case DESC_BOUND_H_FOR_SOLID:
+  case DESC_BOUND_H_FOR_FLUID:
+    return release_h_boundary(&a->d.h_boundary);
+  case DESC_BOUND_T_FOR_SOLID:
+  case DESC_BOUND_T_FOR_FLUID:
+    return release_t_boundary(&a->d.t_boundary);
+  case DESC_BOUND_F_FOR_SOLID:
+    return release_f_boundary(&a->d.f_boundary);
+  case DESC_SOLID_FLUID_CONNECT:
+    return release_sf_connect(&a->d.sf_connect);
+  case DESCRIPTION_TYPE_COUNT__:
+    return RES_OK;
   default: {
     char msg[1024];
     snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",

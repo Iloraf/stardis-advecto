@@ -921,10 +921,10 @@ parse_boundary_line
     }
     desc->d.sf_connect.has_hc = (desc->d.sf_connect.hc > 0);
     CHK_TOK(strtok(NULL, " "), "hc max");
-    res = cstr_to_double(tk, &desc->d.h_boundary.hc_max);
+    res = cstr_to_double(tk, &desc->d.sf_connect.hc_max);
     if (res != RES_OK
-      || desc->d.h_boundary.hc_max < desc->d.h_boundary.hc
-      || desc->d.h_boundary.hc_max < 0) {
+      || desc->d.sf_connect.hc_max < desc->d.sf_connect.hc
+      || desc->d.sf_connect.hc_max < 0) {
       fprintf(stderr, "Invalid hc_max value: %s\n", tk);
       res = RES_BAD_ARG;
       goto exit;

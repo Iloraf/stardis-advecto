@@ -147,7 +147,11 @@ create_intface
         front_med = media[id];
         fluid_side_shader = &interface_shader.front;
         break;
-      default: FATAL("Invalid type.\n");
+      default: {
+        char msg[1024];
+        sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+        FATAL(msg);
+      }
       }
     }
     if (back_defined) {
@@ -163,7 +167,11 @@ create_intface
         back_med = media[id];
         fluid_side_shader = &interface_shader.back;
         break;
-      default: FATAL("Invalid type.\n");
+      default: {
+        char msg[1024];
+        sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+        FATAL(msg);
+      }
       }
     }
     if (connect_defined) {
@@ -311,7 +319,11 @@ create_intface
           interface_props->alpha = connect->d.sf_connect.specular_fraction;
         }
         break;
-      default: FATAL("Invalid type.\n");
+      default: {
+        char msg[1024];
+        sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+        FATAL(msg);
+      }
       }
     }
 

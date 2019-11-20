@@ -319,7 +319,11 @@ create_holder
     if (res != RES_OK) goto error;
 
     break;
-  default: FATAL("Invalid type.\n");
+  default: {
+    char msg[1024];
+    sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+    FATAL(msg);
+  }
   }
 
 end:

@@ -209,7 +209,11 @@ read_triangles
       sa_push(boundary->sides, current_side);
       continue; /* Next triangle */
       break;
-    default: FATAL("Invalid type.\n");
+    default: {
+      char msg[1024];
+      sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+      FATAL(msg);
+    }
     }
     if (*side_desc_ptr != UINT_MAX && *side_desc_ptr != desc_id) {
       /* Already described with a different description! */
@@ -517,7 +521,13 @@ stardis_release(struct stardis* stardis)
       free(desc->d.f_boundary.flux);
       te_free(desc->d.f_boundary.te_flux);
       break;
-    default: FATAL("Invalid type.\n");
+    case DESC_SOLID_FLUID_CONNECT:
+      break;
+    default: {
+      char msg[1024];
+      sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+      FATAL(msg);
+    }
     }
   }
   sa_release(stardis->descriptions);

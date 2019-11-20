@@ -643,7 +643,11 @@ print_description
   case DESC_BOUND_F_FOR_SOLID:
     print_f_boundary(stream, &desc->d.f_boundary, desc->type);
     break;
-  default: FATAL("Invalid type.\n");
+  default: {
+    char msg[1024];
+    sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+    FATAL(msg);
+  }
   }
 }
 
@@ -666,7 +670,11 @@ eq_description(const struct description* a, const struct description* b)
     return eq_f_boundary(&a->d.f_boundary, &b->d.f_boundary);
   case DESC_SOLID_FLUID_CONNECT:
     return eq_sf_connect(&a->d.sf_connect, &b->d.sf_connect);
-  default: FATAL("Invalid type.\n");
+  default: {
+    char msg[1024];
+    sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+    FATAL(msg);
+  }
   }
 }
 
@@ -688,7 +696,11 @@ hash_description(const struct description* key)
     return hash_f_boundary(&key->d.f_boundary);
   case DESC_SOLID_FLUID_CONNECT:
     return hash_sf_connect(&key->d.sf_connect);
-  default: FATAL("Invalid type.\n");
+  default: {
+    char msg[1024];
+    sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+    FATAL(msg);
+  }
   }
 }
 

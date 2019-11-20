@@ -645,7 +645,8 @@ print_description
     break;
   default: {
     char msg[1024];
-    sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
+      __FUNCTION__, __FILE__, __LINE__);
     FATAL(msg);
   }
   }
@@ -672,7 +673,8 @@ eq_description(const struct description* a, const struct description* b)
     return eq_sf_connect(&a->d.sf_connect, &b->d.sf_connect);
   default: {
     char msg[1024];
-    sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
+      __FUNCTION__, __FILE__, __LINE__);
     FATAL(msg);
   }
   }
@@ -698,7 +700,8 @@ hash_description(const struct description* key)
     return hash_sf_connect(&key->d.sf_connect);
   default: {
     char msg[1024];
-    sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
+      __FUNCTION__, __FILE__, __LINE__);
     FATAL(msg);
   }
   }

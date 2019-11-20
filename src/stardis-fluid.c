@@ -50,11 +50,11 @@ fluid_get_temperature
     return te_eval(fluid_props->t_init, vtx);
   /* Must have had t_init defined: error! */
   if (fluid_props->name[0])
-    sprintf(msg,
+    snprintf(msg, sizeof(msg),
       "fluid_get_temperature: getting undefined Tinit (fluid '%s')\n",
       fluid_props->name);
   else
-    sprintf(msg, "fluid_get_temperature: getting undefined Tinit\n");
+    snprintf(msg, sizeof(msg), "fluid_get_temperature: getting undefined Tinit\n");
   FATAL(msg);
 }
 

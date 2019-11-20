@@ -84,11 +84,11 @@ solid_get_temperature
     return te_eval(solid_props->t_init, vtx);
   /* Must have had t_init defined: error! */
   if (solid_props->name[0])
-    sprintf(msg,
+    snprintf(msg, sizeof(msg),
       "solid_get_temperature: getting undefined Tinit (solid '%s')\n",
       solid_props->name);
   else
-    sprintf(msg, "solid_get_temperature: getting undefined Tinit\n");
+    snprintf(msg, sizeof(msg), "solid_get_temperature: getting undefined Tinit\n");
   FATAL(msg);
 }
 

@@ -211,7 +211,8 @@ read_triangles
       break;
     default: {
       char msg[1024];
-      sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+      snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
+        __FUNCTION__, __FILE__, __LINE__);
       FATAL(msg);
     }
     }
@@ -525,7 +526,8 @@ stardis_release(struct stardis* stardis)
       break;
     default: {
       char msg[1024];
-      sprintf(msg, "%s (%s: %d): Invalid type.\n", __FUNCTION__, __FILE__, __LINE__);
+      snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
+        __FUNCTION__, __FILE__, __LINE__);
       FATAL(msg);
     }
     }

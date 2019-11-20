@@ -142,6 +142,7 @@ te_expr* te_duplicate(te_expr* n) {
   te_expr* nn;
   assert(n);
   nn = malloc(size);
+  if (!nn) return NULL;
   memcpy(nn, n, size);
   return nn;
 }

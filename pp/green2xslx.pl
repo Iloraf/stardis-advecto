@@ -241,7 +241,6 @@ for(my $s=0;  $s <  $counts[$ok_rk]; $s++) {
         my $id = $tmp[5+3*$n];
         my $fc =$tmp[6+3*$n];
         die "Wrong ID" unless ($id >= 0) && (defined $seen_id_types[$id]) && ($seen_id_types[$id] eq $ty);
-        die "Wrong power_term factor!" unless ($fc > 0);
         push @pw_types, $ty;
         push @pw_ids, $id;
         push @pw_factors, $fc;
@@ -250,7 +249,6 @@ for(my $s=0;  $s <  $counts[$ok_rk]; $s++) {
         my $id = $tmp[4+$pw_count*3+2*$n];
         my $fc =$tmp[5+$pw_count*3+2*$n];
         die "Wrong ID" unless ($id >= 0) && (defined $seen_id_types[$id]) && ($seen_id_types[$id] eq 'X');
-        die "Wrong power_term factor!" unless ($fc > 0);
         push @fx_ids, $id;
         push @fx_factors, $fc;
     }
@@ -508,7 +506,7 @@ if($counts[$ok_rk] > 0) {
            my $id = @$pw_ids[$n];
            my $fc = @$pw_factors[$n];
            die "Invalid ID ($id)!" unless ($id >= 0) && (defined $seen_id_types[$id]) && ($seen_id_types[$id] eq $ty);
-           die "Inconsistency!" unless (defined $id_pw_cells[$id]) && ($fc > 0);
+           die "Inconsistency!" unless (defined $id_pw_cells[$id]);
            $formula = $formula."+Model!$id_pw_cells[$id]*$fc";
            $cpt_pw_cells[$id] += $fc;
        }
@@ -516,7 +514,7 @@ if($counts[$ok_rk] > 0) {
            my $id = @$fx_ids[$n];
            my $fc = @$fx_factors[$n];
            die "Invalid ID ($id)!" unless ($id >= 0) && (defined $seen_id_types[$id]);
-           die "Inconsistency!" unless (defined $id_fx_cells[$id]) && ($fc > 0);
+           die "Inconsistency!" unless (defined $id_fx_cells[$id]);
            $formula = $formula."+Model!$id_fx_cells[$id]*$fc";
            $cpt_fx_cells[$id] += $fc;
        }

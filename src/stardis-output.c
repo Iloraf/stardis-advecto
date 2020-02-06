@@ -7,7 +7,7 @@
 
 #include <sdis.h>
 
-#include<star/senc.h>
+#include<star/senc3d.h>
 
 #include <rsys/math.h>
 #include <rsys/mem_allocator.h>
@@ -537,20 +537,17 @@ create_edge_file_if
   FILE* obj = NULL;
   struct htable_vrtx_rank ranks;
   char structs_initialized = 0;
-  struct senc_descriptor* analyze = NULL;
+  struct senc3d_scene* senc3d_scn = NULL;
   struct darray_uint comps;
   struct darray_uint edges;
   unsigned cc_count = 0;
   unsigned *cc, *ee, uimax = UINT_MAX;
 
-  res = sdis_scene_get_analysis(scn, &analyze);
-  if (res != RES_OK) goto error;
-  res = sdis_scene_release_analysis(scn);
-  if (res != RES_OK) goto error;
-
   ASSERT(scn && allocator);
 
-  res = senc_descriptor_get_frontier_segments_count(analyze, &scount);
+  res = sdis_scene_get_senc3d_scene(scn, &senc3d_scn);
+  if (res != RES_OK) goto error;
+  res = senc3d_scene_get_frontier_segments_count(senc3d_scn, &scount);
   if (res != RES_OK) goto error;
 
   if (scount == 0)
@@ -568,7 +565,7 @@ create_edge_file_if
   vcount = 0;
   FOR_EACH(i, 0, scount) {
     unsigned v, edge[2], rk[2];
-    res = senc_descriptor_get_frontier_segment(analyze, i, edge);
+    res = senc3d_scene_get_frontier_segment(senc3d_scn, i, edge);
     if (res != RES_OK) goto error;
     FOR_EACH(v, 0, 2) {
       unsigned* p_rank;
@@ -617,13 +614,13 @@ create_edge_file_if
      * (same numbering scheme for all components) */
     FOR_EACH(v, 0, vcount) {
       double coord[3];
-      res = senc_descriptor_get_global_vertex(analyze, ee[v], coord);
+      res = senc3d_scene_get_vertex(senc3d_scn, ee[v], coord);
       if (res != RES_OK) goto error;
       fprintf(obj, "v %f %f %f\n", SPLIT3(coord));
     }
     FOR_EACH(i, 0, scount) {
       unsigned edge[2], new_ranks[2];
-      res = senc_descriptor_get_frontier_segment(analyze, i, edge);
+      res = senc3d_scene_get_frontier_segment(senc3d_scn, i, edge);
       if (res != RES_OK) goto error;
       ASSERT(cc[edge[0]] == cc[edge[1]]);
       if (cc[edge[0]] != comp)
@@ -644,7 +641,7 @@ create_edge_file_if
 
 end:
   if (obj) fclose(obj);
-  if (analyze) senc_descriptor_ref_put(analyze);
+  if (senc3d_scn) senc3d_scene_ref_put(senc3d_scn);
   if (structs_initialized) {
     htable_vrtx_rank_release(&ranks);
     darray_uint_release(&comps);

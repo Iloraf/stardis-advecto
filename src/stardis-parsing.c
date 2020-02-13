@@ -625,29 +625,25 @@ parse_medium_line
       res = RES_BAD_ARG;
       goto exit;
     }
-    /* Depending of the number of spaces before '"' strtok should
-     * be called once or twice */
-    CHK_TOK(strtok(NULL, "\""), "Tinit");
-    if (*(tk + strspn(tk, " \t")) == '\0') {
-      CHK_TOK(strtok(NULL, "\""), "Tinit");
+    CHK_TOK(strtok(NULL, " "), "Tinit");
+    res = cstr_to_double(tk, &desc->d.solid.tinit);
+    if (res != RES_OK || desc->d.solid.tinit < 0) {
+      fprintf(stderr, "Invalid Tinit: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto exit;
     }
-    desc->d.solid.Tinit = malloc(strlen(tk) + 1);
-    strcpy(desc->d.solid.Tinit, tk);
-    /* Closing " fot Tinit; can return NULL if line ends just after "Tinit" */
-    tk = strtok(NULL, "\"");
 
     /* Volumic Power is optional */
-    if (tk && *(tk + strspn(tk, " \t")) == '\0') {
-      /* Depending of the number of spaces before '"' strtok should
-       * be called once or twice */
-      tk = strtok(NULL, "\"");
-    }
+    tk = strtok(NULL, " ");
     if (tk) {
-      desc->d.solid.power = malloc(strlen(tk) + 1);
-      strcpy(desc->d.solid.power, tk);
-      /* Can be changed aftwerwards if compiled to constant 0  */
-      desc->d.solid.has_power = 1;
+      res = cstr_to_double(tk, &desc->d.solid.vpower);
+      if (res != RES_OK) {
+        fprintf(stderr, "Invalid volumic power: %s\n", tk);
+        res = RES_BAD_ARG;
+        goto exit;
+      }
     }
+    else desc->d.solid.vpower = SDIS_VOLUMIC_POWER_NONE;
   }
   else if (strcmp(tk, "FLUID") == 0) {
     desc->type = DESC_MAT_FLUID;
@@ -681,12 +677,13 @@ parse_medium_line
     }
     /* Depending of the number of spaces before '"' strtok should
      * be called once or twice */
-    CHK_TOK(strtok(NULL, "\""), "Tinit");
-    if (*(tk + strspn(tk, " \t")) == '\0') {
-      CHK_TOK(strtok(NULL, "\""), "Tinit");
+    CHK_TOK(strtok(NULL, " "), "Tinit");
+    res = cstr_to_double(tk, &desc->d.fluid.tinit);
+    if (res != RES_OK || desc->d.fluid.tinit < 0) {
+      fprintf(stderr, "Invalid Tinit: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto exit;
     }
-    desc->d.fluid.Tinit = malloc(strlen(tk) + 1);
-    strcpy(desc->d.fluid.Tinit, tk);
   } else {
     res = RES_BAD_ARG;
     fprintf(stderr, "Invalid medium type: %s\n", tk);
@@ -796,14 +793,13 @@ parse_boundary_line
       res = RES_BAD_ARG;
       goto exit;
     }
-    /* Depending of the number of spaces before '"' strtok should
-     * be called once or twice */
-    CHK_TOK(strtok(NULL, "\""), "temperature");
-    if (*(tk + strspn(tk, " \t")) == '\0') {
-      CHK_TOK(strtok(NULL, "\""), "temperature");
+    CHK_TOK(strtok(NULL, " "), "temperature");
+    res = cstr_to_double(tk, &desc->d.h_boundary.imposed_temperature);
+    if (res != RES_OK || desc->d.h_boundary.imposed_temperature < 0) {
+      fprintf(stderr, "Invalid temperature value: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto exit;
     }
-    desc->d.h_boundary.T = malloc(strlen(tk) + 1);
-    strcpy(desc->d.h_boundary.T, tk);
   }
   else if (t_solid || t_fluid) {
     desc->type = t_solid ? DESC_BOUND_T_FOR_SOLID : DESC_BOUND_T_FOR_FLUID;
@@ -822,14 +818,13 @@ parse_boundary_line
     *stl_filename = malloc(strlen(tk) + 1);
     strcpy(*stl_filename, tk);
 
-    /* Depending of the number of spaces before '"' strtok should
-     * be called once or twice */
-    CHK_TOK(strtok(NULL, "\""), "temperature");
-    if (*(tk + strspn(tk, " \t")) == '\0') {
-      CHK_TOK(strtok(NULL, "\""), "temperature");
+    CHK_TOK(strtok(NULL, " "), "temperature");
+    res = cstr_to_double(tk, &desc->d.t_boundary.imposed_temperature);
+    if (res != RES_OK || desc->d.t_boundary.imposed_temperature < 0) {
+      fprintf(stderr, "Invalid temperature value: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto exit;
     }
-    desc->d.t_boundary.T = malloc(strlen(tk) + 1);
-    strcpy(desc->d.t_boundary.T, tk);
 
     /* Parse hc + hc_max only if fluid */
     if (t_fluid) {
@@ -871,12 +866,13 @@ parse_boundary_line
 
     /* Depending of the number of spaces before '"' strtok should
      * be called once or twice */
-    CHK_TOK(strtok(NULL, "\""), "flux");
-    if (*(tk + strspn(tk, " \t")) == '\0') {
-      CHK_TOK(strtok(NULL, "\""), "flux");
+    CHK_TOK(strtok(NULL, " "), "flux");
+    res = cstr_to_double(tk, &desc->d.f_boundary.imposed_flux);
+    if (res != RES_OK) {
+      fprintf(stderr, "Invalid flux value: %s\n", tk);
+      res = RES_BAD_ARG;
+      goto exit;
     }
-    desc->d.f_boundary.flux = malloc(strlen(tk) + 1);
-    strcpy(desc->d.f_boundary.flux, tk);
   }
   else if (sf_connect) {
     desc->type = DESC_SOLID_FLUID_CONNECT;

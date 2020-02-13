@@ -194,42 +194,33 @@ create_holder
    const int is_green)
 {
   res_T res = RES_OK;
-  /* Could be less restrictive if green output included positions/dates */
-  int prohibited = is_green ? NO_VAR_ALLOWED : ALL_VARS_ALLOWED;
 
   switch (description->type) {
   case DESC_BOUND_H_FOR_SOLID:
     counts->hbound_count++;
     /* Create an external fluid with bound temp as fluid temp */
-    res = create_fluid(dev, NULL, 1, 1, is_green, 1, NULL,
-      description->d.h_boundary.T, media, &description->d.h_boundary.mat_id);
+    res = create_fluid(dev, NULL, 1, 1, is_green, 1, -1,
+      description->d.h_boundary.imposed_temperature, media,
+      &description->d.h_boundary.mat_id);
     if (res != RES_OK) goto error;
     break;
   case DESC_BOUND_H_FOR_FLUID:
     /* Create an external solid with bound temp as solid temp */
     counts->hbound_count++;
-    res = create_solid(dev, NULL, INF, 1, 1, 1, is_green, 1, NULL,
-      description->d.h_boundary.T, NULL, media, NULL,
+    res = create_solid(dev, NULL, INF, 1, 1, 1, is_green, 1, -1,
+      description->d.h_boundary.imposed_temperature, 0, media,
       &description->d.h_boundary.mat_id);
     if (res != RES_OK) goto error;
     break;
   case DESC_BOUND_T_FOR_SOLID:
     counts->tbound_count++;
-    ASSERT(description->d.t_boundary.T != NULL);
-    res = compile_expr_to_fn(&description->d.t_boundary.te_temperature,
-      description->d.t_boundary.T, prohibited, NULL);
-    if (res != RES_OK) {
-      fprintf(stderr, "Invalid boundary temperature expression: %s\n",
-        description->d.t_boundary.T);
-      goto error;
-    }
     if (dummies->dummy_fluid) {
       /* Reuse external dummy fluid */
       description->d.t_boundary.mat_id = dummies->dummy_fluid_id;
     } else {
       /* Create dummy fluid */
-      res = create_fluid(dev, NULL, 1, 1, is_green, 1, NULL,
-        NULL, media, &description->d.t_boundary.mat_id);
+      res = create_fluid(dev, NULL, 1, 1, is_green, 1, -1,
+        -1, media, &description->d.t_boundary.mat_id);
       if (res != RES_OK) goto error;
       dummies->dummy_fluid = sa_last(*media);
       dummies->dummy_fluid_id = description->d.t_boundary.mat_id;
@@ -237,21 +228,13 @@ create_holder
     break;
   case DESC_BOUND_T_FOR_FLUID:
     counts->tbound_count++;
-    ASSERT(description->d.t_boundary.T != NULL);
-    res = compile_expr_to_fn(&description->d.t_boundary.te_temperature,
-      description->d.t_boundary.T, prohibited, NULL);
-    if (res != RES_OK) {
-      fprintf(stderr, "Invalid boundary temperature expression: %s\n",
-        description->d.t_boundary.T);
-      goto error;
-    }
     if (dummies->dummy_solid) {
       /* Reuse external dummy solid */
       description->d.t_boundary.mat_id = dummies->dummy_solid_id;
     } else {
       /* Create dummy solid */
-      res = create_solid(dev, NULL, 1, 1, 1, 1, is_green, 1, NULL,
-        NULL, NULL, media, NULL, &description->d.t_boundary.mat_id);
+      res = create_solid(dev, NULL, 1, 1, 1, 1, is_green, 1, -1,
+        -1, 0, media, &description->d.t_boundary.mat_id);
       if (res != RES_OK) goto error;
       dummies->dummy_solid = sa_last(*media);
       dummies->dummy_solid_id = description->d.t_boundary.mat_id;
@@ -259,20 +242,12 @@ create_holder
     break;
   case DESC_BOUND_F_FOR_SOLID:
     counts->fbound_count++;
-    ASSERT(description->d.f_boundary.flux != NULL);
-    res = compile_expr_to_fn(&description->d.f_boundary.te_flux,
-      description->d.f_boundary.flux, 1, NULL);
-    if (res != RES_OK) {
-      fprintf(stderr, "Invalid boundary flux expression: %s\n",
-        description->d.f_boundary.flux);
-      goto error;
-    }
     if (dummies->dummy_fluid) {
       /* Reuse external dummy fluid */
       description->d.f_boundary.mat_id = dummies->dummy_fluid_id;
     } else {
       /* Create dummy fluid */
-      res = create_fluid(dev, NULL, 1, 1, is_green, 1, NULL, NULL,
+      res = create_fluid(dev, NULL, 1, 1, is_green, 1, -1, -1,
         media, &description->d.f_boundary.mat_id);
       if (res != RES_OK) goto error;
       dummies->dummy_fluid = sa_last(*media);
@@ -296,11 +271,10 @@ create_holder
       description->d.solid.delta,
       is_green,
       0,
-      description->d.solid.Tinit,
-      description->d.solid.Temp,
-      description->d.solid.power,
+      description->d.solid.tinit,
+      description->d.solid.imposed_temperature,
+      description->d.solid.vpower,
       media,
-      &description->d.solid.has_power,
       &description->d.solid.solid_id);
     if (res != RES_OK) goto error;
     break;
@@ -312,8 +286,8 @@ create_holder
       description->d.fluid.cp,
       is_green,
       0,
-      description->d.fluid.Tinit,
-      description->d.fluid.Temp,
+      description->d.fluid.tinit,
+      description->d.fluid.imposed_temperature,
       media,
       &description->d.fluid.fluid_id);
     if (res != RES_OK) goto error;
@@ -742,47 +716,6 @@ error:
 /*******************************************************************************
  * Public Functions
  ******************************************************************************/
-
-res_T
-compile_expr_to_fn
-  (struct te_expr** f,
-   const char* math_expr,
-   const int prohibited,
-   int* is_zero)
-{
-  te_variable vars[4] = {
-    TE_DEF_OFFSET("x", offsetof(struct sdis_rwalk_vertex, P[0])),
-    TE_DEF_OFFSET("y", offsetof(struct sdis_rwalk_vertex, P[1])),
-    TE_DEF_OFFSET("z", offsetof(struct sdis_rwalk_vertex, P[2])),
-    TE_DEF_OFFSET("t", offsetof(struct sdis_rwalk_vertex, time))
-  };
-  int fst = 0, lst = 4;
-
-  ASSERT(f && math_expr);
-  ASSERT(prohibited == (prohibited & NO_VAR_ALLOWED)); /* Use only defined flags */
-
-  if (prohibited & XYZ_PROHIBITED) fst = 3;
-  if (prohibited & T_PROHIBITED) lst = 3;
-  *f = te_compile(math_expr, vars + fst, lst - fst, NULL);
-  if (!*f) {
-    if (!te_compile(math_expr, vars, 4, NULL))
-      return RES_BAD_ARG; /* Expr is not valid */
-    /* Expr is valid */
-    if (prohibited != ALL_VARS_ALLOWED)
-      fprintf(stderr, "Expression \"%s\" use a probibited variable ", math_expr);
-    if (prohibited == NO_VAR_ALLOWED)
-      fprintf(stderr, "(no variable allowed)\n");
-    else if (prohibited == XYZ_PROHIBITED)
-      fprintf(stderr, "(xyz prohibited)\n");
-    else {
-      ASSERT(prohibited == T_PROHIBITED);
-      fprintf(stderr, "(t prohibited)\n");
-    }
-    return RES_BAD_OP; /* Expr is valid, but use a forbidden var */
-  }
-  if (is_zero) *is_zero = !((*f)->type == TE_CONSTANT && (*f)->v.value == 0);
-  return RES_OK;
-}
 
 res_T
 stardis_compute

@@ -2,7 +2,6 @@
 #include "stardis-compute.h"
 
 #include <sdis.h>
-#include <tinyexpr.h>
 #include<rsys/stretchy_array.h>
 
 #include <limits.h>
@@ -37,17 +36,15 @@ fluid_get_temperature
    struct sdis_data* data)
 {
   const struct fluid* fluid_props = sdis_data_cget(data);
-  ASSERT(fluid_props->t_init || fluid_props->temp);
   if (fluid_props->is_green || vtx->time > fluid_props->t0) {
     /* Always use temp for Green mode, regardless of time */
-    if (fluid_props->temp)
-      return te_eval(fluid_props->temp, vtx);
+    if (fluid_props->imposed_temperature >= 0)
+      return fluid_props->imposed_temperature;
     else return -1;
   }
-  /* Time is t0: use t_init */
-  if (fluid_props->t_init)
-    return te_eval(fluid_props->t_init, vtx);
-  /* Must have had t_init defined: error! */
+  /* Time is <= 0: use tinit */
+  if (fluid_props->tinit >= 0) return fluid_props->tinit;
+  /* Must have had tinit defined: error! */
   if (fluid_props->name[0]) {
     fprintf(stderr,
       "fluid_get_temperature: getting undefined Tinit (fluid '%s')\n",
@@ -56,15 +53,6 @@ fluid_get_temperature
     abort();
   } else
     FATAL("fluid_get_temperature: getting undefined Tinit\n");
-}
-
-static void
-release_fluid_data
-  (void* f)
-{
-  struct fluid* fluid = (struct fluid*)f;
-  te_free(fluid->t_init);
-  te_free(fluid->temp);
 }
 
 /*******************************************************************************
@@ -79,8 +67,8 @@ create_fluid
    const double cp,
    const int is_green,
    const int is_outside,
-   const char* tinit_expr,
-   const char* t_expr,
+   const double tinit,
+   const double imposed_temperature,
    struct sdis_medium*** media_ptr,
    unsigned* out_id)
 {
@@ -89,15 +77,14 @@ create_fluid
   struct sdis_data* data = NULL;
   struct fluid* fluid_props;
   size_t sz;
-  /* Could be less restrictive if green output included positions/dates */
-  int prohibited = is_green ? NO_VAR_ALLOWED : ALL_VARS_ALLOWED;
 
   ASSERT(dev && rho >= 0 && cp >= 0 && media_ptr && out_id);
+  ASSERT(tinit >= 0 || imposed_temperature >= 0);
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
   fluid_shader.volumic_mass = fluid_get_volumic_mass;
   fluid_shader.temperature = fluid_get_temperature;
   res = sdis_data_create(dev, sizeof(struct fluid), ALIGNOF(struct fluid),
-    release_fluid_data, &data);
+    NULL, &data);
   if (res != RES_OK) goto error;
 
   sz = sa_size(*media_ptr);
@@ -107,31 +94,12 @@ create_fluid
   else fluid_props->name[0] = '\0';
   fluid_props->cp = cp;
   fluid_props->rho = rho;
-  fluid_props->t_init = NULL;
-  fluid_props->temp = NULL;
+  fluid_props->tinit = tinit;
+  fluid_props->imposed_temperature = imposed_temperature;
   fluid_props->is_green = is_green;
   fluid_props->is_outside = is_outside;
-  fluid_props->t0 = 0;
   fluid_props->id = (unsigned)sz;
 
-  if (tinit_expr) {
-    res = compile_expr_to_fn(&fluid_props->t_init, tinit_expr,
-      prohibited | T_PROHIBITED, NULL);
-    if (res != RES_OK) {
-      if (res == RES_BAD_ARG)
-        fprintf(stderr, "Invalid initial temperature expression: %s\n",
-          tinit_expr);
-      goto error;
-    }
-  }
-  if (t_expr) {
-    res = compile_expr_to_fn(&fluid_props->temp, t_expr, prohibited, NULL);
-    if (res != RES_OK) {
-      fprintf(stderr, "Invalid temperature expression: %s\n",
-        t_expr);
-      goto error;
-    }
-  }
   res = sdis_fluid_create(dev, &fluid_shader, data, sa_add(*media_ptr, 1));
   if (res != RES_OK) goto error;
   *out_id = fluid_props->id;

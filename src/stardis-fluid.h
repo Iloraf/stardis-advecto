@@ -6,7 +6,6 @@
 #include <sdis.h>
 #include <rsys/rsys.h>
 
-struct te_expr;
 struct sdis_device;
 struct sdis_medium;
 
@@ -19,10 +18,9 @@ struct fluid {
   double rho; /* Volumic mass */
   /* Compute mode */
   int is_green, is_outside;
-  double t0;
-  /* TinyExpr stuff to compute temperature */
-  struct te_expr *temp;
-  struct te_expr *t_init;
+  double t0; /* End time of tinit */
+  double tinit;
+  double imposed_temperature;
   /* ID */
   unsigned id;
 };
@@ -35,8 +33,8 @@ create_fluid
    const double cp,
    const int is_green,
    const int is_outside,
-   const char* tinit_expr,
-   const char* t_expr,
+   const double tinit,
+   const double imposed_temperature,
    struct sdis_medium*** media_ptr,
    unsigned* out_id);
 

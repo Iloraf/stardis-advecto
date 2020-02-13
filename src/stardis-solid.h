@@ -5,7 +5,6 @@
 
 #include <rsys/rsys.h>
 
-struct te_expr;
 struct sdis_device;
 struct sdis_medium;
 
@@ -18,13 +17,12 @@ struct solid {
   double lambda; /* Conductivity */
   double rho; /* Volumic mass */
   double delta; /* Numerical parameter */
+  double tinit; /* Initial temperature */
+  double imposed_temperature; /* allow to impose a T; -1 if unset */
+  double vpower;
   /* Compute mode */
   int is_green, is_outside;
-  double t0;
-  /* TinyExpr stuff to compute temperature & power */
-  struct te_expr *temp;
-  struct te_expr *t_init;
-  struct te_expr *power;
+  double t0; /* End time of tinit */
   /* ID */
   unsigned id;
 };
@@ -39,11 +37,10 @@ create_solid
    const double delta,
    const int is_green,
    const int is_outside,
-   const char* tinit_expr, /* Can be NULL if not used by getter */
-   const char* t_expr, /* Can be NULL if not used by getter */
-   const char* power_expr, /* Can be NULL */
+   const double tinit,
+   const double imposed_temperature,
+   const double vpower,
    struct sdis_medium*** media_ptr,
-   int* out_has_power, /* Can be NULL */
    unsigned* out_id);
 
 #endif

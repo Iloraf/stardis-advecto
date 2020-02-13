@@ -7,7 +7,6 @@
 
 #include <limits.h>
 
-struct te_expr;
 struct sdis_data;
 struct sdis_device;
 struct geometry;
@@ -21,9 +20,9 @@ struct intface {
   double hc; /* Convection coefficient */
   double emissivity;
   double alpha;
-  /* TinyExpr stuff to compute temperature & flux */
-  struct te_expr *temperature;
-  struct te_expr *flux;
+  /* Imposed compute temperature & flux */
+  double imposed_temperature;
+  double imposed_flux;
   /* IDs */
   unsigned front_boundary_id, back_boundary_id;
 };

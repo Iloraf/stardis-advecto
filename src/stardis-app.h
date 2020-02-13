@@ -11,7 +11,6 @@
 #include <rsys/stretchy_array.h>
 #include <rsys/hash_table.h>
 #include <sdis.h>
-#include <tinyexpr.h>
 
 #include <limits.h>
 
@@ -116,10 +115,10 @@ struct mat_fluid {
   unsigned fluid_id;
   double rho;
   double cp;
-  char* Tinit;
-  char* Temp;
+  double tinit;
+  double imposed_temperature;
 };
-#define NULL_FLUID__ { "", UINT_MAX, 0, 0, NULL, NULL }
+#define NULL_FLUID__ { "", UINT_MAX, 0, 0, -1, -1 }
 static const struct mat_fluid NULL_FLUID = NULL_FLUID__;
 
 static void
@@ -128,20 +127,19 @@ print_fluid(FILE* stream, const struct mat_fluid* f)
   ASSERT(stream && f);
   fprintf(stream, "Fluid '%s': cp=%g rho=%g",
     f->name, f->cp, f->rho);
-  if (f->Tinit) fprintf(stream, " Tinit='%s'", f->Tinit);
-  if (f->Temp) fprintf(stream, " Temp='%s'", f->Temp);
+  if (f->tinit >= 0) fprintf(stream, " Tinit=%f", f->tinit);
+  if (f->imposed_temperature >= 0) fprintf(stream, " Temp=%f", f->imposed_temperature);
   fprintf(stream, "\n");
-}
+}static char
 
-static char
 eq_fluid(const struct mat_fluid* a, const struct mat_fluid* b)
 {
   if (strcmp(a->name, b->name)
     || a->fluid_id != b->fluid_id
     || a->rho != b->rho
     || a->cp != b->cp
-    || strcmp(a->Tinit, b->Tinit)
-    || strcmp(a->Temp, b->Temp))
+    || a->tinit != b->tinit
+    || a->imposed_temperature != b->imposed_temperature)
     return 0;
   return 1;
 }
@@ -153,38 +151,8 @@ cp_fluid(struct mat_fluid* dst, const struct mat_fluid* src)
   dst->fluid_id = src->fluid_id;
   dst->rho = src->rho;
   dst->cp = src->cp;
-  if (!src->Tinit) dst->Tinit = NULL;
-  else {
-    dst->Tinit = malloc(sizeof(src->Tinit) + 1);
-    if (!dst->Tinit) return RES_MEM_ERR;
-    strcpy(dst->Tinit, src->Tinit);
-  }
-  if (!src->Temp) dst->Temp = NULL;
-  else {
-    dst->Temp = malloc(sizeof(src->Temp) + 1);
-    if (!dst->Temp) return RES_MEM_ERR;
-    strcpy(dst->Temp, src->Temp);
-  }
-  return RES_OK;
-}
-
-static FINLINE res_T
-cp_release_fluid(struct mat_fluid* dst, struct mat_fluid* src)
-{
-  strcpy(dst->name, src->name);
-  dst->fluid_id = src->fluid_id;
-  dst->rho = src->rho;
-  dst->cp = src->cp;
-  dst->Tinit = src->Tinit; src->Tinit = NULL;
-  dst->Temp = src->Temp; src->Temp = NULL;
-  return RES_OK;
-}
-
-static FINLINE res_T
-release_fluid(struct mat_fluid* a)
-{
-  free(a->Tinit);
-  free(a->Temp);
+  dst->tinit = src->tinit;
+  dst->imposed_temperature = src->imposed_temperature;
   return RES_OK;
 }
 
@@ -193,8 +161,8 @@ hash_fluid(const struct mat_fluid* key)
 {
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
+    (uint64_t)(((uint64_t)1 << 40) + ((uint64_t)1 << 8) + 0xB3);
+  const uint64_t OFFSET64_BASIS = (uint64_t)14695981039346656037u;
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
@@ -207,23 +175,23 @@ hash_fluid(const struct mat_fluid* key)
     hash = hash * FNV64_PRIME;
   }
   FOR_EACH(i, 0, sizeof(key->rho)) {
-    hash = hash ^ (uint64_t) ((unsigned char)((const char*)&key->rho)[i]);
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->rho)[i]);
     hash = hash * FNV64_PRIME;
   }
   FOR_EACH(i, 0, sizeof(key->cp)) {
     hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->cp)[i]);
     hash = hash * FNV64_PRIME;
   }
-  hash = hash ^ (uint64_t)((unsigned char)(key->Tinit == 0));
+  hash = hash ^ (uint64_t)((unsigned char)(key->tinit == 0));
   hash = hash * FNV64_PRIME;
-  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit)*sizeof(*key->Tinit) : 0) {
-    hash = hash ^ (uint64_t)((unsigned char) ((const char*)key->Tinit)[i]);
+  FOR_EACH(i, 0, sizeof(key->tinit)) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->tinit)[i]);
     hash = hash * FNV64_PRIME;
   }
-  hash = hash ^ (uint64_t)((unsigned char)(key->Temp == 0));
+  hash = hash ^ (uint64_t)((unsigned char)(key->imposed_temperature == 0));
   hash = hash * FNV64_PRIME;
-  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)key->Temp)[i]);
+  FOR_EACH(i, 0, sizeof(key->imposed_temperature)) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->imposed_temperature)[i]);
     hash = hash * FNV64_PRIME;
   }
   return hash;
@@ -236,12 +204,11 @@ struct mat_solid {
   double rho;
   double cp;
   double delta;
-  char* Tinit;
-  char* Temp;
-  char* power;
-  int has_power;
+  double tinit;
+  double imposed_temperature;
+  double vpower;
 };
-#define NULL_SOLID__ { "", UINT_MAX, 0, 0, 0, 0, NULL, NULL, NULL, 0}
+#define NULL_SOLID__ { "", UINT_MAX, 0, 0, 0, 0, -1, -1, 0 }
 static const struct mat_solid NULL_SOLID = NULL_SOLID__;
 
 static void
@@ -249,11 +216,11 @@ print_solid(FILE* stream, const struct mat_solid* s)
 {
   ASSERT(stream && s);
   fprintf(stream,
-    "Solid '%s': lambda=%g cp=%g rho=%g delta=%g Power='%s'",
-    s->name, s->lambda, s->cp, s->rho, s->delta,
-    (s->has_power ? s->power : "0"));
-  if (s->Tinit) fprintf(stream, " Tinit='%s'", s->Tinit);
-  if (s->Temp) fprintf(stream, " Temp='%s'", s->Temp);
+    "Solid '%s': lambda=%g cp=%g rho=%g delta=%g Power=%f",
+    s->name, s->lambda, s->cp, s->rho, s->delta, s->vpower);
+  if (s->tinit >= 0) fprintf(stream, " Tinit=%f", s->tinit);
+  if (s->imposed_temperature >= 0)
+    fprintf(stream, " Temp=%f", s->imposed_temperature);
   fprintf(stream, "\n");
 }
 
@@ -266,11 +233,9 @@ eq_solid(const struct mat_solid* a, const struct mat_solid* b)
     || a->rho != b->rho
     || a->cp != b->cp
     || a->delta != b->delta
-    || strcmp(a->Tinit, b->Tinit)
-    || strcmp(a->Temp, b->Temp)
-    || a->has_power != b->has_power)
+    || a->tinit != b->tinit
+    || a->imposed_temperature != b->imposed_temperature)
     return 0;
-  if (a->has_power && a->power != b->power) return 0;
   return 1;
 }
 
@@ -283,50 +248,8 @@ cp_solid(struct mat_solid* dst, const struct mat_solid* src)
   dst->rho = src->rho;
   dst->cp = src->cp;
   dst->delta = src->delta;
-  if (!src->Tinit) dst->Tinit = NULL;
-  else {
-    dst->Tinit = malloc(sizeof(src->Tinit) + 1);
-    if (!dst->Tinit) return RES_MEM_ERR;
-    strcpy(dst->Tinit, src->Tinit);
-  }
-  if (!src->Temp) dst->Temp = NULL;
-  else {
-    dst->Temp = malloc(sizeof(src->Temp) + 1);
-    if (!dst->Temp) return RES_MEM_ERR;
-    strcpy(dst->Temp, src->Temp);
-  }
-  dst->has_power = src->has_power;
-  if (!src->power) dst->power = NULL;
-  else {
-    dst->power = malloc(sizeof(src->power) + 1);
-    if (!dst->power) return RES_MEM_ERR;
-    strcpy(dst->power, src->power);
-  }
-  return RES_OK;
-}
-
-static FINLINE res_T
-cp_release_solid(struct mat_solid* dst, struct mat_solid* src)
-{
-  strcpy(dst->name, src->name);
-  dst->solid_id = src->solid_id;
-  dst->lambda = src->lambda;
-  dst->rho = src->rho;
-  dst->cp = src->cp;
-  dst->delta = src->delta;
-  dst->Tinit = src->Tinit; src->Tinit = NULL;
-  dst->Temp = src->Temp; src->Temp = NULL;
-  dst->has_power = src->has_power;
-  dst->power = src->power; src->power = NULL;
-  return RES_OK;
-}
-
-static FINLINE res_T
-release_solid(struct mat_solid* a)
-{
-  free(a->power);
-  free(a->Tinit);
-  free(a->Temp);
+  dst->tinit = src->tinit;
+  dst->imposed_temperature = src->imposed_temperature;
   return RES_OK;
 }
 
@@ -335,8 +258,8 @@ hash_solid(const struct mat_solid* key)
 {
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
+    (uint64_t)(((uint64_t)1 << 40) + ((uint64_t)1 << 8) + 0xB3);
+  const uint64_t OFFSET64_BASIS = (uint64_t)14695981039346656037u;
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
@@ -364,25 +287,21 @@ hash_solid(const struct mat_solid* key)
     hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->delta)[i]);
     hash = hash * FNV64_PRIME;
   }
-  hash = hash ^ (uint64_t)((unsigned char)(key->Tinit == 0));
+  hash = hash ^ (uint64_t)((unsigned char)(key->tinit == 0));
   hash = hash * FNV64_PRIME;
-  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit) * sizeof(*key->Tinit) : 0) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)key->Tinit)[i]);
+  FOR_EACH(i, 0,sizeof(key->tinit)) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->tinit)[i]);
     hash = hash * FNV64_PRIME;
   }
-  hash = hash ^ (uint64_t)((unsigned char)(key->Temp == 0));
+  hash = hash ^ (uint64_t)((unsigned char)(key->imposed_temperature == 0));
   hash = hash * FNV64_PRIME;
-  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)key->Temp)[i]);
+  FOR_EACH(i, 0, sizeof(key->imposed_temperature)) {
+    hash = hash ^ (uint64_t)((unsigned char)
+      ((const char*)&key->imposed_temperature)[i]);
     hash = hash * FNV64_PRIME;
   }
-  FOR_EACH(i, 0, sizeof(key->has_power)) {
-    hash = hash ^ (uint64_t) ((unsigned char) ((const char*) &key->has_power)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  if (!key->has_power) return hash;
-  FOR_EACH(i, 0, strlen(key->power) * sizeof(*key->power)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)key->power)[i]);
+  FOR_EACH(i, 0, sizeof(key->vpower)) {
+    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->vpower)[i]);
     hash = hash * FNV64_PRIME;
   }
   return hash;
@@ -395,10 +314,10 @@ struct h_boundary {
   double specular_fraction;
   double hc;
   double hc_max;
-  char* T;
+  double imposed_temperature;
   int has_emissivity, has_hc;
 };
-#define NULL_HBOUND__ { "", UINT_MAX, 0, 0, 0, 0, NULL, 0, 0}
+#define NULL_HBOUND__ { "", UINT_MAX, 0, 0, 0, -1, 0, 0 }
 static const struct h_boundary NULL_HBOUND = NULL_HBOUND__;
 
 static void
@@ -410,25 +329,23 @@ print_h_boundary
   ASSERT(stream && b
     && (type == DESC_BOUND_H_FOR_SOLID || type == DESC_BOUND_H_FOR_FLUID));
   fprintf(stream,
-    "H boundary %s for %s: emissivity=%g specular_fraction=%g hc=%g hc_max=%g T='%s'\n",
+    "H boundary %s for %s: emissivity=%g specular_fraction=%g hc=%g hc_max=%g T=%f\n",
     b->name,
     (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"),
     (b->has_emissivity ? b->emissivity : 0),
     (b->has_emissivity ? b->specular_fraction : 0),
     (b->has_hc ? b->hc : 0),
     (b->has_hc ? b->hc_max : 0),
-    (b->T ? b->T : "0"));
+    b->imposed_temperature);
 }
 
 static char
-eq_h_boundary
-  (const struct h_boundary* a,
-   const struct h_boundary* b)
+eq_h_boundary(const struct h_boundary* a, const struct h_boundary* b)
 {
   if (a->mat_id != b->mat_id
     || strcmp(a->name, b->name)
     || a->specular_fraction != b->specular_fraction
-    || strcmp(a->T, b->T)
+    || a->imposed_temperature != b->imposed_temperature
     || a->has_emissivity != b->has_emissivity
     || a->has_hc != b->has_hc)
     return 0;
@@ -443,39 +360,12 @@ cp_h_boundary(struct h_boundary* dst, const struct h_boundary* src)
   strcpy(dst->name, src->name);
   dst->mat_id = src->mat_id;
   dst->specular_fraction = src->specular_fraction;
-  if (!src->T) dst->T = NULL;
-  else {
-    dst->T = malloc(sizeof(src->T) + 1);
-    if (!dst->T) return RES_MEM_ERR;
-    strcpy(dst->T, src->T);
-  }
+  dst->imposed_temperature = src->imposed_temperature;
   dst->has_emissivity = src->has_emissivity;
   dst->has_hc = src->has_hc;
   dst->emissivity = src->emissivity;
   dst->hc_max = src->hc_max;
   dst->hc = src->hc;
-  return RES_OK;
-}
-
-static FINLINE res_T
-cp_release_h_boundary(struct h_boundary* dst, struct h_boundary* src)
-{
-  strcpy(dst->name, src->name);
-  dst->mat_id = src->mat_id;
-  dst->specular_fraction = src->specular_fraction;
-  dst->T = src->T; src->T = NULL;
-  dst->has_emissivity = src->has_emissivity;
-  dst->has_hc = src->has_hc;
-  dst->emissivity = src->emissivity;
-  dst->hc_max = src->hc_max;
-  dst->hc = src->hc;
-  return RES_OK;
-}
-
-static FINLINE res_T
-release_h_boundary(struct h_boundary* a)
-{
-  free(a->T);
   return RES_OK;
 }
 
@@ -484,8 +374,8 @@ hash_h_boundary(const struct h_boundary* key)
 {
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
+    (uint64_t)(((uint64_t)1 << 40) + ((uint64_t)1 << 8) + 0xB3);
+  const uint64_t OFFSET64_BASIS = (uint64_t)14695981039346656037u;
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
@@ -502,11 +392,13 @@ hash_h_boundary(const struct h_boundary* key)
     hash = hash * FNV64_PRIME;
   }
   FOR_EACH(i, 0, sizeof(key->specular_fraction)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->specular_fraction)[i]);
+    hash = hash ^ (uint32_t)((unsigned char)
+      ((const char*)&key->specular_fraction)[i]);
     hash = hash * FNV64_PRIME;
   }
-  FOR_EACH(i, 0, strlen(key->T) * sizeof(*key->T)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->T)[i]);
+  FOR_EACH(i, 0, sizeof(key->imposed_temperature)) {
+    hash = hash ^ (uint32_t)((unsigned char)
+      ((const char*)&key->imposed_temperature)[i]);
     hash = hash * FNV64_PRIME;
   }
   FOR_EACH(i, 0, sizeof(key->has_emissivity)) {
@@ -514,16 +406,16 @@ hash_h_boundary(const struct h_boundary* key)
     hash = hash * FNV64_PRIME;
   }
   FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->has_hc)[i]);
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_hc)[i]);
     hash = hash * FNV64_PRIME;
   }
   if (!key->has_hc) return hash;
   FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->hc)[i]);
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc)[i]);
     hash = hash * FNV64_PRIME;
   }
   FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->hc_max)[i]);
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc_max)[i]);
     hash = hash * FNV64_PRIME;
   }
   return hash;
@@ -532,13 +424,12 @@ hash_h_boundary(const struct h_boundary* key)
 struct t_boundary {
   char name[32];
   unsigned mat_id;
-  char* T;
-  struct te_expr* te_temperature;
+  double imposed_temperature;
   double hc;
   double hc_max;
   int has_hc;
 };
-#define NULL_TBOUND__ { "", UINT_MAX, NULL, NULL, 0, 0, 0}
+#define NULL_TBOUND__ { "", UINT_MAX, -1, 0, 0, 0 }
 static const struct t_boundary NULL_TBOUND = NULL_TBOUND__;
 
 static void
@@ -550,12 +441,12 @@ print_t_boundary
   ASSERT(stream && b
     && (type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID));
   fprintf(stream,
-    "T boundary %s  for %s: hc=%g hc_max=%g T='%s'\n",
+    "T boundary %s  for %s: hc=%g hc_max=%g T=%f\n",
     b->name,
     (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
     (b->has_hc ? b->hc : 0),
     (b->has_hc ? b->hc_max : 0),
-    (b->T ? b->T : "0"));
+    b->imposed_temperature);
 }
 
 static char
@@ -568,7 +459,7 @@ eq_t_boundary
   /* These fields are meaningful  by both types */
   if (strcmp(a->name, b->name))
     return 0;
-  if (a->mat_id != b->mat_id || strcmp(a->T, b->T))
+  if (a->mat_id != b->mat_id || a->imposed_temperature != b->imposed_temperature)
     return 0;
   if (type != DESC_BOUND_T_FOR_FLUID)
     return 1;
@@ -585,55 +476,24 @@ cp_t_boundary(struct t_boundary* dst, const struct t_boundary* src)
 {
   strcpy(dst->name, src->name);
   dst->mat_id = src->mat_id;
-  if (!src->T) dst->T = NULL;
-  else {
-    dst->T = malloc(sizeof(src->T) + 1);
-    if (!dst->T) return RES_MEM_ERR;
-    strcpy(dst->T, src->T);
-  }
+  dst->imposed_temperature = src->imposed_temperature;
   dst->has_hc = src->has_hc;
   dst->hc_max = src->hc_max;
   dst->hc = src->hc;
-  if (!src->te_temperature) dst->te_temperature = NULL;
-  else {
-    dst->te_temperature = te_duplicate(src->te_temperature);
-    if (!dst->te_temperature) return RES_MEM_ERR;
-  }
-  return RES_OK;
-}
-
-static FINLINE res_T
-cp_release_t_boundary(struct t_boundary* dst, struct t_boundary* src)
-{
-  strcpy(dst->name, src->name);
-  dst->mat_id = src->mat_id;
-  dst->T = src->T; src->T = NULL;
-  dst->has_hc = src->has_hc;
-  dst->hc_max = src->hc_max;
-  dst->hc = src->hc;
-  dst->te_temperature = src->te_temperature; src->te_temperature = NULL;
-  return RES_OK;
-}
-
-static FINLINE res_T
-release_t_boundary(struct t_boundary* a)
-{
-  free(a->T);
-  te_free(a->te_temperature);
   return RES_OK;
 }
 
 static size_t
 hash_t_boundary
-  (const struct t_boundary* key,
-   const enum description_type type)
+(const struct t_boundary* key,
+  const enum description_type type)
 {
   (void)type;
   ASSERT(type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID);
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
+    (uint64_t)(((uint64_t)1 << 40) + ((uint64_t)1 << 8) + 0xB3);
+  const uint64_t OFFSET64_BASIS = (uint64_t)14695981039346656037u;
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
@@ -646,11 +506,12 @@ hash_t_boundary
     hash = hash * FNV64_PRIME;
   }
   FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->has_hc)[i]);
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_hc)[i]);
     hash = hash * FNV64_PRIME;
   }
-  FOR_EACH(i, 0, strlen(key->T) * sizeof(*key->T)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) key->T)[i]);
+  FOR_EACH(i, 0, sizeof(key->imposed_temperature)) {
+    hash = hash ^ (uint32_t)((unsigned char)
+      ((const char*)&key->imposed_temperature)[i]);
     hash = hash * FNV64_PRIME;
   }
   if (!key->has_hc) return hash;
@@ -668,23 +529,21 @@ hash_t_boundary
 struct f_boundary {
   char name[32];
   unsigned mat_id;
-  char* flux;
-  struct te_expr* te_flux;
+  double imposed_flux;
 };
-#define NULL_FBOUND__ { "", UINT_MAX, NULL, NULL}
+#define NULL_FBOUND__ { "", UINT_MAX, SDIS_FLUX_NONE }
 static const struct f_boundary NULL_FBOUND = NULL_FBOUND__;
 
 static void
 print_f_boundary
   (FILE* stream,
-   const struct f_boundary* b,
-   const enum description_type type)
+   const struct f_boundary* b)
 {
-  ASSERT(stream && b && type == DESC_BOUND_F_FOR_SOLID); (void)type;
+  ASSERT(stream && b);
   fprintf(stream,
-    "F boundary %s for SOLID: flux='%s'\n",
+    "F boundary %s for SOLID: flux=%f\n",
     b->name,
-    (b->flux ? b->flux : "0"));
+    b->imposed_flux);
 }
 
 static char
@@ -692,7 +551,7 @@ eq_f_boundary(const struct f_boundary* a, const struct f_boundary* b)
 {
   return (a->mat_id == b->mat_id
     && 0 == strcmp(a->name, b->name)
-    && 0 == strcmp(a->flux, b->flux));
+    && a->imposed_flux == b->imposed_flux);
 }
 
 static FINLINE res_T
@@ -700,36 +559,7 @@ cp_f_boundary(struct f_boundary* dst, const struct f_boundary* src)
 {
   strcpy(dst->name, src->name);
   dst->mat_id = src->mat_id;
-  if (!src->flux) dst->flux = NULL;
-  else {
-    dst->flux = malloc(sizeof(src->flux) + 1);
-    if (!dst->flux) return RES_MEM_ERR;
-    strcpy(dst->flux, src->flux);
-  }
-  if (!src->te_flux) dst->te_flux = NULL;
-  else {
-    dst->te_flux = te_duplicate(src->te_flux);
-    if (!dst->te_flux) return RES_MEM_ERR;
-  }
-  return RES_OK;
-}
-
-static FINLINE res_T
-cp_release_f_boundary(struct f_boundary* dst, struct f_boundary* src)
-{
-  strcpy(dst->name, src->name);
-  dst->mat_id = src->mat_id;
-  dst->flux = malloc(sizeof(src->flux) + 1);
-  dst->flux = src->flux; src->flux = NULL;
-  dst->te_flux = src->te_flux; src->te_flux = NULL;
-  return RES_OK;
-}
-
-static FINLINE res_T
-release_f_boundary(struct f_boundary* a)
-{
-  free(a->flux);
-  te_free(a->te_flux);
+  dst->imposed_flux = src->imposed_flux;
   return RES_OK;
 }
 
@@ -738,8 +568,8 @@ hash_f_boundary(const struct f_boundary* key)
 {
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
+    (uint64_t)(((uint64_t)1 << 40) + ((uint64_t)1 << 8) + 0xB3);
+  const uint64_t OFFSET64_BASIS = (uint64_t)14695981039346656037u;
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
@@ -751,8 +581,8 @@ hash_f_boundary(const struct f_boundary* key)
     hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
     hash = hash * FNV64_PRIME;
   }
-  FOR_EACH(i, 0, strlen(key->flux) * sizeof(*key->flux)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->flux)[i]);
+  FOR_EACH(i, 0, sizeof(key->imposed_flux)) {
+    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->imposed_flux)[i]);
     hash = hash * FNV64_PRIME;
   }
   return hash;
@@ -768,6 +598,20 @@ struct solid_fluid_connect {
 };
 #define NULL_SFCONNECT__ { "", 0, 0, 0, 0, 0, 0}
 static const struct solid_fluid_connect NULL_SFCONNECT = NULL_SFCONNECT__;
+
+static void
+print_sf_connect
+  (FILE* stream,
+   const struct solid_fluid_connect* c)
+{
+  ASSERT(stream && c);
+  fprintf(stream, "Solid-Fluid connection %s:", c->name);
+  if(c->has_emissivity)
+    fprintf(stream, " emissivity=%f, specular_fraction=%f",
+      c->emissivity, c->specular_fraction);
+  if (c->has_hc) fprintf(stream, " hc=%f", c->hc);
+  fprintf(stream, "\n");
+}
 
 static char
 eq_sf_connect(const struct solid_fluid_connect* a, const struct solid_fluid_connect* b)
@@ -812,8 +656,8 @@ hash_sf_connect(const struct solid_fluid_connect* key)
 {
   /* 64-bits Fowler/Noll/Vo hash function */
   const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
+    (uint64_t)(((uint64_t)1 << 40) + ((uint64_t)1 << 8) + 0xB3);
+  const uint64_t OFFSET64_BASIS = (uint64_t)14695981039346656037u;
   uint64_t hash = OFFSET64_BASIS;
   size_t i;
   ASSERT(key);
@@ -847,7 +691,6 @@ hash_sf_connect(const struct solid_fluid_connect* key)
   }
   return hash;
 }
-
 struct description {
   enum description_type type;
   union d {
@@ -882,7 +725,10 @@ print_description
     print_h_boundary(stream, &desc->d.h_boundary, desc->type);
     break;
   case DESC_BOUND_F_FOR_SOLID:
-    print_f_boundary(stream, &desc->d.f_boundary, desc->type);
+    print_f_boundary(stream, &desc->d.f_boundary);
+    break;
+  case DESC_SOLID_FLUID_CONNECT:
+    print_sf_connect(stream, &desc->d.sf_connect);
     break;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
@@ -908,6 +754,29 @@ eq_description(const struct description* a, const struct description* b)
     return eq_f_boundary(&a->d.f_boundary, &b->d.f_boundary);
   case DESC_SOLID_FLUID_CONNECT:
     return eq_sf_connect(&a->d.sf_connect, &b->d.sf_connect);
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
+  }
+}
+
+static INLINE size_t
+hash_description(const struct description* key)
+{
+  switch (key->type) {
+  case DESC_MAT_SOLID:
+    return hash_solid(&key->d.solid);
+  case DESC_MAT_FLUID:
+    return hash_fluid(&key->d.fluid);
+  case DESC_BOUND_H_FOR_SOLID:
+  case DESC_BOUND_H_FOR_FLUID:
+    return hash_h_boundary(&key->d.h_boundary);
+  case DESC_BOUND_T_FOR_SOLID:
+  case DESC_BOUND_T_FOR_FLUID:
+    return hash_t_boundary(&key->d.t_boundary, key->type);
+  case DESC_BOUND_F_FOR_SOLID:
+    return hash_f_boundary(&key->d.f_boundary);
+  case DESC_SOLID_FLUID_CONNECT:
+    return hash_sf_connect(&key->d.sf_connect);
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
@@ -941,82 +810,6 @@ cp_description(struct description* dst, const struct description* src)
     return cp_f_boundary(&dst->d.f_boundary, &src->d.f_boundary);
   case DESC_SOLID_FLUID_CONNECT:
     return cp_sf_connect(&dst->d.sf_connect, &src->d.sf_connect);
-  default:
-    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
-  }
-}
-
-static FINLINE res_T
-cp_release_description(struct description* dst, struct description* src)
-{
-  ASSERT(src && dst);
-  dst->type = src->type;
-  switch (dst->type) {
-  case DESC_MAT_SOLID:
-    return cp_release_solid(&dst->d.solid, &src->d.solid);
-  case DESC_MAT_FLUID:
-    return cp_release_fluid(&dst->d.fluid, &src->d.fluid);
-  case DESC_BOUND_H_FOR_SOLID:
-  case DESC_BOUND_H_FOR_FLUID:
-    return cp_release_h_boundary(&dst->d.h_boundary, &src->d.h_boundary);
-  case DESC_BOUND_T_FOR_SOLID:
-  case DESC_BOUND_T_FOR_FLUID:
-    return cp_release_t_boundary(&dst->d.t_boundary, &src->d.t_boundary);
-  case DESC_BOUND_F_FOR_SOLID:
-    return cp_release_f_boundary(&dst->d.f_boundary, &src->d.f_boundary);
-  case DESC_SOLID_FLUID_CONNECT:
-    return cp_release_sf_connect(&dst->d.sf_connect, &src->d.sf_connect);
-  case DESCRIPTION_TYPE_COUNT__:
-    return RES_OK;
-  default:
-    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
-  }
-}
-
-static FINLINE res_T
-release_description(struct description* a)
-{
-  ASSERT(a);
-  switch (a->type) {
-  case DESC_MAT_SOLID:
-    return release_solid(&a->d.solid);
-  case DESC_MAT_FLUID:
-    return release_fluid(&a->d.fluid);
-  case DESC_BOUND_H_FOR_SOLID:
-  case DESC_BOUND_H_FOR_FLUID:
-    return release_h_boundary(&a->d.h_boundary);
-  case DESC_BOUND_T_FOR_SOLID:
-  case DESC_BOUND_T_FOR_FLUID:
-    return release_t_boundary(&a->d.t_boundary);
-  case DESC_BOUND_F_FOR_SOLID:
-    return release_f_boundary(&a->d.f_boundary);
-  case DESC_SOLID_FLUID_CONNECT:
-    return release_sf_connect(&a->d.sf_connect);
-  case DESCRIPTION_TYPE_COUNT__:
-    return RES_OK;
-  default:
-    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
-  }
-}
-
-static INLINE size_t
-hash_description(const struct description* key)
-{
-  switch (key->type) {
-  case DESC_MAT_SOLID:
-    return hash_solid(&key->d.solid);
-  case DESC_MAT_FLUID:
-    return hash_fluid(&key->d.fluid);
-  case DESC_BOUND_H_FOR_SOLID:
-  case DESC_BOUND_H_FOR_FLUID:
-    return hash_h_boundary(&key->d.h_boundary);
-  case DESC_BOUND_T_FOR_SOLID:
-  case DESC_BOUND_T_FOR_FLUID:
-    return hash_t_boundary(&key->d.t_boundary, key->type);
-  case DESC_BOUND_F_FOR_SOLID:
-    return hash_f_boundary(&key->d.f_boundary);
-  case DESC_SOLID_FLUID_CONNECT:
-    return hash_sf_connect(&key->d.sf_connect);
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }

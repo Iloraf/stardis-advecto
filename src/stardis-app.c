@@ -11,8 +11,6 @@
 #define HTABLE_KEY_FUNCTOR_HASH hash_description
 #define HTABLE_KEY_FUNCTOR_INIT init_description
 #define HTABLE_KEY_FUNCTOR_COPY cp_description
-#define HTABLE_KEY_FUNCTOR_RELEASE release_description
-#define HTABLE_KEY_FUNCTOR_COPY_AND_RELEASE cp_release_description
 #include <rsys/hash_table.h>
 
 #include <string.h>
@@ -498,8 +496,6 @@ stardis_release(struct stardis* stardis)
   }
   sa_release(stardis->geometry.interf_bytrg);
   stardis->geometry.interf_bytrg = NULL;
-  for (i=0; i<sa_size(stardis->descriptions); ++i)
-    release_description(stardis->descriptions + i);
   sa_release(stardis->descriptions);
   release_geometry(&stardis->geometry);
   sa_release(stardis->boundary.primitives);

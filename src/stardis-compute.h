@@ -11,7 +11,6 @@
 #define HTABLE_KEY unsigned
 #include <rsys/hash_table.h>
 
-struct te_expr;
 struct stardis;
 
 struct counts {
@@ -22,21 +21,6 @@ struct counts {
   0, 0, 0, 0, 0, 0\
  }
 static const struct counts COUNTS_NULL = COUNTS_NULL__;
-
-/* A type to limit variable use in tinyexpr expressions */
-enum var_prohibited_t {
-  ALL_VARS_ALLOWED = 0,
-  T_PROHIBITED = BIT(4),
-  XYZ_PROHIBITED = BIT(5),
-  NO_VAR_ALLOWED = T_PROHIBITED | XYZ_PROHIBITED
-};
-
-extern res_T
-compile_expr_to_fn
-  (struct te_expr** f,
-   const char* math_expr,
-   const int prohibited,
-   int* is_zero);
 
 extern res_T
 stardis_compute

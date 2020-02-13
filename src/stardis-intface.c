@@ -2,7 +2,6 @@
 #include "stardis-app.h"
 #include "stardis-output.h"
 
-#include <tinyexpr.h>
 #include <sdis.h>
 #include <rsys/stretchy_array.h>
 
@@ -26,11 +25,8 @@ interface_get_temperature
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-
-  if (interface_props->temperature == NULL)
-    return -1;
-
-  return te_eval(interface_props->temperature, frag);
+  (void)frag;
+  return interface_props->imposed_temperature;
 }
 
 static double
@@ -39,11 +35,8 @@ interface_get_flux
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-
-  if (interface_props->flux == NULL)
-    return SDIS_FLUX_NONE;
-
-  return te_eval(interface_props->flux, frag);
+  (void)frag;
+  return interface_props->imposed_flux;
 }
 
 static double
@@ -64,15 +57,6 @@ interface_get_alpha
   const struct intface* interface_props = sdis_data_cget(data);
   (void)frag;
   return interface_props->alpha;
-}
-
-static void
-release_interface_data
-  (void* s)
-{
-  struct intface* intface = (struct intface*)s;
-  te_free(intface->temperature);
-  te_free(intface->flux);
 }
 
 /*******************************************************************************
@@ -127,10 +111,10 @@ create_intface
     int connect_defined = (cd != UINT_MAX);
 
     SDIS(data_create(dev, sizeof(struct intface), ALIGNOF(struct intface),
-      release_interface_data, &data));
+      NULL, &data));
     interface_props = sdis_data_get(data);
-    interface_props->temperature = NULL;
-    interface_props->flux = NULL;
+    interface_props->imposed_temperature = -1;
+    interface_props->imposed_flux = SDIS_FLUX_NONE;
     interface_props->front_boundary_id = UINT_MAX;
     interface_props->back_boundary_id = UINT_MAX;
 
@@ -266,9 +250,9 @@ create_intface
            * TODO: should be outside to allow contact resistances */
           interface_shader.back.temperature = interface_get_temperature;
         }
-        ASSERT(connect->d.t_boundary.te_temperature);
-        interface_props->temperature
-          = te_duplicate(connect->d.t_boundary.te_temperature);
+        ASSERT(connect->d.t_boundary.imposed_temperature >= 0);
+        interface_props->imposed_temperature
+          = connect->d.t_boundary.imposed_temperature;
         if (connect->d.t_boundary.has_hc) {
           ASSERT(connect->type == DESC_BOUND_T_FOR_FLUID);
           interface_shader.convection_coef = interface_get_convection_coef;
@@ -292,8 +276,8 @@ create_intface
           front_med = media[connect->d.f_boundary.mat_id];
           interface_shader.back.flux = interface_get_flux;
         }
-        ASSERT(connect->d.f_boundary.te_flux);
-        interface_props->flux = te_duplicate(connect->d.f_boundary.te_flux);
+        ASSERT(connect->d.f_boundary.imposed_flux != SDIS_FLUX_NONE);
+        interface_props->imposed_flux = connect->d.f_boundary.imposed_flux;
         break;
       case DESC_SOLID_FLUID_CONNECT:
         /* Both front and back should be defined;

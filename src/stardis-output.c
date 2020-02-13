@@ -440,8 +440,8 @@ dump_green
       const struct mat_solid* sl;
       if (desc->type != DESC_MAT_SOLID) continue;
       sl = &desc->d.solid;
-      printf("%u\t%s\t%g\t%g\t%g\t%s\n",
-        i, sl->name, sl->lambda, sl->rho, sl->cp, (sl->has_power ? sl->power : "0"));
+      printf("%u\t%s\t%g\t%g\t%g\t%g\n",
+        i, sl->name, sl->lambda, sl->rho, sl->cp, sl->vpower);
     }
   }
   if (counts->fmed_count) {
@@ -465,7 +465,7 @@ dump_green
       if (desc->type != DESC_BOUND_T_FOR_SOLID
         && desc->type != DESC_BOUND_T_FOR_FLUID) continue;
       bd = &desc->d.t_boundary;
-      printf("%u\t%s\t%s\n", i, bd->name, bd->T);
+      printf("%u\t%s\t%g\n", i, bd->name, bd->imposed_temperature);
     }
   }
   if (counts->hbound_count) {
@@ -477,10 +477,11 @@ dump_green
       if (desc->type != DESC_BOUND_H_FOR_SOLID
         && desc->type != DESC_BOUND_H_FOR_FLUID) continue;
       bd = &desc->d.h_boundary;
-      printf("%u\t%s\t%g\t%g\t%g\t%g\t%s\n",
+      printf("%u\t%s\t%g\t%g\t%g\t%g\t%g\n",
         i, bd->name, (bd->has_emissivity ? bd->emissivity : 0),
         (bd->has_emissivity ? bd->specular_fraction : 0),
-        (bd->has_hc ? bd->hc : 0), (bd->has_hc ? bd->hc_max : 0), bd->T);
+        (bd->has_hc ? bd->hc : 0), (bd->has_hc ? bd->hc_max : 0),
+        bd->imposed_temperature);
     }
   }
   if (counts->fbound_count) {
@@ -491,8 +492,8 @@ dump_green
       const struct f_boundary* bd;
       if (desc->type != DESC_BOUND_F_FOR_SOLID) continue;
       bd = &desc->d.f_boundary;
-      printf("%u\t%s\t%s\n",
-        i, bd->name, bd->flux);
+      printf("%u\t%s\t%g\n",
+        i, bd->name, bd->imposed_flux);
     }
   }
 

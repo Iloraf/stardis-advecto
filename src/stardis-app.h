@@ -884,12 +884,8 @@ print_description
   case DESC_BOUND_F_FOR_SOLID:
     print_f_boundary(stream, &desc->d.f_boundary, desc->type);
     break;
-  default: {
-    char msg[1024];
-    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
-      __FUNCTION__, __FILE__, __LINE__);
-    FATAL(msg);
-  }
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
 }
 
@@ -912,12 +908,8 @@ eq_description(const struct description* a, const struct description* b)
     return eq_f_boundary(&a->d.f_boundary, &b->d.f_boundary);
   case DESC_SOLID_FLUID_CONNECT:
     return eq_sf_connect(&a->d.sf_connect, &b->d.sf_connect);
-  default: {
-    char msg[1024];
-    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
-      __FUNCTION__, __FILE__, __LINE__);
-    FATAL(msg);
-  }
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
 }
 
@@ -949,12 +941,8 @@ cp_description(struct description* dst, const struct description* src)
     return cp_f_boundary(&dst->d.f_boundary, &src->d.f_boundary);
   case DESC_SOLID_FLUID_CONNECT:
     return cp_sf_connect(&dst->d.sf_connect, &src->d.sf_connect);
-  default: {
-    char msg[1024];
-    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
-      __FUNCTION__, __FILE__, __LINE__);
-    FATAL(msg);
-  }
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
 }
 
@@ -980,12 +968,8 @@ cp_release_description(struct description* dst, struct description* src)
     return cp_release_sf_connect(&dst->d.sf_connect, &src->d.sf_connect);
   case DESCRIPTION_TYPE_COUNT__:
     return RES_OK;
-  default: {
-    char msg[1024];
-    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
-      __FUNCTION__, __FILE__, __LINE__);
-    FATAL(msg);
-  }
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
 }
 
@@ -1010,12 +994,8 @@ release_description(struct description* a)
     return release_sf_connect(&a->d.sf_connect);
   case DESCRIPTION_TYPE_COUNT__:
     return RES_OK;
-  default: {
-    char msg[1024];
-    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
-      __FUNCTION__, __FILE__, __LINE__);
-    FATAL(msg);
-  }
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
 }
 
@@ -1037,12 +1017,8 @@ hash_description(const struct description* key)
     return hash_f_boundary(&key->d.f_boundary);
   case DESC_SOLID_FLUID_CONNECT:
     return hash_sf_connect(&key->d.sf_connect);
-  default: {
-    char msg[1024];
-    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
-      __FUNCTION__, __FILE__, __LINE__);
-    FATAL(msg);
-  }
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
 }
 

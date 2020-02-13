@@ -319,12 +319,8 @@ create_holder
     if (res != RES_OK) goto error;
 
     break;
-  default: {
-    char msg[1024];
-    snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
-      __FUNCTION__, __FILE__, __LINE__);
-    FATAL(msg);
-  }
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
 
 end:
@@ -832,7 +828,7 @@ stardis_compute
     sa_size(stardis->geometry.vertex),
     geometry_get_position, &stardis->geometry, &scn);
   if(res != RES_OK) {
-    fprintf(stderr, "%s: could not setup the scene!\n", __FUNCTION__);
+    fprintf(stderr, "%s: could not setup the scene!\n", FUNC_NAME);
     goto error;
   }
 
@@ -857,7 +853,7 @@ stardis_compute
     res = compute_map(scn, stardis, mode);
   else FATAL("Unknown mode.\n");
   if(res != RES_OK) {
-    fprintf(stderr, "%s: computation failed!\n", __FUNCTION__);
+    fprintf(stderr, "%s: computation failed!\n", FUNC_NAME);
     goto error;
   }
 

@@ -37,7 +37,6 @@ fluid_get_temperature
    struct sdis_data* data)
 {
   const struct fluid* fluid_props = sdis_data_cget(data);
-  char msg[128];
   ASSERT(fluid_props->t_init || fluid_props->temp);
   if (fluid_props->is_green || vtx->time > fluid_props->t0) {
     /* Always use temp for Green mode, regardless of time */
@@ -49,13 +48,14 @@ fluid_get_temperature
   if (fluid_props->t_init)
     return te_eval(fluid_props->t_init, vtx);
   /* Must have had t_init defined: error! */
-  if (fluid_props->name[0])
-    snprintf(msg, sizeof(msg),
+  if (fluid_props->name[0]) {
+    fprintf(stderr,
       "fluid_get_temperature: getting undefined Tinit (fluid '%s')\n",
       fluid_props->name);
-  else
-    snprintf(msg, sizeof(msg), "fluid_get_temperature: getting undefined Tinit\n");
-  FATAL(msg);
+    ASSERT(0);
+    abort();
+  } else
+    FATAL("fluid_get_temperature: getting undefined Tinit\n");
 }
 
 static void

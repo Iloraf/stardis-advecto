@@ -18,20 +18,23 @@ project(stardis-app C)
 
 set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 
-################################################################################
+###############################################################################
 # Check dependencies
-################################################################################
+###############################################################################
 find_package(RCMake 0.4 REQUIRED)
 find_package(RSys 0.8.1 REQUIRED)
-find_package(StarEnc 0.3.1 REQUIRED)
+find_package(StarGeom3D 0.1 REQUIRED)
+find_package(StarEnc3D 0.3.1 REQUIRED)
 find_package(Stardis 0.7.1 REQUIRED)
 find_package(StarSTL 0.3 REQUIRED)
 
-set(TINYEXPR_SOURCE_DIR  "${PROJECT_SOURCE_DIR}/../tinyexpr" CACHE PATH "Directory for TinyExpr source files")
+set(TINYEXPR_SOURCE_DIR  "${PROJECT_SOURCE_DIR}/../tinyexpr"
+  CACHE PATH "Directory for TinyExpr source files")
 
 include_directories(
   ${RSys_INCLUDE_DIR}
-  ${StarEnc_INCLUDE_DIR}
+  ${StarGeom3D_INCLUDE_DIR}
+  ${StarEnc3D_INCLUDE_DIR}
   ${Stardis_INCLUDE_DIR}
   ${StarSTL_INCLUDE_DIR}
   ${TINYEXPR_SOURCE_DIR})
@@ -44,11 +47,11 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${RCMAKE_SOURCE_DIR})
 include(rcmake)
 include(rcmake_runtime)
 
-rcmake_append_runtime_dirs(_runtime_dirs RSys Stardis StarEnc StarSTL)
+rcmake_append_runtime_dirs(_runtime_dirs RSys Stardis StarGeom3D StarEnc3D StarSTL)
 
-################################################################################
+###############################################################################
 # Configure and define targets
-################################################################################
+###############################################################################
 set(VERSION_MAJOR 0)
 set(VERSION_MINOR 4)
 set(VERSION_PATCH 0)
@@ -81,10 +84,12 @@ rcmake_prepend_path(SDIS_FILES_INC ${SDIS_SOURCE_DIR})
 rcmake_prepend_path(SDIS_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
 # Default is right to left pow and log is natural log
-# Build tinyExpr without closure support and with function_1 to function_3 support only
-# (these ones cannot be disabled as predefined functions require them).
+# Build tinyExpr without closure support and with function_1 to function_3
+# support only (these ones cannot be disabled as predefined functions require
+# them).
 set(TE_DEFAULTS
-  "-DTE_POW_FROM_RIGHT -DTE_NAT_LOG -DTE_WITHOUT_CLOSURES -DTE_WITHOUT_FUNCTION_0 -DTE_MAX_FUNCTION_ARITY=3")
+  "-DTE_POW_FROM_RIGHT -DTE_NAT_LOG -DTE_WITHOUT_CLOSURES \
+   -DTE_WITHOUT_FUNCTION_0 -DTE_MAX_FUNCTION_ARITY=3")
 
 ADD_LIBRARY(tinyexpr STATIC
   ${TINYEXPR_SOURCE_DIR}/tinyexpr.c ${TINYEXPR_SOURCE_DIR}/tinyexpr.h)
@@ -105,19 +110,21 @@ if(CMAKE_COMPILER_IS_GNUCC)
   set_target_properties(sdis-app PROPERTIES
     COMPILE_FLAGS "-std=c99 ${TE_DEFAULTS}"
     VERSION ${VERSION})
-  target_link_libraries(sdis-app Stardis StarEnc StarSTL RSys tinyexpr m)
+  target_link_libraries(sdis-app
+    Stardis StarGeom3D StarEnc3D StarSTL RSys tinyexpr m)
 elseif(MSVC)
   set_target_properties(sdis-app PROPERTIES
     COMPILE_FLAGS "${TE_DEFAULTS}"
     VERSION ${VERSION})
-  target_link_libraries(sdis-app Stardis StarEnc StarSTL RSys tinyexpr MuslGetopt)
+  target_link_libraries(sdis-app
+    Stardis StarGeom3D StarEnc3D StarSTL RSys tinyexpr MuslGetopt)
 endif()
 
 rcmake_copy_runtime_libraries(sdis-app)
 
-################################################################################
+###############################################################################
 # Define output & install directories
-################################################################################
+###############################################################################
 install(TARGETS sdis-app
   ARCHIVE DESTINATION bin
   LIBRARY DESTINATION lib

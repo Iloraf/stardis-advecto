@@ -213,12 +213,8 @@ read_triangles
       sa_push(boundary->sides, current_side);
       continue; /* Next triangle */
       break;
-    default: {
-      char msg[1024];
-      snprintf(msg, sizeof(msg), "%s (%s: %d): Invalid type.\n",
-        __FUNCTION__, __FILE__, __LINE__);
-      FATAL(msg);
-    }
+    default: 
+      FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
     }
     if (*side_desc_ptr != UINT_MAX && *side_desc_ptr != desc_id) {
       /* Already described with a different description! */
@@ -227,7 +223,8 @@ read_triangles
         (file_type == CONTENT_CONNECTION
           ? "connection" : (current_side == SDIS_FRONT ? "front" : "back")),
         stl_filename);
-      print_trg_as_obj(stderr, (const struct vertex*)stl_desc->vertices, stl_desc->indices + (3 * tri_index));
+      print_trg_as_obj(stderr, (const struct vertex*)stl_desc->vertices,
+        stl_desc->indices + (3 * tri_index));
       return RES_BAD_ARG;
     }
     /* Everithing is OK: store description */

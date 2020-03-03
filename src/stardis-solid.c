@@ -1,8 +1,8 @@
 #include "stardis-solid.h"
 #include "stardis-compute.h"
+#include "stardis-app.h"
 
 #include <sdis.h>
-#include<rsys/stretchy_array.h>
 
 #include <limits.h>
 
@@ -67,23 +67,24 @@ solid_get_temperature
    struct sdis_data* data)
 {
   const struct solid* solid_props = sdis_data_cget(data);
-  if (solid_props->is_green || vtx->time > solid_props->t0) {
+  if(solid_props->is_green || vtx->time > solid_props->t0) {
     /* Always use temp for Green mode, regardless of time */
-    if (solid_props->imposed_temperature >= 0)
+    if(solid_props->imposed_temperature >= 0)
       return solid_props->imposed_temperature;
     else return -1;
   }
   /* Time is <= 0: use tinit */
-  if (solid_props->tinit >= 0) return solid_props->tinit;
+  if(solid_props->tinit >= 0) return solid_props->tinit;
   /* Must have had t_init defined: error! */
-  if (solid_props->name[0]) {
+  if(str_is_empty(&solid_props->name)) {
+    FATAL("solid_get_temperature: getting undefined Tinit\n");
+  } else {
     fprintf(stderr,
       "solid_get_temperature: getting undefined Tinit (solid '%s')\n",
-      solid_props->name);
+      str_cget(&solid_props->name));
     ASSERT(0);
     abort();
-  } else
-    FATAL("solid_get_temperature: getting undefined Tinit\n");
+  }
 }
 
 static double
@@ -103,7 +104,8 @@ solid_get_power
 res_T
 create_solid
   (struct sdis_device* dev,
-   const char* name,
+   struct mem_allocator* allocator,
+   const struct str* name,
    const double lambda,
    const double rho,
    const double cp,
@@ -113,7 +115,7 @@ create_solid
    const double tinit,
    const double imposed_temperature,
    const double vpower,
-   struct sdis_medium*** media_ptr,
+   struct darray_media_ptr* media_ptr,
    unsigned* out_id)
 {
   res_T res = RES_OK;
@@ -133,15 +135,14 @@ create_solid
   solid_shader.delta_boundary = solid_get_delta_boundary;
 #endif
   solid_shader.temperature = solid_get_temperature;
-  res = sdis_data_create(dev, sizeof(struct solid), ALIGNOF(struct solid),
-    NULL, &data);
-  if (res != RES_OK) goto error;
+  ERR(sdis_data_create(dev, sizeof(struct solid), ALIGNOF(struct solid),
+    NULL, &data));
 
-  sz = sa_size(*media_ptr);
+  sz = darray_media_ptr_size_get(media_ptr);
   ASSERT(sz < INT_MAX);
   solid_props = sdis_data_get(data); /* Fetch the allocated memory space */
-  if (name) strncpy(solid_props->name, name, sizeof(solid_props->name));
-  else solid_props->name[0] = '\0';
+  str_init(allocator, &solid_props->name);
+  if(name) str_copy(&solid_props->name, name);
   solid_props->lambda = lambda;
   solid_props->rho = rho;
   solid_props->cp = cp;
@@ -152,13 +153,14 @@ create_solid
   solid_props->is_green = is_green;
   solid_props->is_outside = is_outside;
   solid_props->id = (unsigned)sz;
-  if (vpower != 0) solid_shader.volumic_power = solid_get_power;
-  res = sdis_solid_create(dev, &solid_shader, data, sa_add(*media_ptr, 1));
-  if (res != RES_OK) goto error;
+  if(vpower != 0) solid_shader.volumic_power = solid_get_power;
+  ERR(darray_media_ptr_resize(media_ptr, sz + 1));
+  ERR(sdis_solid_create(dev, &solid_shader, data,
+    darray_media_ptr_data_get(media_ptr) + sz));
   *out_id = solid_props->id;
 
 end:
-  if (data) SDIS(data_ref_put(data));
+  if(data) SDIS(data_ref_put(data));
   return res;
 error:
   goto end;

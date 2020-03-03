@@ -12,12 +12,14 @@ struct sdis_device;
 struct geometry;
 struct description;
 struct sdis_medium;
+struct darray_descriptions;
+struct darray_media_ptr;
 
 /*******************************************************************************
  * Interface data
  ******************************************************************************/
 struct intface {
-  double hc; /* Convection coefficient */
+  double hc;
   double emissivity;
   double alpha;
   /* Imposed compute temperature & flux */
@@ -60,7 +62,7 @@ create_intface
    unsigned tr_idx,
    struct htable_intface* htable_interfaces,
    struct geometry* geometry,
-   const struct description* descriptions,
-   struct sdis_medium* const* media);
+   const struct darray_descriptions* descriptions,
+   struct darray_media_ptr* media);
 
 #endif

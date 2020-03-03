@@ -4,15 +4,16 @@
 #define SDIS_SOLID_H
 
 #include <rsys/rsys.h>
+#include <rsys/str.h>
 
 struct sdis_device;
-struct sdis_medium;
+struct darray_media_ptr;
 
 /*******************************************************************************
  * Solid data
  ******************************************************************************/
 struct solid {
-  char name[32];
+  struct str name;
   double cp; /* Calorific capacity */
   double lambda; /* Conductivity */
   double rho; /* Volumic mass */
@@ -30,7 +31,8 @@ struct solid {
 extern res_T
 create_solid
   (struct sdis_device* dev,
-   const char* name,
+   struct mem_allocator* allocator,
+   const struct str* name,
    const double lambda,
    const double rho,
    const double cp,
@@ -40,7 +42,7 @@ create_solid
    const double tinit,
    const double imposed_temperature,
    const double vpower,
-   struct sdis_medium*** media_ptr,
+   struct darray_media_ptr* media_ptr,
    unsigned* out_id);
 
 #endif

@@ -6,9 +6,25 @@
 #include <sdis.h>
 
 #include <rsys/rsys.h>
+#include <rsys/dynamic_array_str.h>
+
+#include <star/sstl.h>
 
 struct camera;
 struct description;
+struct mem_allocator;
+struct stardis;
+
+/* Utility macros */
+#define CHK_TOK(x, Name) if((tk = (x)) == NULL) {\
+   fprintf(stderr, "Invalid data (missing token '" Name "')\n");\
+   res = RES_BAD_ARG;\
+   goto error;\
+  } (void)0
+
+#ifdef COMPILER_CL
+#define strtok_r strtok_s
+#endif
 
 enum stardis_mode {
   UNDEF_MODE = 0,
@@ -25,11 +41,13 @@ enum stardis_mode {
   GREEN_COMPATIBLE_MODES = PROBE_COMPUTE | PROBE_COMPUTE_ON_INTERFACE | MEDIUM_COMPUTE
   | BOUNDARY_COMPUTE,
 
-  COMPUTE_MODES = GREEN_COMPATIBLE_MODES | IR_COMPUTE | MAP_COMPUTE | FLUX_BOUNDARY_COMPUTE,
+  REGION_COMPUTE_MODES = BOUNDARY_COMPUTE | FLUX_BOUNDARY_COMPUTE | MAP_COMPUTE,
+
+  COMPUTE_MODES = GREEN_COMPATIBLE_MODES | IR_COMPUTE | REGION_COMPUTE_MODES,
 
   NON_COMPUTE_MODES = UNDEF_MODE | DUMP_VTK | GREEN_MODE,
 
-  EXCLUSIVE_MODES = COMPUTE_MODES | DUMP_VTK | FLUX_BOUNDARY_COMPUTE
+  EXCLUSIVE_MODES = COMPUTE_MODES | FLUX_BOUNDARY_COMPUTE
 };
 
 STATIC_ASSERT(GREEN_COMPATIBLE_MODES == (COMPUTE_MODES & GREEN_COMPATIBLE_MODES), 
@@ -43,23 +61,48 @@ enum dump_path_type {
 };
 
 struct args {
-  char* medium_filename;
-  char* bc_filename;
+  struct mem_allocator* allocator;
+  struct darray_str model_files;
   char* medium_name;
   char* solve_boundary_filename;
-  size_t N;
+  size_t samples;
   unsigned nthreads;
-  union u { /* Trick to allow static initialization with INF */
-    struct pt { double p[3]; uint64_t t; } pt;
-    double probe[4];
-  } u;
+  double probe[4];
   enum stardis_mode mode;
   double scale_factor;
   double radiative_temp[2];
   char* camera;
   enum dump_path_type dump_paths;
   int just_help;
+  int verbose;
 };
+
+/* Same ctx used for both media and interface add (some unused parts) */
+struct add_geom_ctx {
+  struct sstl_desc stl_desc;
+  unsigned properties[3];
+  void* custom;
+};
+
+/* Possible callbacks for sg3d_geometry_add calls
+ * when void* context is a struct add_geom_ctx */
+extern LOCAL_SYM  void
+add_geom_ctx_indices
+  (const unsigned itri,
+   unsigned ids[3],
+   void* context);
+
+extern LOCAL_SYM  void
+add_geom_ctx_properties
+  (const unsigned itri,
+   unsigned prop[3],
+   void* context);
+
+extern LOCAL_SYM  void
+add_geom_ctx_position
+  (const unsigned ivert,
+   double pos[3],
+   void* context);
 
 #ifdef NDEBUG
 #define DEFAULT_NTHREADS SDIS_NTHREADS_DEFAULT
@@ -67,11 +110,11 @@ struct args {
 #define DEFAULT_NTHREADS 1
 #endif
 
-#define ARGS_DEFAULT__ {\
-  NULL, NULL, NULL, NULL, 10000, DEFAULT_NTHREADS,\
-  { { {0.0, 0.0, 0.0}, 0x7FF0000000000000 /* probe[3]=INF */}},\
-  UNDEF_MODE, 1.0, {300.0, 300.0}, NULL, DUMP_NONE, 0}
-static const struct args ARGS_DEFAULT = ARGS_DEFAULT__;
+extern LOCAL_SYM res_T
+init_args(struct mem_allocator* mem, struct args** args);
+
+extern LOCAL_SYM void
+release_args(struct args* args);
 
 extern char
 mode_option
@@ -84,7 +127,7 @@ print_multiple_modes
 
 extern void
 print_help
-  (char* prog);
+  (const char* prog);
 
 extern res_T
 parse_args
@@ -97,16 +140,9 @@ parse_camera
   (char* cam_param,
    struct camera* cam);
 
-extern res_T
-parse_medium_line
+extern LOCAL_SYM res_T
+process_model_line
   (char* line,
-   char** stl_filename,
-   struct description* desc);
-
-extern res_T
-parse_boundary_line
-  (char* line,
-   char** stl_filename,
-   struct description* desc);
+   struct stardis* stardis);
 
 #endif /*ARGS_H*/

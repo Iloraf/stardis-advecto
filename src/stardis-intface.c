@@ -1,9 +1,9 @@
 #include "stardis-intface.h"
 #include "stardis-app.h"
+#include "stardis-compute.h"
 #include "stardis-output.h"
 
 #include <sdis.h>
-#include <rsys/stretchy_array.h>
 
 /*******************************************************************************
  * Local Functions
@@ -69,10 +69,9 @@ create_intface
    unsigned tr_idx,
    struct htable_intface* htable_interfaces,
    struct geometry* geometry,
-   const struct description* descriptions,
-   struct sdis_medium* const* media)
+   const struct darray_descriptions* desc_array,
+   struct darray_media_ptr* med_array)
 {
-  struct triangle *trg;
   struct int_descs int_descs = INT_DESCS_NULL;
   struct sdis_interface** p_intface;
   struct sdis_interface* intface;
@@ -80,26 +79,29 @@ create_intface
   struct sdis_medium* back_med = NULL;
   struct sdis_interface_side_shader* fluid_side_shader = NULL;
   struct sdis_data* data = NULL;
-  unsigned fd, bd, cd;
+  unsigned fd, bd, cd, properties[3];
   int fluid_count = 0, solid_count = 0;
   int solid_fluid_connection_count = 0, connection_count = 0, boundary_count = 0;
+  const struct description* descriptions;
+  struct sdis_medium** media;
   res_T res = RES_OK;
 
-  ASSERT(dev && htable_interfaces && geometry && descriptions && media);
+  ASSERT(dev && htable_interfaces && geometry && desc_array && med_array);
   
-  trg = geometry->triangle + tr_idx;
-  fd = trg->front_description;
-  bd = trg->back_description;
-  cd = trg->connection_description;
+  SG3D(geometry_get_unique_triangle_properties(geometry->sg3d, tr_idx,
+    properties));
+
+  descriptions = darray_descriptions_cdata_get(desc_array);
+  media = darray_media_ptr_data_get(med_array);
 
   /* Create key */
-  int_descs.front = fd;
-  int_descs.back = bd;
-  int_descs.connect = trg->connection_description;
+  int_descs.front = fd = properties[SG3D_FRONT];
+  int_descs.back = bd = properties[SG3D_BACK];
+  int_descs.connect = cd = properties[SG3D_INTFACE];
 
   /* Search if interface already exists, or create it */
   p_intface = htable_intface_find(htable_interfaces, &int_descs);
-  if (p_intface) {
+  if(p_intface) {
     intface = *p_intface;
   } else {
     /* create new interface and register */
@@ -118,7 +120,7 @@ create_intface
     interface_props->front_boundary_id = UINT_MAX;
     interface_props->back_boundary_id = UINT_MAX;
 
-    if (front_defined) {
+    if(front_defined) {
       switch (descriptions[fd].type) {
       case DESC_MAT_SOLID:
         id = descriptions[fd].d.solid.solid_id;
@@ -135,7 +137,7 @@ create_intface
         FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
       }
     }
-    if (back_defined) {
+    if(back_defined) {
       switch (descriptions[bd].type) {
       case DESC_MAT_SOLID:
         id = descriptions[bd].d.solid.solid_id;
@@ -152,13 +154,13 @@ create_intface
         FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
       }
     }
-    if (connect_defined) {
+    if(connect_defined) {
       const struct description* connect = descriptions + cd;
       int type_checked = 0;
       struct sdis_medium* def_medium = NULL;
       unsigned ext_id;
-      if (connect->type == DESC_SOLID_FLUID_CONNECT) {
-        if (solid_count != 1 || fluid_count != 1) {
+      if(connect->type == DESC_SOLID_FLUID_CONNECT) {
+        if(solid_count != 1 || fluid_count != 1) {
           ASSERT(front_defined && back_defined);
           fprintf(stderr,
             "Can only define a DESC_SOLID_FLUID_CONNECT between a fluid and a solid\n");
@@ -166,7 +168,7 @@ create_intface
           goto error;
         }
       } else {
-        if (front_defined == back_defined) {
+        if(front_defined == back_defined) {
           fprintf(stderr,
             "Cannot define a boundary between 2 %s regions\n",
             front_defined ? "defined" : "undefined");
@@ -174,13 +176,13 @@ create_intface
           goto error;
         }
         def_medium = front_defined ? front_med : back_med;
-        if (front_defined)
+        if(front_defined)
           interface_props->front_boundary_id = cd;
         else interface_props->back_boundary_id = cd;
       }
       switch (connect->type) {
       case DESC_BOUND_H_FOR_FLUID:
-        if (sdis_medium_get_type(def_medium) != SDIS_FLUID) {
+        if(sdis_medium_get_type(def_medium) != SDIS_FLUID) {
           fprintf(stderr,
             "Can only define a DESC_BOUND_H_FOR_FLUID boundary for a fluid region\n");
           res = RES_BAD_ARG;
@@ -189,7 +191,7 @@ create_intface
         type_checked = 1;
         /* fall through */
       case DESC_BOUND_H_FOR_SOLID:
-        if (!type_checked
+        if(!type_checked
           &&  sdis_medium_get_type(def_medium) != SDIS_SOLID) {
           fprintf(stderr,
             "Can only define a DESC_BOUND_H_FOR_SOLID boundary for a solid region\n");
@@ -197,18 +199,18 @@ create_intface
           goto error;
         }
         ext_id = connect->d.h_boundary.mat_id; /* External material id */
-        ASSERT(ext_id < sa_size(media));
+        ASSERT(ext_id < darray_media_ptr_size_get(med_array));
         ASSERT(sdis_medium_get_type(media[ext_id]) ==
           (connect->type == DESC_BOUND_H_FOR_SOLID ? SDIS_FLUID : SDIS_SOLID));
         connection_count++;
         boundary_count++;
-        if (front_defined) back_med = media[ext_id];
+        if(front_defined) back_med = media[ext_id];
         else front_med = media[ext_id];
         interface_shader.convection_coef = interface_get_convection_coef;
-        interface_shader.convection_coef_upper_bound = connect->d.h_boundary.hc_max;
+        interface_shader.convection_coef_upper_bound = connect->d.h_boundary.hc;
         interface_props->hc = connect->d.h_boundary.hc;
         ASSERT(!fluid_side_shader); /* Cause defined medium is solid */
-        if (connect->d.h_boundary.has_emissivity) {
+        if(connect->d.h_boundary.hc > 0) {
           fluid_side_shader =
             front_defined ? &interface_shader.back : &interface_shader.front;
           fluid_side_shader->emissivity = interface_get_emissivity;
@@ -218,7 +220,7 @@ create_intface
         }
         break;
       case DESC_BOUND_T_FOR_FLUID:
-        if (sdis_medium_get_type(def_medium) != SDIS_FLUID) {
+        if(sdis_medium_get_type(def_medium) != SDIS_FLUID) {
           fprintf(stderr,
             "Can only define a DESC_BOUND_T_FOR_FLUID boundary for a fluid region\n");
           res = RES_BAD_ARG;
@@ -227,7 +229,7 @@ create_intface
         type_checked = 1;
         /* fall through */
       case DESC_BOUND_T_FOR_SOLID:
-        if (!type_checked
+        if(!type_checked
           &&  sdis_medium_get_type(def_medium) != SDIS_SOLID) {
           fprintf(stderr,
             "Can only define a DESC_BOUND_T_FOR_SOLID boundary for a solid region\n");
@@ -235,11 +237,11 @@ create_intface
           goto error;
         }
         ext_id = connect->d.t_boundary.mat_id; /* External material id */
-        ASSERT(ext_id < sa_size(media));
+        ASSERT(ext_id < darray_media_ptr_size_get(med_array));
         ASSERT(sdis_medium_get_type(media[ext_id]) == SDIS_FLUID);
         connection_count++;
         boundary_count++;
-        if (front_defined) {
+        if(front_defined) {
           back_med = media[ext_id];
           /* We set the known T inside
            * TODO: should be outside to allow contact resistances */
@@ -253,15 +255,15 @@ create_intface
         ASSERT(connect->d.t_boundary.imposed_temperature >= 0);
         interface_props->imposed_temperature
           = connect->d.t_boundary.imposed_temperature;
-        if (connect->d.t_boundary.has_hc) {
+        if(connect->d.t_boundary.hc > 0) {
           ASSERT(connect->type == DESC_BOUND_T_FOR_FLUID);
           interface_shader.convection_coef = interface_get_convection_coef;
-          interface_shader.convection_coef_upper_bound = connect->d.t_boundary.hc_max;
+          interface_shader.convection_coef_upper_bound = connect->d.t_boundary.hc;
           interface_props->hc = connect->d.t_boundary.hc;
         }
         break;
       case DESC_BOUND_F_FOR_SOLID:
-        if (sdis_medium_get_type(def_medium) != SDIS_SOLID) {
+        if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
           fprintf(stderr,
             "Can only define a DESC_BOUND_F_FOR_SOLID boundary for a solid region\n");
           res = RES_BAD_ARG;
@@ -269,7 +271,7 @@ create_intface
         }
         connection_count++;
         boundary_count++;
-        if (front_defined) {
+        if(front_defined) {
           back_med = media[connect->d.f_boundary.mat_id];
           interface_shader.front.flux = interface_get_flux;
         } else {
@@ -285,12 +287,12 @@ create_intface
         connection_count++;
         solid_fluid_connection_count++;
         ASSERT(fluid_side_shader);
-        if (connect->d.sf_connect.has_hc) {
+        if(connect->d.sf_connect.hc > 0) {
           interface_shader.convection_coef = interface_get_convection_coef;
-          interface_shader.convection_coef_upper_bound = connect->d.sf_connect.hc_max;
+          interface_shader.convection_coef_upper_bound = connect->d.sf_connect.hc;
           interface_props->hc = connect->d.sf_connect.hc;
         }
-        if (connect->d.sf_connect.has_emissivity) {
+        if(connect->d.sf_connect.emissivity > 0) {
           fluid_side_shader->emissivity = interface_get_emissivity;
           fluid_side_shader->specular_fraction = interface_get_alpha;
           interface_props->emissivity = connect->d.sf_connect.emissivity;
@@ -302,7 +304,7 @@ create_intface
       }
     }
 
-    if ((fluid_count == 2)
+    if((fluid_count == 2)
       || (fluid_count + solid_count + connection_count < 2)
       || (boundary_count ?
       (fluid_count + solid_count != 1) : (fluid_count + solid_count != 2))
@@ -310,15 +312,14 @@ create_intface
     {
       /* Incoherent triangle description */
       fprintf(stderr, "Incoherent triangle description (%u)\n", tr_idx);
-      print_trg_as_obj(stderr, geometry->vertex, trg->indices.data);
       fprintf(stderr, "Front: ");
-      if (!front_defined) fprintf(stderr, "undefined\n");
+      if(!front_defined) fprintf(stderr, "undefined\n");
       else print_description(stderr, descriptions + fd);
       fprintf(stderr, "Back: ");
-      if (!back_defined) fprintf(stderr, "undefined\n");
+      if(!back_defined) fprintf(stderr, "undefined\n");
       else print_description(stderr, descriptions + bd);
       fprintf(stderr, "Connection: ");
-      if (!connect_defined) fprintf(stderr, "undefined\n");
+      if(!connect_defined) fprintf(stderr, "undefined\n");
       else print_description(stderr, descriptions + cd);
       res = RES_BAD_ARG;
       goto error;
@@ -327,16 +328,15 @@ create_intface
     res = sdis_interface_create(dev, front_med, back_med,
       &interface_shader, data, &intface);
     SDIS(data_ref_put(data)); data = NULL;
-    if (res != RES_OK) {
+    if(res != RES_OK) {
       fprintf(stderr,
         "Cannot create interface associated to triangle %u\n", tr_idx);
       goto error;
     }
-    sa_push(geometry->interfaces, intface);
-    res = htable_intface_set(htable_interfaces, &int_descs, &intface);
-    if (res != RES_OK) goto error;
+    ERR(darray_interface_ptrs_push_back(&geometry->interfaces, &intface));
+    ERR(htable_intface_set(htable_interfaces, &int_descs, &intface));
   }
-  sa_push(geometry->interf_bytrg, intface);
+  ERR(darray_interface_ptrs_push_back(&geometry->interf_bytrg, &intface));
 
 end:
   return res;

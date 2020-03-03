@@ -12,12 +12,13 @@ struct sdis_estimator_buffer;
 struct sdis_green_function;
 struct counts;
 struct description;
-struct sdis_scene;
 struct mem_allocator;
 struct sdis_estimator;
 struct stardis;
 struct geometry;
 struct vertex;
+struct darray_descriptions;
+struct darray_estimators;
 
 extern res_T
 print_sample
@@ -32,13 +33,16 @@ extern res_T
 dump_green
   (struct sdis_green_function* green,
    const struct counts* counts,
-   const struct description* descriptions,
+   const struct darray_descriptions* descriptions,
    const double radiative_temps[2]);
 
+extern int
+has_holes(const struct stardis* stardis);
+
 extern res_T
-create_edge_file_if
-  (struct sdis_scene* scn,
-   struct mem_allocator* allocator);
+dump_holes_at_the_end_of_vtk
+  (const struct stardis* stardis,
+   FILE* stream);
 
 extern res_T
 print_single_MC_result
@@ -47,18 +51,13 @@ print_single_MC_result
    struct stardis* stardis);
 
 extern void
-dump_vtk
-  (const struct geometry* geometry);
-
-extern void
 dump_map
   (const struct stardis* stardis,
-   struct sdis_estimator** estimators);
+   const struct darray_estimators* estimators);
 
-extern void
-print_trg_as_obj
-  (FILE* stream,
-   const struct vertex* vertices,
-   const unsigned* indices);
+extern res_T
+dump_compute_region_at_the_end_of_vtk
+  (const struct stardis* stardis,
+   FILE* stream);
 
 #endif

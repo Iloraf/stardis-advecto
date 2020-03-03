@@ -12,6 +12,15 @@
 #include <rsys/hash_table.h>
 
 struct stardis;
+struct sdis_medium;
+
+#define DARRAY_NAME media_ptr
+#define DARRAY_DATA struct sdis_medium*
+#include <rsys/dynamic_array.h>
+
+#define DARRAY_NAME estimators
+#define DARRAY_DATA struct sdis_estimator*
+#include <rsys/dynamic_array.h>
 
 struct counts {
   size_t smed_count, fmed_count, tbound_count, hbound_count,
@@ -22,9 +31,12 @@ struct counts {
  }
 static const struct counts COUNTS_NULL = COUNTS_NULL__;
 
-extern res_T
+extern LOCAL_SYM res_T
 stardis_compute
   (struct stardis* stardis,
    const int mode);
+
+extern LOCAL_SYM res_T
+read_compute_region(struct stardis* stardis);
 
 #endif

@@ -4,16 +4,18 @@
 #define SDIS_FLUID_H
 
 #include <sdis.h>
+
 #include <rsys/rsys.h>
+#include <rsys/str.h>
 
 struct sdis_device;
-struct sdis_medium;
+struct darray_media_ptr;
 
 /*******************************************************************************
  * Fluid data
  ******************************************************************************/
 struct fluid {
-  char name[32];
+  struct str name;
   double cp; /* Calorific capacity */
   double rho; /* Volumic mass */
   /* Compute mode */
@@ -28,14 +30,15 @@ struct fluid {
 extern res_T
 create_fluid
   (struct sdis_device* dev,
-   const char* name,
+   struct mem_allocator* allocator,
+   const struct str* name,
    const double rho,
    const double cp,
    const int is_green,
    const int is_outside,
    const double tinit,
    const double imposed_temperature,
-   struct sdis_medium*** media_ptr,
+   struct darray_media_ptr* media_ptr,
    unsigned* out_id);
 
 #endif

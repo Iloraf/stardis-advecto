@@ -16,7 +16,7 @@
 #include <stdio.h>
 
 struct w_ctx {
-  const struct description* desc;
+  const struct darray_descriptions* desc;
   struct htable_weigth weigths;
 };
 
@@ -40,7 +40,9 @@ print_power_term
   struct sdis_data* data = NULL;
   enum sdis_medium_type type;
   unsigned id;
-  ASSERT(mdm && ctx); (void)ctx;
+  const struct w_ctx* w_ctx = ctx;
+
+  ASSERT(mdm && ctx);
 
   data = sdis_medium_get_data(mdm);
   type = sdis_medium_get_type(mdm);
@@ -51,8 +53,9 @@ print_power_term
   }
   case SDIS_SOLID: {
     struct solid* d__ = sdis_data_get(data);
+    const struct description* descs = darray_descriptions_cdata_get(w_ctx->desc);
     id = d__->id;
-    ASSERT(id == ((struct w_ctx*)ctx)->desc[id].d.solid.solid_id);
+    ASSERT(id == descs[id].d.solid.solid_id); (void)descs;
     printf("\tS\t%u\t%g", id, power_term);
     break;
   }
@@ -73,14 +76,16 @@ get_flux_terms
   struct intface* d__;
   unsigned id;
   struct w_ctx* w_ctx = ctx;
+  const struct description* descs;
 
   ASSERT(interf && ctx);
 
   data = sdis_interface_get_data(interf);
   d__ = sdis_data_get(data);
   id = (side == SDIS_FRONT) ? d__->front_boundary_id : d__->back_boundary_id;
+  descs = darray_descriptions_cdata_get(w_ctx->desc);
 
-  switch (w_ctx->desc[id].type) {
+  switch (descs[id].type) {
   case DESC_BOUND_T_FOR_SOLID:
   case DESC_BOUND_T_FOR_FLUID:
   case DESC_BOUND_H_FOR_SOLID:
@@ -88,18 +93,18 @@ get_flux_terms
     FATAL("Cannot have a flux term here.\n"); break;
   case DESC_BOUND_F_FOR_SOLID: {
     double* w;
-    ASSERT(id == w_ctx->desc[id].d.f_boundary.mat_id);
+    ASSERT(id == descs[id].d.f_boundary.mat_id);
     w = htable_weigth_find(&w_ctx->weigths, &id);
-    if (w)
-      *w += flux_term;
-    else {
-      res = htable_weigth_set(&w_ctx->weigths, &id, &flux_term);
-    }
+    if(w) *w += flux_term;
+    else ERR(htable_weigth_set(&w_ctx->weigths, &id, &flux_term));
     break;
   }
   default: FATAL("Unreachable code.\n"); break;
   }
+end:
   return res;
+error:
+  goto end;
 }
 
 static res_T
@@ -123,8 +128,7 @@ dump_path
   fprintf(stream, "POINTS %zu double\n", vcount);
   FOR_EACH(i, 0, vcount) {
     struct sdis_heat_vertex vtx;
-    res = sdis_heat_path_get_vertex(path, i, &vtx);
-    if (res != RES_OK) goto error;
+    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
     fprintf(stream, "%g %g %g\n", SPLIT3(vtx.P));
   }
   /* Write the segment of the path */
@@ -138,8 +142,7 @@ dump_path
   fprintf(stream, "LOOKUP_TABLE vertex_type\n");
   FOR_EACH(i, 0, vcount) {
     struct sdis_heat_vertex vtx;
-    res = sdis_heat_path_get_vertex(path, i, &vtx);
-    if (res != RES_OK) goto error;
+    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
     switch (vtx.type) {
     case SDIS_HEAT_VERTEX_CONDUCTION: fprintf(stream, "0.0\n"); break;
     case SDIS_HEAT_VERTEX_CONVECTION: fprintf(stream, "0.5\n"); break;
@@ -156,8 +159,7 @@ dump_path
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(i, 0, vcount) {
     struct sdis_heat_vertex vtx;
-    res = sdis_heat_path_get_vertex(path, i, &vtx);
-    if (res != RES_OK) goto error;
+    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
     fprintf(stream, "%g\n", vtx.weight);
   }
   /* Write the time of the random walk vertices */
@@ -165,19 +167,17 @@ dump_path
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(i, 0, vcount) {
     struct sdis_heat_vertex vtx;
-    res = sdis_heat_path_get_vertex(path, i, &vtx);
-    if (res != RES_OK) goto error;
+    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
     fprintf(stream, "%g\n", IS_INF(vtx.time) ? FLT_MAX : vtx.time);
   }
   /* Write path type */
   fprintf(stream, "CELL_DATA %u\n", 1u);
   fprintf(stream, "SCALARS Path_Type float 1\n");
   fprintf(stream, "LOOKUP_TABLE path_type\n");
-  res = sdis_heat_path_get_status(path, &status);
-  if (res != RES_OK) goto error;
+  ERR(sdis_heat_path_get_status(path, &status));
   switch (status) {
-  case SDIS_HEAT_PATH_SUCCEED: fprintf(stream, "0.0\n"); break;
-  case SDIS_HEAT_PATH_FAILED: fprintf(stream, "1.0\n"); break;
+  case SDIS_HEAT_PATH_SUCCESS: fprintf(stream, "0.0\n"); break;
+  case SDIS_HEAT_PATH_FAILURE: fprintf(stream, "1.0\n"); break;
   default: FATAL("Unreachable code.\n"); break;
   }
   fprintf(stream, "LOOKUP_TABLE path_type 2\n");
@@ -207,10 +207,10 @@ print_sample
   unsigned id;
   size_t pcount, fcount;
   struct w_ctx* w_ctx = ctx;
+  const struct description* descs;
   CHK(path && ctx);
 
-  res = sdis_green_path_get_limit_point(path, &pt);
-  if (res != RES_OK) goto error;
+  ERR(sdis_green_path_get_limit_point(path, &pt));
 
   /* For each path, prints:
    * # end #power_terms #flux_terms power_term_1  ... power_term_n flux_term_1 ... flux_term_n
@@ -220,6 +220,7 @@ print_sample
    * - flux_term_i = flux_id_i factor_i
    */
 
+  descs = darray_descriptions_cdata_get(w_ctx->desc);
   switch (pt.type) {
   case SDIS_FRAGMENT: {
     struct intface* d__;
@@ -228,19 +229,19 @@ print_sample
     id = (pt.data.itfrag.fragment.side == SDIS_FRONT)
       ? d__->front_boundary_id : d__->back_boundary_id;
     ASSERT(id != UINT_MAX);
-    switch (w_ctx->desc[id].type) {
+    switch (descs[id].type) {
     case DESC_BOUND_T_FOR_SOLID:
     case DESC_BOUND_T_FOR_FLUID:
-      ASSERT(id == w_ctx->desc[id].d.t_boundary.mat_id);
+      ASSERT(id == descs[id].d.t_boundary.mat_id);
       printf("T\t%u", id);
       break;
     case DESC_BOUND_H_FOR_SOLID:
     case DESC_BOUND_H_FOR_FLUID:
-      ASSERT(id == w_ctx->desc[id].d.h_boundary.mat_id);
+      ASSERT(id == descs[id].d.h_boundary.mat_id);
       printf("H\t%u", id);
       break;
     case DESC_BOUND_F_FOR_SOLID:
-      ASSERT(id == w_ctx->desc[id].d.f_boundary.mat_id);
+      ASSERT(id == descs[id].d.f_boundary.mat_id);
       printf("X\t%u", id);
       break;
     default: FATAL("Unreachable code.\n"); break;
@@ -250,15 +251,17 @@ print_sample
   case SDIS_VERTEX:
     type = sdis_medium_get_type(pt.data.mdmvert.medium);
     data = sdis_medium_get_data(pt.data.mdmvert.medium);
-    if (pt.data.mdmvert.vertex.P[0] == INF) {
+    if(pt.data.mdmvert.vertex.P[0] == INF) {
       /* Radiative output */
-      printf("R\t%u", (unsigned)sa_size(w_ctx->desc));
+      size_t sz = darray_descriptions_size_get(w_ctx->desc);
+      ASSERT(sz <= UINT_MAX);
+      printf("R\t%u", (unsigned)sz);
     }
-    else if (type == SDIS_FLUID) {
+    else if(type == SDIS_FLUID) {
       struct fluid* d__ = sdis_data_get(data);
       id = d__->id;
-      ASSERT(id == w_ctx->desc[id].d.fluid.fluid_id);
-      if (d__->is_outside)
+      ASSERT(id == descs[id].d.fluid.fluid_id);
+      if(d__->is_outside)
         /* If outside the model and in a fluid with known temperature,
          * its a fluid attached to a H boundary */
         printf("H\t%u", id);
@@ -268,7 +271,7 @@ print_sample
       struct solid* d__ = sdis_data_get(data);
       ASSERT(type == SDIS_SOLID);
       id = d__->id;
-      ASSERT(id == w_ctx->desc[id].d.solid.solid_id);
+      ASSERT(id == descs[id].d.solid.solid_id);
       ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
       printf("S\t%u", id);
     }
@@ -276,18 +279,15 @@ print_sample
   default: FATAL("Unreachable code.\n"); break;
   }
 
-  res = sdis_green_function_get_power_terms_count(path, &pcount);
-  if (res != RES_OK) goto error;
+  ERR(sdis_green_function_get_power_terms_count(path, &pcount));
 
   htable_weigth_clear(&w_ctx->weigths);
-  res = sdis_green_path_for_each_flux_term(path, get_flux_terms, w_ctx);
-  if (res != RES_OK) goto error;
+  ERR(sdis_green_path_for_each_flux_term(path, get_flux_terms, w_ctx));
   fcount = htable_weigth_size_get(&w_ctx->weigths);
 
   printf("\t%zu\t%zu", pcount, fcount);
 
-  res = sdis_green_path_for_each_power_term(path, print_power_term, ctx);
-  if (res != RES_OK) goto error;
+  ERR(sdis_green_path_for_each_power_term(path, print_power_term, ctx));
 
   htable_weigth_begin(&w_ctx->weigths, &it);
   htable_weigth_end(&w_ctx->weigths, &end);
@@ -315,11 +315,10 @@ dump_image
   size_t ix, iy;
 
   CHK(buf != NULL);
-  res = sdis_estimator_buffer_get_definition(buf, definition);
-  if (res != RES_OK) goto error;
+  ERR(sdis_estimator_buffer_get_definition(buf, definition));
 
   temps = mem_alloc(definition[0] * definition[1] * sizeof(double));
-  if (temps == NULL) {
+  if(temps == NULL) {
     res = RES_MEM_ERR;
     goto error;
   }
@@ -336,10 +335,8 @@ dump_image
     FOR_EACH(ix, 0, definition[0]) {
       const struct sdis_estimator* estimator;
       struct sdis_mc T;
-      res = sdis_estimator_buffer_at(buf, ix, iy, &estimator);
-      if (res != RES_OK) goto error;
-      res = sdis_estimator_get_temperature(estimator, &T);
-      if (res != RES_OK) goto error;
+      ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
+      ERR(sdis_estimator_get_temperature(estimator, &T));
       fprintf(stdout, "%f\n", T.E);
     }
   }
@@ -349,10 +346,8 @@ dump_image
     FOR_EACH(ix, 0, definition[0]) {
       const struct sdis_estimator* estimator;
       struct sdis_mc T;
-      res = sdis_estimator_buffer_at(buf, ix, iy, &estimator);
-      if (res != RES_OK) goto error;
-      res = sdis_estimator_get_temperature(estimator, &T);
-      if (res != RES_OK) goto error;
+      ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
+      ERR(sdis_estimator_get_temperature(estimator, &T));
       fprintf(stdout, "%f\n", T.SE);
     }
   }
@@ -362,10 +357,8 @@ dump_image
     FOR_EACH(ix, 0, definition[0]) {
       const struct sdis_estimator* estimator;
       struct sdis_mc time;
-      res = sdis_estimator_buffer_at(buf, ix, iy, &estimator);
-      if (res != RES_OK) goto error;
-      res = sdis_estimator_get_realisation_time(estimator, &time);
-      if (res != RES_OK) goto error;
+      ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
+      ERR(sdis_estimator_get_realisation_time(estimator, &time));
       fprintf(stdout, "%f\n", time.E);
     }
   }
@@ -375,10 +368,8 @@ dump_image
     FOR_EACH(ix, 0, definition[0]) {
       const struct sdis_estimator* estimator;
       struct sdis_mc time;
-      res = sdis_estimator_buffer_at(buf, ix, iy, &estimator);
-      if (res != RES_OK) goto error;
-      res = sdis_estimator_get_realisation_time(estimator, &time);
-      if (res != RES_OK) goto error;
+      ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
+      ERR(sdis_estimator_get_realisation_time(estimator, &time));
       fprintf(stdout, "%f\n", time.SE);
     }
   }
@@ -388,10 +379,8 @@ dump_image
     FOR_EACH(ix, 0, definition[0]) {
       const struct sdis_estimator* estimator;
       size_t nfails;
-      res = sdis_estimator_buffer_at(buf, ix, iy, &estimator);
-      if (res != RES_OK) goto error;
-      res = sdis_estimator_get_failure_count(estimator, &nfails);
-      if (res != RES_OK) goto error;
+      ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
+      ERR(sdis_estimator_get_failure_count(estimator, &nfails));
       fprintf(stdout, "%zu\n", nfails);
     }
   }
@@ -407,21 +396,24 @@ res_T
 dump_green
   (struct sdis_green_function* green,
    const struct counts* counts,
-   const struct description* descriptions,
+   const struct darray_descriptions* descriptions,
    const double radiative_temps[2])
 {
   res_T res = RES_OK;
-  size_t ok_count, failed_count;
+  size_t ok_count, failed_count, sz;
   struct w_ctx w_ctx;
-  unsigned i;
+  int table_initialized = 0;
+  unsigned i, szd;
+  const struct description* descs;
 
   ASSERT(green && counts && descriptions && radiative_temps);
 
-  res = sdis_green_function_get_invalid_paths_count(green, &failed_count);
-  if (res != RES_OK) goto error;
-
-  res = sdis_green_function_get_paths_count(green, &ok_count);
-  if (res != RES_OK) goto error;
+  ERR(sdis_green_function_get_invalid_paths_count(green, &failed_count));
+  ERR(sdis_green_function_get_paths_count(green, &ok_count));
+  sz = darray_descriptions_size_get(descriptions);
+  ASSERT(sz <= UINT_MAX);
+  szd = (unsigned)sz;
+  descs = darray_descriptions_cdata_get(descriptions);
 
   /* Output counts */
   printf("---BEGIN GREEN---\n");
@@ -432,76 +424,73 @@ dump_green
     ok_count, failed_count);
 
   /* List Media */
-  if (counts->smed_count) {
+  if(counts->smed_count) {
     printf("# Solids\n");
     printf("# ID Name lambda rho cp power\n");
-    FOR_EACH(i, 0, (unsigned)sa_size(descriptions)) {
-      const struct description* desc = descriptions + i;
+    FOR_EACH(i, 0, szd) {
+      const struct description* desc = descs + i;
       const struct mat_solid* sl;
-      if (desc->type != DESC_MAT_SOLID) continue;
+      if(desc->type != DESC_MAT_SOLID) continue;
       sl = &desc->d.solid;
       printf("%u\t%s\t%g\t%g\t%g\t%g\n",
-        i, sl->name, sl->lambda, sl->rho, sl->cp, sl->vpower);
+        i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower);
     }
   }
-  if (counts->fmed_count) {
+  if(counts->fmed_count) {
     printf("# Fluids\n");
     printf("# ID Name rho cp\n");
-    FOR_EACH(i, 0, sa_size(descriptions)) {
-      const struct description* desc = descriptions + i;
+    FOR_EACH(i, 0, szd) {
+      const struct description* desc = descs + i;
       const struct mat_fluid* fl;
       fl = &desc->d.fluid;
-      printf("%u\t%s\t%g\t%g\n", i, fl->name, fl->rho, fl->cp);
+      printf("%u\t%s\t%g\t%g\n", i, str_cget(&fl->name), fl->rho, fl->cp);
     }
   }
 
   /* List Boundaries */
-  if (counts->tbound_count) {
+  if(counts->tbound_count) {
     printf("# T Boundaries\n");
     printf("# ID Name temperature\n");
-    FOR_EACH(i, 0, sa_size(descriptions)) {
-      const struct description* desc = descriptions + i;
+    FOR_EACH(i, 0, szd) {
+      const struct description* desc = descs + i;
       const struct t_boundary* bd;
-      if (desc->type != DESC_BOUND_T_FOR_SOLID
+      if(desc->type != DESC_BOUND_T_FOR_SOLID
         && desc->type != DESC_BOUND_T_FOR_FLUID) continue;
       bd = &desc->d.t_boundary;
-      printf("%u\t%s\t%g\n", i, bd->name, bd->imposed_temperature);
+      printf("%u\t%s\t%g\n", i, str_cget(&bd->name), bd->imposed_temperature);
     }
   }
-  if (counts->hbound_count) {
+  if(counts->hbound_count) {
     printf("# H Boundaries\n");
     printf("# ID Name emissivity specular_fraction hc hc_max T_env\n");
-    FOR_EACH(i, 0, sa_size(descriptions)) {
-      const struct description* desc = descriptions + i;
+    FOR_EACH(i, 0, szd) {
+      const struct description* desc = descs + i;
       const struct h_boundary* bd;
-      if (desc->type != DESC_BOUND_H_FOR_SOLID
+      if(desc->type != DESC_BOUND_H_FOR_SOLID
         && desc->type != DESC_BOUND_H_FOR_FLUID) continue;
       bd = &desc->d.h_boundary;
-      printf("%u\t%s\t%g\t%g\t%g\t%g\t%g\n",
-        i, bd->name, (bd->has_emissivity ? bd->emissivity : 0),
-        (bd->has_emissivity ? bd->specular_fraction : 0),
-        (bd->has_hc ? bd->hc : 0), (bd->has_hc ? bd->hc_max : 0),
-        bd->imposed_temperature);
+      printf("%u\t%s\t%g\t%g\t%g\t%g\n",
+        i, str_cget(&bd->name), bd->emissivity, bd->specular_fraction,
+        bd->hc, bd->imposed_temperature);
     }
   }
-  if (counts->fbound_count) {
+  if(counts->fbound_count) {
     printf("# F Boundaries\n");
     printf("# ID Name flux\n");
-    FOR_EACH(i, 0, sa_size(descriptions)) {
-      const struct description* desc = descriptions + i;
+    FOR_EACH(i, 0, szd) {
+      const struct description* desc = descs + i;
       const struct f_boundary* bd;
-      if (desc->type != DESC_BOUND_F_FOR_SOLID) continue;
+      if(desc->type != DESC_BOUND_F_FOR_SOLID) continue;
       bd = &desc->d.f_boundary;
       printf("%u\t%s\t%g\n",
-        i, bd->name, bd->imposed_flux);
+        i, str_cget(&bd->name), bd->imposed_flux);
     }
   }
 
   /* Radiative Temperatures */
   printf("# Radiative Temperatures\n");
   printf("# ID Rad_Temp Lin_Temp\n");
-  printf("%u\t%g\t%g\n", (unsigned)sa_size(descriptions),
-    radiative_temps[0], radiative_temps[1]);
+  printf("%u\t%g\t%g\n", szd, radiative_temps[0], radiative_temps[1]);
 
   printf("# Samples\n");
   printf("# end #power_terms #flux_terms power_term_1 ... power_term_n flux_term_1 ... flux_term_n\n");
@@ -511,146 +500,70 @@ dump_green
 
   w_ctx.desc = descriptions;
   htable_weigth_init(NULL, &w_ctx.weigths);
+  table_initialized = 1;
 
-  res = sdis_green_function_for_each_path(green, print_sample, &w_ctx);
-  htable_weigth_release(&w_ctx.weigths);
-  if (res != RES_OK) goto error;
-
+  ERR(sdis_green_function_for_each_path(green, print_sample, &w_ctx));
 
   printf("---END GREEN---\n");
 
-  CHK(sdis_green_function_ref_put(green) == RES_OK);
+  ERR(sdis_green_function_ref_put(green));
 
 end:
+  if(table_initialized) htable_weigth_release(&w_ctx.weigths);
   return res;
 error:
   goto end;
 }
 
+int
+has_holes(const struct stardis* stardis)
+{
+  struct senc3d_scene* senc3d_scn;
+  unsigned count;
+  SDIS(scene_get_senc3d_scene(stardis->geometry.sdis_scn, &senc3d_scn));
+  SENC3D(scene_get_frontier_segments_count(senc3d_scn, &count));
+  return count != 0;
+}
+
 res_T
-create_edge_file_if
-  (struct sdis_scene* scn,
-   struct mem_allocator* allocator)
+dump_holes_at_the_end_of_vtk
+  (const struct stardis* stardis,
+   FILE* stream)
 {
   res_T res = RES_OK;
-  unsigned i, comp, scount, vcount;
-  char name[64];
-  FILE* obj = NULL;
-  struct htable_vrtx_rank ranks;
-  char structs_initialized = 0;
+  unsigned* trgs = NULL;
   struct senc3d_scene* senc3d_scn = NULL;
-  struct darray_uint comps;
-  struct darray_uint edges;
-  unsigned cc_count = 0;
-  unsigned *cc, *ee, uimax = UINT_MAX;
+  unsigned tsz, scount, i;
+  ASSERT(stardis && stream);
+  ASSERT(stardis);
 
-  ASSERT(scn && allocator);
+  ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
+  /* Store frontier triangles */
+  trgs = MEM_CALLOC(stardis->allocator, tsz, sizeof(*trgs));
+  if(!trgs) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
 
-  res = sdis_scene_get_senc3d_scene(scn, &senc3d_scn);
-  if (res != RES_OK) goto error;
-  res = senc3d_scene_get_frontier_segments_count(senc3d_scn, &scount);
-  if (res != RES_OK) goto error;
-
-  if (scount == 0)
-    /* No edge to exit */
-    goto end;
-
-  fprintf(stderr, "Some frontier edges found: create OBJ files\n");
-
-  htable_vrtx_rank_init(allocator, &ranks);
-  darray_uint_init(allocator, &comps);
-  darray_uint_init(allocator, &edges);
-  structs_initialized = 1;
-
-  /* Exit vertices, with a new numbering scheme */
-  vcount = 0;
+  /* Keep the involved segments (not the vertices) */
+  ERR(sdis_scene_get_senc3d_scene(stardis->geometry.sdis_scn, &senc3d_scn));
+  ERR(senc3d_scene_get_frontier_segments_count(senc3d_scn, &scount));
   FOR_EACH(i, 0, scount) {
-    unsigned v, edge[2], rk[2];
-    res = senc3d_scene_get_frontier_segment(senc3d_scn, i, edge);
-    if (res != RES_OK) goto error;
-    FOR_EACH(v, 0, 2) {
-      unsigned* p_rank;
-      p_rank = htable_vrtx_rank_find(&ranks, edge + v);
-      if (p_rank) {
-        rk[v] = *p_rank;
-      } else {
-        /* First appearance: allocate a rank and exit it */
-        unsigned rank;
-        size_t tmp = htable_vrtx_rank_size_get(&ranks);
-        ASSERT(tmp < UINT_MAX);
-        rank = (unsigned)tmp;
-        res = htable_vrtx_rank_set(&ranks, edge + v, &rank);
-        if (res != RES_OK) goto error;
-        rk[v] = rank;
-        darray_uint_push_back(&comps, &uimax);
-        darray_uint_push_back(&edges, edge + v);
-        vcount++;
-      }
-      /* Manage components */
-      cc = darray_uint_data_get(&comps);
-      if (cc[rk[0]] != UINT_MAX || cc[rk[1]] != UINT_MAX) {
-        /* If both components known, they must be the same */
-        ASSERT(cc[rk[0]] == UINT_MAX || cc[rk[1]] == UINT_MAX
-          || cc[rk[0]] == cc[rk[1]]);
-        FOR_EACH(v, 0, 2) {
-          unsigned w = 1 - v; /* The other vertex */
-          if (cc[rk[v]] == UINT_MAX) cc[rk[v]] = cc[rk[w]];
-        }
-      } else {
-        /* None are in a know component: create a new one */
-        cc[rk[0]] = cc[rk[1]] = cc_count++;
-      }
-    }
+    unsigned vrtc[2], trid;
+    ERR(senc3d_scene_get_frontier_segment(senc3d_scn, i, vrtc, &trid));
+    trgs[trid] = 1;
   }
 
-  /* Exit segments by component using the new numbering scheme */
-  cc = darray_uint_data_get(&comps);
-  ee = darray_uint_data_get(&edges);
-  FOR_EACH(comp, 0, cc_count) {
-    unsigned v;
-    snprintf(name, sizeof(name), "frontier_component_%u.obj", comp);
-    obj = fopen(name, "w");
-    if (!obj) goto error;
-    /* Exit all vertices even unused
-     * (same numbering scheme for all components) */
-    FOR_EACH(v, 0, vcount) {
-      double coord[3];
-      res = senc3d_scene_get_vertex(senc3d_scn, ee[v], coord);
-      if (res != RES_OK) goto error;
-      fprintf(obj, "v %f %f %f\n", SPLIT3(coord));
-    }
-    FOR_EACH(i, 0, scount) {
-      unsigned edge[2], new_ranks[2];
-      res = senc3d_scene_get_frontier_segment(senc3d_scn, i, edge);
-      if (res != RES_OK) goto error;
-      ASSERT(cc[edge[0]] == cc[edge[1]]);
-      if (cc[edge[0]] != comp)
-        /* Segment not in this component */
-        continue;
-      FOR_EACH(v, 0, 2) {
-        unsigned* p_rank;
-        p_rank = htable_vrtx_rank_find(&ranks, edge + v);
-        ASSERT(p_rank && *p_rank < vcount);
-        new_ranks[v] = *p_rank;
-      }
-#define OBJ_IDX(Rank) ((Rank)+1)
-      fprintf(obj, "l %u %u\n", OBJ_IDX(new_ranks[0]), OBJ_IDX(new_ranks[1]));
-#undef OBJ_IDX
-    }
-    fclose(obj); obj = NULL;
-  }
+  fprintf(stream, "SCALARS Holes_frontiers int\n");
+  fprintf(stream, "LOOKUP_TABLE default\n");
+  FOR_EACH(i, 0, tsz) fprintf(stream, "%d\n", trgs[i]);
 
-end:
-  if (obj) fclose(obj);
-  if (senc3d_scn) senc3d_scene_ref_put(senc3d_scn);
-  if (structs_initialized) {
-    htable_vrtx_rank_release(&ranks);
-    darray_uint_release(&comps);
-    darray_uint_release(&edges);
-  }
+exit:
+  if(trgs) MEM_RM(stardis->allocator, trgs);
+  if(senc3d_scn) senc3d_scene_ref_put(senc3d_scn);
   return res;
 error:
-  goto end;
+  goto exit;
 }
 
 res_T
@@ -666,10 +579,8 @@ print_single_MC_result
   ASSERT(estimator && stardis);
 
   /* Fetch the estimation data */
-  res = sdis_estimator_get_temperature(estimator, &result);
-  if (res != RES_OK) goto error;
-  res = sdis_estimator_get_failure_count(estimator, &nfailures);
-  if (res != RES_OK) goto error;
+  ERR(sdis_estimator_get_temperature(estimator, &result));
+  ERR(sdis_estimator_get_failure_count(estimator, &nfailures));
 
   /* Print the results */
   switch (mode & COMPUTE_MODES) {
@@ -682,55 +593,50 @@ print_single_MC_result
     break;
   case MEDIUM_COMPUTE:
     printf("Temperature in medium %s at t=%g = %g +/- %g\n",
-      stardis->solve_name, stardis->probe[3],
+      str_cget(&stardis->solve_name), stardis->probe[3],
       result.E, /* Expected value */
       result.SE); /* Standard error */
     break;
   case BOUNDARY_COMPUTE:
     printf("Temperature at boundary %s at t=%g = %g +/- %g\n",
-      stardis->solve_name, stardis->probe[3],
+      str_cget(&stardis->solve_name), stardis->probe[3],
       result.E, /* Expected value */
       result.SE); /* Standard error */
     break;
   case FLUX_BOUNDARY_COMPUTE: {
     enum sdis_estimator_type type;
-    sdis_estimator_get_type(estimator, &type);
-    if (res != RES_OK) goto error;
+    ERR(sdis_estimator_get_type(estimator, &type));
     ASSERT(type == SDIS_ESTIMATOR_FLUX);
 
     printf("Temperature at boundary %s at t=%g = %g +/- %g\n",
-      stardis->solve_name, stardis->probe[3],
+      str_cget(&stardis->solve_name), stardis->probe[3],
       result.E, /* Expected value */
       result.SE); /* Standard error */
-    res = sdis_estimator_get_convective_flux(estimator, &result);
-    if (res != RES_OK) goto error;
+    ERR(sdis_estimator_get_convective_flux(estimator, &result));
     printf("Convective flux at boundary %s at t=%g = %g +/- %g\n",
-      stardis->solve_name, stardis->probe[3],
+      str_cget(&stardis->solve_name), stardis->probe[3],
       result.E, /* Expected value */
       result.SE); /* Standard error */
-    res = sdis_estimator_get_radiative_flux(estimator, &result);
-    if (res != RES_OK) goto error;
+    ERR(sdis_estimator_get_radiative_flux(estimator, &result));
     printf("Radiative flux at boundary %s at t=%g = %g +/- %g\n",
-      stardis->solve_name, stardis->probe[3],
+      str_cget(&stardis->solve_name), stardis->probe[3],
       result.E, /* Expected value */
       result.SE); /* Standard error */
-    res = sdis_estimator_get_total_flux(estimator, &result);
-    if (res != RES_OK) goto error;
+    ERR(sdis_estimator_get_total_flux(estimator, &result));
     printf("Total flux Flux at boundary %s at t=%g = %g +/- %g\n",
-      stardis->solve_name, stardis->probe[3],
+      str_cget(&stardis->solve_name), stardis->probe[3],
       result.E, /* Expected value */
       result.SE); /* Standard error */
     break;
   }
   default: FATAL("Invalid mode.");
   }
-  printf("#failures: %zu/%zu\n", nfailures, stardis->N);
-  if (nfailures)
-    fprintf(stderr, "#failures: %zu/%zu\n", nfailures, stardis->N);
+  printf("#failures: %zu/%zu\n", nfailures, stardis->samples);
+  if(nfailures)
+    fprintf(stderr, "#failures: %zu/%zu\n", nfailures, stardis->samples);
 
   /* Dump paths according to user settings */
-  res = sdis_estimator_for_each_path(estimator, dump_path, stdout);
-  if (res != RES_OK) goto error;
+  ERR(sdis_estimator_for_each_path(estimator, dump_path, stdout));
 end:
   return res;
 error:
@@ -738,127 +644,141 @@ error:
 }
 
 void
-dump_vtk
-  (const struct geometry* geometry)
-{
-  size_t i;
-  struct vertex* vtx;
-  struct triangle* tri;
-
-  ASSERT(geometry);
-
-  vtx = geometry->vertex;
-  tri = geometry->triangle;
-
-  printf("# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET POLYDATA\n");
-  printf("POINTS %zu float\n\n", sa_size(vtx));
-  for (i = 0; i < sa_size(vtx); ++i) {
-    printf("%f %f %f\n", SPLIT3(vtx[i].xyz));
-  }
-  printf("\nPOLYGONS %zu %zu\n", sa_size(tri), 4 * sa_size(tri));
-  for (i = 0; i < sa_size(tri); ++i) {
-    printf("3 %u %u %u\n", SPLIT3(tri[i].indices.data));
-  }
-  printf("\nCELL_DATA %zu\n", sa_size(tri));
-  printf("SCALARS front_description long_long_int 1\n");
-  printf("LOOKUP_TABLE default\n");
-  for (i = 0; i < sa_size(tri); ++i) {
-    printf("%lld\n", (long long int)tri[i].front_description);
-  }
-  printf("SCALARS back_description long_long_int 1\n");
-  printf("LOOKUP_TABLE default\n");
-  for (i = 0; i < sa_size(tri); ++i) {
-    printf("%lld\n", (long long int)tri[i].back_description);
-  }
-}
-
-void
 dump_map
   (const struct stardis* stardis,
-   struct sdis_estimator** estimators)
+   const struct darray_estimators* estimators)
 {
-  size_t i, last_v = 0;
-  size_t* idx;
-  struct vertex* vtx;
-  struct triangle* tri;
+  unsigned i, vcount, tcount, last_v = 0;
+  const size_t* idx;
+  size_t sz;
+  unsigned szp;
+  const struct sdis_estimator* const* est;
 
-  ASSERT(stardis);
+  ASSERT(stardis && estimators);
 
-  idx = stardis->boundary.primitives;
-  vtx = stardis->geometry.vertex;
-  tri = stardis->geometry.triangle;
+  est = darray_estimators_cdata_get(estimators);
+  idx = darray_size_t_cdata_get(&stardis->compute_region.primitives);
+  sz = darray_size_t_size_get(&stardis->compute_region.primitives);
+  ASSERT(sz <= UINT_MAX);
+  szp = (unsigned)sz;
+  SG3D(geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));
+  SG3D(geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tcount));
 
   /* Find last used vertex */
-  for (i = 0; i < sa_size(idx); ++i) {
-    size_t t = idx[i];
-    last_v = MMAX(MMAX(last_v, tri[t].indices.data[0]),
-      MMAX(tri[t].indices.data[1], tri[t].indices.data[2]));
+  for(i = 0; i < szp; ++i) {
+    unsigned t;
+    unsigned indices[3];
+    ASSERT(idx[i] <= UINT_MAX);
+    t = (unsigned)idx[i];
+    SG3D(geometry_get_unique_triangle_vertices(stardis->geometry.sg3d, t,
+      indices));
+    last_v = MMAX(MMAX(last_v, indices[0]), MMAX(indices[1], indices[2]));
   }
 
   /* Dump vertices up to last_v, even unused ones, to avoid reindexing */
   printf("# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET POLYDATA\n");
-  printf("POINTS %zu float\n\n", last_v + 1);
-  for (i = 0; i <= last_v; ++i) {
-    printf("%f %f %f\n", SPLIT3(vtx[i].xyz));
+  printf("POINTS %u float\n\n", last_v + 1);
+  for(i = 0; i <= last_v; ++i) {
+    double coord[3];
+    SG3D(geometry_get_unique_vertex(stardis->geometry.sg3d, i, coord));
+    printf("%f %f %f\n", SPLIT3(coord));
   }
   /* Dump only primitives in boundary */
-  printf("\nPOLYGONS %zu %zu\n", sa_size(idx), 4 * sa_size(idx));
-  for (i = 0; i < sa_size(idx); ++i) {
-    size_t t = idx[i];
-    printf("3 %u %u %u\n", SPLIT3(tri[t].indices.data));
+  printf("\nPOLYGONS %u %u\n", szp, 4 * szp);
+  for(i = 0; i < szp; ++i) {
+    unsigned t;
+    unsigned indices[3];
+    ASSERT(idx[i] <= UINT_MAX);
+    t = (unsigned)idx[i];
+    SG3D(geometry_get_unique_triangle_vertices(stardis->geometry.sg3d, t,
+      indices));
+    printf("3 %u %u %u\n", SPLIT3(indices));
   }
-  printf("\nCELL_DATA %zu\n", sa_size(idx));
+  printf("\nCELL_DATA %u\n", szp);
   printf("SCALARS temperature_estimate float 1\n");
   printf("LOOKUP_TABLE default\n");
-  for (i = 0; i < sa_size(idx); ++i) {
-    const struct sdis_estimator* estimator = estimators[i];
+  for(i = 0; i < szp; ++i) {
     struct sdis_mc T;
-    SDIS(estimator_get_temperature(estimator, &T));
+    SDIS(estimator_get_temperature(est[i], &T));
     printf("%f\n", T.E);
   }
   printf("SCALARS temperature_std_dev float 1\n");
   printf("LOOKUP_TABLE default\n");
-  for (i = 0; i < sa_size(idx); ++i) {
-    const struct sdis_estimator* estimator = estimators[i];
+  for(i = 0; i < szp; ++i) {
     struct sdis_mc T;
-    SDIS(estimator_get_temperature(estimator, &T));
+    SDIS(estimator_get_temperature(est[i], &T));
     printf("%f\n", T.SE);
   }
   printf("SCALARS temperature_failures_count unsigned_long_long 1\n");
   printf("LOOKUP_TABLE default\n");
-  for (i = 0; i < sa_size(idx); ++i) {
-    const struct sdis_estimator* estimator = estimators[i];
+  for(i = 0; i < szp; ++i) {
     size_t nfails;
-    SDIS(estimator_get_failure_count(estimator, &nfails));
-    printf("%zu\n", nfails);
+    SDIS(estimator_get_failure_count(est[i], &nfails));
+    ASSERT(nfails <= UINT_MAX);
+    printf("%u\n", (unsigned)nfails);
   }
   printf("SCALARS computation_time_estimate float 1\n");
   printf("LOOKUP_TABLE default\n");
-  for (i = 0; i < sa_size(idx); ++i) {
-    const struct sdis_estimator* estimator = estimators[i];
+  for(i = 0; i < szp; ++i) {
     struct sdis_mc time;
-    SDIS(estimator_get_realisation_time(estimator, &time));
+    SDIS(estimator_get_realisation_time(est[i], &time));
     printf("%f\n", time.E);
   }
   printf("SCALARS computation_time_std_dev float 1\n");
   printf("LOOKUP_TABLE default\n");
-  for (i = 0; i < sa_size(idx); ++i) {
-    const struct sdis_estimator* estimator = estimators[i];
+  for(i = 0; i < szp; ++i) {
     struct sdis_mc time;
-    SDIS(estimator_get_realisation_time(estimator, &time));
+    SDIS(estimator_get_realisation_time(est[i], &time));
     printf("%f\n", time.SE);
   }
 }
 
-void
-print_trg_as_obj
-  (FILE* stream,
-   const struct vertex* vertices,
-   const unsigned* indices)
+res_T
+dump_compute_region_at_the_end_of_vtk
+  (const struct stardis* stardis,
+   FILE* stream)
 {
-  ASSERT(stream && vertices && indices);
-  fprintf(stream, "v %.8f %.8f %.8f\nv %.8f %.8f %.8f\nv %.8f %.8f %.8f\nf 1 2 3\n",
-    SPLIT3(vertices[indices[0]].xyz),
-    SPLIT3(vertices[indices[1]].xyz),
-    SPLIT3(vertices[indices[2]].xyz));
+  res_T res = RES_OK;
+  unsigned char* v = NULL;
+  unsigned tsz, i;
+  size_t j;
+  ASSERT(stardis && stream);
+  ASSERT(darray_size_t_size_get(&stardis->compute_region.primitives)
+  == darray_sides_size_get(&stardis->compute_region.sides));
+
+  ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
+  /* For triangles not in compute region v==0 */
+  v = MEM_CALLOC(stardis->allocator, tsz, sizeof(*v));
+  if(!v) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
+
+  /* For triangles in compute region, v==1 if FRONT or v==2 for BACK */
+  FOR_EACH(j, 0, darray_size_t_size_get(&stardis->compute_region.primitives)) {
+    size_t prim = darray_size_t_cdata_get(&stardis->compute_region.primitives)[j];
+    enum sdis_side side = darray_sides_cdata_get(&stardis->compute_region.sides)[j];
+    ASSERT(prim <= tsz);
+    ASSERT(v[(unsigned)prim] == 0); /* Not the same triangle twice */
+    v[(unsigned)prim] = (side == SDIS_FRONT) ? 1 : 2;   
+  }
+
+  /* For triangles in compute region with error v==MAX */
+  FOR_EACH(j, 0, darray_uint_size_get(&stardis->compute_region.err_triangles)) {
+    unsigned prim = darray_uint_cdata_get(&stardis->compute_region.err_triangles)[j];
+    ASSERT(prim <= tsz);
+    ASSERT(v[prim] == 0); /* Not the same triangle twice */
+    v[(unsigned)prim] = UCHAR_MAX;
+  }
+
+  fprintf(stream, "SCALARS Compute_region int\n");
+  fprintf(stream, "LOOKUP_TABLE default\n");
+  FOR_EACH(i, 0, tsz)
+    fprintf(stream, "%d\n", v[i] == UCHAR_MAX ? INT_MAX : v[i]);
+
+exit:
+  if(v) MEM_RM(stardis->allocator, v);
+  return res;
+error:
+  goto exit;
 }

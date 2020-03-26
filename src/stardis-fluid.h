@@ -8,8 +8,7 @@
 #include <rsys/rsys.h>
 #include <rsys/str.h>
 
-struct sdis_device;
-struct darray_media_ptr;
+struct stardis;
 
 /*******************************************************************************
  * Fluid data
@@ -28,9 +27,8 @@ struct fluid {
 };
 
 extern res_T
-create_fluid
-  (struct sdis_device* dev,
-   struct mem_allocator* allocator,
+create_stardis_fluid
+  (struct stardis* stardis,
    const struct str* name,
    const double rho,
    const double cp,
@@ -38,7 +36,6 @@ create_fluid
    const int is_outside,
    const double tinit,
    const double imposed_temperature,
-   struct darray_media_ptr* media_ptr,
    unsigned* out_id);
 
 #endif

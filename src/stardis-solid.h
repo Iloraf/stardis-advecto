@@ -6,8 +6,7 @@
 #include <rsys/rsys.h>
 #include <rsys/str.h>
 
-struct sdis_device;
-struct darray_media_ptr;
+struct stardis;
 
 /*******************************************************************************
  * Solid data
@@ -29,9 +28,8 @@ struct solid {
 };
 
 extern res_T
-create_solid
-  (struct sdis_device* dev,
-   struct mem_allocator* allocator,
+create_stardis_solid
+  (struct stardis* stardis,
    const struct str* name,
    const double lambda,
    const double rho,
@@ -42,7 +40,6 @@ create_solid
    const double tinit,
    const double imposed_temperature,
    const double vpower,
-   struct darray_media_ptr* media_ptr,
    unsigned* out_id);
 
 #endif

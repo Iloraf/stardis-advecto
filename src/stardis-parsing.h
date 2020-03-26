@@ -11,13 +11,15 @@
 #include <star/sstl.h>
 
 struct camera;
-struct description;
+struct logger;
+enum log_type;
 struct mem_allocator;
 struct stardis;
 
 /* Utility macros */
 #define CHK_TOK(x, Name) if((tk = (x)) == NULL) {\
-   fprintf(stderr, "Invalid data (missing token '" Name "')\n");\
+   logger_print(stardis->logger, LOG_ERROR,\
+     "Invalid data (missing token '" Name "')\n");\
    res = RES_BAD_ARG;\
    goto error;\
   } (void)0
@@ -37,17 +39,26 @@ enum stardis_mode {
   DUMP_VTK = BIT(6),
   GREEN_MODE = BIT(7),
   FLUX_BOUNDARY_COMPUTE = BIT(8),
+  DUMP_PATHS = BIT(9),
+  DUMP_HELP = BIT(10),
+  DUMP_VERSION = BIT(11),
 
-  GREEN_COMPATIBLE_MODES = PROBE_COMPUTE | PROBE_COMPUTE_ON_INTERFACE | MEDIUM_COMPUTE
-  | BOUNDARY_COMPUTE,
+  GREEN_COMPATIBLE_MODES
+    = PROBE_COMPUTE | PROBE_COMPUTE_ON_INTERFACE | MEDIUM_COMPUTE | BOUNDARY_COMPUTE,
 
-  REGION_COMPUTE_MODES = BOUNDARY_COMPUTE | FLUX_BOUNDARY_COMPUTE | MAP_COMPUTE,
+  SURFACE_COMPUTE_MODES
+    = BOUNDARY_COMPUTE | FLUX_BOUNDARY_COMPUTE | MAP_COMPUTE,
 
-  COMPUTE_MODES = GREEN_COMPATIBLE_MODES | IR_COMPUTE | REGION_COMPUTE_MODES,
+  REGION_COMPUTE_MODES = SURFACE_COMPUTE_MODES | MEDIUM_COMPUTE,
 
-  NON_COMPUTE_MODES = UNDEF_MODE | DUMP_VTK | GREEN_MODE,
+  COMPUTE_MODES = GREEN_COMPATIBLE_MODES | IR_COMPUTE | SURFACE_COMPUTE_MODES,
 
-  EXCLUSIVE_MODES = COMPUTE_MODES | FLUX_BOUNDARY_COMPUTE
+  EXCLUSIVE_MODES = COMPUTE_MODES,
+
+  SHORT_EXIT_MODES = DUMP_HELP | DUMP_VERSION,
+
+  USE_STDOUT_MODES
+  = DUMP_VTK | DUMP_PATHS | DUMP_HELP | DUMP_VERSION | IR_COMPUTE | GREEN_MODE
 };
 
 STATIC_ASSERT(GREEN_COMPATIBLE_MODES == (COMPUTE_MODES & GREEN_COMPATIBLE_MODES), 
@@ -61,10 +72,11 @@ enum dump_path_type {
 };
 
 struct args {
+  struct logger* logger;
   struct mem_allocator* allocator;
   struct darray_str model_files;
   char* medium_name;
-  char* solve_boundary_filename;
+  char* solve_filename;
   size_t samples;
   unsigned nthreads;
   double probe[4];
@@ -73,7 +85,6 @@ struct args {
   double radiative_temp[2];
   char* camera;
   enum dump_path_type dump_paths;
-  int just_help;
   int verbose;
 };
 
@@ -111,10 +122,14 @@ add_geom_ctx_position
 #endif
 
 extern LOCAL_SYM res_T
-init_args(struct mem_allocator* mem, struct args** args);
+init_args
+  (struct logger* logger,
+   struct mem_allocator* mem,
+   struct args** args);
 
 extern LOCAL_SYM void
-release_args(struct args* args);
+release_args
+  (struct args* args);
 
 extern char
 mode_option
@@ -122,12 +137,19 @@ mode_option
 
 extern void
 print_multiple_modes
-  (FILE* stream,
-   const int modes);
+  (char* buf,
+   const size_t sz,
+   const int modes,
+   const int dont);
+
+extern void
+print_version
+  (FILE* stream);
 
 extern void
 print_help
-  (const char* prog);
+  (FILE* stream,
+   const char* prog);
 
 extern res_T
 parse_args
@@ -137,12 +159,14 @@ parse_args
 
 extern res_T
 parse_camera
-  (char* cam_param,
+  (struct logger* logger, 
+   char* cam_param,
    struct camera* cam);
 
 extern LOCAL_SYM res_T
 process_model_line
-  (char* line,
+  (const char* file_name,
+   char* line,
    struct stardis* stardis);
 
 #endif /*ARGS_H*/

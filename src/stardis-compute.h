@@ -4,39 +4,27 @@
 #define SDIS_COMPUTE_H
 
 #include <rsys/rsys.h>
-#include <rsys/hash_table.h>
-
-#define HTABLE_NAME weigth
-#define HTABLE_DATA double
-#define HTABLE_KEY unsigned
-#include <rsys/hash_table.h>
+#include <rsys/dynamic_array.h>
 
 struct stardis;
-struct sdis_medium;
-
-#define DARRAY_NAME media_ptr
-#define DARRAY_DATA struct sdis_medium*
-#include <rsys/dynamic_array.h>
+struct str;
 
 #define DARRAY_NAME estimators
 #define DARRAY_DATA struct sdis_estimator*
 #include <rsys/dynamic_array.h>
 
-struct counts {
-  size_t smed_count, fmed_count, tbound_count, hbound_count,
-    fbound_count, sfconnect_count;
-};
-#define COUNTS_NULL__ {\
-  0, 0, 0, 0, 0, 0\
- }
-static const struct counts COUNTS_NULL = COUNTS_NULL__;
+struct sdis_medium*
+find_medium_by_name
+  (struct stardis* stardis,
+   const struct str* name,
+   unsigned* id); /* Can be NULL */
 
 extern LOCAL_SYM res_T
 stardis_compute
-  (struct stardis* stardis,
-   const int mode);
+  (struct stardis* stardis);
 
 extern LOCAL_SYM res_T
-read_compute_region(struct stardis* stardis);
+read_compute_surface
+  (struct stardis* stardis);
 
 #endif

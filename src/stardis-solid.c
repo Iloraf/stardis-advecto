@@ -102,10 +102,9 @@ solid_get_power
  ******************************************************************************/
 
 res_T
-create_solid
-  (struct sdis_device* dev,
-   struct mem_allocator* allocator,
-   const struct str* name,
+create_stardis_solid
+  (struct stardis* stardis,
+   const struct str* name, /* Can be NULL */
    const double lambda,
    const double rho,
    const double cp,
@@ -115,7 +114,6 @@ create_solid
    const double tinit,
    const double imposed_temperature,
    const double vpower,
-   struct darray_media_ptr* media_ptr,
    unsigned* out_id)
 {
   res_T res = RES_OK;
@@ -125,8 +123,8 @@ create_solid
   size_t sz;
   /* Could be less restrictive if green output included positions/dates */
 
-  ASSERT(dev && lambda >= 0 && rho >= 0 && cp >= 0 && delta > 0
-    && media_ptr && out_id);
+  ASSERT(stardis && lambda >= 0 && rho >= 0 && cp >= 0 && delta > 0
+    && out_id);
   solid_shader.calorific_capacity = solid_get_calorific_capacity;
   solid_shader.thermal_conductivity = solid_get_thermal_conductivity;
   solid_shader.volumic_mass = solid_get_volumic_mass;
@@ -135,14 +133,15 @@ create_solid
   solid_shader.delta_boundary = solid_get_delta_boundary;
 #endif
   solid_shader.temperature = solid_get_temperature;
-  ERR(sdis_data_create(dev, sizeof(struct solid), ALIGNOF(struct solid),
+  ERR(sdis_data_create(stardis->dev, sizeof(struct solid), ALIGNOF(struct solid),
     NULL, &data));
 
-  sz = darray_media_ptr_size_get(media_ptr);
+  sz = darray_media_ptr_size_get(&stardis->media);
   ASSERT(sz < INT_MAX);
   solid_props = sdis_data_get(data); /* Fetch the allocated memory space */
-  str_init(allocator, &solid_props->name);
+  str_init(stardis->allocator, &solid_props->name);
   if(name) str_copy(&solid_props->name, name);
+  solid_props->t0 = 0;
   solid_props->lambda = lambda;
   solid_props->rho = rho;
   solid_props->cp = cp;
@@ -154,9 +153,9 @@ create_solid
   solid_props->is_outside = is_outside;
   solid_props->id = (unsigned)sz;
   if(vpower != 0) solid_shader.volumic_power = solid_get_power;
-  ERR(darray_media_ptr_resize(media_ptr, sz + 1));
-  ERR(sdis_solid_create(dev, &solid_shader, data,
-    darray_media_ptr_data_get(media_ptr) + sz));
+  ERR(darray_media_ptr_resize(&stardis->media, sz + 1));
+  ERR(sdis_solid_create(stardis->dev, &solid_shader, data,
+    darray_media_ptr_data_get(&stardis->media) + sz));
   *out_id = solid_props->id;
 
 end:

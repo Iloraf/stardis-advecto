@@ -17,7 +17,6 @@ struct sdis_estimator;
 struct stardis;
 struct geometry;
 struct vertex;
-struct darray_descriptions;
 struct darray_estimators;
 
 extern res_T
@@ -27,37 +26,35 @@ print_sample
 
 extern res_T
 dump_image
-  (const struct sdis_estimator_buffer* buf);
+  (const struct sdis_estimator_buffer* buf,
+   FILE* stream);
 
 extern res_T
 dump_green
   (struct sdis_green_function* green,
-   const struct counts* counts,
-   const struct darray_descriptions* descriptions,
-   const double radiative_temps[2]);
-
-extern int
-has_holes(const struct stardis* stardis);
+   const struct stardis* stardis,
+   FILE* stream);
 
 extern res_T
-dump_holes_at_the_end_of_vtk
+dump_enclosure_related_stuff_at_the_end_of_vtk
   (const struct stardis* stardis,
    FILE* stream);
 
 extern res_T
 print_single_MC_result
-  (const int mode,
-   struct sdis_estimator* estimator,
-   struct stardis* stardis);
+  (struct sdis_estimator* estimator,
+   struct stardis* stardis,
+   FILE* stream);
 
 extern void
 dump_map
   (const struct stardis* stardis,
-   const struct darray_estimators* estimators);
+   const struct darray_estimators* estimators,
+   FILE* stream);
 
 extern res_T
 dump_compute_region_at_the_end_of_vtk
-  (const struct stardis* stardis,
+  (struct stardis* stardis,
    FILE* stream);
 
 #endif

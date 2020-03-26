@@ -19,6 +19,11 @@
 
 #include <limits.h>
 
+/* Forward declarations */
+struct logger;
+struct mem_allocator;
+struct sdis_medium;
+
 /* Utility macros */
 #define ERR(Expr) if((res = (Expr)) != RES_OK) goto error; else (void)0
 
@@ -40,53 +45,137 @@ enum description_type {
 #define DARRAY_DATA struct sdis_interface*
 #include <rsys/dynamic_array.h>
 
+struct dummies {
+  struct sdis_medium* dummy_fluid;
+  unsigned dummy_fluid_id;
+  struct sdis_medium* dummy_solid;
+  unsigned dummy_solid_id;
+};
+#define DUMMIES_NULL__ {\
+  NULL, UINT_MAX, NULL, UINT_MAX\
+}
+
+#define DARRAY_NAME media_ptr
+#define DARRAY_DATA struct sdis_medium*
+#include <rsys/dynamic_array.h>
+
 struct geometry {
   struct sg3d_geometry* sg3d;
-  struct sdis_scene* sdis_scn;
   struct darray_interface_ptrs interf_bytrg;
   struct darray_interface_ptrs interfaces;
 };
-
-static INLINE res_T
-init_geometry
-  (struct mem_allocator* allocator,
-   const int verbose,
-   struct geometry* geom)
-{
-  res_T res = RES_OK;
-  struct sg3d_device* sg3d_dev = NULL;
-  struct sg3d_geometry* sg3d = NULL;
-  ASSERT(allocator && geom);
-
-  ERR(sg3d_device_create(NULL, allocator, verbose, &sg3d_dev));
-  ERR(sg3d_geometry_create(sg3d_dev, &sg3d));
-  darray_interface_ptrs_init(allocator, &geom->interfaces);
-  darray_interface_ptrs_init(allocator, &geom->interf_bytrg);
-
-exit:
-  geom->sg3d = sg3d;
-  geom->sdis_scn = NULL;
-  if(sg3d_dev) SG3D(device_ref_put(sg3d_dev));
-  return res;
-error:
-  if(sg3d) SG3D(geometry_ref_put(sg3d));
-  sg3d = NULL;
-  goto exit;
-}
 
 static INLINE void
 release_geometry(struct geometry* geom)
 {
   size_t i;
   struct sdis_interface
-    **intf = darray_interface_ptrs_data_get(&geom->interfaces);
+    ** intf = darray_interface_ptrs_data_get(&geom->interfaces);
   if(geom->sg3d) SG3D(geometry_ref_put(geom->sg3d));
-  if(geom->sdis_scn) SDIS(scene_ref_put(geom->sdis_scn));
   for(i = 0; i < darray_interface_ptrs_size_get(&geom->interfaces); ++i)
     SDIS(interface_ref_put(intf[i]));
   darray_interface_ptrs_release(&geom->interfaces);
   darray_interface_ptrs_release(&geom->interf_bytrg);
 }
+
+static INLINE res_T
+init_geometry
+  (struct logger* logger,
+   struct mem_allocator* allocator,
+   const int verbose,
+   struct geometry* geom)
+{
+  res_T res = RES_OK;
+  struct sg3d_device* sg3d_dev = NULL;
+
+  ASSERT(allocator && geom);
+  
+  geom->sg3d = NULL;
+  darray_interface_ptrs_init(allocator, &geom->interfaces);
+  darray_interface_ptrs_init(allocator, &geom->interf_bytrg);
+  ERR(sg3d_device_create(logger, allocator, verbose, &sg3d_dev));
+  ERR(sg3d_geometry_create(sg3d_dev, &geom->sg3d));
+
+exit:
+  if(sg3d_dev) SG3D(device_ref_put(sg3d_dev));
+  return res;
+error:
+  release_geometry(geom);
+  goto exit;
+}
+
+/*******************************************************************************
+ * rsys/str additions
+ ******************************************************************************/
+static res_T
+ensure_allocated(struct str* str, const size_t len, const char keep_old)
+{
+  char* buf = NULL;
+  const size_t alloc_granularity = 32;
+  size_t mod = 0;
+  size_t new_len = 0;
+  size_t new_size = 0;
+  ASSERT(str);
+
+ if(len * sizeof(char) <= str->allocated)
+    return RES_OK;
+
+  mod = len % alloc_granularity;
+  new_len = !mod ? len : len - mod + alloc_granularity;
+  new_size = new_len * sizeof(char);
+  buf = MEM_ALLOC(str->allocator, new_size);
+ if(!buf)
+    return RES_MEM_ERR;
+
+ if(keep_old) {
+    strncpy(buf, str->cstr, new_len - 1);
+    buf[new_len - 1] = '\0';
+  }
+
+  str->allocated = new_len * sizeof(char);
+ if(str->cstr != str->buffer)
+    MEM_RM(str->allocator, str->cstr);
+
+  str->cstr = buf;
+  return RES_OK;
+}
+
+static res_T
+str_printf
+(struct str* str,
+  const char* fmt, ...)
+#ifdef COMPILER_GCC
+  __attribute((format(printf, 3, 4)))
+#endif
+{
+  res_T res = RES_OK;
+  size_t initial_len, left;
+  va_list args_cp;
+  int needed = 0;
+  va_list args;
+  ASSERT(str && fmt);
+  va_start(args, fmt);
+
+  initial_len = str_len(str);
+  left = str->allocated - initial_len;
+  ASSERT(left >= 0);
+ if(left) {
+    VA_COPY(args_cp, args);
+    needed = vsnprintf(str->cstr+ initial_len, left, fmt, args_cp);
+  }
+ if(needed >= left) {
+    ERR(ensure_allocated(str, initial_len + needed + 1, 1));
+    left = str->allocated - initial_len;
+    needed = vsnprintf(str->cstr+ initial_len, left, fmt, args);
+    CHK(needed < left);
+  }
+  va_end(args);
+end:
+  return res;
+error:
+  goto end;
+}
+/******************************************************************************/
 
 struct mat_fluid {
   struct str name;
@@ -115,16 +204,23 @@ release_fluid(struct mat_fluid* fluid)
   str_release(&fluid->name);
 }
 
-static void
-print_fluid(FILE* stream, const struct mat_fluid* f)
+static res_T
+print_fluid
+  (struct str* str,
+   const struct mat_fluid* f)
 {
-  ASSERT(stream && f);
-  fprintf(stream, "Fluid '%s': rho=%g cp=%g",
-    str_cget(&f->name), f->rho, f->cp);
-  if(f->tinit >= 0) fprintf(stream, " Tinit=%g", f->tinit);
+  res_T res = RES_OK;
+  ASSERT(str && f);
+  ERR(str_printf(str, "Fluid '%s': rho=%g cp=%g",
+    str_cget(&f->name), f->rho, f->cp));
+  if(f->tinit >= 0)
+    ERR(str_printf(str, " Tinit=%g", f->tinit));
   if(f->imposed_temperature >= 0)
-    fprintf(stream, " Temp=%g", f->imposed_temperature);
-  fprintf(stream, "\n");
+    ERR(str_printf(str, " Temp=%g", f->imposed_temperature));
+end:
+  return res;
+error:
+  goto end;
 }
 
 static FINLINE res_T
@@ -172,18 +268,25 @@ release_solid(struct mat_solid* solid)
   str_release(&solid->name);
 }
 
-static void
-print_solid(FILE* stream, const struct mat_solid* s)
+static res_T
+print_solid
+  (struct str* str,
+   const struct mat_solid* s)
 {
-  ASSERT(stream && s);
-  fprintf(stream,
-    "Solid '%s': lambda=%g rho=%g cp=%g delta=%g",
-    str_cget(&s->name), s->lambda, s->rho, s->cp, s->delta);
-  if(s->vpower != 0) fprintf(stream, " VPower=%g", s->vpower);
-  if(s->tinit >= 0) fprintf(stream, " Tinit=%g", s->tinit);
+  res_T res = RES_OK;
+  ASSERT(str && s);
+  ERR(str_printf(str, "Solid '%s': lambda=%g rho=%g cp=%g delta=%g",
+    str_cget(&s->name), s->lambda, s->rho, s->cp, s->delta));
+  if(s->vpower != 0)
+    ERR(str_printf(str, " VPower=%g", s->vpower));
+  if(s->tinit >= 0)
+    ERR(str_printf(str, " Tinit=%g", s->tinit));
   if(s->imposed_temperature >= 0)
-    fprintf(stream, " Temp=%g", s->imposed_temperature);
-  fprintf(stream, "\n");
+    ERR(str_printf(str, " Temp=%g", s->imposed_temperature));
+end:
+  return res;
+error:
+  goto end;
 }
 
 static FINLINE res_T
@@ -228,20 +331,24 @@ release_h_boundary(struct h_boundary* bound)
   str_release(&bound->name);
 }
 
-static void
+static res_T
 print_h_boundary
-  (FILE* stream,
+  (struct str* str,
    const struct h_boundary* b,
    const enum description_type type)
 {
-  ASSERT(stream && b
+  res_T res = RES_OK;
+  ASSERT(str && b
     && (type == DESC_BOUND_H_FOR_SOLID || type == DESC_BOUND_H_FOR_FLUID));
-  fprintf(stream,
-    "H boundary for %s '%s': emissivity=%g specular_fraction=%g hc=%g T=%g\n",
-    (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"),
-    str_cget(&b->name),
-    b->emissivity, b->specular_fraction, b->hc,
-    b->imposed_temperature);
+  ERR(str_printf(str,
+    "H boundary for %s '%s': emissivity=%g specular_fraction=%g hc=%g T=%g "
+    "(using medium %u as external medium)",
+    (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"), str_cget(&b->name),
+    b->emissivity, b->specular_fraction, b->hc, b->imposed_temperature, b->mat_id));
+end:
+  return res;
+error:
+  goto end;
 }
 
 static FINLINE res_T
@@ -259,6 +366,8 @@ cp_h_boundary(struct h_boundary* dst, const struct h_boundary* src)
 struct t_boundary {
   struct str name;
   unsigned mat_id;
+  double emissivity;
+  double specular_fraction;
   double hc;
   double imposed_temperature;
 };
@@ -268,6 +377,8 @@ init_t(struct mem_allocator* allocator, struct t_boundary* dst)
 {
   str_init(allocator, &dst->name);
   dst->mat_id = UINT_MAX;
+  dst->emissivity = 0;
+  dst->specular_fraction = 0;
   dst->hc = 0;
   dst->imposed_temperature = -1;
   return RES_OK;
@@ -279,19 +390,28 @@ release_t_boundary(struct t_boundary* bound)
   str_release(&bound->name);
 }
 
-static void
+static res_T
 print_t_boundary
-  (FILE* stream,
+  (struct str* str,
    const struct t_boundary* b,
    const enum description_type type)
 {
-  ASSERT(stream && b
+  res_T res = RES_OK;
+  ASSERT(str && b
     && (type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID));
-  fprintf(stream,
-    "T boundary for %s' %s': hc=%g T=%f\n",
+  ERR(str_printf(str, "T boundary for %s' %s': T=%g ",
     (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
-    str_cget(&b->name),
-    b->hc, b->imposed_temperature);
+    str_cget(&b->name), b->imposed_temperature));
+
+  if(type == DESC_BOUND_T_FOR_FLUID)
+    ERR(str_printf(str, "emissivity=%g, specular_fraction=%g hc=%g ",
+      b->emissivity, b->specular_fraction, b->hc));
+
+  ERR(str_printf(str, "(using medium %u as external medium)", b->mat_id));
+end:
+  return res;
+error:
+  goto end;
 }
 
 static FINLINE res_T
@@ -299,8 +419,10 @@ cp_t_boundary(struct t_boundary* dst, const struct t_boundary* src)
 {
   str_copy(&dst->name, &src->name);
   dst->mat_id = src->mat_id;
-  dst->imposed_temperature = src->imposed_temperature;
+  dst->emissivity = src->emissivity;
+  dst->specular_fraction = src->specular_fraction;
   dst->hc = src->hc;
+  dst->imposed_temperature = src->imposed_temperature;
   return RES_OK;
 }
 
@@ -325,16 +447,20 @@ release_f_boundary(struct f_boundary* bound)
   str_release(&bound->name);
 }
 
-static void
+static res_T
 print_f_boundary
-  (FILE* stream,
+  (struct str* str,
    const struct f_boundary* b)
 {
-  ASSERT(stream && b);
-  fprintf(stream,
-    "F boundary for SOLID '%s': flux=%f\n",
-    str_cget(&b->name),
-    b->imposed_flux);
+  res_T res = RES_OK;
+  ASSERT(str && b);
+  ERR(str_printf(str,
+    "F boundary for SOLID '%s': flux=%g (using medium %u as external medium)",
+    str_cget(&b->name), b->imposed_flux, b->mat_id));
+end:
+  return res;
+error:
+  goto end;
 }
 
 static FINLINE res_T
@@ -369,17 +495,20 @@ init_sf(struct mem_allocator* allocator, struct solid_fluid_connect* dst)
   return RES_OK;
 }
 
-static void
+static res_T
 print_sf_connect
-  (FILE* stream,
+  (struct str* str,
    const struct solid_fluid_connect* c)
 {
-  ASSERT(stream && c);
-  fprintf(stream, "Solid-Fluid connection '%s':", str_cget(&c->name));
-  fprintf(stream, " emissivity=%f, specular_fraction=%f",
-      c->emissivity, c->specular_fraction);
-  fprintf(stream, " hc=%f", c->hc);
-  fprintf(stream, "\n");
+  res_T res = RES_OK;
+  ASSERT(str && c);
+  ERR(str_printf(str, "Solid-Fluid connection '%s':", str_cget(&c->name)));
+  ERR(str_printf(str, " emissivity=%g, specular_fraction=%g hc=%g",
+      c->emissivity, c->specular_fraction, c->hc));
+end:
+  return res;
+error:
+  goto end;
 }
 
 static FINLINE res_T
@@ -448,40 +577,47 @@ release_description(struct description* desc)
   }
 }
 
-static INLINE void
+static INLINE res_T
 print_description
-  (FILE* stream,
+  (struct str* str,
    const struct description* desc)
 {
-  ASSERT(stream && desc);
+  res_T res = RES_OK;
+  ASSERT(str && desc);
   switch (desc->type) {
   case DESC_MAT_SOLID:
-    print_solid(stream, &desc->d.solid);
+    ERR(print_solid(str, &desc->d.solid));
     break;
   case DESC_MAT_FLUID:
-    print_fluid(stream, &desc->d.fluid);
+    ERR(print_fluid(str, &desc->d.fluid));
     break;
   case DESC_BOUND_T_FOR_SOLID:
   case DESC_BOUND_T_FOR_FLUID:
-    print_t_boundary(stream, &desc->d.t_boundary, desc->type);
+    ERR(print_t_boundary(str, &desc->d.t_boundary, desc->type));
     break;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
-    print_h_boundary(stream, &desc->d.h_boundary, desc->type);
+    ERR(print_h_boundary(str, &desc->d.h_boundary, desc->type));
     break;
   case DESC_BOUND_F_FOR_SOLID:
-    print_f_boundary(stream, &desc->d.f_boundary);
+    ERR(print_f_boundary(str, &desc->d.f_boundary));
     break;
   case DESC_SOLID_FLUID_CONNECT:
-    print_sf_connect(stream, &desc->d.sf_connect);
+    ERR(print_sf_connect(str, &desc->d.sf_connect));
     break;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
+end:
+  return res;
+error:
+  goto end;
 }
 
 static FINLINE res_T
-cp_description(struct description* dst, const struct description* src)
+cp_description
+  (struct description* dst,
+   const struct description* src)
 {
   res_T res = RES_OK;
   ASSERT(src && dst);
@@ -560,6 +696,50 @@ init_camera(struct camera* cam) {
   cam->time = INF;
 }
 
+static void
+log_err(const char* msg, void* ctx)
+{
+  ASSERT(msg);
+  (void)ctx;
+#ifdef OS_WINDOWS
+  fprintf(stderr, "error: %s", msg);
+#else
+  fprintf(stderr, "\x1b[31merror:\x1b[0m %s", msg);
+#endif
+}
+
+static void
+log_warn(const char* msg, void* ctx)
+{
+  ASSERT(msg);
+  (void)ctx;
+#ifdef OS_WINDOWS
+  fprintf(stderr, "warning: %s", msg);
+#else
+  fprintf(stderr, "\x1b[33mwarning:\x1b[0m %s", msg);
+#endif
+}
+
+static void
+log_prt(const char* msg, void* ctx)
+{
+  ASSERT(msg);
+  (void)ctx;
+#ifdef OS_WINDOWS
+  fprintf(stderr, "message: %s", msg);
+#else
+  fprintf(stderr, "\x1b[32moutput:\x1b[0m %s", msg);
+#endif
+}
+
+struct counts {
+  size_t smed_count, fmed_count, tbound_count, hbound_count,
+    fbound_count, sfconnect_count;
+};
+#define COUNTS_NULL__ {\
+  0, 0, 0, 0, 0, 0\
+ }
+
 /* Type to store the primitives of a compute region */
 #define DARRAY_NAME sides
 #define DARRAY_DATA enum sdis_side
@@ -572,7 +752,7 @@ init_camera(struct camera* cam) {
 #define DARRAY_FUNCTOR_RELEASE release_description
 #include <rsys/dynamic_array.h>
 
-struct compute_region {
+struct compute_surface {
   struct darray_size_t primitives;
   struct darray_sides sides;
   struct darray_uint err_triangles;
@@ -580,20 +760,27 @@ struct compute_region {
 
 struct stardis {
   struct geometry geometry;
+  struct sdis_scene* sdis_scn; /* The solver scene */
   struct darray_descriptions descriptions;  /* Materials and boundaries */
+  struct darray_media_ptr media;
+  struct counts counts;
 
   double probe[4]; /* x,y,z,t of probe when mode is PROBE_COMPUTE */
   struct camera camera; /* camera when mode is IR_COMPUTE */
   struct str solve_name; /* medium name when mode is MEDIUM_COMPUTE,
                             boundary file name when [FLUX_]BOUNDARY_COMPUTE
                             map file name when MAP_COMPUTE */
-  struct compute_region compute_region; /* Compute region when mode is
-                                           BOUNDARY_COMPUTE or BOUNDARY_COMPUTE */
+  struct compute_surface compute_surface; /* 2D compute region when mode is
+                                             [FLUX_]BOUNDARY_COMPUTE
+                                             or MAP_COMPUTE */
+  int mode;
   size_t samples;
   unsigned nthreads;
   double scale_factor;
   double radiative_temp[2];
   struct mem_allocator* allocator;
+  struct logger* logger;
+  struct sdis_device* dev;
   enum sdis_heat_path_flag dump_paths;
   int verbose;
 };
@@ -601,12 +788,9 @@ struct stardis {
 extern LOCAL_SYM res_T
 stardis_init
   (const struct args* args,
+   struct logger* logger,
+   struct mem_allocator* allocator,
    struct stardis* stardis);
-
-extern LOCAL_SYM res_T
-stardis_compute
-  (struct stardis* stardis,
-   const int mode);
 
 extern LOCAL_SYM void
 stardis_release

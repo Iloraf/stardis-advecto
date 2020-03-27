@@ -732,7 +732,7 @@ parse_args
         res = RES_BAD_ARG;
         print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_PATHS);
         logger_print(args->logger, LOG_ERROR,
-          "Option -%c cannot be used in conjunction with other dump options\n(%s).\n",
+          "Option -%c cannot be used in conjunction with other dump options (%s).\n",
           (char)opt, buf);
         goto error;
       }
@@ -740,7 +740,7 @@ parse_args
         res = RES_BAD_ARG;
         print_multiple_modes(buf, sizeof(buf), COMPUTE_MODES, 0);
         logger_print(args->logger, LOG_ERROR,
-          "Option -%c can only be used in conjunction with a compute option\n(%s).\n",
+          "Option -%c can only be used in conjunction with a compute option (%s).\n",
           (char)opt, buf);
         goto error;
       }

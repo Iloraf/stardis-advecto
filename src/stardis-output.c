@@ -56,9 +56,7 @@ print_power_term
   }
   case SDIS_SOLID: {
     struct solid* d__ = sdis_data_get(data);
-    const struct description* descs = darray_descriptions_cdata_get(w_ctx->desc);
     id = d__->id;
-    ASSERT(id == descs[id].d.solid.solid_id); (void)descs;
     fprintf(w_ctx->stream, "\tS\t%u\t%g", id, power_term);
     break;
   }
@@ -96,7 +94,6 @@ get_flux_terms
     FATAL("Cannot have a flux term here.\n"); break;
   case DESC_BOUND_F_FOR_SOLID: {
     double* w;
-    ASSERT(id == descs[id].d.f_boundary.mat_id);
     w = htable_weigth_find(&w_ctx->weigths, &id);
     if(w) *w += flux_term;
     else ERR(htable_weigth_set(&w_ctx->weigths, &id, &flux_term));
@@ -235,16 +232,13 @@ print_sample
     switch (descs[id].type) {
     case DESC_BOUND_T_FOR_SOLID:
     case DESC_BOUND_T_FOR_FLUID:
-      ASSERT(id == descs[id].d.t_boundary.mat_id);
       fprintf(w_ctx->stream, "T\t%u", id);
       break;
     case DESC_BOUND_H_FOR_SOLID:
     case DESC_BOUND_H_FOR_FLUID:
-      ASSERT(id == descs[id].d.h_boundary.mat_id);
       fprintf(w_ctx->stream, "H\t%u", id);
       break;
     case DESC_BOUND_F_FOR_SOLID:
-      ASSERT(id == descs[id].d.f_boundary.mat_id);
       fprintf(w_ctx->stream, "X\t%u", id);
       break;
     default: FATAL("Unreachable code.\n"); break;
@@ -263,7 +257,6 @@ print_sample
     else if(type == SDIS_FLUID) {
       struct fluid* d__ = sdis_data_get(data);
       id = d__->id;
-      ASSERT(id == descs[id].d.fluid.fluid_id);
       if(d__->is_outside)
         /* If outside the model and in a fluid with known temperature,
          * its a fluid attached to a H boundary */
@@ -274,7 +267,6 @@ print_sample
       struct solid* d__ = sdis_data_get(data);
       ASSERT(type == SDIS_SOLID);
       id = d__->id;
-      ASSERT(id == descs[id].d.solid.solid_id);
       ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
       fprintf(w_ctx->stream, "S\t%u", id);
     }
@@ -509,13 +501,12 @@ dump_green
 
   w_ctx.desc = &stardis->descriptions;
   htable_weigth_init(NULL, &w_ctx.weigths);
+  w_ctx.stream = stream;
   table_initialized = 1;
 
   ERR(sdis_green_function_for_each_path(green, print_sample, &w_ctx));
 
   fprintf(stream, "---END GREEN---\n");
-
-  ERR(sdis_green_function_ref_put(green));
 
 end:
   if(table_initialized) htable_weigth_release(&w_ctx.weigths);

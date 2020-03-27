@@ -562,7 +562,6 @@ read_compute_surface
   struct sstl* sstl = NULL;
   struct add_geom_ctx add_geom_ctx;
   struct sg3d_geometry_add_callbacks callbacks = SG3D_ADD_CALLBACKS_NULL__;
-  int new_triangles_initialized = 0;
   const char* file;
 
   ASSERT(stardis);
@@ -584,7 +583,6 @@ read_compute_surface
   ASSERT(add_geom_ctx.stl_desc.vertices_count <= UINT_MAX
     && add_geom_ctx.stl_desc.triangles_count <= UINT_MAX);
 
-  new_triangles_initialized = 1;
   add_geom_ctx.custom = &stardis->compute_surface;
 
   res = sg3d_geometry_add(

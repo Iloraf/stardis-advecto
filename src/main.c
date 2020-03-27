@@ -65,8 +65,9 @@ main
     /* Dump all the app-independent information */
     ERR(sg3d_geometry_dump_as_vtk(stardis.geometry.sg3d, stdout));
     /* Dump the compute region if any */
-    if(stardis.mode & REGION_COMPUTE_MODES)
+    if(stardis.mode & REGION_COMPUTE_MODES) {
       ERR(dump_compute_region_at_the_end_of_vtk(&stardis, stdout));
+    }
     /* Dump possible holes
      * TODO: as this extracts enclosures, it could dump front/back
      * enclosure IDs too */

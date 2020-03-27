@@ -656,7 +656,7 @@ dump_map
   const size_t* idx;
   size_t sz;
   unsigned szp;
-  const struct sdis_estimator* const* est;
+  struct sdis_estimator* const* est;
 
   ASSERT(stardis && estimators && stream);
 
@@ -765,7 +765,8 @@ dump_compute_region_at_the_end_of_vtk
       size_t prim = darray_size_t_cdata_get(&stardis->compute_surface.primitives)[j];
       enum sdis_side side = darray_sides_cdata_get(&stardis->compute_surface.sides)[j];
       ASSERT(prim <= tsz);
-      v[(unsigned)prim] |= (side == SDIS_FRONT ? 1 : 2);
+      v[(unsigned)prim] =
+        (unsigned char)(v[(unsigned)prim] | (side == SDIS_FRONT ? 1 : 2));
     }
 
     /* For triangles in compute surface with error v==MAX */

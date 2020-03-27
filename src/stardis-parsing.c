@@ -337,8 +337,9 @@ print_multiple_modes
     m = BIT(b++);
     if(m & dont) continue;
     if(m & modes) {
-      int n = snprintf(buf, left, (fst ? "-%c" : ", -%c"), mode_option(m));
-      if(n < 0 || n >= left) FATAL("Buffer is too small.");
+      size_t n =
+        (size_t)snprintf(buf, left, (fst ? "-%c" : ", -%c"), mode_option(m));
+      if(n >= left) FATAL("Buffer is too small.");
       left -= n;
       buf += n;
       fst = 0;

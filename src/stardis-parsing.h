@@ -12,7 +12,6 @@
 
 struct camera;
 struct logger;
-enum log_type;
 struct mem_allocator;
 struct stardis;
 

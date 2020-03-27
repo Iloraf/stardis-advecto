@@ -18,6 +18,7 @@
 #include <sdis.h>
 
 #include <limits.h>
+#include <stdarg.h>
 
 /* Forward declarations */
 struct logger;
@@ -105,76 +106,16 @@ error:
 }
 
 /*******************************************************************************
- * rsys/str additions
+ * rsys/str addition
  ******************************************************************************/
-static res_T
-ensure_allocated(struct str* str, const size_t len, const char keep_old)
-{
-  char* buf = NULL;
-  const size_t alloc_granularity = 32;
-  size_t mod = 0;
-  size_t new_len = 0;
-  size_t new_size = 0;
-  ASSERT(str);
-
- if(len * sizeof(char) <= str->allocated)
-    return RES_OK;
-
-  mod = len % alloc_granularity;
-  new_len = !mod ? len : len - mod + alloc_granularity;
-  new_size = new_len * sizeof(char);
-  buf = MEM_ALLOC(str->allocator, new_size);
- if(!buf)
-    return RES_MEM_ERR;
-
- if(keep_old) {
-    strncpy(buf, str->cstr, new_len - 1);
-    buf[new_len - 1] = '\0';
-  }
-
-  str->allocated = new_len * sizeof(char);
- if(str->cstr != str->buffer)
-    MEM_RM(str->allocator, str->cstr);
-
-  str->cstr = buf;
-  return RES_OK;
-}
-
-static res_T
+extern LOCAL_SYM res_T
 str_printf
-(struct str* str,
-  const char* fmt, ...)
+  (struct str* str,
+   const char* fmt, ...)
 #ifdef COMPILER_GCC
-  __attribute((format(printf, 3, 4)))
+  __attribute((format(printf, 2, 3)))
 #endif
-{
-  res_T res = RES_OK;
-  size_t initial_len, left;
-  va_list args_cp;
-  int needed = 0;
-  va_list args;
-  ASSERT(str && fmt);
-  va_start(args, fmt);
-
-  initial_len = str_len(str);
-  left = str->allocated - initial_len;
-  ASSERT(left >= 0);
- if(left) {
-    VA_COPY(args_cp, args);
-    needed = vsnprintf(str->cstr+ initial_len, left, fmt, args_cp);
-  }
- if(needed >= left) {
-    ERR(ensure_allocated(str, initial_len + needed + 1, 1));
-    left = str->allocated - initial_len;
-    needed = vsnprintf(str->cstr+ initial_len, left, fmt, args);
-    CHK(needed < left);
-  }
-  va_end(args);
-end:
-  return res;
-error:
-  goto end;
-}
+  ;
 /******************************************************************************/
 
 struct mat_fluid {
@@ -213,10 +154,12 @@ print_fluid
   ASSERT(str && f);
   ERR(str_printf(str, "Fluid '%s': rho=%g cp=%g",
     str_cget(&f->name), f->rho, f->cp));
-  if(f->tinit >= 0)
+  if(f->tinit >= 0) {
     ERR(str_printf(str, " Tinit=%g", f->tinit));
-  if(f->imposed_temperature >= 0)
+  }
+  if(f->imposed_temperature >= 0) {
     ERR(str_printf(str, " Temp=%g", f->imposed_temperature));
+  }
 end:
   return res;
 error:
@@ -277,12 +220,15 @@ print_solid
   ASSERT(str && s);
   ERR(str_printf(str, "Solid '%s': lambda=%g rho=%g cp=%g delta=%g",
     str_cget(&s->name), s->lambda, s->rho, s->cp, s->delta));
-  if(s->vpower != 0)
+  if(s->vpower != 0) {
     ERR(str_printf(str, " VPower=%g", s->vpower));
-  if(s->tinit >= 0)
+  }
+  if(s->tinit >= 0) {
     ERR(str_printf(str, " Tinit=%g", s->tinit));
-  if(s->imposed_temperature >= 0)
+  }
+  if(s->imposed_temperature >= 0) {
     ERR(str_printf(str, " Temp=%g", s->imposed_temperature));
+  }
 end:
   return res;
 error:
@@ -403,10 +349,10 @@ print_t_boundary
     (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
     str_cget(&b->name), b->imposed_temperature));
 
-  if(type == DESC_BOUND_T_FOR_FLUID)
+  if(type == DESC_BOUND_T_FOR_FLUID) {
     ERR(str_printf(str, "emissivity=%g, specular_fraction=%g hc=%g ",
       b->emissivity, b->specular_fraction, b->hc));
-
+  }
   ERR(str_printf(str, "(using medium %u as external medium)", b->mat_id));
 end:
   return res;
@@ -685,7 +631,7 @@ struct camera {
   double time;
 };
 
-static void
+static INLINE void
 init_camera(struct camera* cam) {
   d3_splat(cam->pos, 0);
   d3_splat(cam->tgt, 0);
@@ -696,7 +642,7 @@ init_camera(struct camera* cam) {
   cam->time = INF;
 }
 
-static void
+static INLINE void
 log_err(const char* msg, void* ctx)
 {
   ASSERT(msg);
@@ -708,7 +654,7 @@ log_err(const char* msg, void* ctx)
 #endif
 }
 
-static void
+static INLINE void
 log_warn(const char* msg, void* ctx)
 {
   ASSERT(msg);
@@ -720,7 +666,7 @@ log_warn(const char* msg, void* ctx)
 #endif
 }
 
-static void
+static INLINE void
 log_prt(const char* msg, void* ctx)
 {
   ASSERT(msg);

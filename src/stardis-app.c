@@ -121,7 +121,7 @@ error:
     ERR(str_printf(&str, "Front: "));\
     ERR(print_description(&str, descs + properties[SG3D_FRONT]));\
     ERR(str_printf(&str, "\n"));\
-    ERR(logger_print(stardis->logger, LOG_OUTPUT, str_cget(&str))); \
+    ERR(logger_print(stardis->logger, LOG_OUTPUT, "%s", str_cget(&str))); \
   }\
   str_clear(&str);\
   if(!back_defined)\
@@ -130,7 +130,7 @@ error:
     ERR(str_printf(&str, "Back: "));\
     ERR(print_description(&str, descs + properties[SG3D_BACK]));\
     ERR(str_printf(&str, "\n"));\
-    ERR(logger_print(stardis->logger, LOG_OUTPUT, str_cget(&str))); \
+    ERR(logger_print(stardis->logger, LOG_OUTPUT, "%s", str_cget(&str))); \
   }\
   str_clear(&str);\
   if(!connect_defined)\
@@ -139,7 +139,7 @@ error:
     ERR(str_printf(&str, "Connection: "));\
     ERR(print_description(&str, descs + properties[SG3D_INTFACE]));\
     ERR(str_printf(&str, "\n"));\
-    ERR(logger_print(stardis->logger, LOG_OUTPUT, str_cget(&str))); \
+    ERR(logger_print(stardis->logger, LOG_OUTPUT, "%s", str_cget(&str))); \
   }\
   str_release(&str);\
 }
@@ -528,7 +528,7 @@ stardis_init
     ERR(print_description(&str,
       darray_descriptions_cdata_get(&stardis->descriptions) + i));
     ERR(str_printf(&str, "\n"));
-    logger_print(stardis->logger, LOG_OUTPUT, str_cget(&str));
+    logger_print(stardis->logger, LOG_OUTPUT, "%s", str_cget(&str));
   }
   str_release(&str);
 
@@ -639,4 +639,74 @@ stardis_release(struct stardis* stardis)
   FOR_EACH(i, 0, darray_media_ptr_size_get(&stardis->media))
     SDIS(medium_ref_put(darray_media_ptr_data_get(&stardis->media)[i]));
   darray_media_ptr_release(&stardis->media);
+}
+
+/*******************************************************************************
+ * rsys/str additions
+ ******************************************************************************/
+static res_T
+ensure_allocated(struct str* str, const size_t len, const char keep_old)
+{
+  char* buf = NULL;
+  const size_t alloc_granularity = 32;
+  size_t mod = 0;
+  size_t new_len = 0;
+  size_t new_size = 0;
+  ASSERT(str);
+
+  if (len * sizeof(char) <= str->allocated)
+    return RES_OK;
+
+  mod = len % alloc_granularity;
+  new_len = !mod ? len : len - mod + alloc_granularity;
+  new_size = new_len * sizeof(char);
+  buf = MEM_ALLOC(str->allocator, new_size);
+  if (!buf)
+    return RES_MEM_ERR;
+
+  if (keep_old) {
+    strncpy(buf, str->cstr, new_len - 1);
+    buf[new_len - 1] = '\0';
+  }
+
+  str->allocated = new_len * sizeof(char);
+  if (str->cstr != str->buffer)
+    MEM_RM(str->allocator, str->cstr);
+
+  str->cstr = buf;
+  return RES_OK;
+}
+
+res_T
+str_printf
+(struct str* str,
+  const char* fmt, ...)
+{
+  res_T res = RES_OK;
+  size_t initial_len, left;
+  va_list args_cp;
+  size_t needed = 0;
+  va_list args;
+  ASSERT(str && fmt);
+  va_start(args, fmt);
+
+  initial_len = str_len(str);
+  ASSERT(str->allocated >= initial_len);
+  left = str->allocated - initial_len;
+  if (left) {
+    VA_COPY(args_cp, args);
+    needed = (size_t)vsnprintf(str->cstr + initial_len, left, fmt, args_cp);
+  }
+  if (needed >= left) {
+    ERR(ensure_allocated(str, initial_len + needed + 1, 1));
+    ASSERT(str->allocated >= initial_len);
+    left = str->allocated - initial_len;
+    needed = (size_t)vsnprintf(str->cstr + initial_len, left, fmt, args);
+    CHK(needed < left);
+  }
+  va_end(args);
+end:
+  return res;
+error:
+  goto end;
 }

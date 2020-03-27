@@ -22,7 +22,7 @@ set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 # Check dependencies
 ###############################################################################
 find_package(RCMake 0.4 REQUIRED)
-find_package(RSys 0.8.1 REQUIRED)
+find_package(RSys 0.9 REQUIRED)
 find_package(StarGeom3D 0.1 REQUIRED)
 find_package(StarEnc3D 0.3.1 REQUIRED)
 find_package(Stardis 0.7.1 REQUIRED)

@@ -14,26 +14,26 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 :toc:
 
-solstice(1)
+stardis(1)
 ===========
 
 NAME
 ----
-solstice - compute the power collected by a concentrated solar plant
+stardis - compute the power collected by a concentrated solar plant
 
 SYNOPSIS
 --------
 [verse]
-*solstice*
-*solstice* [_option_]... [_file_]
-*solstice* *-g* <__sub-option__[:...]> [_option_]... [_file_]
-*solstice* *-p* <__sub-option__[:...]> [_option_]... [_file_]
-*solstice* *-r* <__sub-option__[:...]> [_option_]... [_file_]
+*stardis*
+*stardis* [_option_]... [_file_]
+*stardis* *-g* <__sub-option__[:...]> [_option_]... [_file_]
+*stardis* *-p* <__sub-option__[:...]> [_option_]... [_file_]
+*stardis* *-r* <__sub-option__[:...]> [_option_]... [_file_]
 
 DESCRIPTION
 -----------
-*solstice* computes the total power collected by a concentrated solar plant, as
-described in the *solstice-input*(5) _file_. If the _file_ argument is not
+*stardis* computes the total power collected by a concentrated solar plant, as
+described in the *stardis-input*(5) _file_. If the _file_ argument is not
 provided, the solar plant is read from standard input. To evaluate various
 efficiencies for each primary reflector, it computes losses due to cosine
 effect, shadowing and masking, orientation and surface irregularities,
@@ -41,32 +41,32 @@ materials properties and atmospheric extinction. The efficiency for each
 one of these effects is subsequently computed for each reflector.
 
 The entities on which computations must be performed are listed in the
-*solstice-receiver*(5) file submitted through the *-R* option. The estimated
-results follow the *solstice-output*(5) format and are written to the _output_
+*stardis-receiver*(5) file submitted through the *-R* option. The estimated
+results follow the *stardis-output*(5) format and are written to the _output_
 file or to the standard output whether the *-o* _output_ option is defined or
-not, respectively. Note that the *solstice* algorithm is based on the
+not, respectively. Note that the *stardis* algorithm is based on the
 Monte-Carlo method, which means that every result is provided with its
 numerical accuracy.
 
-*solstice* is designed to efficiently handle complex solar facilities: several
+*stardis* is designed to efficiently handle complex solar facilities: several
 reflectors can be specified (planes, conics, cylindro-parabolic, etc.) and
 positioned in 3D space, with a possibility for 1-axis and 2-axis
 auto-orientation. Multiple materials can be used, as long as the relevant
 physical properties are provided. Spectral effects are also taken into account:
 it is possible to define the spectral distribution of any physical property,
 including the input solar spectrum and the transmissivity of the atmosphere, at
-any spectral resolution. Refer to *solstice-input*(5) for more informations.
+any spectral resolution. Refer to *stardis-input*(5) for more informations.
 
-In addition of the aforementioned computations, *solstice* provides three
+In addition of the aforementioned computations, *stardis* provides three
 other functionalities. The *-g* option can be used to convert the
-*solstice-input*(5) geometries in CAO files. The *-p* option saves the sampled
+*stardis-input*(5) geometries in CAO files. The *-p* option saves the sampled
 radiative paths used by the estimates, allowing to visualise them externally
 which may be a great help to identify a design issue. Finally, the *-r* option
 is used to render an image of the submitted solar facility. Note that these
 three options are mutually exclusives, and once defined, they replace the
-default *solstice* behaviour.
+default *stardis* behaviour.
 
-Please note that any coordinate-related question in Solstice must be
+Please note that any coordinate-related question in Stardis must be
 considered with the right-handed convention in mind.
 
 OPTIONS
@@ -78,8 +78,8 @@ OPTIONS
   Each provided sun direction triggers a new computation whose results are
   concatenated to the _output_ file.
 +
-Following the right-handed convention, Solstice azimuthal rotation is
-counter-clockwise, with 0° on the X axis. Solstice elevation starts from 0° for
+Following the right-handed convention, Stardis azimuthal rotation is
+counter-clockwise, with 0° on the X axis. Stardis elevation starts from 0° for
 directions in the XY plane, up to 90° at zenith. Thus -D0,0 -D90,0 -D180,0 and
 -D270,0 will produce solar vectors {-1,0,0} {0,-1,0} {+1,0,0} and {0,+1,0}
 respectively, while -D__alpha__,90 will produce {0,0,-1} regardless of _alpha_
@@ -117,7 +117,7 @@ value.
   *split=*<**geometry**|*object*|*none*>;;
     Define how the output mesh is split in sub meshes. A sub mesh can be
     generated for each *geometry* or for each *object* as defined in the
-    *solstice-input*(5) file format. The *none* option means that only one
+    *stardis-input*(5) file format. The *none* option means that only one
     mesh is generated for the whole solar facility. By default, the *split*
     option is set to *none*.
 
@@ -129,7 +129,7 @@ value.
   default _experiments-count_ is set to @SOLSTICE_ARGS_DEFAULT_NREALISATIONS@.
 
 *-o* _output_::
-  Write results to _output_ with respect to the *solstice-output*(5) format. If
+  Write results to _output_ with respect to the *stardis-output*(5) format. If
   not defined, write results to standard output.
 
 *-p* <__sub-option__:...>::
@@ -151,8 +151,8 @@ value.
   Do not print the helper message when no _file_ is submitted.
 
 *-R* _receivers_::
-  *solstice-receiver*(5) file defining the scene receivers, i.e. the solar
-  plant entities for which *solstice* computes Monte-Carlo estimates.
+  *stardis-receiver*(5) file defining the scene receivers, i.e. the solar
+  plant entities for which *stardis* computes Monte-Carlo estimates.
 
 *-r* <__sub-option__:...>::
   Render an image of the scene through a pinhole camera, for each submitted
@@ -204,7 +204,7 @@ value.
   cores.
 
 *-v*::
-  Make solstice more verbose.
+  Make stardis more verbose.
 
 *--version*::
   Output version information and exit.
@@ -219,7 +219,7 @@ declared in the *rcvs.yaml* file. *10000* experiments are used by the
 Monte-Carlo estimates and the results are written to *output* even though this
 file already exists:
 
-    $ solstice -D45,70:50,75 -R rcvs.yaml -n 10000 -f -o output input.yaml
+    $ stardis -D45,70:50,75 -R rcvs.yaml -n 10000 -f -o output input.yaml
 
 Generate a mesh for each geometry described in *input.yaml*, and save them in
 the *output* file with respect to the Alias Wavefront OBJ format. The meshes
@@ -228,32 +228,32 @@ sun direction whose azimuthal and elevation angles are {*30*,*60*}. Use the
 *csplit*(1) Unix command to generate an Alias Wavefront OBJ file per geometry
 stored in *output*. The name of the generated Alias Wavefront OBJ files are
 *geom*<__NUM__>**.obj** with __NUM__ in [0, N-1] where N is the number of
-geometries described in *input.yaml*. Refer to *solstice-output*(5) for
+geometries described in *input.yaml*. Refer to *stardis-output*(5) for
 informations on the regular expression *^---$* used to split the output file:
 
-    $ solstice -D30,60 -g format=obj:split=geometry -f -o output input.yaml
+    $ stardis -D30,60 -g format=obj:split=geometry -f -o output input.yaml
     $ csplit -f geom -b %02d.obj -z --suppress-matched output /^---$/ {*}
 
 Trace 100 radiative paths into the solar plant described in *input.yaml*, with
 respect to the sun direction whose azimuthal and elevations angles are *0* and
-*90* degrees, respectively. Write the *solstice-output*(5) result to the
+*90* degrees, respectively. Write the *stardis-output*(5) result to the
 standard output and postprocess it with the *sed*(1) Unix command to remove the
 first line that stores the sun direction from which the radiative paths come
 from. The remaining data that list the radiative paths geometry are redirected
 into the *paths.vtk* file:
 
-    $ solstice -n 100 -D0,90 -R rcvs.yaml -p default input.yaml | sed '1d'>paths.vtk
+    $ stardis -n 100 -D0,90 -R rcvs.yaml -p default input.yaml | sed '1d'>paths.vtk
 
 Use the path-tracing rendering algorithm to draw the solar plant
 *solplant.yaml* with respect to the sun direction whose azimuthal and elevation
 angles are *180* and *45* degrees, respectively. Use *64* samples per pixel to
 estimate the per-pixel radiance and fix the up camera vector to {*0*,*0*,*1*}.
-Write the *solstice-output*(5) result to standard output and use the *sed*(1)
+Write the *stardis-output*(5) result to standard output and use the *sed*(1)
 Unix command to remove the first line which stores the sun direction used to
 draw the image. Finally, visualise the rendered picture by redirecting the
 remaining data to the *feh*(1) image viewer.
 
-    $ solstice -D180,45 -r up=0,0,1:rmode=pt:spp=64 solplant.yaml | sed '1d' | feh -
+    $ stardis -D180,45 -r up=0,0,1:rmode=pt:spp=64 solplant.yaml | sed '1d' | feh -
 
 COPYRIGHT
 ---------
@@ -267,6 +267,6 @@ SEE ALSO
 *csplit*(1),
 *feh*(1),
 *sed*(1),
-*solstice-input*(5),
-*solstice-output*(5),
-*solstice-receiver*(5)
+*stardis-input*(5),
+*stardis-output*(5),
+*stardis-receiver*(5)

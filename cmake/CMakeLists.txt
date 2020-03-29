@@ -82,7 +82,12 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${RCMAKE_SOURCE_DIR})
 include(rcmake)
 include(rcmake_runtime)
 
-rcmake_append_runtime_dirs(_runtime_dirs RSys Stardis StarGeom3D StarEnc3D StarSTL)
+if(CMAKE_COMPILER_IS_GNUCC)
+  rcmake_append_runtime_dirs(_runtime_dirs RSys Stardis StarGeom3D StarEnc3D StarSTL)
+endif()
+if(MSVC)
+  rcmake_append_runtime_dirs(_runtime_dirs RSys MuslGetopt Stardis StarGeom3D StarEnc3D StarSTL)
+endif()
 
 ###############################################################################
 # Build subprojects
@@ -124,26 +129,20 @@ rcmake_prepend_path(SDIS_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 add_executable(sdis-app
   ${SDIS_FILES_SRC}
   ${SDIS_FILES_INC})
-  
-if(CMAKE_COMPILER_IS_GNUCC)
-  set(MATH_LIB m)
-endif()
-if(MSVC)
-  set(GETOPT_LIB MuslGetopt)
-endif()
 
 if(CMAKE_COMPILER_IS_GNUCC)
+  set(MATH_LIB m)
   set_target_properties(sdis-app PROPERTIES
     COMPILE_FLAGS "-std=c99"
     VERSION ${VERSION})
 elseif(MSVC)
+  set(GETOPT_LIB MuslGetopt)
   set_target_properties(sdis-app PROPERTIES
     VERSION ${VERSION})
 endif()
 
 target_link_libraries(sdis-app
   Stardis StarGeom3D StarEnc3D StarSTL RSys ${GETOPT_LIB}  ${MATH_LIB})
-
 
 ###############################################################################
 # Define output & install directories

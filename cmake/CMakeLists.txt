@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2018 |Meso|Star>
+# Copyright (C) 2018-2020 |Meso|Star>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,24 +18,63 @@ project(stardis-app C)
 
 set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 
+if(CMAKE_HOST_UNIX)
+  set(STARDIS_DOC "TROFF & HTML" CACHE STRING
+    "Type of documentation to generate and install.")
+else()
+  set(STARDIS_DOC "HTML" CACHE STRING
+    "Type of documentation to generate and install.")
+endif()
+
+set_property(CACHE STARDIS_DOC PROPERTY STRINGS
+  "HTML"
+  "TROFF"
+  "TROFF & HTML"
+  "NONE")
+  
+###############################################################################
+# Generate files
+###############################################################################set(SOLSTICE_ARGS_DEFAULT_NREALISATIONS "10000")
+set(SOLSTICE_ARGS_DEFAULT_CAMERA_POS "0,0,0")
+set(SOLSTICE_ARGS_DEFAULT_CAMERA_TGT "0,0,-1")
+set(SOLSTICE_ARGS_DEFAULT_CAMERA_UP "0,1,0")
+set(SOLSTICE_ARGS_DEFAULT_CAMERA_FOV "70") # In degrees
+set(SOLSTICE_ARGS_DEFAULT_IMG_WIDTH  "800")
+set(SOLSTICE_ARGS_DEFAULT_IMG_HEIGHT "600")
+set(SOLSTICE_ARGS_DEFAULT_IMG_SPP "1")
+
+configure_file(${SDIS_SOURCE_DIR}/../doc/stardis.1.txt.in
+  ${CMAKE_CURRENT_BINARY_DIR}/doc/stardis.1.txt @ONLY)
+
+set(VERSION_MAJOR 0)
+set(VERSION_MINOR 4)
+set(VERSION_PATCH 0)
+set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+
+configure_file(${SDIS_SOURCE_DIR}/stardis-version.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-version.h @ONLY)
+
 ###############################################################################
 # Check dependencies
 ###############################################################################
 find_package(RCMake 0.4 REQUIRED)
 find_package(RSys 0.9 REQUIRED)
 find_package(StarGeom3D 0.1 REQUIRED)
-find_package(StarEnc3D 0.3.1 REQUIRED)
-find_package(Stardis 0.7.1 REQUIRED)
+find_package(StarEnc3D 0.4.2 REQUIRED)
+find_package(Stardis 0.8.2 REQUIRED)
 find_package(StarSTL 0.3 REQUIRED)
+if(MSVC)
+  find_package(MuslGetopt REQUIRED)
+endif()
 
 include_directories(
   ${RSys_INCLUDE_DIR}
   ${StarGeom3D_INCLUDE_DIR}
   ${StarEnc3D_INCLUDE_DIR}
   ${Stardis_INCLUDE_DIR}
-  ${StarSTL_INCLUDE_DIR})
+  ${StarSTL_INCLUDE_DIR}
+  ${CMAKE_CURRENT_BINARY_DIR})
 if(MSVC)
-  find_package(MuslGetopt REQUIRED)
   include_directories(${MuslGetopt_INCLUDE_DIR})
 endif()
 
@@ -46,13 +85,15 @@ include(rcmake_runtime)
 rcmake_append_runtime_dirs(_runtime_dirs RSys Stardis StarGeom3D StarEnc3D StarSTL)
 
 ###############################################################################
+# Build subprojects
+###############################################################################
+if(NOT STARDIS_DOC STREQUAL "NONE")
+  add_subdirectory(doc)
+endif()
+
+###############################################################################
 # Configure and define targets
 ###############################################################################
-set(VERSION_MAJOR 0)
-set(VERSION_MINOR 4)
-set(VERSION_PATCH 0)
-set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
-
 set(SDIS_FILES_SRC
   stardis-app.c
   stardis-compute.c
@@ -70,7 +111,8 @@ set(SDIS_FILES_INC
   stardis-intface.h
   stardis-output.h
   stardis-parsing.h
-  stardis-solid.h)
+  stardis-solid.h
+  stardis-version.h.in)
 
 set(SDIS_FILES_DOC COPYING README.md)
 
@@ -84,20 +126,24 @@ add_executable(sdis-app
   ${SDIS_FILES_INC})
   
 if(CMAKE_COMPILER_IS_GNUCC)
-  set_target_properties(sdis-app PROPERTIES
-    COMPILE_FLAGS "-std=c99 ${TE_DEFAULTS}"
-    VERSION ${VERSION})
-  target_link_libraries(sdis-app
-    Stardis StarGeom3D StarEnc3D StarSTL RSys m)
-elseif(MSVC)
-  set_target_properties(sdis-app PROPERTIES
-    COMPILE_FLAGS "${TE_DEFAULTS}"
-    VERSION ${VERSION})
-  target_link_libraries(sdis-app
-    Stardis StarGeom3D StarEnc3D StarSTL RSys MuslGetopt)
+  set(MATH_LIB m)
+endif()
+if(MSVC)
+  set(GETOPT_LIB MuslGetopt)
 endif()
 
-rcmake_copy_runtime_libraries(sdis-app)
+if(CMAKE_COMPILER_IS_GNUCC)
+  set_target_properties(sdis-app PROPERTIES
+    COMPILE_FLAGS "-std=c99"
+    VERSION ${VERSION})
+elseif(MSVC)
+  set_target_properties(sdis-app PROPERTIES
+    VERSION ${VERSION})
+endif()
+
+target_link_libraries(sdis-app
+  Stardis StarGeom3D StarEnc3D StarSTL RSys ${GETOPT_LIB}  ${MATH_LIB})
+
 
 ###############################################################################
 # Define output & install directories
@@ -106,4 +152,7 @@ install(TARGETS sdis-app
   ARCHIVE DESTINATION bin
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
+
 install(FILES ${SDIS_FILES_DOC} DESTINATION share/doc/stardis-app)
+
+rcmake_copy_runtime_libraries(sdis-app)

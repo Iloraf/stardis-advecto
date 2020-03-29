@@ -97,7 +97,7 @@ print_version
   ASSERT(stream);
   fprintf(stream,
     "Stardis version %i.%i.%i built on stardis solver version %i.%i.%i\n",
-    StardisApp_VERSION_MAJOR, StardisApp_VERSION_MINOR, StardisApp_VERSION_PATCH,
+    STARDIS_APP_VERSION_MAJOR, STARDIS_APP_VERSION_MINOR, STARDIS_APP_VERSION_PATCH,
     Stardis_VERSION_MAJOR, Stardis_VERSION_MINOR, Stardis_VERSION_PATCH);
 }
 

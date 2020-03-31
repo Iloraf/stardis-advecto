@@ -16,6 +16,7 @@
 #define _GNU_SOURCE 1
 #include "stardis-parsing.h"
 #include "stardis-app.h"
+#include "stardis-default.h"
 #include "stardis-version.h"
 
 #include <rsys/cstr.h>
@@ -56,7 +57,7 @@ split_line
   char** result = 0;
   size_t count = 0;
   char* tmp = a_str;
-  char* last_comma = 0;
+  char* last_delim = a_str;
   char delim[2];
   delim[0] = a_delim;
   delim[1] = 0;
@@ -64,32 +65,27 @@ split_line
   ASSERT(a_str);
 
   /* Count how many elements will be extracted. */
-  while(*tmp)
-  {
-    if(a_delim == *tmp)
-    {
+  while(*tmp) {
+    if(a_delim == *tmp) {
       count++;
-      last_comma = tmp;
+      last_delim = tmp;
     }
     tmp++;
   }
 
   /* Add space for trailing token. */
-  count += last_comma < (a_str + strlen(a_str) - 1);
+  count += last_delim < (a_str + strlen(a_str) - 1);
 
   /* Add space for terminating null string so caller
      knows where the list of returned strings ends. */
   count++;
 
   result = malloc(sizeof(char*) * count);
-
-  if(result)
-  {
+  if(result) {
     size_t idx = 0;
     char* token = strtok(a_str, delim);
 
-    while(token)
-    {
+    while(token) {
       ASSERT(idx < count);
 #ifdef COMPILER_CL
       *(result + idx++) = _strdup(token);
@@ -101,7 +97,6 @@ split_line
     ASSERT(idx == count - 1);
     *(result + idx) = 0;
   }
-
   return result;
 }
 
@@ -291,13 +286,14 @@ init_args
   args->logger = logger;
   args->allocator = allocator;
   darray_str_init(allocator, &args->model_files);
-  /* Some fields have non-zero default values */
-  args->samples = 10000;
+  /* Set default values */
+  args->samples = STARDIS_DEFAULT_SAMPLES_COUNT;
   args->nthreads = DEFAULT_NTHREADS;
-  args->probe[3] = INF; /* Probe time */
-  args->scale_factor = 1;
-  args->radiative_temp[0] = args->radiative_temp[1] = 300;
-  args->verbose = 1;
+  args->probe[3] = STARDIS_DEFAULT_COMPUTE_TIME;
+  args->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
+  args->ambiant_temp = STARDIS_DEFAULT_AMBIANT_TEMP;
+  args->ref_temp = STARDIS_DEFAULT_REFERENCE_TEMP;
+  args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;
 
 end:
   *out_args = args;
@@ -363,7 +359,7 @@ print_multiple_modes
 }
 
 void
-print_help
+short_help
   (FILE* stream,
    const char* prog)
 {
@@ -377,132 +373,78 @@ print_help
   name = 1 + strrchr(prog, '\\');
 #endif
 
+  fprintf(stream,
+    "Usage: %s [OPTIONS]\n"
+    "\nSolve coupled thermal systems under the linear assumption.\n"
+    "Refer to stardis(1) man page for more information.\n\n",
+    name);
   print_version(stream);
-  fprintf(stream, "\nUsage: \n");
-  fprintf(stream, "------\n");
 
-  fprintf(stream, "\n%s {-M MODEL_FILE_NAME}+\n", name);
-  fprintf(stream, "  [ -p X,Y,Z,TIME | -P X,Y,Z,TIME | -m MEDIUM_NAME,TIME\n");
-  fprintf(stream, "    | -s STL_FILE_NAME,TIME | -S STL_FILE_NAME,TIME | -F STL_FILE_NAME,TIME\n");
-  fprintf(stream, "    | -R t=TIME:spp=SPP:fov=FOV:up=XUP,YUP,ZUP:pos=X,Y,Z:tgt=XT,YT,ZT:img=WxH ]\n");
-  fprintf(stream, "  [-d] [-D {all|error|success}] [-g] [-f SCALE_FACTOR] [-n REALIZATIONS_COUNT]\n");
-  fprintf(stream, "  [-t NUM_OF_THREADS] [-r AMBIENT_RAD_TEMP:REFERENCE_TEMP]\n");
+  fprintf(stream, "\nMandatory arguments\n");
+  fprintf(stream, "-------------------\n");
 
-  fprintf(stream, "\n%s -h: print this help.\n", name);
+  fprintf(stream, "\n  -M <FILE>\n");
+  fprintf(stream, "     Read a text file that contains (partial) description of the model.\n");
 
-  fprintf(stream, "\n%s -v: print stardis-app version.\n", name);
+  fprintf(stream, "\nExclusive arguments\n");
+  fprintf(stream, "-------------------\n");
 
-  fprintf(stream, "\nMandatory arguments:\n");
-  fprintf(stream, "--------------------\n");
+  fprintf(stream, "\n  -F STL_FILE,TIME\n");
+  fprintf(stream, "     Compute the mean flux on a given 2D region at a given time.\n");
 
-  fprintf(stream, "\n  -M <MODEL_FILE_NAME>:\n");
-  fprintf(stream, "     Add a text file that contains (partial) description of the model.\n");
-  fprintf(stream, "     Can include both media and boundary conditions, in any order.\n");
-  fprintf(stream, "     Can be used more than once if description is split across different files.\n");
+  fprintf(stream, "\n  -m MEDIUM_NAME,TIME\n");
+  fprintf(stream, "     Compute the mean temperature in a given medium at a given time.\n");
 
-  fprintf(stream, "\nExclusive arguments:\n");
-  fprintf(stream, "--------------------\n");
+  fprintf(stream, "\n  -p X,Y,Z,TIME\n");
+  fprintf(stream, "     Compute the temperature at the given probe.\n");
 
-  fprintf(stream, "\n -p X,Y,Z,TIME:\n");
-  fprintf(stream, "    Compute the temperature at the given probe.\n");
-  fprintf(stream, "    The probe must be in a medium.\n");
+  fprintf(stream, "\n  -P X,Y,Z,TIME\n");
+  fprintf(stream, "     Compute the temperature at the given probe on an interface.\n");
 
-  fprintf(stream, "\n -P X,Y,Z,TIME:\n");
-  fprintf(stream, "    Compute the temperature at the given probe on an interface.\n");
-  fprintf(stream, "    The probe is suposed to be on an interface and is adjusted to the\n");
-  fprintf(stream, "    closest point of the closest interface.\n");
+  fprintf(stream, "\n  -R [RENDERING_OPTIONS]\n");
+  fprintf(stream, "     Compute an infra-red image of the model.\n");
 
-  fprintf(stream, "\n -m MEDIUM_NAME,TIME:\n");
-  fprintf(stream, "    Compute the mean temperature in a given medium at a given time. The medium\n");
-  fprintf(stream, "    doesn't need to be connex.\n");
+  fprintf(stream, "\n  -s STL_FILE,TIME\n");
+  fprintf(stream, "     Compute the mean temperature on a given 2D region.\n");
 
-  fprintf(stream, "\n -s STL_FILE_NAME,TIME:\n");
-  fprintf(stream, "    Compute the mean temperature on a given 2D region at a given time, the\n");
-  fprintf(stream, "    region being defined as the front sides of the triangles in the provided\n");
-  fprintf(stream, "    file. These triangles are not added to the geometry, but must be already\n");
-  fprintf(stream, "    part of it. The region doesn't need to be connex.\n");
+  fprintf(stream, "\n  -S STL_FILE,TIME\n");
+  fprintf(stream, "     Compute the by-triangle mean temperature on a given 2D region.\n");
 
-  fprintf(stream, "\n -S STL_FILE_NAME,TIME:\n");
-  fprintf(stream, "    Compute the by-triangle mean temperature on a given 2D region at a given\n");
-  fprintf(stream, "    time, the region being defined as the front sides of the triangles in the\n");
-  fprintf(stream, "    provided file. These triangles are not added to the geometry, but must be\n");
-  fprintf(stream, "    already part of it. The region doesn't need to be connex.\n");
+  fprintf(stream, "\nOptionnal arguments\n");
+  fprintf(stream, "-------------------\n");
 
-  fprintf(stream, "\n -F STL_FILE_NAME,TIME:\n");
-  fprintf(stream, "    Compute the mean flux on a given 2D region at a given time, the region\n");
-  fprintf(stream, "    being defined as the front sides of the triangles in the provided file.\n");
-  fprintf(stream, "    Flux is accounted positive when going from the front side to the back side,\n");
-  fprintf(stream, "    at a single-triangle scale. These triangles are not added to the geometry,\n");
-  fprintf(stream, "    but must be already part of it. The region doesn't need to be connex.\n");
+  fprintf(stream, "\n  -a AMBIENT_TEMP\n");
+  fprintf(stream, "     Set the ambient radiative temperature .\n");
 
-  fprintf(stream, "\n -R t=TIME:spp=SPP:fov=FOV:up=XUP,YUP,ZUP:pos=X,Y,Z:tgt=XT,YT,ZT:img=WxH:\n");
-  fprintf(stream, "    Compute an infra-red image of the model and dump it to stdout in VTK format.\n");
-  fprintf(stream, "    t is the rendering time (default: INF).\n");
-  fprintf(stream, "    spp is the number of samples per pixel (default: 4).\n");
-  fprintf(stream, "    fov is the field of view (default: 70 degrees).\n");
-  fprintf(stream, "    up is the up direction (default: 0,0,1).\n");
-  fprintf(stream, "    pos is the position of the camera (default: 1,1,1).\n");
-  fprintf(stream, "    tgt is the target of the camera (default: 0,0,0).\n");
-  fprintf(stream, "    img is the image resolution (default: 640x480).\n");
+  fprintf(stream, "\n  -d\n");
+  fprintf(stream, "     Dump the geometry to stdout in VTK format along with various properties.\n");
 
-  fprintf(stream, "\nOptionnal arguments:\n");
-  fprintf(stream, "--------------------\n");
+  fprintf(stream, "\n  -D TYPE\n");
+  fprintf(stream, "     Dump thermal paths of the given TYPE to stdout in VTK format.\n");
 
-  fprintf(stream, "\n -d:\n");
-  fprintf(stream, "    Dump the geometry to stdout in VTK format along with various properties,\n");
-  fprintf(stream, "    including possible errors. If this option is used, no computation occurs.\n");
-  fprintf(stream, "    Using this option in conjunction with an options that specifies a compute\n");
-  print_multiple_modes(buf, sizeof(buf), SURFACE_COMPUTE_MODES, 0);
-  fprintf(stream, "    region (%s) has the effect to include the region in the dump.\n", buf);
-  fprintf(stream, "    This option cannot be used in conjunction with other dump options.\n");
-  print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_VTK);
-  fprintf(stream, "    (%s).\n", buf);
+  fprintf(stream, "\n  -f SCALE_FACTOR\n");
+  fprintf(stream, "     Rescale the geometry before sending it to the solver.\n");
 
-  fprintf(stream, "\n -D TYPE:\n");
-  fprintf(stream, "    Dump thermal paths of type TYPE to stdout in VTK format.\n");
-  fprintf(stream, "    Type can be:\n");
-  fprintf(stream, "    - error (paths ending in error),\n");
-  fprintf(stream, "    - success (successful paths)\n");
-  fprintf(stream, "    - all (all paths).\n");
+  fprintf(stream, "\n  -g\n");
+  fprintf(stream, "     Change the required computation to produce the green function.\n");
 
-  fprintf(stream, "    This option can only be used in conjuction with an option that runs a\n");
-  print_multiple_modes(buf, sizeof(buf), COMPUTE_MODES, 0);
-  fprintf(stream, "    computation (%s) and cannot be used in conjunction\n", buf);
-  print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_PATHS);
-  fprintf(stream, "    with other dump options (%s).\n", buf);
+  fprintf(stream, "\n  -h\n");
+  fprintf(stream, "     Print this help and exit.\n", name);
 
-  fprintf(stream, "\n -g:\n");
-  fprintf(stream, "    Change the required computation to produce the green function at t=INF\n");
-  fprintf(stream, "    and dump it to stdout.\n");
-  print_multiple_modes(buf, sizeof(buf), GREEN_COMPATIBLE_MODES, 0);
-  fprintf(stream, "    Can only be used in conjonction with one these options: %s\n", buf);
-  fprintf(stream, "    The provided TIME is silently ignored.\n");
+  fprintf(stream, "\n  -n SAMPLE_COUNT\n");
+  fprintf(stream, "     Set the number of Monte-Carlo samples.\n");
 
-  fprintf(stream, "\n -f SCALE_FACTOR.\n");
-  fprintf(stream, "    Rescale the geometry before sending it to the solver.\n");
+  fprintf(stream, "\n  -r REFERENCE_TEMP\n");
+  fprintf(stream, "     Set the temperature used for the linearization of the radiative transfer.\n");
 
-  fprintf(stream, "\n -n NUM_OF_REALIZATIONS:\n");
-  fprintf(stream, "    Set the number of Monte-Carlo realizations.\n");
-  fprintf(stream, "    Default value: 10000.\n");
+  fprintf(stream, "\n  -t NUM_OF_THREADS\n");
+  fprintf(stream, "     Hint on the number of threads.\n");
 
-  fprintf(stream, "\n -t NUM_OF_THREADS:\n");
-  fprintf(stream, "    Set the number of threads.\n");
-  fprintf(stream, "    Default is to use all threads available.\n");
+  fprintf(stream, "\n  -v\n");
+  fprintf(stream, "     Print version information and exit.\n", name);
 
-  fprintf(stream, "\n -r AMBIENT_RAD_TEMP,REFERENCE_TEMP:\n");
-  fprintf(stream, "    Set the parameters for the radiative transfer.\n");
-  fprintf(stream, "    AMBIENT_RAD_TEMP is the ambient radiative temperature .\n");
-  fprintf(stream, "    REFERENCE_TEMP is the temperature used for the linearization of the\n");
-  fprintf(stream, "    radiative transfer.\n");
-  fprintf(stream, "    Default values: 300 and 300.\n");
-
-  fprintf(stream, "\n -V LEVEL:\n");
-  fprintf(stream, "    Set the verbosity level.\n");
-  fprintf(stream, "    Level can be:\n");
-  fprintf(stream, "    - 0 (non-verbose),\n");
-  fprintf(stream, "    - 1 (errors only, default),\n");
-  fprintf(stream, "    - 2 (errors and warnings),\n");
-  fprintf(stream, "    - 3 (errors, warnings and messages).\n");
+  fprintf(stream, "\n  -V LEVEL\n");
+  fprintf(stream, "     Set the verbosity level.\n");
 }
 
 res_T
@@ -513,20 +455,29 @@ parse_args
 {
   int opt = 0, n_used = 0;
   size_t len = 0;
-  const char option_list[] = "hvgn:t:B:M:m:p:P:dD:s:S:F:f:r:R:V:";
+  const char option_list[] = "a:d:D:f:F:ghm:M:n:p:P:r:R:s:S:tvV:";
   char buf[128];
+  static char empty_arg[1] = "";
   res_T res = RES_OK;
 
   ASSERT(argv && args);
 
   opterr = 0; /* No default error messages */
   while((opt = getopt(argc, argv, option_list)) != -1) {
+re_switch:
     switch (opt) {
+
     case '?': /* Unreconised option */
     {
       char* ptr = strchr(option_list, optopt);
-      res = RES_BAD_ARG;
       if(ptr && ptr[1] == ':') {
+        /* As a special case -R option can accept an empty argument */
+        if(optopt == 'R') {
+          opt = optopt;
+          optarg = empty_arg;
+          goto re_switch; /* retry switch */
+        }
+        res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
           "Missing argument for option -%c\n",
           optopt);
@@ -536,64 +487,10 @@ parse_args
       goto error;
     }
 
-    case 'h':
-      if(args->mode & USE_STDOUT_MODES) {
-        res = RES_BAD_ARG;
-        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_HELP);
-        logger_print(args->logger, LOG_ERROR,
-          "Option -%c cannot be used in conjunction with other dump options (%s).\n",
-          (char)opt, buf);
-        goto error;
-      }
-      args->mode |= DUMP_HELP;
-      break;
-
-    case 'v':
-      if(args->mode & USE_STDOUT_MODES) {
-        res = RES_BAD_ARG;
-        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_VERSION);
-        logger_print(args->logger, LOG_ERROR,
-          "Option -%c cannot be used in conjunction with other dump options (%s).\n",
-          (char)opt, buf);
-        goto error;
-      }
-      args->mode |= DUMP_VERSION;
-      break;
-
-    case 'g':
-      args->mode |= GREEN_MODE;
-      break;
-
-    case 'n': {
-      unsigned long n;
-      res = cstr_to_ulong(optarg, &n);
+    case 'a':
+      res = cstr_to_double(optarg, &args->ambiant_temp);
       if(res != RES_OK
-        || n == 0)
-      {
-        if(res == RES_OK) res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
-      args->samples = n;
-      n_used = 1;
-      break;
-    }
-
-    case 'M': {
-      struct str name;
-      str_init(args->allocator, &name);
-      str_set(&name, optarg);
-      ERR(darray_str_push_back(&args->model_files, &name));
-      str_release(&name);
-      break;
-    }
-
-    case 't':
-      res = cstr_to_uint(optarg, &args->nthreads);
-      if(res != RES_OK
-        || args->nthreads <= 0)
+        || args->ambiant_temp < 0)
       {
         if(res == RES_OK) res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
@@ -602,119 +499,6 @@ parse_args
         goto error;
       }
       break;
-
-    case 'p':
-      if(args->mode & EXCLUSIVE_MODES) {
-        res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Modes -%c and -%c are exclusive.\n",
-          (char)opt, mode_option(args->mode));
-        goto error;
-      }
-      args->mode |= PROBE_COMPUTE;
-      res = cstr_to_list_double(optarg, ',', args->probe, &len, 4);
-      if(len != 4
-        || res != RES_OK
-        || args->probe[3] < 0)
-      {
-        if(res == RES_OK) res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
-      break;
-
-    case 'P':
-      if(args->mode & EXCLUSIVE_MODES) {
-        res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Modes -%c and -%c are exclusive.\n",
-          (char)opt, mode_option(args->mode));
-        goto error;
-      }
-      args->mode |= PROBE_COMPUTE_ON_INTERFACE;
-      res = cstr_to_list_double(optarg, ',', args->probe, &len, 4);
-      if(len != 4
-        || res != RES_OK
-        || args->probe[3] < 0)
-      {
-        if(res == RES_OK) res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
-      break;
-
-    case 's':
-    case 'S':
-    case 'F': {
-      int err = 0;
-      char *ptr;
-      if(args->mode & EXCLUSIVE_MODES) {
-        res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Modes -%c and -%c are exclusive.\n",
-          (char)opt, mode_option(args->mode));
-        goto error;
-      }
-      switch (opt) {
-      case 's':
-        args->mode |= BOUNDARY_COMPUTE;
-        break;
-      case 'S':
-        args->mode |= MAP_COMPUTE;
-        break;
-      case 'F':
-        args->mode |= FLUX_BOUNDARY_COMPUTE;
-        break;
-      }
-      ptr = strrchr(optarg, ',');
-      /* Single ',' expected */
-      if(!ptr || ptr != strchr(optarg, ','))
-        err = 1;
-      else {
-        *ptr = '\0';
-        ptr++;
-        args->solve_filename = optarg;
-        err = (RES_OK != cstr_to_double(ptr, args->probe + 3)
-          || args->probe[3] < 0);
-      }
-      if(err) {
-        res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
-      break;
-    }
-
-    case 'm': {
-      char* ptr;
-      if(args->mode & EXCLUSIVE_MODES) {
-        res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Modes -%c and -%c are exclusive.\n",
-          (char)opt, mode_option(args->mode));
-        goto error;
-      }
-      args->mode |= MEDIUM_COMPUTE;
-      ptr = strpbrk(optarg, ",");
-      if(!ptr || ptr == optarg)
-        res = RES_BAD_ARG;
-      else res = cstr_to_double(ptr + 1, args->probe + 3);
-      if(res != RES_OK) {
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
-      *ptr = '\0';
-      args->medium_name = optarg;
-      break;
-    }
 
     case 'd':
       if(args->mode & USE_STDOUT_MODES) {
@@ -776,12 +560,124 @@ parse_args
       }
       break;
 
-    case 'r':
-      res = cstr_to_list_double(optarg, ',', args->radiative_temp, &len, 2);
+    /*case 'F': see 's' */
+
+    case 'g':
+      args->mode |= GREEN_MODE;
+      break;
+
+    case 'h':
+      if(args->mode & USE_STDOUT_MODES) {
+        res = RES_BAD_ARG;
+        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_HELP);
+        logger_print(args->logger, LOG_ERROR,
+          "Option -%c cannot be used in conjunction with other dump options (%s).\n",
+          (char)opt, buf);
+        goto error;
+      }
+      args->mode |= DUMP_HELP;
+      break;
+
+    case 'm': {
+      char* ptr;
+      if(args->mode & EXCLUSIVE_MODES) {
+        res = RES_BAD_ARG;
+        logger_print(args->logger, LOG_ERROR,
+          "Modes -%c and -%c are exclusive.\n",
+          (char)opt, mode_option(args->mode));
+        goto error;
+      }
+      args->mode |= MEDIUM_COMPUTE;
+      ptr = strpbrk(optarg, ",");
+      if(!ptr || ptr == optarg)
+        res = RES_BAD_ARG;
+      else res = cstr_to_double(ptr + 1, args->probe + 3);
+      if(res != RES_OK) {
+        logger_print(args->logger, LOG_ERROR,
+          "Invalid argument for option -%c: %s\n",
+          opt, optarg);
+        goto error;
+      }
+      *ptr = '\0';
+      args->medium_name = optarg;
+      break;
+    }
+
+    case 'M': {
+      struct str name;
+      str_init(args->allocator, &name);
+      str_set(&name, optarg);
+      ERR(darray_str_push_back(&args->model_files, &name));
+      str_release(&name);
+      break;
+    }
+    case 'n': {
+      unsigned long n;
+      res = cstr_to_ulong(optarg, &n);
       if(res != RES_OK
-        || len != 2
-        || args->radiative_temp[0] < 0
-        || args->radiative_temp[1] < 0)
+        || n == 0)
+      {
+        if(res == RES_OK) res = RES_BAD_ARG;
+        logger_print(args->logger, LOG_ERROR,
+          "Invalid argument for option -%c: %s\n",
+          opt, optarg);
+        goto error;
+      }
+      args->samples = n;
+      n_used = 1;
+      break;
+    }
+
+    case 'p':
+      if(args->mode & EXCLUSIVE_MODES) {
+        res = RES_BAD_ARG;
+        logger_print(args->logger, LOG_ERROR,
+          "Modes -%c and -%c are exclusive.\n",
+          (char)opt, mode_option(args->mode));
+        goto error;
+      }
+      args->mode |= PROBE_COMPUTE;
+      res = cstr_to_list_double(optarg, ',', args->probe, &len, 4);
+      if(res != RES_OK
+        || len < 3
+        || (len == 4 && args->probe[3] < 0)
+        || len > 4)
+      {
+        if(res == RES_OK) res = RES_BAD_ARG;
+        logger_print(args->logger, LOG_ERROR,
+          "Invalid argument for option -%c: %s\n",
+          opt, optarg);
+        goto error;
+      }
+      break;
+
+    case 'P':
+      if(args->mode & EXCLUSIVE_MODES) {
+        res = RES_BAD_ARG;
+        logger_print(args->logger, LOG_ERROR,
+          "Modes -%c and -%c are exclusive.\n",
+          (char)opt, mode_option(args->mode));
+        goto error;
+      }
+      args->mode |= PROBE_COMPUTE_ON_INTERFACE;
+      res = cstr_to_list_double(optarg, ',', args->probe, &len, 4);
+      if(res != RES_OK
+        || len < 3
+        || (len == 4 && args->probe[3] < 0)
+        || len > 4)
+      {
+        if(res == RES_OK) res = RES_BAD_ARG;
+        logger_print(args->logger, LOG_ERROR,
+          "Invalid argument for option -%c: %s\n",
+          opt, optarg);
+        goto error;
+      }
+      break;
+
+    case 'r':
+      res = cstr_to_double(optarg, &args->ref_temp);
+      if(res != RES_OK
+        || args->ref_temp < 0)
       {
         if(res == RES_OK) res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
@@ -801,6 +697,75 @@ parse_args
       }
       args->mode |= IR_COMPUTE;
       args->camera = optarg;
+      break;
+
+    case 's':
+    case 'S':
+    case 'F': {
+      int err = 0;
+      char *ptr;
+      if(args->mode & EXCLUSIVE_MODES) {
+        res = RES_BAD_ARG;
+        logger_print(args->logger, LOG_ERROR,
+          "Modes -%c and -%c are exclusive.\n",
+          (char)opt, mode_option(args->mode));
+        goto error;
+      }
+      switch (opt) {
+      case 's':
+        args->mode |= BOUNDARY_COMPUTE;
+        break;
+      case 'S':
+        args->mode |= MAP_COMPUTE;
+        break;
+      case 'F':
+        args->mode |= FLUX_BOUNDARY_COMPUTE;
+        break;
+      }
+      ptr = strrchr(optarg, ',');
+      /* Single ',' expected */
+      if(!ptr || ptr != strchr(optarg, ','))
+        err = 1;
+      else {
+        *ptr = '\0';
+        ptr++;
+        args->solve_filename = optarg;
+        err = (RES_OK != cstr_to_double(ptr, args->probe + 3)
+          || args->probe[3] < 0);
+      }
+      if(err) {
+        res = RES_BAD_ARG;
+        logger_print(args->logger, LOG_ERROR,
+          "Invalid argument for option -%c: %s\n",
+          opt, optarg);
+        goto error;
+      }
+      break;
+    }
+
+    case 't':
+      res = cstr_to_uint(optarg, &args->nthreads);
+      if(res != RES_OK
+        || args->nthreads <= 0)
+      {
+        if(res == RES_OK) res = RES_BAD_ARG;
+        logger_print(args->logger, LOG_ERROR,
+          "Invalid argument for option -%c: %s\n",
+          opt, optarg);
+        goto error;
+      }
+      break;
+
+    case 'v':
+      if(args->mode & USE_STDOUT_MODES) {
+        res = RES_BAD_ARG;
+        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_VERSION);
+        logger_print(args->logger, LOG_ERROR,
+          "Option -%c cannot be used in conjunction with other dump options (%s).\n",
+          (char)opt, buf);
+        goto error;
+      }
+      args->mode |= DUMP_VERSION;
       break;
 
     case 'V':
@@ -908,7 +873,10 @@ parse_camera
         ERR(cstr_to_list_double(opt[1], ',', cam->pos, &len, 3));
       }
       else if(strcmp(opt[0], "IMG") == 0) {
-        ERR(cstr_to_list_uint(opt[1], 'x', cam->img, &len, 2));
+        unsigned img_sz[2];
+        ERR(cstr_to_list_uint(opt[1], 'x', img_sz, &len, 2));
+        cam->img_width = img_sz[0];
+        cam->img_height = img_sz[1];
       }
       else if(strcmp(opt[0], "SPP") == 0) {
         ERR(cstr_to_uint(opt[1], &cam->spp));

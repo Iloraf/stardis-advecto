@@ -94,7 +94,7 @@ struct args {
   double probe[4];
   enum stardis_mode mode;
   double scale_factor;
-  double radiative_temp[2];
+  double ambiant_temp, ref_temp;
   char* camera;
   enum dump_path_type dump_paths;
   int verbose;
@@ -159,7 +159,7 @@ print_version
   (FILE* stream);
 
 extern void
-print_help
+short_help
   (FILE* stream,
    const char* prog);
 

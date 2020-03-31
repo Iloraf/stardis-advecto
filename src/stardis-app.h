@@ -17,6 +17,7 @@
 #define STARDIS_APP_H
 
 #include "stardis-parsing.h"
+#include "stardis-default.h"
 
 #include <star/sstl.h>
 #include <star/sg3d.h>
@@ -640,19 +641,20 @@ struct camera {
   double up[3];
   double fov;
   unsigned spp;
-  unsigned img[2];
+  unsigned img_width, img_height;
   double time;
 };
 
 static INLINE void
 init_camera(struct camera* cam) {
-  d3_splat(cam->pos, 0);
-  d3_splat(cam->tgt, 0);
-  d3_splat(cam->up, 0);
-  cam->fov = 0;
-  cam->spp = 0;
-  cam->img[0] = cam->img[1] = 0;
-  cam->time = INF;
+  d3(cam->pos, STARDIS_DEFAULT_RENDERING_POS);
+  d3(cam->tgt, STARDIS_DEFAULT_RENDERING_TGT);
+  d3(cam->up, STARDIS_DEFAULT_RENDERING_UP);
+  cam->fov = STARDIS_DEFAULT_RENDERING_FOV;
+  cam->spp = STARDIS_DEFAULT_RENDERING_SPP;
+  cam->img_width = STARDIS_DEFAULT_RENDERING_IMG_WIDTH;
+  cam->img_height = STARDIS_DEFAULT_RENDERING_IMG_HEIGHT;
+  cam->time = STARDIS_DEFAULT_RENDERING_TIME;
 }
 
 static INLINE void
@@ -736,7 +738,7 @@ struct stardis {
   size_t samples;
   unsigned nthreads;
   double scale_factor;
-  double radiative_temp[2];
+  double ambiant_temp, ref_temp;
   struct mem_allocator* allocator;
   struct logger* logger;
   struct sdis_device* dev;

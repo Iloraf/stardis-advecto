@@ -1,17 +1,18 @@
-// Copyright (C) 2016-2018 CNRS, 2018-2019 |Meso|Star>
+// Copyright (C) 2018-2020 |Meso|Star>
 //
-// This is free documentation: you can redistribute it and/or modify
+// This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This manual is distributed in the hope that it will be useful,
+// This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
+
 :toc:
 
 stardis(1)
@@ -19,245 +20,238 @@ stardis(1)
 
 NAME
 ----
-stardis - compute the power collected by a concentrated solar plant
+stardis - statistical solving of coupled thermal systems
 
 SYNOPSIS
 --------
 [verse]
-*stardis*
-*stardis* [_option_]... [_file_]
-*stardis* *-g* <__sub-option__[:...]> [_option_]... [_file_]
-*stardis* *-p* <__sub-option__[:...]> [_option_]... [_file_]
-*stardis* *-r* <__sub-option__[:...]> [_option_]... [_file_]
+*stardis* [_option_]
+*stardis* *-M* <__file__> [_option_]
 
 DESCRIPTION
 -----------
-*stardis* computes the total power collected by a concentrated solar plant, as
-described in the *stardis-input*(5) _file_. If the _file_ argument is not
-provided, the solar plant is read from standard input. To evaluate various
-efficiencies for each primary reflector, it computes losses due to cosine
-effect, shadowing and masking, orientation and surface irregularities,
-materials properties and atmospheric extinction. The efficiency for each
-one of these effects is subsequently computed for each reflector.
+*stardis* solves coupled thermal systems under the linear assumption. Here
+coupled refers to conductive, convective and radiative transfers, and linear
+means that each phenomena is represented using a model that is linear 
+with temperature. *stardis* can deal with complex geometries as well as
+high-frequency external solicitations over a very long period of time,
+relative to the characteristic time of the system.
 
-The entities on which computations must be performed are listed in the
-*stardis-receiver*(5) file submitted through the *-R* option. The estimated
-results follow the *stardis-output*(5) format and are written to the _output_
-file or to the standard output whether the *-o* _output_ option is defined or
-not, respectively. Note that the *stardis* algorithm is based on the
-Monte-Carlo method, which means that every result is provided with its
-numerical accuracy.
+*stardis* can compute a thermal observable, like temperature or flux, at a
+probe point and date or the mean value of an observable over a given surface
+or volume, and time period. In addition, *stardis* gives access to the
+evaluation of the propagator (aka the *Green function*).
 
-*stardis* is designed to efficiently handle complex solar facilities: several
-reflectors can be specified (planes, conics, cylindro-parabolic, etc.) and
-positioned in 3D space, with a possibility for 1-axis and 2-axis
-auto-orientation. Multiple materials can be used, as long as the relevant
-physical properties are provided. Spectral effects are also taken into account:
-it is possible to define the spectral distribution of any physical property,
-including the input solar spectrum and the transmissivity of the atmosphere, at
-any spectral resolution. Refer to *stardis-input*(5) for more informations.
+The propagator is of great value for thermicist engineers as it gives some
+crucial information to analyse heat transfers in the system. It helps engineers
+answer questions like "Where from does the heat come at this location?".
+Propagators seamlessly agregate all the provided geometrical and physical
+information on the system in an unbiased and very-fast statistical model.
 
 In addition of the aforementioned computations, *stardis* provides three
-other functionalities. The *-g* option can be used to convert the
-*stardis-input*(5) geometries in CAO files. The *-p* option saves the sampled
-radiative paths used by the estimates, allowing to visualise them externally
-which may be a great help to identify a design issue. Finally, the *-r* option
-is used to render an image of the submitted solar facility. Note that these
-three options are mutually exclusives, and once defined, they replace the
-default *stardis* behaviour.
+other functionalities. The *-d* option can be used to convert the
+*stardis-input*(5) geometry into a VTK file. The *-D* option saves the sampled
+thermal paths used by the estimates, allowing to visualise them externally
+which may be of a great help to identify issues. Finally, the *-R* option
+can be used to render an infrared image of the submitted system.
 
-Please note that any coordinate-related question in Stardis must be
-considered with the right-handed convention in mind.
+The provided system should be described in the *stardis-input*(5) format
+and can be split over any number of files, each being submited through the
+*-M* option. 
 
-OPTIONS
--------
-*-D* <__alpha__,__beta__[:...]>::
-  List of sun directions. A direction is defined by two angles in degrees. The
-  first one, here refered to as _alpha_, is an azimuthal angle in [0, 360[ and
-  the second one, here refered to as _beta_, is an elevation in [0, 90].
-  Each provided sun direction triggers a new computation whose results are
-  concatenated to the _output_ file.
+Stardis' algorithms are based on state-of-the-art Monte-Carlo method applied
+to radiative transfer physics (Delatorre [1]) combined with conduction's
+statistical formulation (Kac [2] and Muller [3]). Thanks to recent advances in
+computer graphics technology which has already been a game changer in the
+cinema industry (FX and animated movies), this theoretical framework can now
+be practically used on the most geometrically complex systems. While this
+capability is part of the StarEngine Star3D library, it is internally powered
+by Intel® Rendering Framework: Embree.
+
+Everytime the linear assumption is relevant, this theoretical framework allows
+to encompass all the heat transfer mecanisms (conductive-convective-radiative)
+in an unified statistical model. Such systems can be solved by a Monte-Carlo
+approach just by sampling thermal paths. This can be seen as an extension of
+Monte-Carlo algorithms that solve radiative transfer by sampling optical paths.
+A main property of this approach is that the resulting algorithms does not rely
+on a volume mesh of the system.
+
+[1] Delatorre et al., Monte Carlo advances and concentrated solar applications,
+Solar Energy, 2014
+
+[2] Kac, On Distributions of Certain Wiener Functionals. The Annals of
+Mathematical Statistics, 1949.
+
+[3] Muller, Some continuous Monte-Carlo Methods for the Dirichlet Problem,
+Transactions of the American Mathematical Society, 1956.
+
+MANDATORY OPTIONS
+-----------------
+*-M* _file_::
+  Read a text file containing a (partial) description of the system.
+  Can include both media enclosures and boundary conditions, in any order.
+  Can be used more than once if the description is splited across different
+  files.
 +
-Following the right-handed convention, Stardis azimuthal rotation is
-counter-clockwise, with 0° on the X axis. Stardis elevation starts from 0° for
-directions in the XY plane, up to 90° at zenith. Thus -D0,0 -D90,0 -D180,0 and
--D270,0 will produce solar vectors {-1,0,0} {0,-1,0} {+1,0,0} and {0,+1,0}
-respectively, while -D__alpha__,90 will produce {0,0,-1} regardless of _alpha_
-value.
+blabla right-handed normals blabla inside/outside blabla.
 
-*-f*::
-  Force overwrite of the output files, i.e. the _output_ file and the file
-  where the state of the random number generator is saved (see the *-G*
-  option).
+EXCLUSIVE OPTIONS
+-----------------
+*-p* _x,y,z[,time]_::
+  Compute the temperature at the given probe at a given time. By default
+  compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The probe must be in a
+  medium.
 
-*-G* <__sub-option__:...>::
-  Save and restore the state of the random number generator. This option can be
-  used to ensure the statistical independence between successive simulations
-  on the same system. For instance, one can run a new simulation and
-  initialising its random number generator with the final state of the
-  generator as defined by the previous run. Available sub options are:
+*-P* _x,y,z[,time]_::
+  Compute the temperature at the given probe on an interface at a given time.
+  By default compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The probe is
+  suposed to be on an interface and is moved to the closest point of the
+  closest interface.
 
-  **istate=**_input_rng_state_;;
-    Define the file from which the initial state of the random number generator
-    is read. If not defined, the random number generator is initialised with
-    its default seed.
+*-m* _medium_name[,time]_::
+  Compute the mean temperature in a given medium at a given time. By default
+  compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The medium doesn't need
+  to be connex.
 
-  **ostate=**_output_rng_state_;;
-    Define the file where the final state of the random number generator is
-    written. If not defined, this state is simply discarded.
-  
-*-g* <__sub-option__:...>::
-  Generate the shape of the geometry defined in the submitted _file_ and store
-  it in _output_. Available sub-options are:
+*-s* _file[,time]_::
+  Compute the mean temperature on a given 2D region at a given time, the
+  region being defined as the front sides of the triangles in the provided
+  *STL* file. By default compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
+  These triangles are not added to the geometry, but must be part of it. The
+  region doesn't need to be connex.
 
-  *format=obj*;;
-    Define the file format in which the meshes are stored. Currently, only the
-    Alias Wavefront OBJ file format is supported.
+*-S* _file[,time]_::
+  Compute the by-triangle mean temperature on a given 2D region at a given
+  time, the region being defined as the front sides of the triangles in the
+  provided *VTK* file. By default compute time is
+  @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. These triangles are not added to the
+  geometry, but must be part of it. The region doesn't need to be connex.
 
-  *split=*<**geometry**|*object*|*none*>;;
-    Define how the output mesh is split in sub meshes. A sub mesh can be
-    generated for each *geometry* or for each *object* as defined in the
-    *stardis-input*(5) file format. The *none* option means that only one
-    mesh is generated for the whole solar facility. By default, the *split*
-    option is set to *none*.
+*-F* _file[,time]_::
+  Compute the mean flux on a given 2D region at a given time, the region
+  being defined as the front sides of the triangles in the provided *VTK* file.
+  By default compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
+  Flux is accounted positive when going from the front side to the back side,
+  at a single-triangle level. These triangles are not added to the geometry,
+  but must be part of it. The region doesn't need to be connex.
 
-*-h*::
-  List short help and exit.
-
-*-n* _experiments-count_::
-  Number of Monte-Carlo experiments used to estimate the solar flux. By
-  default _experiments-count_ is set to @SOLSTICE_ARGS_DEFAULT_NREALISATIONS@.
-
-*-o* _output_::
-  Write results to _output_ with respect to the *stardis-output*(5) format. If
-  not defined, write results to standard output.
-
-*-p* <__sub-option__:...>::
-  Register the sampled radiative paths for each sun direction and write them to
-  _output_. Available sub-options are:
-
-  *default*;;
-    Use default sub-options.
-
-  **irlen=**_length_;;
-    Length of the radiative path segments going to the infinity. By default, it
-    is computed relatively to the scene size.
-
-  **srlen=**_length_;;
-    Length of the radiative path segments coming from the sun. By default, it
-    is computed relatively to the scene size.
-
-*-q*::
-  Do not print the helper message when no _file_ is submitted.
-
-*-R* _receivers_::
-  *stardis-receiver*(5) file defining the scene receivers, i.e. the solar
-  plant entities for which *stardis* computes Monte-Carlo estimates.
-
-*-r* <__sub-option__:...>::
-  Render an image of the scene through a pinhole camera, for each submitted
-  sun direction. Write the resulting images to _output_. Available sub-options
-  are:
+*-R* [__sub-option__:...]::
+  Render an infrared image of the system through a pinhole camera and write it
+  to _standard output_ in VTK format. Available sub-options are:
 
   **fov=**_angle_;;
     Horizontal field of view of the camera in [30, 120] degrees. By default
-    _angle_ is @SOLSTICE_ARGS_DEFAULT_CAMERA_FOV@ degrees.
+    _angle_ is @STARDIS_ARGS_DEFAULT_RENDERING_FOV@ degrees.
 
   **img=**_width_**x**_height_;;
     Definition of the rendered image in pixels. By default the image definition
-    is @SOLSTICE_ARGS_DEFAULT_IMG_WIDTH@x@SOLSTICE_ARGS_DEFAULT_IMG_HEIGHT@.
+    is @STARDIS_ARGS_DEFAULT_RENDERING_IMG_WIDTH@x@STARDIS_ARGS_DEFAULT_RENDERING_IMG_HEIGHT@.
 
   **pos=**_x_**,**_y_**,**_z_;;
     Position of the camera. By default it is set to
-    {@SOLSTICE_ARGS_DEFAULT_CAMERA_POS@} or it is automatically computed to
-    ensure that the whole scene is visible, whether *tgt* is set or not,
-    respectively.
-
-  **rmode=**<**draft**|**pt**>;;
-    Rendering mode. In *draft* mode, images are computed by ray-casting; all
-    materials are lambertian, the sun is ignored and the only light source is
-    positioned at the camera position. In *pt* mode, the scene is rendered with
-    the un-biased path-tracing Monte-Carlo algorithm; the materials described
-    in the committed _file_ as well as the submitted sun directions are
-    correctly handled and an uniform skydome is added to simulate the diffuse
-    infinite lighting. By default *rmode* is set to *draft*.
+    {@STARDIS_ARGS_DEFAULT_RENDERING_POS@}.
 
   **spp=**_samples-count_;;
-    Number of samples per pixel. If *rmode* is *draft*, the samples position
-    into a pixel are the same for all pixels. With *rmode=pt* the pixel
-    samples are generated independently for each pixel. By default, use 1
-    sample per pixel.
+    Number of samples per pixel.
+	By default, use @STARDIS_ARGS_DEFAULT_RENDERING_SPP@ samples per pixel.
 
+  **t=**_time_;;
+    Rendering time. By default _time_ is @STARDIS_ARGS_DEFAULT_RENDERING_TIME@
+	seconds.
+	
   **tgt=**_x_**,**_y_**,**_z_;;
     Position targeted by the camera. By default, it is set to
-    {@SOLSTICE_ARGS_DEFAULT_CAMERA_TGT@} or it is automatically computed to
+    {@STARDIS_ARGS_DEFAULT_RENDERING_TGT@} or it is automatically computed to
     ensure that the whole scene is visible, whether *pos* is set or not,
     respectively.
 
   **up=**_x_**,**_y_**,**_z_;;
     Up vector of the camera. If *rmode* is *pt*, this vector also defines the
     direction toward the top of the skydome. By default, *up* is set to
-    {@SOLSTICE_ARGS_DEFAULT_CAMERA_UP@}.
+    {@STARDIS_ARGS_DEFAULT_RENDERING_UP@}.
+
+OTHER OPTIONS
+-------------
+
+*-a* _ambiant_::
+  Set *ambiant* as the ambient radiative temperature for the whole system.
+  By default *ambiant* is @STARDIS_ARGS_DEFAULT_AMBIANT_TEMP@.
+
+*-d*::
+  Write the geometry to _standard output_ in VTK format along with various
+  properties, including possible errors. If this option is used, no 
+  computation occurs.
++
+Using this option in conjunction with an option that
+specifies a compute region (-s, -S, -F) has the effect to include the
+region in the output. This option cannot be used in conjunction with other
+options that write to	_standard output_ (-R, -g, -D, -h, -v).
+
+*-D* _type_::
+  Write thermal paths of the given *type* to _standard output_ in VTK format.
+  Possible values are *error* (write paths ending in error), *success*
+  (write successful paths),*all* (write all paths).
++
+This option can only be used in conjuction with an option that runs a
+computation (-p, -P, -m, -s, -R, -S, -F) and cannot be used in conjunction
+with other options that write to _standard output_ (-R, -d, -g, -h, -v).
+
+*-g*::
+  Write the green function at a steady state to _standard output_ after the
+  specified computation. 
++
+This option can only be used in conjonction with one these options: -p, -P,
+-m, -s. Any provided compute time is silently ignored.
+
+**-f** _factor_::
+  Rescale the geometry by the given *factor* before sending it to the solver.
+  Default rescale *factor* is @STARDIS_ARGS_DEFAULT_SCALE_FACTOR@.
+
+*-n* _samples-count_::
+  Number of Monte-Carlo samples. By default _samples-count_ is set to
+  @STARDIS_ARGS_DEFAULT_SAMPLES_COUNT@.
+
+*-r* _reference_::
+  Set *reference* as the temperature used for the linearization of the
+  radiative transfer. By default *reference* is
+  @STARDIS_ARGS_DEFAULT_REFERENCE_TEMP@.
 
 *-t* _threads-count_::
   Hint on the number of threads to use. By default use as many threads as CPU
   cores.
 
-*-v*::
-  Make stardis more verbose.
+*-V* _level_::
+  Set the verbosity level according to the following list. Default verbosity
+  *level* is @STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL@.
+  **0** (write no message to _standard error_),;;
+  **1** (write error messages only to _standard error_),;;
+  **2** (write error and warning messages to _standard error_),;;
+  **3** (write error, warning and informative messages to _standard error_).;;
 
-*--version*::
+*-v*::
   Output version information and exit.
 
 EXAMPLES
 --------
 
-Launch two simulations for sun directions whose azimuthal and elevation angles
-are {*45*,*70*} and {*50*,*75*}. The solar facility is described in
-*input.yaml* and the receivers on which the integrations must be performed are
-declared in the *rcvs.yaml* file. *10000* experiments are used by the
-Monte-Carlo estimates and the results are written to *output* even though this
-file already exists:
+Pre-process the system as described in *scene.txt* when intending to compute
+the mean flux on the triangles from the file *edge.stl*, and write its geometry
+in the file *scene.vtk*. Verbosity level is set to *3* and the possible 
+messages are printed to standard error:
 
-    $ stardis -D45,70:50,75 -R rcvs.yaml -n 10000 -f -o output input.yaml
+    $ stardis -M scene.txt -F edge.stl -d -V 3 > scene.vtk
 
-Generate a mesh for each geometry described in *input.yaml*, and save them in
-the *output* file with respect to the Alias Wavefront OBJ format. The meshes
-are positioned according to their orientation constraints, with respect to the
-sun direction whose azimuthal and elevation angles are {*30*,*60*}. Use the
-*csplit*(1) Unix command to generate an Alias Wavefront OBJ file per geometry
-stored in *output*. The name of the generated Alias Wavefront OBJ files are
-*geom*<__NUM__>**.obj** with __NUM__ in [0, N-1] where N is the number of
-geometries described in *input.yaml*. Refer to *stardis-output*(5) for
-informations on the regular expression *^---$* used to split the output file:
 
-    $ stardis -D30,60 -g format=obj:split=geometry -f -o output input.yaml
-    $ csplit -f geom -b %02d.obj -z --suppress-matched output /^---$/ {*}
+Compute the temperature at the probe point *0, 0.5, 0* at the steady state. The
+system is read from the 2 files *media.txt* and *bound.txt* and the number of
+samples is set to *1000000*:
 
-Trace 100 radiative paths into the solar plant described in *input.yaml*, with
-respect to the sun direction whose azimuthal and elevations angles are *0* and
-*90* degrees, respectively. Write the *stardis-output*(5) result to the
-standard output and postprocess it with the *sed*(1) Unix command to remove the
-first line that stores the sun direction from which the radiative paths come
-from. The remaining data that list the radiative paths geometry are redirected
-into the *paths.vtk* file:
+    $ stardis -M media.txt -M bounds.txt -p 0,0.5,0 -n 1000000
 
-    $ stardis -n 100 -D0,90 -R rcvs.yaml -p default input.yaml | sed '1d'>paths.vtk
-
-Use the path-tracing rendering algorithm to draw the solar plant
-*solplant.yaml* with respect to the sun direction whose azimuthal and elevation
-angles are *180* and *45* degrees, respectively. Use *64* samples per pixel to
-estimate the per-pixel radiance and fix the up camera vector to {*0*,*0*,*1*}.
-Write the *stardis-output*(5) result to standard output and use the *sed*(1)
-Unix command to remove the first line which stores the sun direction used to
-draw the image. Finally, visualise the rendered picture by redirecting the
-remaining data to the *feh*(1) image viewer.
-
-    $ stardis -D180,45 -r up=0,0,1:rmode=pt:spp=64 solplant.yaml | sed '1d' | feh -
 
 COPYRIGHT
 ---------
-Copyright &copy; 2016-2018 CNRS, 2018-2019 |Meso|Star>. License GPLv3+: GNU GPL
+Copyright &copy; 2018-2020 |Meso|Star>. License GPLv3+: GNU GPL
 version 3 or later <http://gnu.org/licenses/gpl.html>. This is free software.
 You are free to change and redistribute it. There is NO WARRANTY, to the extent
 permitted by law.
@@ -268,5 +262,4 @@ SEE ALSO
 *feh*(1),
 *sed*(1),
 *stardis-input*(5),
-*stardis-output*(5),
-*stardis-receiver*(5)
+*stardis-output*(5)

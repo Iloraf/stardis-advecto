@@ -13,12 +13,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef STARDIS_VERSION_H
-#define STARDIS_VERSION_H
+#ifndef STARDIS_APP_VERSION_H
+#define STARDIS_APP_VERSION_H
 
 #define STARDIS_APP_VERSION_MAJOR @VERSION_MAJOR@
 #define STARDIS_APP_VERSION_MINOR @VERSION_MINOR@
 #define STARDIS_APP_VERSION_PATCH @VERSION_PATCH@
 
-#endif /* STARDIS_VERSION_H */
+#endif /* STARDIS_APP_VERSION_H */
 

@@ -53,7 +53,7 @@ main
   ERR(parse_args(argc, argv, args));
 
   if(args->mode & DUMP_HELP) {
-    print_help(stdout, argv[0]);
+    short_help(stdout, argv[0]);
     goto exit;
   }
   else if(args->mode & DUMP_VERSION) {

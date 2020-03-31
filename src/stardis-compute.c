@@ -175,8 +175,8 @@ compute_probe(struct stardis* stardis)
       stardis->samples,
       pos,
       stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
+      stardis->ambiant_temp,
+      stardis->ref_temp,
       &green));
     ERR(dump_green(green, stardis, stdout));
   } else {
@@ -187,8 +187,8 @@ compute_probe(struct stardis* stardis)
       pos,
       time,
       stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
+      stardis->ambiant_temp,
+      stardis->ref_temp,
       stardis->dump_paths,
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -222,8 +222,8 @@ compute_probe_on_interface(struct stardis* stardis)
       uv,
       SDIS_FRONT,
       stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
+      stardis->ambiant_temp,
+      stardis->ref_temp,
       &green));
     ERR(dump_green(green, stardis, stdout));
   } else {
@@ -236,8 +236,8 @@ compute_probe_on_interface(struct stardis* stardis)
       time,
       SDIS_FRONT,
       stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
+      stardis->ambiant_temp,
+      stardis->ref_temp,
       stardis->dump_paths,
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -262,8 +262,8 @@ compute_camera(const struct stardis* stardis)
   ASSERT(stardis
     && !(stardis->mode & GREEN_MODE) && (stardis->mode & IR_COMPUTE));
 
-  width = (size_t)stardis->camera.img[0];
-  height = (size_t)stardis->camera.img[1];
+  width = (size_t)stardis->camera.img_width;
+  height = (size_t)stardis->camera.img_height;
   /* Setup the camera */
   ERR(sdis_camera_create(stardis->dev, &cam));
   ERR(sdis_camera_set_proj_ratio(cam, (double)width / (double)height));
@@ -279,8 +279,8 @@ compute_camera(const struct stardis* stardis)
     cam,
     time,
     stardis->scale_factor,
-    stardis->radiative_temp[0],
-    stardis->radiative_temp[1],
+    stardis->ambiant_temp,
+    stardis->ref_temp,
     width,
     height,
     (size_t)stardis->camera.spp,
@@ -324,8 +324,8 @@ compute_medium(struct stardis* stardis)
       stardis->samples,
       medium,
       stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
+      stardis->ambiant_temp,
+      stardis->ref_temp,
       &green));
     ERR(dump_green(green, stardis, stdout));
   } else {
@@ -336,8 +336,8 @@ compute_medium(struct stardis* stardis)
       medium,
       time,
       stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
+      stardis->ambiant_temp,
+      stardis->ref_temp,
       stardis->dump_paths,
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -417,8 +417,8 @@ compute_boundary(struct stardis* stardis)
       darray_sides_cdata_get(&stardis->compute_surface.sides),
       darray_size_t_size_get(&stardis->compute_surface.primitives),
       stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
+      stardis->ambiant_temp,
+      stardis->ref_temp,
       &green));
     ERR(dump_green(green, stardis, stdout));
   } else {
@@ -430,8 +430,8 @@ compute_boundary(struct stardis* stardis)
       darray_size_t_size_get(&stardis->compute_surface.primitives),
       time,
       stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
+      stardis->ambiant_temp,
+      stardis->ref_temp,
       stardis->dump_paths,
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -462,8 +462,8 @@ compute_flux_boundary(struct stardis* stardis)
     darray_size_t_size_get(&stardis->compute_surface.primitives),
     time,
     stardis->scale_factor,
-    stardis->radiative_temp[0],
-    stardis->radiative_temp[1],
+    stardis->ambiant_temp,
+    stardis->ref_temp,
     &estimator));
   ERR(print_single_MC_result(estimator, stardis, stdout));
 end:
@@ -504,8 +504,8 @@ compute_map(struct stardis* stardis)
       1,
       time,
       stardis->scale_factor,
-      stardis->radiative_temp[0],
-      stardis->radiative_temp[1],
+      stardis->ambiant_temp,
+      stardis->ref_temp,
       stardis->dump_paths,
       darray_estimators_data_get(&estimators) + p));
   }

@@ -34,14 +34,21 @@ set_property(CACHE STARDIS_DOC PROPERTY STRINGS
   
 ###############################################################################
 # Generate files
-###############################################################################set(SOLSTICE_ARGS_DEFAULT_NREALISATIONS "10000")
-set(SOLSTICE_ARGS_DEFAULT_CAMERA_POS "0,0,0")
-set(SOLSTICE_ARGS_DEFAULT_CAMERA_TGT "0,0,-1")
-set(SOLSTICE_ARGS_DEFAULT_CAMERA_UP "0,1,0")
-set(SOLSTICE_ARGS_DEFAULT_CAMERA_FOV "70") # In degrees
-set(SOLSTICE_ARGS_DEFAULT_IMG_WIDTH  "800")
-set(SOLSTICE_ARGS_DEFAULT_IMG_HEIGHT "600")
-set(SOLSTICE_ARGS_DEFAULT_IMG_SPP "1")
+###############################################################################
+set(STARDIS_ARGS_DEFAULT_AMBIANT_TEMP "300")
+set(STARDIS_ARGS_DEFAULT_COMPUTE_TIME "INF")
+set(STARDIS_ARGS_DEFAULT_RENDERING_FOV "70") # degrees
+set(STARDIS_ARGS_DEFAULT_RENDERING_IMG_HEIGHT "480")
+set(STARDIS_ARGS_DEFAULT_RENDERING_IMG_WIDTH "640")
+set(STARDIS_ARGS_DEFAULT_RENDERING_POS "1,1,1")
+set(STARDIS_ARGS_DEFAULT_RENDERING_SPP "4")
+set(STARDIS_ARGS_DEFAULT_RENDERING_TGT "0,0,0")
+set(STARDIS_ARGS_DEFAULT_RENDERING_TIME "INF")
+set(STARDIS_ARGS_DEFAULT_RENDERING_UP "0,0,1")
+set(STARDIS_ARGS_DEFAULT_REFERENCE_TEMP "300")
+set(STARDIS_ARGS_DEFAULT_SAMPLES_COUNT "10000")
+set(STARDIS_ARGS_DEFAULT_SCALE_FACTOR "1")
+set(STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL "1")
 
 configure_file(${SDIS_SOURCE_DIR}/../doc/stardis.1.txt.in
   ${CMAKE_CURRENT_BINARY_DIR}/doc/stardis.1.txt @ONLY)
@@ -51,6 +58,9 @@ set(VERSION_MINOR 4)
 set(VERSION_PATCH 0)
 set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 
+configure_file(${SDIS_SOURCE_DIR}/stardis-default.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-default.h @ONLY)
+  
 configure_file(${SDIS_SOURCE_DIR}/stardis-version.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-version.h @ONLY)
 
@@ -112,6 +122,7 @@ set(SDIS_FILES_SRC
 set(SDIS_FILES_INC
   stardis-app.h
   stardis-compute.h
+  stardis-default.h.in
   stardis-fluid.h
   stardis-intface.h
   stardis-output.h

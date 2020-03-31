@@ -504,8 +504,8 @@ stardis_init
   stardis->samples = args->samples;
   stardis->nthreads = args->nthreads;
   stardis->scale_factor = args->scale_factor;
-  stardis->radiative_temp[0] = args->radiative_temp[0];
-  stardis->radiative_temp[1] = args->radiative_temp[1];
+  stardis->ambiant_temp = args->ambiant_temp;
+  stardis->ref_temp = args->ref_temp;
   stardis->dump_paths = SDIS_HEAT_PATH_NONE;
   if(args->dump_paths & DUMP_ERROR)
     stardis->dump_paths |= SDIS_HEAT_PATH_FAILURE;

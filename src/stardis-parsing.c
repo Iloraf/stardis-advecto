@@ -1,3 +1,18 @@
+/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>. */
+
 #define _GNU_SOURCE 1
 #include "stardis-parsing.h"
 #include "stardis-app.h"
@@ -824,7 +839,7 @@ parse_args
   if(args->mode == UNDEF_MODE) {
     print_multiple_modes(buf, sizeof(buf), EXCLUSIVE_MODES | USE_STDOUT_MODES, 0);
     logger_print(args->logger, LOG_WARNING,
-      "Nothing to do. One of the following options should be used: %s",
+      "Nothing to do.\nOne of the following options should be used: %s\n",
       buf);
     res = RES_BAD_ARG;
     goto error;
@@ -835,7 +850,7 @@ parse_args
   {
     print_multiple_modes(buf, sizeof(buf), GREEN_COMPATIBLE_MODES, 0);
     logger_print(args->logger, LOG_ERROR,
-      "Option -g can only be used in conjunction with: %s",
+      "Option -g can only be used in conjunction with: %s\n",
       buf);
     logger_print(args->logger, LOG_ERROR, "\n");
     res = RES_BAD_ARG;

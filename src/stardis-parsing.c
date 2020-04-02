@@ -364,7 +364,6 @@ short_help
    const char* prog)
 {
   char* name;
-  char buf[128];
   ASSERT(stream && prog);
 
 #ifdef COMPILER_GCC
@@ -429,7 +428,7 @@ short_help
   fprintf(stream, "     Change the required computation to produce the green function.\n");
 
   fprintf(stream, "\n  -h\n");
-  fprintf(stream, "     Print this help and exit.\n", name);
+  fprintf(stream, "     Print this help and exit.\n");
 
   fprintf(stream, "\n  -n SAMPLE_COUNT\n");
   fprintf(stream, "     Set the number of Monte-Carlo samples.\n");
@@ -441,7 +440,7 @@ short_help
   fprintf(stream, "     Hint on the number of threads.\n");
 
   fprintf(stream, "\n  -v\n");
-  fprintf(stream, "     Print version information and exit.\n", name);
+  fprintf(stream, "     Print version information and exit.\n");
 
   fprintf(stream, "\n  -V LEVEL\n");
   fprintf(stream, "     Set the verbosity level.\n");

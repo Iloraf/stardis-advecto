@@ -363,15 +363,16 @@ short_help
   (FILE* stream,
    const char* prog)
 {
-  char* name;
+  const char* name;
   ASSERT(stream && prog);
 
 #ifdef COMPILER_GCC
-  name = 1 + strrchr(prog, '/');
+  name = strrchr(prog, '/');
 #else
-  name = 1 + strrchr(prog, '\\');
+  name = strrchr(prog, '\\');
 #endif
 
+  name = name ? name + 1 : prog;
   fprintf(stream,
     "Usage: %s [OPTIONS]\n"
     "\nSolve coupled thermal systems under the linear assumption.\n"

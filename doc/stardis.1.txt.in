@@ -226,7 +226,7 @@ This option can only be used in conjonction with one these options: -p, -P,
   **0** (write no message to _standard error_),;;
   **1** (write error messages only to _standard error_),;;
   **2** (write error and warning messages to _standard error_),;;
-  **3** (write error, warning and informative messages to _standard error_).;;
+  **3** (write error, warning and informative messages to _standard error_).
 
 *-v*::
   Output version information and exit.

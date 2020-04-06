@@ -92,8 +92,6 @@ MANDATORY OPTIONS
   Can include both media enclosures and boundary conditions, in any order.
   Can be used more than once if the description is splited across different
   files.
-+
-blabla right-handed normals blabla inside/outside blabla.
 
 EXCLUSIVE OPTIONS
 -----------------
@@ -196,6 +194,11 @@ This option can only be used in conjuction with an option that runs a
 computation (-p, -P, -m, -s, -R, -S, -F) and cannot be used in conjunction
 with other options that write to _standard output_ (-R, -d, -g, -h, -v).
 
+**-f** _factor_::
+  Rescale the geometry by the given *factor* before sending it to the solver,
+  expected length unit being meter. Default rescale *factor*
+  is @STARDIS_ARGS_DEFAULT_SCALE_FACTOR@.
+
 *-g*::
   Write the green function at a steady state to _standard output_ after the
   specified computation. 
@@ -203,10 +206,9 @@ with other options that write to _standard output_ (-R, -d, -g, -h, -v).
 This option can only be used in conjonction with one these options: -p, -P,
 -m, -s. Any provided compute time is silently ignored.
 
-**-f** _factor_::
-  Rescale the geometry by the given *factor* before sending it to the solver.
-  Default rescale *factor* is @STARDIS_ARGS_DEFAULT_SCALE_FACTOR@.
-
+*-h*::
+  Output short help and exit.
+  
 *-n* _samples-count_::
   Number of Monte-Carlo samples. By default _samples-count_ is set to
   @STARDIS_ARGS_DEFAULT_SAMPLES_COUNT@.
@@ -223,10 +225,10 @@ This option can only be used in conjonction with one these options: -p, -P,
 *-V* _level_::
   Set the verbosity level according to the following list. Default verbosity
   *level* is @STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL@.
-  **0** (write no message to _standard error_),;;
-  **1** (write error messages only to _standard error_),;;
-  **2** (write error and warning messages to _standard error_),;;
-  **3** (write error, warning and informative messages to _standard error_).
+  * *0*: (write no message to _standard error_),
+  * *1*: (write error messages only to _standard error_),
+  * *2*: (write error and warning messages to _standard error_),
+  * *3*: (write error, warning and informative messages to _standard error_).
 
 *-v*::
   Output version information and exit.
@@ -236,8 +238,7 @@ EXAMPLES
 
 Pre-process the system as described in *scene.txt* when intending to compute
 the mean flux on the triangles from the file *edge.stl*, and write its geometry
-in the file *scene.vtk*. Verbosity level is set to *3* and the possible 
-messages are printed to standard error:
+in the file *scene.vtk*. Verbosity level is set to *3*:
 
     $ stardis -M scene.txt -F edge.stl -d -V 3 > scene.vtk
 
@@ -248,6 +249,10 @@ samples is set to *1000000*:
 
     $ stardis -M media.txt -M bounds.txt -p 0,0.5,0 -n 1000000
 
+Compute the mean temperature in the medium *med05* at *t=100* s. The system is
+read from the 2 files *media.txt* and *bound.txt*:
+
+    $ stardis -M media.txt -M bounds.txt -m med05,100
 
 COPYRIGHT
 ---------
@@ -258,8 +263,5 @@ permitted by law.
 
 SEE ALSO
 --------
-*csplit*(1),
-*feh*(1),
-*sed*(1),
 *stardis-input*(5),
 *stardis-output*(5)

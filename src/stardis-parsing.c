@@ -455,7 +455,7 @@ parse_args
 {
   int opt = 0, n_used = 0;
   size_t len = 0;
-  const char option_list[] = "a:d:D:f:F:ghm:M:n:p:P:r:R:s:S:tvV:";
+  const char option_list[] = "a:dD:f:F:ghm:M:n:p:P:r:R:s:S:tvV:";
   char buf[128];
   static char empty_arg[1] = "";
   res_T res = RES_OK;

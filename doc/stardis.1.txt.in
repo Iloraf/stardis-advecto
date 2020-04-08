@@ -32,7 +32,7 @@ DESCRIPTION
 -----------
 *stardis* solves coupled thermal systems under the linear assumption. Here
 coupled refers to conductive, convective and radiative transfers, and linear
-means that each phenomena is represented using a model that is linear 
+means that each phenomena is represented using a model that is linear
 with temperature. *stardis* can deal with complex geometries as well as
 high-frequency external solicitations over a very long period of time,
 relative to the characteristic time of the system.
@@ -51,13 +51,13 @@ information on the system in an unbiased and very-fast statistical model.
 In addition of the aforementioned computations, *stardis* provides three
 other functionalities. The *-d* option can be used to convert the
 *stardis-input*(5) geometry into a VTK file. The *-D* option saves the sampled
-thermal paths used by the estimates, allowing to visualise them externally
+heat paths used by the estimates, allowing to visualise them externally
 which may be of a great help to identify issues. Finally, the *-R* option
 can be used to render an infrared image of the submitted system.
 
 The provided system should be described in the *stardis-input*(5) format
 and can be split over any number of files, each being submited through the
-*-M* option. 
+*-M* option.
 
 Stardis' algorithms are based on state-of-the-art Monte-Carlo method applied
 to radiative transfer physics (Delatorre [1]) combined with conduction's
@@ -71,7 +71,7 @@ by Intel® Rendering Framework: Embree.
 Everytime the linear assumption is relevant, this theoretical framework allows
 to encompass all the heat transfer mecanisms (conductive-convective-radiative)
 in an unified statistical model. Such systems can be solved by a Monte-Carlo
-approach just by sampling thermal paths. This can be seen as an extension of
+approach just by sampling heat paths. This can be seen as an extension of
 Monte-Carlo algorithms that solve radiative transfer by sampling optical paths.
 A main property of this approach is that the resulting algorithms does not rely
 on a volume mesh of the system.
@@ -107,9 +107,9 @@ EXCLUSIVE OPTIONS
   closest interface.
 
 *-m* _medium_name[,time]_::
-  Compute the mean temperature in a given medium at a given time. By default
-  compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The medium doesn't need
-  to be connex.
+  Compute the mean temperature in a given medium at a given time. The medium
+  name must be part of the system description. By default compute time is
+  @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The medium doesn't need to be connex.
 
 *-s* _file[,time]_::
   Compute the mean temperature on a given 2D region at a given time, the
@@ -151,12 +151,12 @@ EXCLUSIVE OPTIONS
 
   **spp=**_samples-count_;;
     Number of samples per pixel.
-	By default, use @STARDIS_ARGS_DEFAULT_RENDERING_SPP@ samples per pixel.
+    By default, use @STARDIS_ARGS_DEFAULT_RENDERING_SPP@ samples per pixel.
 
   **t=**_time_;;
     Rendering time. By default _time_ is @STARDIS_ARGS_DEFAULT_RENDERING_TIME@
-	seconds.
-	
+    seconds.
+
   **tgt=**_x_**,**_y_**,**_z_;;
     Position targeted by the camera. By default, it is set to
     {@STARDIS_ARGS_DEFAULT_RENDERING_TGT@} or it is automatically computed to
@@ -177,16 +177,16 @@ OTHER OPTIONS
 
 *-d*::
   Write the geometry to _standard output_ in VTK format along with various
-  properties, including possible errors. If this option is used, no 
+  properties, including possible errors. If this option is used, no
   computation occurs.
 +
 Using this option in conjunction with an option that
 specifies a compute region (-s, -S, -F) has the effect to include the
 region in the output. This option cannot be used in conjunction with other
-options that write to	_standard output_ (-R, -g, -D, -h, -v).
+options that write to   _standard output_ (-R, -g, -D, -h, -v).
 
 *-D* _type_::
-  Write thermal paths of the given *type* to _standard output_ in VTK format.
+  Write heat paths of the given *type* to _standard output_ in VTK format.
   Possible values are *error* (write paths ending in error), *success*
   (write successful paths),*all* (write all paths).
 +
@@ -201,14 +201,14 @@ with other options that write to _standard output_ (-R, -d, -g, -h, -v).
 
 *-g*::
   Write the green function at a steady state to _standard output_ after the
-  specified computation. 
+  specified computation.
 +
 This option can only be used in conjonction with one these options: -p, -P,
 -m, -s. Any provided compute time is silently ignored.
 
 *-h*::
   Output short help and exit.
-  
+
 *-n* _samples-count_::
   Number of Monte-Carlo samples. By default _samples-count_ is set to
   @STARDIS_ARGS_DEFAULT_SAMPLES_COUNT@.

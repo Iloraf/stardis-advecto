@@ -24,7 +24,7 @@ stardis-input - thermal system description for stardis(1)
 
 DESCRIPTION
 -----------
-*stardis-input* is the format used by the *stardis*(1) program to discribe a
+*stardis-input* is the format used by the *stardis*(1) program to describe a
 thermal system. It relies on a line-based ad-hoc syntax.
 
 A thermal system is composed of lines of text, each one describing either a
@@ -45,105 +45,108 @@ applies to *stardis(1)* outputs as described in *stardis-output(5)*.
 Finally, description lines can be submitted to the *stardis*(1) program in
 any order and can be split accross more than one file, through multiple use
 of the *-M* option.
-   
+
 GRAMMAR
 -------
-
 In what follows, some lines end in *\*. This is used as a convenience to
-continue the explanation next line. However, this caracter cannot be used in
+continue a description next line. However, this character cannot be used in
 actual description files and actual description lines must be kept single-line.
+Also, text appearing between quote marks has to be used verbatim in the input,
+except the quote characters. Finally, text following the *#* character in
+descriptions, when not verbatim, is a comment and is not part of the
+description.
 
 [verse]
 _______
-<thermal-system>         ::= <description-line>
-                           [ <thermal-system> ]
+<thermal-system>      ::= <description-line>
+                          [ <thermal-system> ]
 
-<description-line>       ::= [ <medium-frontier> ... ]
-                             [ <medium-boundary> ... ]
-                             [ <media-connection> ... ]
-							 
--------------------------------------
-
-<medium-frontier>        ::= <solid-frontier>
-                           | <fluid-frontier>
-						  
-<solid-frontier>         ::= SOLID <medium-name> <lambda> <rho> <cp> <delta> \
-                             <initial-temperature> <volumic-power> <triangle-sides>
-
-<fluid-frontier>         ::= FLUID <medium-name> <ka> <ks> <rho> <cp> \
-                             <initial-temperature> <triangle-sides>
+<description-line>    ::= [ <medium-frontier> ... ]
+                          [ <medium-boundary> ... ]
+                          [ <media-connection> ... ]
 
 -------------------------------------
 
-<medium-name>            ::= STRING # no space allowed
+<medium-frontier>     ::= <solid-frontier>
+                        | <fluid-frontier>
 
-<lambda>                 ::= REAL # in ]0, INF)
+<solid-frontier>      ::= "SOLID" <medium-name> <lambda> <rho> <cp> <delta> \
+                          <initial-temp> <volumic-power> <triangle-sides>
 
-<rho>                    ::= REAL # in ]0, INF)
-
-<cp>                     ::= REAL # in ]0, INF)
-
-<delta>                  ::= REAL # in ]0, INF)
-
-<initial-temperature>    ::= REAL # in [0, INF)
-
-<volumic-power>          ::= REAL # in (-INF , INF)
-
-<ka>                     ::= REAL # in [0, INF)
-
-<ks>                     ::= REAL # in [0, INF)
-
-<triangle-sides>         ::= <side-specifier> <file-name> [ <triangle-sides> ]
+<fluid-frontier>      ::= "FLUID" <medium-name> <ka> <ks> <rho> <cp> \
+                          <initial-temp> <triangle-sides>
 
 -------------------------------------
 
-<side-specifier>         ::= FRONT | BACK | BOTH
+<medium-name>         ::= STRING # no space allowed
 
-<file-name>              ::= STRING # no space allowed
+<lambda>              ::= REAL # in ]0, INF)
 
--------------------------------------
+<rho>                 ::= REAL # in ]0, INF)
 
-<medium-boundary>        ::= <h-boundary-for-solid>
-                           | <h-boundary-for-fluid>
-                           | <t-boundary-for-solid>
-                           | <t-boundary-for-fluid>
-                           | <f-boundary-for-solid>
-						  
-<h-boundary-for-solid>   ::= H_BOUNDARY_FOR_SOLID <boundary-name> <emissivity> \
-                             <specular-fraction> <hc> <external-temperature> <triangles>
+<cp>                  ::= REAL # in ]0, INF)
 
-<h-boundary-for-fluid>   ::= H_BOUNDARY_FOR_FLUID <boundary-name> <emissivity> \
-                             <specular-fraction> <hc> <external-temperature> <triangles>
+<delta>               ::= REAL # in ]0, INF)
 
-<t-boundary-for-solid>   ::= T_BOUNDARY_FOR_SOLID <boundary-name> <temperature> <triangles>
+<initial-temp>        ::= REAL # in [0, INF)
 
-<t-boundary-for-fluid>   ::= T_BOUNDARY_FOR_FLUID <boundary-name> <temperature> \
-                             <emissivity> <specular-fraction> <hc> <triangles>
+<volumic-power>       ::= REAL # in (-INF , INF)
 
-<f-boundary-for-solid>   ::= T_BOUNDARY_FOR_SOLID <boundary-name> <flux> <triangles>
+<ka>                  ::= REAL # in [0, INF)
+
+<ks>                  ::= REAL # in [0, INF)
+
+<triangle-sides>      ::= <side-specifier> <file-name> [ <triangle-sides> ]
 
 -------------------------------------
 
-<boundary-name>          ::= STRING # no space allowed
+<side-specifier>      ::= "FRONT" | "BACK" | "BOTH"
 
-<emissivity>             ::= REAL # in [0, 1]
-
-<specular-fraction>      ::= REAL # in [0, 1]
-
-<hc>                     ::= REAL # in [0, INF)
-
-<external-temperature>   ::= REAL # in [0, INF)
-
-<flux>                   ::= REAL # in (-INF , INF)
-
-<triangles>              ::= <file-name> [ <triangles> ]
+<file-name>           ::= STRING # no space allowed
 
 -------------------------------------
 
-<media-connection>       ::= <solid-fluid-connection>
+<medium-boundary>     ::= <h-bound-for-solid>
+                        | <h-bound-for-fluid>
+                        | <t-bound-for-solid>
+                        | <t-bound-for-fluid>
+                        | <f-bound-for-solid>
 
-<solid-fluid-connection> ::= SOLID_FLUID_CONNECTION <boundary-name> <emissivity> \
-                             <specular-fraction> <hc> <triangles>
+<h-bound-for-solid>   ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <emissivity> \
+                          <specular-fraction> <hc> <external-temp> <triangles>
+
+<h-bound-for-fluid>   ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <emissivity> \
+                          <specular-fraction> <hc> <external-temperature> <triangles>
+
+<t-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> <triangles>
+
+<t-bound-for-fluid>   ::= "T_BOUNDARY_FOR_FLUID" <bound-name> <temperature> \
+                          <emissivity> <specular-fraction> <hc> <triangles>
+
+<f-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <flux> <triangles>
+
+-------------------------------------
+
+<bound-name>          ::= STRING # no space allowed
+
+<emissivity>          ::= REAL # in [0, 1]
+
+<specular-fraction>   ::= REAL # in [0, 1]
+
+<hc>                  ::= REAL # in [0, INF)
+
+<external-temp>       ::= REAL # in [0, INF)
+
+<flux>                ::= REAL # in (-INF , INF)
+
+<triangles>           ::= <file-name> [ <triangles> ]
+
+-------------------------------------
+
+<media-connection>    ::= <solid-fluid-connect>
+
+<solid-fluid-connect> ::= "SOLID_FLUID_CONNECTION" <bound-name> <emissivity> \
+                          <specular-fraction> <hc> <triangles>
 
 ______________
 
@@ -155,18 +158,19 @@ first consider the direct triangle's normal (right-hand rule), then we define
 the BACK side of a triangle to be the side this normal comes out from. That
 means that a closed set of triangles with normals pointing outside should be
 used with the FRONT side specifier to describe inside medium.
-   
+
 NAMES
 -----
 
 Names, either file names, medium names or boundary names, are a sequence of
-one or ore ascii characters, including numbers and special characters like
+one or ore ASCII characters, including numbers and special characters like
 *.* *_* *-* as one may consider using in standard file names, *without any
 spacing* either escaped or not.
 
-Two different description lines can use the same name. However, computating 
+Two different description lines can use the same name. However, computating
 mean temperature in a given medium (*-m* option of *stardis*) has an undefined
-behaviour when the involved name has been used more than once in the system.
+behaviour when the medium name has been used more than once in the system
+description.
 
 EXAMPLES
 --------

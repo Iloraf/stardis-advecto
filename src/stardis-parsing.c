@@ -389,25 +389,25 @@ short_help
   fprintf(stream, "\nExclusive arguments\n");
   fprintf(stream, "-------------------\n");
 
-  fprintf(stream, "\n  -F STL_FILE,TIME\n");
+  fprintf(stream, "\n  -F STL_FILE[,TIME]\n");
   fprintf(stream, "     Compute the mean flux on a given 2D region at a given time.\n");
 
-  fprintf(stream, "\n  -m MEDIUM_NAME,TIME\n");
+  fprintf(stream, "\n  -m MEDIUM_NAME[,TIME]\n");
   fprintf(stream, "     Compute the mean temperature in a given medium at a given time.\n");
 
-  fprintf(stream, "\n  -p X,Y,Z,TIME\n");
+  fprintf(stream, "\n  -p X,Y,Z[,TIME]\n");
   fprintf(stream, "     Compute the temperature at the given probe.\n");
 
-  fprintf(stream, "\n  -P X,Y,Z,TIME\n");
+  fprintf(stream, "\n  -P X,Y,Z[,TIME]\n");
   fprintf(stream, "     Compute the temperature at the given probe on an interface.\n");
 
   fprintf(stream, "\n  -R [RENDERING_OPTIONS]\n");
   fprintf(stream, "     Compute an infra-red image of the model.\n");
 
-  fprintf(stream, "\n  -s STL_FILE,TIME\n");
+  fprintf(stream, "\n  -s STL_FILE[,TIME]\n");
   fprintf(stream, "     Compute the mean temperature on a given 2D region.\n");
 
-  fprintf(stream, "\n  -S STL_FILE,TIME\n");
+  fprintf(stream, "\n  -S STL_FILE[,TIME]\n");
   fprintf(stream, "     Compute the by-triangle mean temperature on a given 2D region.\n");
 
   fprintf(stream, "\nOptionnal arguments\n");
@@ -588,16 +588,19 @@ re_switch:
         goto error;
       }
       args->mode |= MEDIUM_COMPUTE;
-      ptr = strpbrk(optarg, ",");
-      if (ptr) {
-        res = cstr_to_double(ptr + 1, args->probe + 3);
-        if (res != RES_OK) {
-          logger_print(args->logger, LOG_ERROR,
-            "Invalid argument for option -%c: %s\n",
-            opt, optarg);
-          goto error;
-        }
+      ptr = strrchr(optarg, ',');
+      if(ptr) {
+        if(ptr != strchr(optarg, ','))
+          res = RES_BAD_ARG; /* Single ',' allowed */
+        else
+          res = cstr_to_double(ptr + 1, args->probe + 3);
         *ptr = '\0';
+      }
+      if(res != RES_OK) {
+        logger_print(args->logger, LOG_ERROR,
+          "Invalid argument for option -%c: %s\n",
+          opt, optarg);
+        goto error;
       }
       args->medium_name = optarg;
       break;
@@ -702,7 +705,6 @@ re_switch:
     case 's':
     case 'S':
     case 'F': {
-      int err = 0;
       char *ptr;
       if(args->mode & EXCLUSIVE_MODES) {
         res = RES_BAD_ARG;
@@ -723,18 +725,18 @@ re_switch:
         break;
       }
       ptr = strrchr(optarg, ',');
-      /* Single ',' expected */
-      if(!ptr || ptr != strchr(optarg, ','))
-        err = 1;
-      else {
+      if(ptr) {
+        if(ptr != strchr(optarg, ','))
+          res = RES_BAD_ARG; /* Single ',' allowed */
+        else {
+          res = cstr_to_double(ptr + 1, args->probe + 3);
+          if(res == RES_OK && args->probe[3] < 0)
+            res = RES_BAD_ARG;
+        }
         *ptr = '\0';
-        ptr++;
-        args->solve_filename = optarg;
-        err = (RES_OK != cstr_to_double(ptr, args->probe + 3)
-          || args->probe[3] < 0);
       }
-      if(err) {
-        res = RES_BAD_ARG;
+      args->solve_filename = optarg;
+      if(res != RES_OK) {
         logger_print(args->logger, LOG_ERROR,
           "Invalid argument for option -%c: %s\n",
           opt, optarg);
@@ -921,8 +923,8 @@ find_description_by_name
   FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
     struct description* desc
       = darray_descriptions_data_get(&stardis->descriptions) + i;
-    if (str_eq(name, get_description_name(desc))) {
-      if (out_id) *out_id = i;
+    if(str_eq(name, get_description_name(desc))) {
+      if(out_id) *out_id = i;
       return desc;
     }
   }
@@ -955,12 +957,12 @@ process_h
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "h boundary name");
   ERR(str_set(&desc->d.h_boundary.name, tk));
-  if (find_description_by_name(stardis, &desc->d.h_boundary.name, NULL)
+  if(find_description_by_name(stardis, &desc->d.h_boundary.name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
-    if (res == RES_OK) res = RES_BAD_ARG;
+    if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
 
@@ -1038,12 +1040,12 @@ process_t
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "temperature boundary name");
   ERR(str_set(&desc->d.t_boundary.name, tk));
-  if (find_description_by_name(stardis, &desc->d.t_boundary.name, NULL)
+  if(find_description_by_name(stardis, &desc->d.t_boundary.name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
-    if (res == RES_OK) res = RES_BAD_ARG;
+    if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
 
@@ -1121,12 +1123,12 @@ process_flx
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "flux boundary name");
   ERR(str_set(&desc->d.f_boundary.name, tk));
-  if (find_description_by_name(stardis, &desc->d.f_boundary.name, NULL)
+  if(find_description_by_name(stardis, &desc->d.f_boundary.name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
-    if (res == RES_OK) res = RES_BAD_ARG;
+    if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
 
@@ -1171,12 +1173,12 @@ process_sfc
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "solid fluid connection name");
   ERR(str_set(&desc->d.sf_connect.name, tk));
-  if (find_description_by_name(stardis, &desc->d.sf_connect.name, NULL)
+  if(find_description_by_name(stardis, &desc->d.sf_connect.name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
-    if (res == RES_OK) res = RES_BAD_ARG;
+    if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
 
@@ -1243,12 +1245,12 @@ process_solid
   
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "solid name");
   ERR(str_set(&desc->d.solid.name, tk));
-  if (find_description_by_name(stardis, &desc->d.solid.name, NULL)
+  if(find_description_by_name(stardis, &desc->d.solid.name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
-    if (res == RES_OK) res = RES_BAD_ARG;
+    if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
 
@@ -1337,12 +1339,12 @@ process_fluid
   
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "fluid name");
   ERR(str_set(&desc->d.fluid.name, tk));
-  if (find_description_by_name(stardis, &desc->d.fluid.name, NULL)
+  if(find_description_by_name(stardis, &desc->d.fluid.name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
-    if (res == RES_OK) res = RES_BAD_ARG;
+    if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
 

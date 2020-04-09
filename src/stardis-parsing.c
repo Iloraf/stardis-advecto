@@ -955,7 +955,9 @@ process_h
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "h boundary name");
   ERR(str_set(&desc->d.h_boundary.name, tk));
-  if (find_description_by_name(stardis, &desc->d.h_boundary.name, NULL)) {
+  if (find_description_by_name(stardis, &desc->d.h_boundary.name, NULL)
+    != desc)
+  {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if (res == RES_OK) res = RES_BAD_ARG;
@@ -1036,7 +1038,9 @@ process_t
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "temperature boundary name");
   ERR(str_set(&desc->d.t_boundary.name, tk));
-  if (find_description_by_name(stardis, &desc->d.t_boundary.name, NULL)) {
+  if (find_description_by_name(stardis, &desc->d.t_boundary.name, NULL)
+    != desc)
+  {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if (res == RES_OK) res = RES_BAD_ARG;
@@ -1117,7 +1121,9 @@ process_flx
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "flux boundary name");
   ERR(str_set(&desc->d.f_boundary.name, tk));
-  if (find_description_by_name(stardis, &desc->d.f_boundary.name, NULL)) {
+  if (find_description_by_name(stardis, &desc->d.f_boundary.name, NULL)
+    != desc)
+  {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if (res == RES_OK) res = RES_BAD_ARG;
@@ -1163,9 +1169,11 @@ process_sfc
   connection_id = (unsigned)sz;
   desc->type = DESC_SOLID_FLUID_CONNECT;
 
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "connection name");
+  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "solid fluid connection name");
   ERR(str_set(&desc->d.sf_connect.name, tk));
-  if (find_description_by_name(stardis, &desc->d.sf_connect.name, NULL)) {
+  if (find_description_by_name(stardis, &desc->d.sf_connect.name, NULL)
+    != desc)
+  {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if (res == RES_OK) res = RES_BAD_ARG;
@@ -1235,7 +1243,9 @@ process_solid
   
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "solid name");
   ERR(str_set(&desc->d.solid.name, tk));
-  if (find_description_by_name(stardis, &desc->d.solid.name, NULL)) {
+  if (find_description_by_name(stardis, &desc->d.solid.name, NULL)
+    != desc)
+  {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if (res == RES_OK) res = RES_BAD_ARG;
@@ -1327,7 +1337,9 @@ process_fluid
   
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "fluid name");
   ERR(str_set(&desc->d.fluid.name, tk));
-  if (find_description_by_name(stardis, &desc->d.fluid.name, NULL)) {
+  if (find_description_by_name(stardis, &desc->d.fluid.name, NULL)
+    != desc)
+  {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if (res == RES_OK) res = RES_BAD_ARG;

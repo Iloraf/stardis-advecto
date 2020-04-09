@@ -94,7 +94,7 @@ struct args {
   double probe[4];
   enum stardis_mode mode;
   double scale_factor;
-  double ambiant_temp, ref_temp;
+  double ambient_temp, ref_temp;
   char* camera;
   enum dump_path_type dump_paths;
   int verbose;

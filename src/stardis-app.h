@@ -738,7 +738,7 @@ struct stardis {
   size_t samples;
   unsigned nthreads;
   double scale_factor;
-  double ambiant_temp, ref_temp;
+  double ambient_temp, ref_temp;
   struct mem_allocator* allocator;
   struct logger* logger;
   struct sdis_device* dev;

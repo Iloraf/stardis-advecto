@@ -35,7 +35,7 @@ set_property(CACHE STARDIS_DOC PROPERTY STRINGS
 ###############################################################################
 # Generate files
 ###############################################################################
-set(STARDIS_ARGS_DEFAULT_AMBIANT_TEMP "300")
+set(STARDIS_ARGS_DEFAULT_AMBIENT_TEMP "300")
 set(STARDIS_ARGS_DEFAULT_COMPUTE_TIME "INF")
 set(STARDIS_ARGS_DEFAULT_RENDERING_FOV "70") # degrees
 set(STARDIS_ARGS_DEFAULT_RENDERING_IMG_HEIGHT "480")

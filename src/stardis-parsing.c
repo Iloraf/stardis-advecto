@@ -291,7 +291,7 @@ init_args
   args->nthreads = DEFAULT_NTHREADS;
   args->probe[3] = STARDIS_DEFAULT_COMPUTE_TIME;
   args->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
-  args->ambiant_temp = STARDIS_DEFAULT_AMBIANT_TEMP;
+  args->ambient_temp = STARDIS_DEFAULT_AMBIENT_TEMP;
   args->ref_temp = STARDIS_DEFAULT_REFERENCE_TEMP;
   args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;
 
@@ -488,9 +488,9 @@ re_switch:
     }
 
     case 'a':
-      res = cstr_to_double(optarg, &args->ambiant_temp);
+      res = cstr_to_double(optarg, &args->ambient_temp);
       if(res != RES_OK
-        || args->ambiant_temp < 0)
+        || args->ambient_temp < 0)
       {
         if(res == RES_OK) res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,

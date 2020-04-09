@@ -28,28 +28,30 @@ DESCRIPTION
 thermal system. It relies on a line-based ad-hoc syntax.
 
 A thermal system is composed of lines of text, each one describing either a
-medium (solid or fluid) frontier, or a boundary (limit condition or connection
-between two media). In either case, the description line includes a list of
-file names that constitute the limit or boundary. The current version of
-*stardis* only accepts triangle mesh geometry files in *VTK* format.
+medium (solid or fluid) a frontier, or a boundary (limit condition or
+connection between two media). In either case, the description line includes a
+list of file names that constitute the limit or boundary. The current version
+of *stardis* only accepts triangle mesh geometry files in *VTK* format.
 
 There are no constraints on triangle partitions: a medium limit or a boundary
 description can be split accross files and description lines, and a single
 file or description line can describe more than one frontier (more than one
 connex region).
 
-Any physical quantity involved in descriptions is expected in the
-International System of Units (second, metre, kilogram, kelvin); the same
-applies to *stardis(1)* outputs as described in *stardis-output(5)*.
-
 Finally, description lines can be submitted to the *stardis*(1) program in
 any order and can be split accross more than one file, through multiple use
 of the *-M* option.
 
+UNITS
+-----
+Any physical quantity involved in descriptions is expected in the
+International System of Units (second, metre, kilogram, kelvin); the same
+applies to *stardis(1)* outputs as described in *stardis-output(5)*.
+
 GRAMMAR
 -------
 In what follows, some lines end in *\*. This is used as a convenience to
-continue a description next line. However, this character cannot be used in
+continue a description next line. However, this trick cannot be used in
 actual description files and actual description lines must be kept single-line.
 Also, text appearing between quote marks has to be used verbatim in the input,
 except the quote characters. Finally, text following the *#* character in
@@ -152,7 +154,6 @@ ______________
 
 TRIANGLE SIDES
 --------------
-
 Side descriptions in side specifiers rely on the following convention: we
 first consider the direct triangle's normal (right-hand rule), then we define
 the BACK side of a triangle to be the side this normal comes out from. That
@@ -161,20 +162,18 @@ used with the FRONT side specifier to describe inside medium.
 
 NAMES
 -----
-
 Names, either file names, medium names or boundary names, are a sequence of
 one or ore ASCII characters, including numbers and special characters like
 *.* *_* *-* as one may consider using in standard file names, *without any
 spacing* either escaped or not.
 
-Two different description lines can use the same name. However, computating
+Two different description lines can use the same name. However, computing
 mean temperature in a given medium (*-m* option of *stardis*) has an undefined
 behaviour when the medium name has been used more than once in the system
 description.
 
 EXAMPLES
 --------
-
 Define a solid cube with a h boundary. The cube geometry is read from the file
 cube.stl and the solid medium properties are lambda=0.1, rho=25, cp=2. The
 numerical parameter delta, that is used for solid conductive walks, is 0.05.

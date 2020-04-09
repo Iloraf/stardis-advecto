@@ -175,7 +175,7 @@ compute_probe(struct stardis* stardis)
       stardis->samples,
       pos,
       stardis->scale_factor,
-      stardis->ambiant_temp,
+      stardis->ambient_temp,
       stardis->ref_temp,
       &green));
     ERR(dump_green(green, stardis, stdout));
@@ -187,7 +187,7 @@ compute_probe(struct stardis* stardis)
       pos,
       time,
       stardis->scale_factor,
-      stardis->ambiant_temp,
+      stardis->ambient_temp,
       stardis->ref_temp,
       stardis->dump_paths,
       &estimator));
@@ -222,7 +222,7 @@ compute_probe_on_interface(struct stardis* stardis)
       uv,
       SDIS_FRONT,
       stardis->scale_factor,
-      stardis->ambiant_temp,
+      stardis->ambient_temp,
       stardis->ref_temp,
       &green));
     ERR(dump_green(green, stardis, stdout));
@@ -236,7 +236,7 @@ compute_probe_on_interface(struct stardis* stardis)
       time,
       SDIS_FRONT,
       stardis->scale_factor,
-      stardis->ambiant_temp,
+      stardis->ambient_temp,
       stardis->ref_temp,
       stardis->dump_paths,
       &estimator));
@@ -279,7 +279,7 @@ compute_camera(const struct stardis* stardis)
     cam,
     time,
     stardis->scale_factor,
-    stardis->ambiant_temp,
+    stardis->ambient_temp,
     stardis->ref_temp,
     width,
     height,
@@ -324,7 +324,7 @@ compute_medium(struct stardis* stardis)
       stardis->samples,
       medium,
       stardis->scale_factor,
-      stardis->ambiant_temp,
+      stardis->ambient_temp,
       stardis->ref_temp,
       &green));
     ERR(dump_green(green, stardis, stdout));
@@ -336,7 +336,7 @@ compute_medium(struct stardis* stardis)
       medium,
       time,
       stardis->scale_factor,
-      stardis->ambiant_temp,
+      stardis->ambient_temp,
       stardis->ref_temp,
       stardis->dump_paths,
       &estimator));
@@ -417,7 +417,7 @@ compute_boundary(struct stardis* stardis)
       darray_sides_cdata_get(&stardis->compute_surface.sides),
       darray_size_t_size_get(&stardis->compute_surface.primitives),
       stardis->scale_factor,
-      stardis->ambiant_temp,
+      stardis->ambient_temp,
       stardis->ref_temp,
       &green));
     ERR(dump_green(green, stardis, stdout));
@@ -430,7 +430,7 @@ compute_boundary(struct stardis* stardis)
       darray_size_t_size_get(&stardis->compute_surface.primitives),
       time,
       stardis->scale_factor,
-      stardis->ambiant_temp,
+      stardis->ambient_temp,
       stardis->ref_temp,
       stardis->dump_paths,
       &estimator));
@@ -462,7 +462,7 @@ compute_flux_boundary(struct stardis* stardis)
     darray_size_t_size_get(&stardis->compute_surface.primitives),
     time,
     stardis->scale_factor,
-    stardis->ambiant_temp,
+    stardis->ambient_temp,
     stardis->ref_temp,
     &estimator));
   ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -504,7 +504,7 @@ compute_map(struct stardis* stardis)
       1,
       time,
       stardis->scale_factor,
-      stardis->ambiant_temp,
+      stardis->ambient_temp,
       stardis->ref_temp,
       stardis->dump_paths,
       darray_estimators_data_get(&estimators) + p));

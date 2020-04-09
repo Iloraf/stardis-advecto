@@ -505,7 +505,7 @@ dump_green
   fprintf(stream, "# Radiative Temperatures\n");
   fprintf(stream, "# ID Rad_Temp Lin_Temp\n");
   fprintf(stream, "%u\t%g\t%g\n",
-    szd, stardis->ambiant_temp, stardis->ref_temp);
+    szd, stardis->ambient_temp, stardis->ref_temp);
 
   fprintf(stream, "# Samples\n");
   fprintf(stream,

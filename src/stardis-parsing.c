@@ -909,6 +909,26 @@ error:
   goto end;
 }
 
+static struct description*
+find_description_by_name
+  (struct stardis* stardis,
+   const struct str* name,
+   size_t* out_id)
+{
+  size_t i;
+  ASSERT(stardis && name);
+
+  FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
+    struct description* desc
+      = darray_descriptions_data_get(&stardis->descriptions) + i;
+    if (str_eq(name, get_description_name(desc))) {
+      if (out_id) *out_id = i;
+      return desc;
+    }
+  }
+  return NULL;
+}
+
 /* H_BOUNDARY_FOR_SOLID Name emissivity specular_fraction hc T_env STL_filenames
  * H_BOUNDARY_FOR_FLUID Name emissivity specular_fraction hc T_env STL_filenames */
 static res_T
@@ -935,6 +955,12 @@ process_h
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "h boundary name");
   ERR(str_set(&desc->d.h_boundary.name, tk));
+  if (find_description_by_name(stardis, &desc->d.h_boundary.name, NULL)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if (res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "emissivity");
   res = cstr_to_double(tk, &desc->d.h_boundary.emissivity);
@@ -1010,6 +1036,12 @@ process_t
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "temperature boundary name");
   ERR(str_set(&desc->d.t_boundary.name, tk));
+  if (find_description_by_name(stardis, &desc->d.t_boundary.name, NULL)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if (res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "temperature");
   res = cstr_to_double(tk, &desc->d.t_boundary.imposed_temperature);
@@ -1085,6 +1117,12 @@ process_flx
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "flux boundary name");
   ERR(str_set(&desc->d.f_boundary.name, tk));
+  if (find_description_by_name(stardis, &desc->d.f_boundary.name, NULL)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if (res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "flux");
   res = cstr_to_double(tk, &desc->d.f_boundary.imposed_flux);
@@ -1127,6 +1165,12 @@ process_sfc
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "connection name");
   ERR(str_set(&desc->d.sf_connect.name, tk));
+  if (find_description_by_name(stardis, &desc->d.sf_connect.name, NULL)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if (res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "emissivity");
   res = cstr_to_double(tk, &desc->d.sf_connect.emissivity);
@@ -1191,6 +1235,12 @@ process_solid
   
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "solid name");
   ERR(str_set(&desc->d.solid.name, tk));
+  if (find_description_by_name(stardis, &desc->d.solid.name, NULL)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if (res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "lambda");
   res = cstr_to_double(tk, &desc->d.solid.lambda);
@@ -1277,6 +1327,12 @@ process_fluid
   
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "fluid name");
   ERR(str_set(&desc->d.fluid.name, tk));
+  if (find_description_by_name(stardis, &desc->d.fluid.name, NULL)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if (res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
 
   CHK_TOK(strtok_r(NULL, " ", tok_ctx), "rho");
   res = cstr_to_double(tk, &desc->d.fluid.rho);

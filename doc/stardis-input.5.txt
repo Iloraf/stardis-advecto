@@ -165,12 +165,8 @@ NAMES
 Names, either file names, medium names or boundary names, are a sequence of
 one or ore ASCII characters, including numbers and special characters like
 *.* *_* *-* as one may consider using in standard file names, *without any
-spacing* either escaped or not.
-
-Two different description lines can use the same name. However, computing
-mean temperature in a given medium (*-m* option of *stardis*) has an undefined
-behaviour when the medium name has been used more than once in the system
-description.
+spacing* either escaped or not. Two different description lines cannot use
+the same name.
 
 EXAMPLES
 --------

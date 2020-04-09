@@ -574,6 +574,31 @@ error:
   goto end;
 }
 
+static INLINE struct str*
+get_description_name
+  (struct description* desc)
+{
+  ASSERT(desc);
+  switch (desc->type) {
+  case DESC_MAT_SOLID:
+    return &desc->d.solid.name;
+  case DESC_MAT_FLUID:
+    return &desc->d.fluid.name;
+  case DESC_BOUND_T_FOR_SOLID:
+  case DESC_BOUND_T_FOR_FLUID:
+    return &desc->d.t_boundary.name;
+  case DESC_BOUND_H_FOR_SOLID:
+  case DESC_BOUND_H_FOR_FLUID:
+    return &desc->d.h_boundary.name;
+  case DESC_BOUND_F_FOR_SOLID:
+    return &desc->d.f_boundary.name;
+  case DESC_SOLID_FLUID_CONNECT:
+    return &desc->d.sf_connect.name;
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
+  }
+}
+
 static FINLINE res_T
 cp_description
   (struct description* dst,

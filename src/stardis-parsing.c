@@ -589,16 +589,16 @@ re_switch:
       }
       args->mode |= MEDIUM_COMPUTE;
       ptr = strpbrk(optarg, ",");
-      if(!ptr || ptr == optarg)
-        res = RES_BAD_ARG;
-      else res = cstr_to_double(ptr + 1, args->probe + 3);
-      if(res != RES_OK) {
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
+      if (ptr) {
+        res = cstr_to_double(ptr + 1, args->probe + 3);
+        if (res != RES_OK) {
+          logger_print(args->logger, LOG_ERROR,
+            "Invalid argument for option -%c: %s\n",
+            opt, optarg);
+          goto error;
+        }
+        *ptr = '\0';
       }
-      *ptr = '\0';
       args->medium_name = optarg;
       break;
     }

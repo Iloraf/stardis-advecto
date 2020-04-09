@@ -873,9 +873,11 @@ parse_camera
       }
       else if(strcmp(opt[0], "TGT") == 0) {
         ERR(cstr_to_list_double(opt[1], ',', cam->tgt, &len, 3));
+        cam->auto_look_at = 0;
       }
       else if(strcmp(opt[0], "POS") == 0) {
         ERR(cstr_to_list_double(opt[1], ',', cam->pos, &len, 3));
+        cam->auto_look_at = 0;
       }
       else if(strcmp(opt[0], "IMG") == 0) {
         unsigned img_sz[2];

@@ -665,9 +665,10 @@ struct camera {
   double tgt[3];
   double up[3];
   double fov;
+  double time;
   unsigned spp;
   unsigned img_width, img_height;
-  double time;
+  int auto_look_at;
 };
 
 static INLINE void
@@ -680,6 +681,7 @@ init_camera(struct camera* cam) {
   cam->img_width = STARDIS_DEFAULT_RENDERING_IMG_WIDTH;
   cam->img_height = STARDIS_DEFAULT_RENDERING_IMG_HEIGHT;
   cam->time = STARDIS_DEFAULT_RENDERING_TIME;
+  cam->auto_look_at = 1;
 }
 
 static INLINE void

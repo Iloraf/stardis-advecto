@@ -251,10 +251,88 @@ error:
 }
 
 static res_T
-compute_camera(const struct stardis* stardis)
+auto_look_at
+  (struct sdis_scene* scn,
+   const double fov_x, /* Horizontal field of view in radian */
+   const double proj_ratio, /* Width / height */
+   const double up[3], /* Up vector */
+   double position[3],
+   double target[3])
+{
+  double lower[3], upper[3];
+  double up_abs[3];
+  double axis_min[3];
+  double axis_x[3];
+  double axis_z[3];
+  double tmp[3];
+  double radius;
+  double depth;
+  res_T res;
+  ASSERT(scn && fov_x && proj_ratio && up);
+
+  ERR(sdis_scene_get_aabb(scn, lower, upper));
+
+  if(lower[0] > upper[0] || lower[1] > upper[1] || lower[2] > upper[2]) {
+    /* Empty scene */
+    d3(position, STARDIS_DEFAULT_RENDERING_POS);
+    d3(target, STARDIS_DEFAULT_RENDERING_TGT);
+    goto exit;
+  }
+
+  /* The target is the scene centroid */
+  d3_muld(target, d3_add(target, lower, upper), 0.5);
+
+  /* Define which up dimension is minimal and use its unit vector to compute a
+   * vector orthogonal to `up'. This ensures that the unit vector and `up' are
+   * not collinear so that their cross product is not a zero vector. */
+  up_abs[0] = fabs(up[0]);
+  up_abs[1] = fabs(up[1]);
+  up_abs[2] = fabs(up[2]);
+  if(up_abs[0] < up_abs[1]) {
+    if(up_abs[0] < up_abs[2]) d3(axis_min, 1, 0, 0);
+    else d3(axis_min, 0, 0, 1);
+  } else {
+    if(up_abs[1] < up_abs[2]) d3(axis_min, 0, 1, 0);
+    else d3(axis_min, 0, 0, 1);
+  }
+  d3_normalize(axis_x, d3_cross(axis_x, up, axis_min));
+  d3_normalize(axis_z, d3_cross(axis_z, up, axis_x));
+
+  /* Find whether the XYZ or the ZYX basis maximise the model's visibility */
+  if(fabs(d3_dot(axis_x, upper)) < fabs(d3_dot(axis_z, upper))) {
+    SWAP(double, axis_x[0], axis_z[0]);
+    SWAP(double, axis_x[1], axis_z[1]);
+    SWAP(double, axis_x[2], axis_z[2]);
+  }
+
+  /* Ensure that the whole model is visible */
+  radius = d3_len(d3_sub(tmp, upper, lower)) * 0.5;
+  if(proj_ratio < 1) {
+    depth = radius / sin(fov_x / 2.0);
+  } else {
+    depth = radius / sin(fov_x / (2.0 * proj_ratio));
+  }
+
+  /* Define the camera position */
+  d3_sub(position, target, d3_muld(tmp, axis_z, depth));
+
+  /* Empirically move the position to find a better point of view */
+  d3_add(position, position, d3_muld(tmp, up, radius)); /*Empirical offset*/
+  d3_add(position, position, d3_muld(tmp, axis_x, radius)); /*Empirical offset*/
+  d3_normalize(tmp, d3_sub(tmp, target, position));
+  d3_sub(position, target, d3_muld(tmp, tmp, depth));
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+compute_camera(struct stardis* stardis)
 {
   res_T res = RES_OK;
-  double time[2];
+  double proj_ratio, time[2];
   size_t width, height;
   struct sdis_estimator_buffer* buf = NULL;
   struct sdis_camera* cam = NULL;
@@ -264,10 +342,15 @@ compute_camera(const struct stardis* stardis)
 
   width = (size_t)stardis->camera.img_width;
   height = (size_t)stardis->camera.img_height;
+  proj_ratio = (double)width / (double)height;
   /* Setup the camera */
   ERR(sdis_camera_create(stardis->dev, &cam));
-  ERR(sdis_camera_set_proj_ratio(cam, (double)width / (double)height));
+  ERR(sdis_camera_set_proj_ratio(cam, proj_ratio));
   ERR(sdis_camera_set_fov(cam, MDEG2RAD(stardis->camera.fov)));
+  if(stardis->camera.auto_look_at) {
+    ERR(auto_look_at(stardis->sdis_scn, MDEG2RAD(stardis->camera.fov), proj_ratio,
+      stardis->camera.up, stardis->camera.pos, stardis->camera.tgt));
+  }
   ERR(sdis_camera_look_at(cam,
     stardis->camera.pos,
     stardis->camera.tgt,

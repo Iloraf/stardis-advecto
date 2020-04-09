@@ -667,23 +667,23 @@ ensure_allocated(struct str* str, const size_t len, const char keep_old)
   size_t new_size = 0;
   ASSERT(str);
 
-  if (len * sizeof(char) <= str->allocated)
+  if(len * sizeof(char) <= str->allocated)
     return RES_OK;
 
   mod = len % alloc_granularity;
   new_len = !mod ? len : len - mod + alloc_granularity;
   new_size = new_len * sizeof(char);
   buf = MEM_ALLOC(str->allocator, new_size);
-  if (!buf)
+  if(!buf)
     return RES_MEM_ERR;
 
-  if (keep_old) {
+  if(keep_old) {
     strncpy(buf, str->cstr, new_len - 1);
     buf[new_len - 1] = '\0';
   }
 
   str->allocated = new_len * sizeof(char);
-  if (str->cstr != str->buffer)
+  if(str->cstr != str->buffer)
     MEM_RM(str->allocator, str->cstr);
 
   str->cstr = buf;
@@ -706,11 +706,11 @@ str_printf
   initial_len = str_len(str);
   ASSERT(str->allocated >= initial_len);
   left = str->allocated - initial_len;
-  if (left) {
+  if(left) {
     VA_COPY(args_cp, args);
     needed = (size_t)vsnprintf(str->cstr + initial_len, left, fmt, args_cp);
   }
-  if (needed >= left) {
+  if(needed >= left) {
     ERR(ensure_allocated(str, initial_len + needed + 1, 1));
     ASSERT(str->allocated >= initial_len);
     left = str->allocated - initial_len;

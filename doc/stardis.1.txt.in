@@ -190,9 +190,10 @@ options that write to  _standard output_ (-R, -g, -D, -h, -v).
   Possible values are *error* (write paths ending in error), *success*
   (write successful paths), and *all* (write all paths).
 +
-This option can only be used in conjuction with an option that runs a
-computation (-p, -P, -m, -s, -R, -S, -F) and cannot be used in conjunction
-with some other options that write to _standard output_ (-R, -d, -g, -h, -v).
+This option can only be used in conjuction with options that compute a simple
+Monte-Carlo result (-p, -P, -m, -s, -S, -F) and cannot be used in conjunction
+with some other options that write additional information to _standard output_
+(-R, -d, -g, -h, -v).
 
 **-f** _factor_::
   Rescale the geometry by the given *factor* before sending it to the solver,

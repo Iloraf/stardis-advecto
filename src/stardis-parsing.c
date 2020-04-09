@@ -528,22 +528,6 @@ re_switch:
           opt, optarg);
         goto error;
       }
-      if(args->mode & USE_STDOUT_MODES) {
-        res = RES_BAD_ARG;
-        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_PATHS);
-        logger_print(args->logger, LOG_ERROR,
-          "Option -%c cannot be used in conjunction with other dump options (%s).\n",
-          (char)opt, buf);
-        goto error;
-      }
-      if(!(args->mode & COMPUTE_MODES)) {
-        res = RES_BAD_ARG;
-        print_multiple_modes(buf, sizeof(buf), COMPUTE_MODES, 0);
-        logger_print(args->logger, LOG_ERROR,
-          "Option -%c can only be used in conjunction with a compute option (%s).\n",
-          (char)opt, buf);
-        goto error;
-      }
       args->mode |= DUMP_PATHS;
       break;
 
@@ -830,6 +814,25 @@ re_switch:
       " use rendering's SPP suboption instead.\n");
     res = RES_BAD_ARG;
     goto error;
+  }
+
+  if(args->mode |= DUMP_PATHS) {
+    if(args->mode & USE_STDOUT_MODES) {
+      res = RES_BAD_ARG;
+      print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_PATHS);
+      logger_print(args->logger, LOG_ERROR,
+        "Option -%c cannot be used in conjunction with other dump options (%s).\n",
+        (char)opt, buf);
+      goto error;
+    }
+    if(!(args->mode & SINGLE_RESULT_MODES)) {
+      res = RES_BAD_ARG;
+      print_multiple_modes(buf, sizeof(buf), SINGLE_RESULT_MODES, 0);
+      logger_print(args->logger, LOG_ERROR,
+        "Option -%c can only be used in conjunction with option producing a single result (%s).\n",
+        mode_option(DUMP_PATHS), buf);
+      goto error;
+    }
   }
 
 end:

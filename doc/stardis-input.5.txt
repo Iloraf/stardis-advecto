@@ -29,14 +29,15 @@ thermal system. It relies on a line-based ad-hoc syntax.
 
 A thermal system is composed of lines of text, each one describing either a
 medium (solid or fluid) a frontier, or a boundary (limit condition or
-connection between two media). In either case, the description line includes a
+connection between two media). In either case, a description line includes a
 list of file names that constitute the limit or boundary. The current version
 of *stardis* only accepts triangle mesh geometry files in *VTK* format.
 
-There are no constraints on triangle partitions: a medium limit or a boundary
-description can be split accross files and description lines, and a single
-file or description line can describe more than one frontier (more than one
-connex region).
+A medium limit or a boundary description can be split accross files and a
+single file or description line can describe more than one frontier (more than
+one connex region). The main semantic constraint on descriptions is that any
+enclosure must be defined by a single description line, to ensure that any
+part in the system is made from a single medium.
 
 Finally, description lines can be submitted to the *stardis*(1) program in
 any order and can be split accross more than one file, through multiple use

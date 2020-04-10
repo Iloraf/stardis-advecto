@@ -135,7 +135,9 @@ EXCLUSIVE OPTIONS
 
 *-R* [__sub-option__:...]::
   Render an infrared image of the system through a pinhole camera and write it
-  to _standard output_ in VTK format. Available sub-options are:
+  to _standard output_ in VTK format. One can use all-default sub-options by
+  simply providing the colon character (*:*) alone as an argument. Available
+  sub-options are:
 
   **fov=**_angle_;;
     Horizontal field of view of the camera in [30, 120] degrees. By default
@@ -254,6 +256,16 @@ Compute the mean temperature in the medium *med05* at *t=100* s. The system is
 read from the 2 files *media.txt* and *bounds.txt*:
 
     $ stardis -M media.txt -M bounds.txt -m med05,100
+
+Render the system as described in *scene.txt* with default settings:
+
+    $ stardis -M scene.txt -R :
+
+Render the system as described in *scene.txt* at *t=1000*, *spp=2*,
+*img=800x600* and all other settings set to their default values:
+
+    $ stardis -M scene.txt -R t=1000:spp=2:img=800x600
+
 
 COPYRIGHT
 ---------

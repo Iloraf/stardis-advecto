@@ -55,46 +55,51 @@ split_line
    const char a_delim)
 {
   char** result = 0;
-  size_t count = 0;
+  size_t chunks_count;
   char* tmp = a_str;
-  char* last_delim = a_str;
   char delim[2];
-  delim[0] = a_delim;
-  delim[1] = 0;
+  char* tok_ctx = NULL;
 
   ASSERT(a_str);
 
-  /* Count how many elements will be extracted. */
+  delim[0] = a_delim;
+  delim[1] = 0;
+
+  /* if a_str starts with initial useless delimiters remove them */
+  while(*a_str == a_delim) a_str++;
+
+  /* if a_str ends with final useless delimiters remove them */
+  tmp = a_str + strlen(a_str) - 1;
+  while(*tmp == a_delim && tmp >= a_str) { *tmp = '\0'; tmp--; }
+
+  if(tmp >= a_str) chunks_count = 1;
+  else return NULL;
+
+  tmp = a_str;
   while(*tmp) {
-    if(a_delim == *tmp) {
-      count++;
-      last_delim = tmp;
-    }
+    int delim_found = 0;
+    while(*tmp == a_delim) { delim_found = 1; tmp++; }
+    if(delim_found) chunks_count++;
     tmp++;
   }
 
-  /* Add space for trailing token. */
-  count += last_delim < (a_str + strlen(a_str) - 1);
-
   /* Add space for terminating null string so caller
      knows where the list of returned strings ends. */
-  count++;
-
-  result = malloc(sizeof(char*) * count);
+  result = malloc(sizeof(char*) * (1 + chunks_count));
   if(result) {
     size_t idx = 0;
-    char* token = strtok(a_str, delim);
+    char* token = strtok_r(a_str, delim, &tok_ctx);
 
     while(token) {
-      ASSERT(idx < count);
+      ASSERT(idx <= chunks_count);
 #ifdef COMPILER_CL
       *(result + idx++) = _strdup(token);
 #else
       *(result + idx++) = strdup(token);
 #endif
-      token = strtok(0, delim);
+      token = strtok_r(NULL, delim, &tok_ctx);
     }
-    ASSERT(idx == count - 1);
+    ASSERT(idx == chunks_count);
     *(result + idx) = 0;
   }
   return result;
@@ -457,26 +462,18 @@ parse_args
   size_t len = 0;
   const char option_list[] = "a:dD:f:F:ghm:M:n:p:P:r:R:s:S:tvV:";
   char buf[128];
-  static char empty_arg[1] = "";
   res_T res = RES_OK;
 
   ASSERT(argv && args);
 
   opterr = 0; /* No default error messages */
   while((opt = getopt(argc, argv, option_list)) != -1) {
-re_switch:
     switch (opt) {
 
     case '?': /* Unreconised option */
     {
       char* ptr = strchr(option_list, optopt);
       if(ptr && ptr[1] == ':') {
-        /* As a special case -R option can accept an empty argument */
-        if(optopt == 'R') {
-          opt = optopt;
-          optarg = empty_arg;
-          goto re_switch; /* retry switch */
-        }
         res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
           "Missing argument for option -%c\n",
@@ -861,6 +858,7 @@ parse_camera
     for(i = 0; *(line + i); i++) {
       size_t len = 0;
       opt = split_line(line[i], '=');
+      ASSERT(opt[0] && opt[1] && !opt[2]);
       _strupr(opt[0]);
       if(strcmp(opt[0], "T") == 0) {
         ERR(cstr_to_double(opt[1], &cam->time));

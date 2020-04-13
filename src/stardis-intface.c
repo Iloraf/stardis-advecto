@@ -254,17 +254,15 @@ create_intface
           == (connect->type == DESC_BOUND_T_FOR_FLUID ? SDIS_SOLID: SDIS_FLUID));
         connection_count++;
         boundary_count++;
-        if(front_defined) {
+        if(front_defined)
           back_med = media[ext_id];
-          /* We set the known T inside
-           * TODO: should be outside to allow contact resistances */
-          interface_shader.front.temperature = interface_get_temperature;
-        } else {
-          front_med = media[ext_id];
-          /* We set the known T inside
-           * TODO: should be outside to allow contact resistances */
-          interface_shader.back.temperature = interface_get_temperature;
-        }
+        else front_med = media[ext_id];
+        /* The imposed T is for the 2 sides (until there is contact resistnces) */
+        interface_shader.front.temperature = interface_get_temperature;
+        interface_shader.back.temperature = interface_get_temperature;
+        /* Set emissivity to 1 to allow radiative paths to 'see' the imposed T */
+        fluid_side_shader->emissivity = interface_get_emissivity;
+        interface_props->emissivity = 1;
         ASSERT(connect->d.t_boundary.imposed_temperature >= 0);
         interface_props->imposed_temperature
           = connect->d.t_boundary.imposed_temperature;

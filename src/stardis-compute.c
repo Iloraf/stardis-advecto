@@ -351,9 +351,8 @@ compute_camera(struct stardis* stardis)
     ERR(auto_look_at(stardis->sdis_scn, MDEG2RAD(stardis->camera.fov), proj_ratio,
       stardis->camera.up, stardis->camera.pos, stardis->camera.tgt));
     logger_print(stardis->logger, LOG_OUTPUT,
-      "Camera auto-look at: position=%g,%g,%g up=%g,%g,%g target=%g,%g,%g.\n",
-      SPLIT3(stardis->camera.pos), SPLIT3(stardis->camera.up),
-      SPLIT3(stardis->camera.tgt));
+      "Camera auto-look at: position=%g,%g,%g target=%g,%g,%g.\n",
+      SPLIT3(stardis->camera.pos), SPLIT3(stardis->camera.tgt));
   }
   ERR(sdis_camera_look_at(cam,
     stardis->camera.pos,

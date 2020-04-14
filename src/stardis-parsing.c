@@ -510,6 +510,14 @@ parse_args
       break;
 
     case 'D':
+      if(args->mode & USE_STDOUT_MODES) {
+        res = RES_BAD_ARG;
+        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_PATHS);
+        logger_print(args->logger, LOG_ERROR,
+          "Option -%c cannot be used in conjunction with other dump options (%s).\n",
+          (char)opt, buf);
+        goto error;
+      }
       if(0 == strcmp(optarg, "all")) {
         args->dump_paths = DUMP_ALL;
       }
@@ -814,14 +822,6 @@ parse_args
   }
 
   if(args->mode & DUMP_PATHS) {
-    if(args->mode & USE_STDOUT_MODES) {
-      res = RES_BAD_ARG;
-      print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_PATHS);
-      logger_print(args->logger, LOG_ERROR,
-        "Option -%c cannot be used in conjunction with other dump options (%s).\n",
-        mode_option(DUMP_PATHS), buf);
-      goto error;
-    }
     if(!(args->mode & SINGLE_RESULT_MODES)) {
       res = RES_BAD_ARG;
       print_multiple_modes(buf, sizeof(buf), SINGLE_RESULT_MODES, 0);

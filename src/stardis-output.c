@@ -335,8 +335,10 @@ dump_image
   }
 
   /* Compute the per pixel temperature */
-  fprintf(stream,
-    "# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET STRUCTURED_POINTS\n");
+  fprintf(stream, "# vtk DataFile Version 2.0\n");
+  fprintf(stream, "Infrared Image\n");
+  fprintf(stream, "ASCII\n");
+  fprintf(stream, "DATASET STRUCTURED_POINTS\n");
   fprintf(stream, "DIMENSIONS %zu %zu 1\n", definition[0], definition[1]);
   fprintf(stream, "ORIGIN 0 0 0\n");
   fprintf(stream, "SPACING 1 1 1\n");
@@ -385,7 +387,7 @@ dump_image
       fprintf(stream, "%f\n", time.SE);
     }
   }
-  fprintf(stream, "SCALARS temperature_failures_count unsigned_long_long 1\n");
+  fprintf(stream, "SCALARS failures_count unsigned_long_long 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(iy, 0, definition[1]) {
     FOR_EACH(ix, 0, definition[0]) {
@@ -695,8 +697,10 @@ dump_map
   }
 
   /* Dump vertices up to last_v, even unused ones, to avoid reindexing */
-  fprintf(stream,
-    "# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET POLYDATA\n");
+  fprintf(stream, "# vtk DataFile Version 2.0\n");
+  fprintf(stream, "Temperature Map\n");
+  fprintf(stream, "ASCII\n");
+  fprintf(stream, "DATASET POLYDATA\n");
   fprintf(stream, "POINTS %u float\n\n", last_v + 1);
   for(i = 0; i <= last_v; ++i) {
     double coord[3];
@@ -729,7 +733,7 @@ dump_map
     SDIS(estimator_get_temperature(est[i], &T));
     fprintf(stream, "%f\n", T.SE);
   }
-  fprintf(stream, "SCALARS temperature_failures_count unsigned_long_long 1\n");
+  fprintf(stream, "SCALARS failures_count unsigned_long_long 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
   for(i = 0; i < szp; ++i) {
     size_t nfails;

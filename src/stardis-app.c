@@ -36,7 +36,7 @@ static const struct counts COUNTS_NULL = COUNTS_NULL__;
  * These values are used in dumps
  ******************************************************************************/
 enum properties_conflict_t {
-  NO_CONFLICT,
+  NO_PROPERTY_CONFLICT,
   BOUND_H_FOR_FLUID_BETWEEN_2_DEFS,
   BOUND_H_FOR_FLUID_BETWEEN_2_UNDEFS,
   BOUND_H_FOR_FLUID_ENCLOSING_SOLID,
@@ -55,11 +55,19 @@ enum properties_conflict_t {
   SFCONNECT_BETWEEN_2_SOLIDS,
   SFCONNECT_BETWEEN_2_FLUIDS,
   SFCONNECT_USED_AS_BOUNDARY,
-  NO_BOUND_BETWEEN_FLUIDS,
-  TRG_WITH_NO_PROPERTY,
+  SFCONNECT_BETWEEN_2_UNDEFS,
+  NO_CONNECTION_BETWEEN_2_FLUIDS,
+  NO_CONNECTION_BETWEEN_SOLID_AND_FLUID,
   NO_BOUND_BETWEEN_FLUID_AND_UNDEF,
   NO_BOUND_BETWEEN_SOLID_AND_UNDEF,
+  TRG_WITH_NO_PROPERTY,
   PROPERTIES_CONFLICT_COUNT__
+};
+
+enum enclosure_errors_t {
+  NO_ENCLOSURE_ERROR,
+  INTERNAL_ENCLOSURE_WITH_N_MEDIA,
+  ENCLOSURE_ERRORS_COUNT__
 };
 
 /*******************************************************************************
@@ -122,41 +130,6 @@ error:
     else fluid_count++;\
   }\
 }
-
-#define PRT_INCOHERENT_TRG() {\
-  struct str str;\
-  str_init(stardis->allocator, &str);\
-  ERR(logger_print(stardis->logger, LOG_WARNING,\
-    "Incoherent triangle description (%u)\n", itri));\
-  if(!front_defined)\
-    ERR(logger_print(stardis->logger, LOG_OUTPUT, "Front: undefined\n"));\
-  else {\
-    ERR(str_printf(&str, "Front: "));\
-    ERR(print_description(&str, descs + properties[SG3D_FRONT]));\
-    ERR(str_printf(&str, "\n"));\
-    ERR(logger_print(stardis->logger, LOG_OUTPUT, "%s", str_cget(&str))); \
-  }\
-  str_clear(&str);\
-  if(!back_defined)\
-    ERR(logger_print(stardis->logger, LOG_OUTPUT, "Back: undefined\n"));\
-  else {\
-    ERR(str_printf(&str, "Back: "));\
-    ERR(print_description(&str, descs + properties[SG3D_BACK]));\
-    ERR(str_printf(&str, "\n"));\
-    ERR(logger_print(stardis->logger, LOG_OUTPUT, "%s", str_cget(&str))); \
-  }\
-  str_clear(&str);\
-  if(!connect_defined)\
-    ERR(logger_print(stardis->logger, LOG_OUTPUT, "Connection: undefined\n"));\
-  else {\
-    ERR(str_printf(&str, "Connection: "));\
-    ERR(print_description(&str, descs + properties[SG3D_INTFACE]));\
-    ERR(str_printf(&str, "\n"));\
-    ERR(logger_print(stardis->logger, LOG_OUTPUT, "%s", str_cget(&str))); \
-  }\
-  str_release(&str);\
-}
-
 static res_T
 validate_properties
   (const unsigned itri,
@@ -194,10 +167,7 @@ validate_properties
     switch (intface->type) {
     case DESC_BOUND_H_FOR_FLUID:
       if(!(solid_count == 0 && fluid_count == 1)) {
-        PRT_INCOHERENT_TRG();
-        logger_print(stardis->logger, LOG_ERROR,
-          "Can only define a DESC_BOUND_H_FOR_FLUID boundary for a fluid region\n");
-        if(solid_count + fluid_count == 2)
+       if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_DEFS;
         else if(solid_count + fluid_count == 0)
           *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_UNDEFS;
@@ -209,9 +179,6 @@ validate_properties
       break;
     case DESC_BOUND_H_FOR_SOLID:
       if(!(solid_count == 1 && fluid_count == 0)) {
-        PRT_INCOHERENT_TRG();
-        logger_print(stardis->logger, LOG_ERROR,
-          "Can only define a DESC_BOUND_H_FOR_SOLID boundary for a solid region\n");
         if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_H_FOR_SOLID_BETWEEN_2_DEFS;
         else if(solid_count + fluid_count == 0)
@@ -224,10 +191,7 @@ validate_properties
       break;
     case DESC_BOUND_T_FOR_FLUID:
       if(!(solid_count == 0 && fluid_count == 1)) {
-        PRT_INCOHERENT_TRG();
-        logger_print(stardis->logger, LOG_ERROR,
-          "Can only define a DESC_BOUND_T_FOR_FLUID boundary for a fluid region\n");
-        if(solid_count + fluid_count == 2)
+      if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_DEFS;
         else if(solid_count + fluid_count == 0)
           *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS;
@@ -239,10 +203,7 @@ validate_properties
       break;
     case DESC_BOUND_T_FOR_SOLID:
       if(!(solid_count == 1 && fluid_count == 0)) {
-        PRT_INCOHERENT_TRG();
-        logger_print(stardis->logger, LOG_ERROR,
-          "Can only define a DESC_BOUND_T_FOR_SOLID boundary for a solid region\n");
-        if(solid_count + fluid_count == 2)
+       if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_DEFS;
         else if(solid_count + fluid_count == 0)
           *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_UNDEFS;
@@ -254,9 +215,6 @@ validate_properties
       break;
     case DESC_BOUND_F_FOR_SOLID:
       if(!(solid_count == 1 && fluid_count == 0)) {
-        PRT_INCOHERENT_TRG();
-        logger_print(stardis->logger, LOG_ERROR,
-          "Can only define a DESC_BOUND_F_FOR_SOLID boundary for a solid region\n");
         if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_F_FOR_SOLID_BETWEEN_2_DEFS;
         else if(solid_count + fluid_count == 0)
@@ -269,15 +227,14 @@ validate_properties
       break;
     case DESC_SOLID_FLUID_CONNECT:
       if(solid_count != 1 || fluid_count != 1) {
-        PRT_INCOHERENT_TRG();
-        logger_print(stardis->logger, LOG_ERROR,
-          "Can only define a DESC_SOLID_FLUID_CONNECT between a fluid and a solid\n");
         if(solid_count == 2)
           *properties_conflict_status = SFCONNECT_BETWEEN_2_SOLIDS;
         else if(fluid_count == 2)
           *properties_conflict_status = SFCONNECT_BETWEEN_2_FLUIDS;
-        else if(solid_count + fluid_count < 2)
+        else if(solid_count + fluid_count == 1)
           *properties_conflict_status = SFCONNECT_USED_AS_BOUNDARY;
+        else if (solid_count + fluid_count == 0)
+          *properties_conflict_status = SFCONNECT_BETWEEN_2_UNDEFS;
         else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
         goto end;
       }
@@ -288,12 +245,12 @@ validate_properties
   } else {
     /* No interface defined */
     ASSERT(intface_count == 0 && undef_count >= 1);
-    if(fluid_count == 2) {
-      *properties_conflict_status = NO_BOUND_BETWEEN_FLUIDS;
-      goto end;
-    }
     if(undef_count == 3) {
       *properties_conflict_status = TRG_WITH_NO_PROPERTY;
+      goto end;
+    }
+    if(fluid_count == 2) {
+      *properties_conflict_status = NO_CONNECTION_BETWEEN_2_FLUIDS;
       goto end;
     }
     if(undef_count == 2) {
@@ -303,18 +260,19 @@ validate_properties
       else *properties_conflict_status = NO_BOUND_BETWEEN_SOLID_AND_UNDEF;
       goto end;
     }
+    if(undef_count == 1 && solid_count == 1 && fluid_count == 1) {
+      *properties_conflict_status = NO_CONNECTION_BETWEEN_SOLID_AND_FLUID;
+      goto end;
+    }
     /* Undef interface between solids is OK */
-    if(undef_count == 1) CHK(solid_count == 2);
+    CHK(solid_count == 2);
   }
   
 end:
   return res;
-error:
-  goto end;
 }
 
 #undef COUNT_SIDE
-#undef PRT_INCOHERENT_TRG
 
 static struct sdis_interface*
 geometry_get_interface
@@ -513,8 +471,10 @@ stardis_init
     stardis->dump_paths |= SDIS_HEAT_PATH_SUCCESS;
   stardis->verbose = args->verbose;
   darray_media_ptr_init(stardis->allocator, &stardis->media);
-  
-  is_for_compute = (stardis->mode & COMPUTE_MODES);
+
+  /* If a dump is expected, we won't process any computation */
+  is_for_compute =
+    (stardis->mode & COMPUTE_MODES) && !(stardis->mode & DUMP_VTK);
   ERR(init_geometry(stardis->logger, stardis->allocator, stardis->verbose,
     &stardis->geometry));
 
@@ -564,12 +524,15 @@ stardis_init
     }
   }
 
-  for(i = 0; i < tcount; ++i) {
-    ERR(create_intface(stardis, i, &htable_interfaces));
+  if(is_for_compute) {
+    for(i = 0; i < tcount; ++i) {
+      ERR(create_intface(stardis, i, &htable_interfaces));
+    }
   }
 
   /* If computation is on a compute surface, read it */
   if(args->mode & SURFACE_COMPUTE_MODES) {
+    unsigned save_count = count;
     ASSERT(!str_is_empty(&stardis->solve_name));
     ERR(read_compute_surface(stardis));
     /* Check compute surface  */
@@ -577,13 +540,14 @@ stardis_init
       validate_properties, stardis));
     ERR(sg3d_geometry_get_unique_triangles_with_properties_conflict_count(
       stardis->geometry.sg3d, &count));
-    if(count) {
+    ASSERT(count >= save_count);
+    if(save_count != count) {
       logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
         "Invalid compute region defined by file '%s'.\n",
         str_cget(&stardis->solve_name));
       logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
-        "The file contains %u triangles not in the model.\n", count);
-      if(is_for_compute) {
+        "The file contains %u triangles not in the model.\n", count - save_count);
+     if(is_for_compute) {
         res = RES_BAD_ARG;
         goto error;
       }

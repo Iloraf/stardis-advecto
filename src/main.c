@@ -86,7 +86,7 @@ main
      * enclosure IDs too */
     ERR(dump_enclosure_related_stuff_at_the_end_of_vtk(&stardis, stdout));
 
-    /* If dump flag set, then dump and exit */
+    /* If dump flag set exit after dump done */
     goto exit;
   }
 

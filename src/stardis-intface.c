@@ -173,12 +173,12 @@ create_intface
       struct sdis_medium* def_medium = NULL;
       unsigned ext_id;
       if(connect->type == DESC_SOLID_FLUID_CONNECT) {
+        if(solid_count != 1 || fluid_count != 1) { res = RES_BAD_ARG; goto error; }
         ASSERT(front_defined && back_defined);
         fluid_side_shader = (descriptions[fd].type == DESC_MAT_SOLID)
           ? &interface_shader.back : &interface_shader.front;
-        if(solid_count != 1 || fluid_count != 1) goto error;
       } else {
-        if(front_defined == back_defined) goto error;
+        if(front_defined == back_defined) { res = RES_BAD_ARG; goto error; }
         def_medium = front_defined ? front_med : back_med;
         if(front_defined) {
           ASSERT(descriptions[fd].type == DESC_MAT_SOLID
@@ -197,7 +197,7 @@ create_intface
       }
       switch(connect->type) {
       case DESC_BOUND_H_FOR_FLUID:
-        if(sdis_medium_get_type(def_medium) != SDIS_FLUID) goto error;
+        if(sdis_medium_get_type(def_medium) != SDIS_FLUID) { res = RES_BAD_ARG; goto error; }
         type_checked = 1;
         ASSERT(connect->d.h_boundary.imposed_temperature >= 0);
         interface_props->imposed_temperature
@@ -206,7 +206,10 @@ create_intface
         /* fall through */
       case DESC_BOUND_H_FOR_SOLID:
         if(!type_checked
-          &&  sdis_medium_get_type(def_medium) != SDIS_SOLID) goto error;
+          &&  sdis_medium_get_type(def_medium) != SDIS_SOLID)
+        {
+          res = RES_BAD_ARG; goto error;
+        }
         ext_id = connect->d.h_boundary.mat_id; /* External material id */
         ASSERT(ext_id < darray_media_ptr_size_get(&stardis->media));
         ASSERT(sdis_medium_get_type(media[ext_id]) ==
@@ -229,7 +232,7 @@ create_intface
         }
         break;
       case DESC_BOUND_T_FOR_FLUID:
-        if(sdis_medium_get_type(def_medium) != SDIS_FLUID) goto error;
+        if(sdis_medium_get_type(def_medium) != SDIS_FLUID) { res = RES_BAD_ARG; goto error; }
         type_checked = 1;
         interface_shader.convection_coef_upper_bound = connect->d.t_boundary.hc;
         interface_props->hc = connect->d.t_boundary.hc;
@@ -247,7 +250,10 @@ create_intface
         /* fall through */
       case DESC_BOUND_T_FOR_SOLID:
         if(!type_checked
-          &&  sdis_medium_get_type(def_medium) != SDIS_SOLID) goto error;
+          &&  sdis_medium_get_type(def_medium) != SDIS_SOLID)
+        {
+          res = RES_BAD_ARG; goto error;
+        }
         ext_id = connect->d.t_boundary.mat_id; /* External material id */
         ASSERT(ext_id < darray_media_ptr_size_get(&stardis->media));
         ASSERT(sdis_medium_get_type(media[ext_id])
@@ -268,7 +274,7 @@ create_intface
           = connect->d.t_boundary.imposed_temperature;
         break;
       case DESC_BOUND_F_FOR_SOLID:
-        if(sdis_medium_get_type(def_medium) != SDIS_SOLID) goto error;
+        if(sdis_medium_get_type(def_medium) != SDIS_SOLID) { res = RES_BAD_ARG; goto error; }
         connection_count++;
         boundary_count++;
         if(front_defined) {
@@ -309,7 +315,9 @@ create_intface
       || (boundary_count ?
       (fluid_count + solid_count != 1) : (fluid_count + solid_count != 2))
       || (solid_fluid_connection_count && (fluid_count != 1 || solid_count != 1)))
-      goto error;
+    {
+      res = RES_BAD_ARG; goto error;
+    }
 
     ERR(sdis_interface_create(stardis->dev, front_med, back_med,
       &interface_shader, data, &intface));

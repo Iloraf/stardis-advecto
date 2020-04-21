@@ -581,8 +581,10 @@ parse_args
       if(ptr) {
         if(ptr != strchr(optarg, ','))
           res = RES_BAD_ARG; /* Single ',' allowed */
-        else
+        else {
           res = cstr_to_double(ptr + 1, args->probe + 3);
+          if(res == RES_OK && args->probe[3] < 0) res = RES_BAD_ARG;
+        }
         *ptr = '\0';
       }
       if(res != RES_OK) {
@@ -598,7 +600,7 @@ parse_args
     case 'M': {
       struct str name;
       str_init(args->allocator, &name);
-      str_set(&name, optarg);
+      ERR(str_set(&name, optarg));
       ERR(darray_str_push_back(&args->model_files, &name));
       str_release(&name);
       break;

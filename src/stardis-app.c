@@ -142,7 +142,7 @@ validate_properties
   unsigned undef_count, solid_count, fluid_count, intface_count;
   const struct description* descs;
   const struct description* intface = NULL;
-  int front_defined, back_defined, connect_defined;
+  int front_defined, back_defined;
 
   (void)itri;
   ASSERT(stardis && properties_conflict_status);
@@ -157,7 +157,6 @@ validate_properties
 
   front_defined = (properties[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY);
   back_defined = (properties[SG3D_BACK] != SG3D_UNSPECIFIED_PROPERTY);
-  connect_defined = (properties[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY);
 
   ASSERT(solid_count <= 2 && fluid_count <= 2 && intface_count <= 1);
   ASSERT(undef_count + solid_count + fluid_count + intface_count == 3);
@@ -530,8 +529,9 @@ stardis_init
     for(i = 0; i < tcount; ++i) {
       ERR(create_intface(stardis, i, &htable_interfaces));
     }
-    if(args->out_filename)
+    if(args->out_filename) {
       ERR(str_set(&stardis->out_filename, args->out_filename));
+    }
   }
 
   /* If computation is on a compute surface, read it */

@@ -142,7 +142,6 @@ validate_properties
   unsigned undef_count, solid_count, fluid_count, intface_count;
   const struct description* descs;
   const struct description* intface = NULL;
-  int front_defined, back_defined;
 
   (void)itri;
   ASSERT(stardis && properties_conflict_status);
@@ -154,9 +153,6 @@ validate_properties
   if(properties[SG3D_INTFACE] == SG3D_UNSPECIFIED_PROPERTY)
     undef_count++;
   else intface_count++;
-
-  front_defined = (properties[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY);
-  back_defined = (properties[SG3D_BACK] != SG3D_UNSPECIFIED_PROPERTY);
 
   ASSERT(solid_count <= 2 && fluid_count <= 2 && intface_count <= 1);
   ASSERT(undef_count + solid_count + fluid_count + intface_count == 3);

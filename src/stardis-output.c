@@ -541,14 +541,24 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
   unsigned* trgs = NULL;
   struct senc3d_scene* senc3d_scn = NULL;
   struct senc3d_device* senc_dev = NULL;
-  unsigned tsz, vsz, scount, i;
+  struct senc3d_enclosure* enc = NULL;
+  unsigned tsz, vsz, e, s, t, scount, ecount;
+  int* enc_status = NULL;
+  int invalid_enclosures_count = 0;
   ASSERT(stardis && stream);
 
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vsz));
+  trgs = MEM_CALLOC(stardis->allocator, tsz, sizeof(*trgs));
+  if(!trgs) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
 
-  /* Create enclosures to have holes information */
-  ERR(senc3d_device_create(stardis->logger, stardis->allocator, stardis->nthreads,
+  /* Create enclosures
+   * For dump results to be reproducible, we setup star-enclosures with a
+   * single thread */
+  ERR(senc3d_device_create(stardis->logger, stardis->allocator, 1,
     stardis->verbose, &senc_dev));
   ERR(senc3d_scene_create(senc_dev,
     SENC3D_CONVENTION_NORMAL_BACK | SENC3D_CONVENTION_NORMAL_OUTSIDE,
@@ -556,28 +566,69 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
     vsz, sg3d_sencXd_geometry_get_position, stardis->geometry.sg3d,
     &senc3d_scn));
 
-  /* Keep the involved segments (not the vertices) */
+  /* Keep the segments involved in holes (not the vertices) */
   ERR(senc3d_scene_get_frontier_segments_count(senc3d_scn, &scount));
   if(scount) {
     /* Room to store frontier triangles */
-    trgs = MEM_CALLOC(stardis->allocator, tsz, sizeof(*trgs));
-    if(!trgs) {
-      res = RES_MEM_ERR;
-      goto error;
-    }
-    FOR_EACH(i, 0, scount) {
+    FOR_EACH(s, 0, scount) {
       unsigned vrtc[2], trid;
-      ERR(senc3d_scene_get_frontier_segment(senc3d_scn, i, vrtc, &trid));
+      ERR(senc3d_scene_get_frontier_segment(senc3d_scn, s, vrtc, &trid));
       trgs[trid] = 1;
     }
-
-    fprintf(stream, "SCALARS Hole_frontiers int\n");
+    logger_print(stardis->logger, LOG_WARNING, "Model contains hole(s).\n");
+    fprintf(stream, "SCALARS Hole_frontiers unsigned_int 1\n");
     fprintf(stream, "LOOKUP_TABLE default\n");
-    FOR_EACH(i, 0, tsz) fprintf(stream, "%d\n", trgs[i]);
+    FOR_EACH(t, 0, tsz) fprintf(stream, "%u\n", trgs[t]);
+  }
+
+  /* Dump enclosure information */
+  ERR(senc3d_scene_get_enclosure_count(senc3d_scn, &ecount));
+  enc_status = MEM_CALLOC(stardis->allocator, ecount, sizeof(*enc_status));
+  if(!enc_status) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  FOR_EACH(e, 0, ecount) {
+    struct senc3d_enclosure_header header;
+
+    enc_status[e] = NO_ENCLOSURE_ERROR;
+    ERR(senc3d_scene_get_enclosure(senc3d_scn, e, &enc));
+    ERR(senc3d_enclosure_get_header(enc, &header));
+    /* Check if anclosure is invalid regarding stardis solver requirements */
+    if(!header.is_infinite) {
+      unsigned m, med;
+      if(header.enclosed_media_count != 1)
+        enc_status[e] |= INTERNAL_ENCLOSURE_WITH_N_MEDIA;
+      FOR_EACH(m, 0, header.enclosed_media_count) {
+        ERR(senc3d_enclosure_get_medium(enc, m, &med));
+        if(med==SENC3D_UNSPECIFIED_MEDIUM)
+          enc_status[e] |= INTERNAL_ENCLOSURE_WITH_UNDEF_MEDIUM;
+      }
+      if(enc_status[e] != NO_ENCLOSURE_ERROR) invalid_enclosures_count++;
+    }
+    ERR(senc3d_enclosure_ref_put(enc));
+  }
+  if(invalid_enclosures_count) {
+    logger_print(stardis->logger, LOG_WARNING,
+      "Found %d invalid enclosure(s).\n", invalid_enclosures_count);
+  }
+  fprintf(stream, "FIELD FieldData 1\n");
+  fprintf(stream, "Enclosure_ID %d %d unsigned_char\n", ecount, tsz);
+  FOR_EACH(t, 0, tsz) {
+    unsigned encs[2];
+    ERR(senc3d_scene_get_triangle_enclosures(senc3d_scn, t, encs));
+    FOR_EACH(e, 0, ecount) {
+      if(e == encs[SENC3D_FRONT] || e == encs[SENC3D_BACK])
+        fprintf(stream, "%d ", (char)enc_status[e]);
+      else fprintf(stream, "0 ");
+
+    }
+    fprintf(stream, "\n");
   }
 
 exit:
   if(trgs) MEM_RM(stardis->allocator, trgs);
+  if(enc_status) MEM_RM(stardis->allocator,  enc_status);
   if(senc3d_scn) senc3d_scene_ref_put(senc3d_scn);
   if(senc_dev) senc3d_device_ref_put(senc_dev);
   return res;

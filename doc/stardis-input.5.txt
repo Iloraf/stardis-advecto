@@ -28,7 +28,7 @@ DESCRIPTION
 thermal system. It relies on a line-based ad-hoc syntax.
 
 A thermal system is composed of lines of text, each one describing either a
-medium (solid or fluid) a frontier, or a boundary (limit condition or
+medium (solid or fluid) frontier or a boundary (limit condition or
 connection between two media). In either case, a description line includes a
 list of file names that constitute the limit or boundary. The current version
 of *stardis* only accepts triangle mesh geometry files in *VTK* format.
@@ -171,14 +171,14 @@ the same name.
 
 EXAMPLES
 --------
-Define a solid cube with a h boundary. The cube geometry is read from the file
-cube.stl and the solid medium properties are lambda=0.1, rho=25, cp=2. The
-numerical parameter delta, that is used for solid conductive walks, is 0.05.
-The initial temperature of the cube is 0°K and its volumic power is 0.
+Define a solid named Cube with a h boundary. The cube geometry is read from
+the file cube.stl and the solid medium properties are lambda=0.1, rho=25, cp=2.
+The numerical parameter delta, that is used for solid conductive walks, is
+0.05. The initial temperature of the cube is 0°K and its volumic power is 0.
 The boundary properties are emisivity=0, specular-fraction=0, h=10 and
 external-temperature = 100°K.
 .......
-SOLID CUBE 0.1 25 2 0.05 0 0 FRONT cube.stl
+SOLID Cube 0.1 25 2 0.05 0 0 FRONT cube.stl
 H_BOUNDARY_FOR_SOLID HdT 0 0 10 100 cube.stl
 .......
 

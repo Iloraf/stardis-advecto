@@ -30,7 +30,9 @@
 #include <rsys/dynamic_array_uint.h>
 #include <rsys/hash_table.h>
 #include <rsys/logger.h>
+#include <rsys/str.h>
 
+#include <limits.h>
 #include <stdio.h>
 
 #define HTABLE_NAME weigth
@@ -42,6 +44,16 @@ struct w_ctx {
   const struct darray_descriptions* desc;
   struct htable_weigth weigths;
   FILE* stream;
+};
+
+/*******************************************************************************
+ * Local Type; for documentation purpose
+ * These values are used in dumps
+ ******************************************************************************/
+enum enclosure_errors_t {
+  NO_ENCLOSURE_ERROR = BIT(0),
+  INTERNAL_ENCLOSURE_WITH_N_MEDIA = BIT(1),
+  INTERNAL_ENCLOSURE_WITH_UNDEF_MEDIUM = BIT(2)
 };
 
 /*******************************************************************************
@@ -122,20 +134,43 @@ error:
   goto end;
 }
 
-static res_T
+/*******************************************************************************
+ * Public Functions
+ ******************************************************************************/
+
+res_T
 dump_path
   (const struct sdis_heat_path* path,
    void* context)
 {
   res_T res = RES_OK;
-  FILE* stream = context;
+  struct dump_path_context* dump_ctx = context;
+  FILE* stream = NULL;
+  char* name = NULL;
   enum sdis_heat_path_flag status = SDIS_HEAT_PATH_NONE;
-  size_t i, vcount;
+  size_t i, vcount, name_sz;
 
+  ASSERT(path && dump_ctx
+    && dump_ctx->stardis
+    && !str_is_empty(&dump_ctx->stardis->out_filename));
+
+  name_sz = 16 + str_len(&dump_ctx->stardis->out_filename);
+  name = MEM_CALLOC(dump_ctx->stardis->allocator, name_sz, sizeof(*name));
+  if(!name) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  snprintf(name, name_sz, "%s%08zu.vtk",
+    str_cget(&dump_ctx->stardis->out_filename), dump_ctx->rank++);
+
+  stream = fopen(name, "w");
+  if(!stream) {
+    res = RES_IO_ERR;
+    goto error;
+  }
   /* Header */
-  fprintf(stream, "---\n");
   fprintf(stream, "# vtk DataFile Version 2.0\n");
-  fprintf(stream, "Heat paths\n");
+  fprintf(stream, "Heat path\n");
   fprintf(stream, "ASCII\n");
   fprintf(stream, "DATASET POLYDATA\n");
   /* Write path positions */
@@ -153,22 +188,24 @@ dump_path
   fprintf(stream, "\n");
   fprintf(stream, "POINT_DATA %zu\n", vcount);
   /* Write the type of the random walk vertices */
-  fprintf(stream, "SCALARS Vertex_Type float 1\n");
-  fprintf(stream, "LOOKUP_TABLE vertex_type\n");
+  fprintf(stream, "SCALARS Vertex_Type unsigned_char 1\n");
+  fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(i, 0, vcount) {
     struct sdis_heat_vertex vtx;
     ERR(sdis_heat_path_get_vertex(path, i, &vtx));
-    switch (vtx.type) {
-    case SDIS_HEAT_VERTEX_CONDUCTION: fprintf(stream, "0.0\n"); break;
-    case SDIS_HEAT_VERTEX_CONVECTION: fprintf(stream, "0.5\n"); break;
-    case SDIS_HEAT_VERTEX_RADIATIVE:  fprintf(stream, "1.0\n"); break;
-    default: FATAL("Unreachable code.\n"); break;
-    }
+    ASSERT((size_t)vtx.type <= UCHAR_MAX);
+    fprintf(stream, "%d\n", vtx.type);
   }
-  fprintf(stream, "LOOKUP_TABLE vertex_type 3\n");
-  fprintf(stream, "0.0 1.0 1.0 1.0\n"); /* 0.0 = Magenta: conduction */
-  fprintf(stream, "1.0 1.0 0.0 1.0\n"); /* 0.5 = Yellow: convection */
-  fprintf(stream, "1.0 0.0 1.0 1.0\n"); /* 1.0 = Purple: radiative */
+  /* Write path type */
+  fprintf(stream, "CELL_DATA %d\n", 1);
+  fprintf(stream, "SCALARS Path_Type unsigned_char 1\n");
+  fprintf(stream, "LOOKUP_TABLE default\n");
+  ERR(sdis_heat_path_get_status(path, &status));
+  switch (status) {
+  case SDIS_HEAT_PATH_SUCCESS: fprintf(stream, "0\n"); break;
+  case SDIS_HEAT_PATH_FAILURE: fprintf(stream, "1\n"); break;
+  default: FATAL("Unreachable code.\n"); break;
+  }
   /* Write the weights of the random walk vertices */
   fprintf(stream, "SCALARS Weight double 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
@@ -177,37 +214,27 @@ dump_path
     ERR(sdis_heat_path_get_vertex(path, i, &vtx));
     fprintf(stream, "%g\n", vtx.weight);
   }
-  /* Write the time of the random walk vertices */
-  fprintf(stream, "SCALARS Time double 1\n");
-  fprintf(stream, "LOOKUP_TABLE default\n");
+  /* If computation time is not INF for every vertex,
+   * write the time of the random walk vertices */
   FOR_EACH(i, 0, vcount) {
     struct sdis_heat_vertex vtx;
     ERR(sdis_heat_path_get_vertex(path, i, &vtx));
-    fprintf(stream, "%g\n", IS_INF(vtx.time) ? FLT_MAX : vtx.time);
+    if(i == 0) {
+      if(IS_INF(vtx.time)) break;
+      fprintf(stream, "SCALARS Time double 1\n");
+      fprintf(stream, "LOOKUP_TABLE default\n");
+    }
+    ASSERT(!IS_INF(vtx.time));
+    fprintf(stream, "%g\n", vtx.time);
   }
-  /* Write path type */
-  fprintf(stream, "CELL_DATA %d\n", 1);
-  fprintf(stream, "SCALARS Path_Type float 1\n");
-  fprintf(stream, "LOOKUP_TABLE path_type\n");
-  ERR(sdis_heat_path_get_status(path, &status));
-  switch (status) {
-  case SDIS_HEAT_PATH_SUCCESS: fprintf(stream, "0.0\n"); break;
-  case SDIS_HEAT_PATH_FAILURE: fprintf(stream, "1.0\n"); break;
-  default: FATAL("Unreachable code.\n"); break;
-  }
-  fprintf(stream, "LOOKUP_TABLE path_type 2\n");
-  fprintf(stream, "0.0 0.0 1.0 1.0\n"); /* 0.0 = Blue: success */
-  fprintf(stream, "1.0 0.0 0.0 1.0\n"); /* 1.0 = Red: failure */
 
 end:
+  if(name) MEM_RM(dump_ctx->stardis->allocator, name);
+  if(stream) fclose(stream);
   return res;
 error:
   goto end;
 }
-
-/*******************************************************************************
- * Public Functions
- ******************************************************************************/
 
 res_T
 print_sample
@@ -706,8 +733,6 @@ print_single_MC_result
     logger_print(stardis->logger, LOG_ERROR,
       "#failures: %zu/%zu\n", nfailures, stardis->samples);
 
-  /* Dump paths according to user settings */
-  ERR(sdis_estimator_for_each_path(estimator, dump_path, stdout));
 end:
   return res;
 error:
@@ -866,10 +891,10 @@ dump_compute_region_at_the_end_of_vtk
     }
   }
 
-  fprintf(stream, "SCALARS Compute_region int\n");
+  fprintf(stream, "SCALARS Compute_region unsigned_int 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(i, 0, tsz)
-    fprintf(stream, "%d\n", v[i] == UCHAR_MAX ? INT_MAX : v[i]);
+    fprintf(stream, "%u\n", v[i] == UCHAR_MAX ? UINT_MAX : v[i]);
 
 exit:
   if(v) MEM_RM(stardis->allocator, v);

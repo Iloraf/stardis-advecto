@@ -761,6 +761,7 @@ struct stardis {
   struct compute_surface compute_surface; /* 2D compute region when mode is
                                              [FLUX_]BOUNDARY_COMPUTE
                                              or MAP_COMPUTE */
+  struct str out_filename;
   int mode;
   size_t samples;
   unsigned nthreads;

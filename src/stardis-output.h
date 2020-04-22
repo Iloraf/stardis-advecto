@@ -32,6 +32,16 @@ struct geometry;
 struct vertex;
 struct darray_estimators;
 
+struct dump_path_context {
+  size_t rank;
+  struct stardis* stardis;
+};
+
+extern res_T
+dump_path
+  (const struct sdis_heat_path* path,
+   void* context);
+
 extern res_T
 print_sample
   (struct sdis_green_path* path,

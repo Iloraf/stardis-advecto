@@ -40,11 +40,11 @@ relative to the characteristic time of the system.
 *stardis* can compute a thermal observable, like temperature or flux, at a
 probe point and date or the mean value of an observable over a given surface
 or volume, and time period. In addition, *stardis* gives access to the
-evaluation of the propagator (aka the *Green function*).
+evaluation of the propagator (a.k.a the *Green function*).
 
 The propagator is of great value for thermicist engineers as it gives some
 crucial information to analyse heat transfers in the system. It helps engineers
-answer questions like "Where from does the heat come at this location?".
+answer questions like _"Where from does the heat come at this location?"_.
 Propagators seamlessly agregate all the provided geometrical and physical
 information on the system in an unbiased and very-fast statistical model.
 
@@ -150,8 +150,8 @@ EXCLUSIVE OPTIONS
   **pos=**_x_**,**_y_**,**_z_;;
     Position of the camera. By default it is set to
     {@STARDIS_ARGS_DEFAULT_RENDERING_POS@} or it is automatically computed to
-	ensure that the whole scene is visible, whether *tgt* is set or not,
-	respectively.
+    ensure that the whole scene is visible, whether *tgt* is set or not,
+    respectively.
 
   **spp=**_samples-count_;;
     Number of samples per pixel.
@@ -183,19 +183,19 @@ OTHER OPTIONS
   computation occurs.
 +
 Using this option in conjunction with an option that
-specifies a compute region (-s, -S, -F) has the effect to include the
+specifies a compute region (-F, -S, -s) has the effect to include the
 region in the output. This option cannot be used in conjunction with other
-options that write to  _standard output_ (-R, -g, -D, -h, -v).
+options that write to  _standard output_ (-g, -h, -R, -v).
 
-*-D* _type_::
-  Write heat paths of the given *type* to _standard output_ in VTK format.
-  Possible values are *error* (write paths ending in error), *success*
-  (write successful paths), and *all* (write all paths).
+*-D* _type,file_name_prefix_::
+  Write sampled heat paths of the given *type* to files in VTK format, one
+  file per path. Possible values for *type* are *error* (write paths ending
+  in error), *success* (write successful paths), and *all* (write all paths).
+  Actual file names are produced by appending *file_name_prefix* and the path
+  rank: prefix00000000.vtk, prefix00000001.vtk, ...
 +
-This option can only be used in conjuction with options that compute a simple
-Monte-Carlo result (-p, -P, -m, -s, -S, -F) and cannot be used in conjunction
-with some other options that write additional information to _standard output_
-(-R, -d, -g, -h, -v).
+This option can only be used in conjuction with options that compute a 
+result (-F, -m, -P, -p, -R, -S, -s).
 
 **-f** _factor_::
   Rescale the geometry by the given *factor* before sending it to the solver,
@@ -226,25 +226,21 @@ ignored.
   cores.
 
 *-V* _level_::
-  Set the verbosity level. Possible values are:
-  * *0*: (write no message to _standard error_),
-  * *1*: (write error messages only to _standard error_),
-  * *2*: (write error and warning messages to _standard error_),
-  * *3*: (write error, warning and informative messages to _standard error_).
-+
-Default verbosity *level* is @STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL@.
+  Set the verbosity level. Possible values are *0* (no message), *1* (error
+  messages only), *2* (error and warning messages), and *3* (error, warning
+  and informative messages). All the messages are written to _standard error_.
+  Default verbosity *level* is @STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL@.
 
 *-v*::
   Output version information and exit.
 
 EXAMPLES
 --------
-Preprocess the system as described in *scene.txt* when intending to compute
+Preprocess the system as described in *scene 5.txt* when intending to compute
 the mean flux on the triangles from the file *edge.stl*, and write its geometry
 in the file *scene.vtk*. Verbosity level is set to *3*:
 
-    $ stardis -M scene.txt -F edge.stl -d -V 3 > scene.vtk
-
+    $ stardis -M "scene 5.txt" -F edge.stl -d -V 3 > scene.vtk
 
 Compute the temperature at the probe point *0, 0.5, 0* at steady state. The
 system is read from the 2 files *media.txt* and *bounds.txt* and the number of
@@ -256,6 +252,11 @@ Compute the mean temperature in the medium *med05* at *t=100* s. The system is
 read from the 2 files *media.txt* and *bounds.txt*:
 
     $ stardis -M media.txt -M bounds.txt -m med05,100
+
+Supposing that the computation above encountered erroneous paths, redo it and dump
+these paths to VTK files named _error_path_NNNNNNNN.vtk_.
+
+    $ stardis -M media.txt -M bounds.txt -m med05,100 -D error,error_path_
 
 Render the system as described in *scene.txt* with default settings:
 

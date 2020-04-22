@@ -233,7 +233,7 @@ validate_properties
           *properties_conflict_status = SFCONNECT_BETWEEN_2_FLUIDS;
         else if(solid_count + fluid_count == 1)
           *properties_conflict_status = SFCONNECT_USED_AS_BOUNDARY;
-        else if (solid_count + fluid_count == 0)
+        else if(solid_count + fluid_count == 0)
           *properties_conflict_status = SFCONNECT_BETWEEN_2_UNDEFS;
         else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
         goto end;
@@ -456,6 +456,7 @@ stardis_init
   stardis->counts = COUNTS_NULL;
   init_camera(&stardis->camera);
   str_init(stardis->allocator, &stardis->solve_name);
+  str_init(stardis->allocator, &stardis->out_filename);
   darray_size_t_init(stardis->allocator, &stardis->compute_surface.primitives);
   darray_sides_init(stardis->allocator, &stardis->compute_surface.sides);
   darray_uint_init(stardis->allocator, &stardis->compute_surface.err_triangles);
@@ -475,6 +476,7 @@ stardis_init
   /* If a dump is expected, we won't process any computation */
   is_for_compute =
     (stardis->mode & COMPUTE_MODES) && !(stardis->mode & DUMP_VTK);
+
   ERR(init_geometry(stardis->logger, stardis->allocator, stardis->verbose,
     &stardis->geometry));
 
@@ -528,6 +530,8 @@ stardis_init
     for(i = 0; i < tcount; ++i) {
       ERR(create_intface(stardis, i, &htable_interfaces));
     }
+    if(args->out_filename)
+      ERR(str_set(&stardis->out_filename, args->out_filename));
   }
 
   /* If computation is on a compute surface, read it */
@@ -608,6 +612,7 @@ stardis_release(struct stardis* stardis)
   if(stardis->dev) SDIS(device_ref_put(stardis->dev));
   if(stardis->sdis_scn) SDIS(scene_ref_put(stardis->sdis_scn));
   str_release(&stardis->solve_name);
+  str_release(&stardis->out_filename);
   darray_descriptions_release(&stardis->descriptions);
   release_geometry(&stardis->geometry);
   darray_size_t_release(&stardis->compute_surface.primitives);

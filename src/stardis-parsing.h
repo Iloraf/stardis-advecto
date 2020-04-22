@@ -41,19 +41,20 @@ struct stardis;
 #endif
 
 enum stardis_mode {
+  /* Ordered so that print_multiple_modes() prints in alphabetical order */
   UNDEF_MODE = 0,
-  PROBE_COMPUTE = BIT(0),
-  PROBE_COMPUTE_ON_INTERFACE = BIT(1),
-  MEDIUM_COMPUTE = BIT(2),
-  BOUNDARY_COMPUTE = BIT(3),
-  IR_COMPUTE = BIT(4),
-  MAP_COMPUTE = BIT(5),
-  DUMP_VTK = BIT(6),
-  GREEN_MODE = BIT(7),
-  FLUX_BOUNDARY_COMPUTE = BIT(8),
-  DUMP_PATHS = BIT(9),
-  DUMP_HELP = BIT(10),
-  DUMP_VERSION = BIT(11),
+  DUMP_PATHS = BIT(0), /* -D */
+  DUMP_VTK = BIT(1), /* -d */
+  FLUX_BOUNDARY_COMPUTE = BIT(2), /* -F */
+  GREEN_MODE = BIT(3), /* -g */
+  DUMP_HELP = BIT(4), /* -h */
+  MEDIUM_COMPUTE = BIT(5), /* -m */
+  PROBE_COMPUTE_ON_INTERFACE = BIT(6), /* -P */
+  PROBE_COMPUTE = BIT(7), /* -p */
+  IR_COMPUTE = BIT(8), /* -R */
+  MAP_COMPUTE = BIT(9), /* -S */
+  BOUNDARY_COMPUTE = BIT(10), /* -s */
+  DUMP_VERSION = BIT(11), /* -v */
 
   GREEN_COMPATIBLE_MODES
     = PROBE_COMPUTE | PROBE_COMPUTE_ON_INTERFACE | MEDIUM_COMPUTE | BOUNDARY_COMPUTE,
@@ -63,8 +64,6 @@ enum stardis_mode {
 
   REGION_COMPUTE_MODES = SURFACE_COMPUTE_MODES | MEDIUM_COMPUTE,
 
-  SINGLE_RESULT_MODES = GREEN_COMPATIBLE_MODES | SURFACE_COMPUTE_MODES,
-
   COMPUTE_MODES = GREEN_COMPATIBLE_MODES | IR_COMPUTE | SURFACE_COMPUTE_MODES,
 
   EXCLUSIVE_MODES = COMPUTE_MODES,
@@ -72,7 +71,7 @@ enum stardis_mode {
   SHORT_EXIT_MODES = DUMP_HELP | DUMP_VERSION,
 
   USE_STDOUT_MODES
-  = DUMP_VTK | DUMP_PATHS | DUMP_HELP | DUMP_VERSION | IR_COMPUTE | GREEN_MODE
+  = DUMP_VTK | DUMP_HELP | DUMP_VERSION | IR_COMPUTE | GREEN_MODE
 };
 
 STATIC_ASSERT(GREEN_COMPATIBLE_MODES == (COMPUTE_MODES & GREEN_COMPATIBLE_MODES), 
@@ -91,6 +90,7 @@ struct args {
   struct darray_str model_files;
   char* medium_name;
   char* solve_filename;
+  char* out_filename;
   size_t samples;
   unsigned nthreads;
   double probe[4];

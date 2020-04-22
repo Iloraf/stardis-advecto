@@ -163,6 +163,7 @@ compute_probe(struct stardis* stardis)
   size_t iprim = SIZE_MAX;
   struct sdis_green_function* green = NULL;
   struct sdis_estimator* estimator = NULL;
+  struct dump_path_context dump_ctx;
   
   ASSERT(stardis && (stardis->mode & PROBE_COMPUTE));
 
@@ -193,6 +194,12 @@ compute_probe(struct stardis* stardis)
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
   }
+
+  /* Dump paths recorded according to user settings */
+  dump_ctx.stardis = stardis;
+  dump_ctx.rank = 0;
+  ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+
 end:
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
@@ -209,6 +216,7 @@ compute_probe_on_interface(struct stardis* stardis)
   size_t iprim = SIZE_MAX;
   struct sdis_estimator* estimator = NULL;
   struct sdis_green_function* green = NULL;
+  struct dump_path_context dump_ctx;
 
   ASSERT(stardis && (stardis->mode & PROBE_COMPUTE_ON_INTERFACE));
   d3_set(pos, stardis->probe);
@@ -242,6 +250,12 @@ compute_probe_on_interface(struct stardis* stardis)
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
   }
+
+  /* Dump paths recorded according to user settings */
+  dump_ctx.stardis = stardis;
+  dump_ctx.rank = 0;
+  ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+
 end:
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
@@ -336,6 +350,9 @@ compute_camera(struct stardis* stardis)
   size_t width, height;
   struct sdis_estimator_buffer* buf = NULL;
   struct sdis_camera* cam = NULL;
+  struct dump_path_context dump_ctx;
+  size_t definition[2];
+  size_t ix, iy;
 
   ASSERT(stardis
     && !(stardis->mode & GREEN_MODE) && (stardis->mode & IR_COMPUTE));
@@ -370,11 +387,23 @@ compute_camera(struct stardis* stardis)
     width,
     height,
     (size_t)stardis->camera.spp,
-    0,
+    stardis->dump_paths,
     &buf));
 
   /* Write the image */
   ERR(dump_image(buf, stdout));
+
+  /* Dump paths recorded according to user settings */
+  dump_ctx.stardis = stardis;
+  dump_ctx.rank = 0;
+  ERR(sdis_estimator_buffer_get_definition(buf, definition));
+  FOR_EACH(iy, 0, definition[1]) {
+    FOR_EACH(ix, 0, definition[0]) {
+      const struct sdis_estimator* estimator;
+      ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
+      ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+    }
+  }
 
 end:
   if(cam) SDIS(camera_ref_put(cam));
@@ -392,6 +421,7 @@ compute_medium(struct stardis* stardis)
   struct sdis_medium* medium = NULL;
   struct sdis_estimator* estimator = NULL;
   struct sdis_green_function* green = NULL;
+  struct dump_path_context dump_ctx;
 
   ASSERT(stardis && (stardis->mode & MEDIUM_COMPUTE));
 
@@ -428,6 +458,12 @@ compute_medium(struct stardis* stardis)
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
   }
+
+  /* Dump paths recorded according to user settings */
+  dump_ctx.stardis = stardis;
+  dump_ctx.rank = 0;
+  ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+
 end:
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
@@ -490,7 +526,8 @@ compute_boundary(struct stardis* stardis)
   res_T res = RES_OK;
   double time[2], pos[3];
   struct sdis_green_function* green = NULL;
-  struct sdis_estimator* estimator = NULL;  
+  struct sdis_estimator* estimator = NULL;
+  struct dump_path_context dump_ctx;
 
   ASSERT(stardis && (stardis->mode & BOUNDARY_COMPUTE));
 
@@ -522,6 +559,12 @@ compute_boundary(struct stardis* stardis)
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
   }
+
+  /* Dump paths recorded according to user settings */
+  dump_ctx.stardis = stardis;
+  dump_ctx.rank = 0;
+  ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+
 end:
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
@@ -537,6 +580,7 @@ compute_flux_boundary(struct stardis* stardis)
   double time[2], pos[3];
   struct sdis_green_function* green = NULL;
   struct sdis_estimator* estimator = NULL;
+  struct dump_path_context dump_ctx;
 
   ASSERT(stardis && (stardis->mode & FLUX_BOUNDARY_COMPUTE));
 
@@ -552,6 +596,12 @@ compute_flux_boundary(struct stardis* stardis)
     stardis->ref_temp,
     &estimator));
   ERR(print_single_MC_result(estimator, stardis, stdout));
+
+  /* Dump paths recorded according to user settings */
+  dump_ctx.stardis = stardis;
+  dump_ctx.rank = 0;
+  ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+
 end:
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));

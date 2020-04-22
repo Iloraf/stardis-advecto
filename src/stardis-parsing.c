@@ -509,24 +509,26 @@ parse_args
       args->mode |= DUMP_VTK;
       break;
 
-    case 'D':
-      if(args->mode & USE_STDOUT_MODES) {
-        res = RES_BAD_ARG;
-        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_PATHS);
-        logger_print(args->logger, LOG_ERROR,
-          "Option -%c cannot be used in conjunction with other dump options (%s).\n",
-          (char)opt, buf);
-        goto error;
+    case 'D': {
+      char* ptr = strrchr(optarg, ',');
+      if(!ptr || ptr != strchr(optarg, ','))
+        res = RES_BAD_ARG; /* Single ',' expected */
+      else {
+        args->out_filename = ptr + 1;
+        *ptr = '\0';
       }
-      if(0 == strcmp(optarg, "all")) {
-        args->dump_paths = DUMP_ALL;
+      if(res == RES_OK) {
+        if(0 == strcmp(optarg, "all")) {
+          args->dump_paths = DUMP_ALL;
+        }
+        else if(0 == strcmp(optarg, "error")) {
+          args->dump_paths = DUMP_ERROR;
+        }
+        else if(0 == strcmp(optarg, "success")) {
+          args->dump_paths = DUMP_SUCCESS;
+        }
       }
-      else if(0 == strcmp(optarg, "error")) {
-        args->dump_paths = DUMP_ERROR;
-      }
-      else if(0 == strcmp(optarg, "success")) {
-        args->dump_paths = DUMP_SUCCESS;
-      } else {
+      if(res != RES_OK) {
         res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
           "Invalid argument for option -%c: %s\n",
@@ -535,6 +537,7 @@ parse_args
       }
       args->mode |= DUMP_PATHS;
       break;
+    }
 
     case 'f':
       res = cstr_to_double(optarg, &args->scale_factor);
@@ -803,14 +806,11 @@ parse_args
     goto error;
   }
 
-  if(args->mode & GREEN_MODE
-    && (args->mode != (args->mode & (GREEN_MODE | GREEN_COMPATIBLE_MODES))))
-  {
+  if(args->mode & GREEN_MODE && !(args->mode & GREEN_COMPATIBLE_MODES)) {
     print_multiple_modes(buf, sizeof(buf), GREEN_COMPATIBLE_MODES, 0);
     logger_print(args->logger, LOG_ERROR,
       "Option -g can only be used in conjunction with: %s\n",
       buf);
-    logger_print(args->logger, LOG_ERROR, "\n");
     res = RES_BAD_ARG;
     goto error;
   }
@@ -824,11 +824,12 @@ parse_args
   }
 
   if(args->mode & DUMP_PATHS) {
-    if(!(args->mode & SINGLE_RESULT_MODES)) {
+    if(!(args->mode & COMPUTE_MODES)) {
       res = RES_BAD_ARG;
-      print_multiple_modes(buf, sizeof(buf), SINGLE_RESULT_MODES, 0);
+      print_multiple_modes(buf, sizeof(buf), COMPUTE_MODES, 0);
       logger_print(args->logger, LOG_ERROR,
-        "Option -%c can only be used in conjunction with option producing a single result (%s).\n",
+        "Option -%c can only be used in conjunction with an option"
+        " that samples heat paths (%s).\n",
         mode_option(DUMP_PATHS), buf);
       goto error;
     }

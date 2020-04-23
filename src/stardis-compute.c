@@ -193,12 +193,11 @@ compute_probe(struct stardis* stardis)
       stardis->dump_paths,
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
+    /* Dump paths recorded according to user settings */
+    dump_ctx.stardis = stardis;
+    dump_ctx.rank = 0;
+    ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
-
-  /* Dump paths recorded according to user settings */
-  dump_ctx.stardis = stardis;
-  dump_ctx.rank = 0;
-  ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
 
 end:
   if(estimator) SDIS(estimator_ref_put(estimator));
@@ -249,12 +248,11 @@ compute_probe_on_interface(struct stardis* stardis)
       stardis->dump_paths,
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
+    /* Dump paths recorded according to user settings */
+    dump_ctx.stardis = stardis;
+    dump_ctx.rank = 0;
+    ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
-
-  /* Dump paths recorded according to user settings */
-  dump_ctx.stardis = stardis;
-  dump_ctx.rank = 0;
-  ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
 
 end:
   if(estimator) SDIS(estimator_ref_put(estimator));
@@ -457,12 +455,11 @@ compute_medium(struct stardis* stardis)
       stardis->dump_paths,
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
+    /* Dump paths recorded according to user settings */
+    dump_ctx.stardis = stardis;
+    dump_ctx.rank = 0;
+    ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
-
-  /* Dump paths recorded according to user settings */
-  dump_ctx.stardis = stardis;
-  dump_ctx.rank = 0;
-  ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
 
 end:
   if(estimator) SDIS(estimator_ref_put(estimator));
@@ -558,12 +555,11 @@ compute_boundary(struct stardis* stardis)
       stardis->dump_paths,
       &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
+    /* Dump paths recorded according to user settings */
+    dump_ctx.stardis = stardis;
+    dump_ctx.rank = 0;
+    ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
-
-  /* Dump paths recorded according to user settings */
-  dump_ctx.stardis = stardis;
-  dump_ctx.rank = 0;
-  ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
 
 end:
   if(estimator) SDIS(estimator_ref_put(estimator));

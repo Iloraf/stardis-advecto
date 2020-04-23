@@ -35,7 +35,8 @@ coupled refers to conductive, convective and radiative transfers, and linear
 means that each phenomena is represented using a model that is linear
 with temperature. *stardis* can deal with complex geometries as well as
 high-frequency external solicitations over a very long period of time,
-relative to the characteristic time of the system.
+relative to the characteristic time of the system. The provided system
+description should comply with the *stardis-input*(5) format.
 
 *stardis* can compute a thermal observable, like temperature or flux, at a
 probe point and date or the mean value of an observable over a given surface
@@ -48,16 +49,9 @@ answer questions like _"Where from does the heat come at this location?"_.
 Propagators seamlessly agregate all the provided geometrical and physical
 information on the system in an unbiased and very-fast statistical model.
 
-In addition of the aforementioned computations, *stardis* provides three
-other functionalities. The *-d* option can be used to convert the
-*stardis-input*(5) geometry into a VTK file. The *-D* option saves the sampled
-heat paths used to build the estimate, allowing to visualise them externally
-which may be of a great help to identify issues. Finally, the *-R* option
-can be used to render an infrared image of the submitted system.
-
-The provided system description should comply with the *stardis-input*(5)
-format and can be split over any number of files, each being submited through
-the *-M* option.
+*stardis*(1) also provides two additional functionalities: converting the
+*stardis-input*(5) geometry into a VTK file and rendering an infrared image
+of the submitted system.
 
 Stardis' algorithms are based on state-of-the-art Monte-Carlo method applied
 to radiative transfer physics (Delatorre [1]) combined with conduction's
@@ -192,10 +186,11 @@ options that write to  _standard output_ (-g, -h, -R, -v).
   file per path. Possible values for *type* are *error* (write paths ending
   in error), *success* (write successful paths), and *all* (write all paths).
   Actual file names are produced by appending *file_name_prefix* and the path
-  rank: prefix00000000.vtk, prefix00000001.vtk, ...
+  rank starting at index 00000000: prefix00000000.vtk, prefix00000001.vtk, ...
 +
 This option can only be used in conjuction with options that compute a 
-result (-F, -m, -P, -p, -R, -S, -s).
+result (-F, -m, -P, -p, -R, -S, -s) and cannot be used in conjunction with the
+-g option.
 
 **-f** _factor_::
   Rescale the geometry by the given *factor* before sending it to the solver,
@@ -206,9 +201,9 @@ result (-F, -m, -P, -p, -R, -S, -s).
   Write the green function at steady state to _standard output_ after the
   specified computation.
 +
-This option can only be used in conjonction with one these options: -p, -P,
--m, -s. Any compute time provided through one of these options is silently
-ignored.
+This option can only be used in conjunction with one these options: -p, -P,
+-m, -s and cannot be used in conjunction with the -D option. Any compute time
+provided through one of these options is silently ignored.
 
 *-h*::
   Output short help and exit.
@@ -253,19 +248,16 @@ read from the 2 files *media.txt* and *bounds.txt*:
 
     $ stardis -M media.txt -M bounds.txt -m med05,100
 
-Supposing that the computation above encountered erroneous paths, redo it and dump
-these paths to VTK files named _error_path_NNNNNNNN.vtk_.
-
-    $ stardis -M media.txt -M bounds.txt -m med05,100 -D error,error_path_
-
 Render the system as described in *scene.txt* with default settings:
 
     $ stardis -M scene.txt -R :
 
-Render the system as described in *scene.txt* at *t=1000*, *spp=2*,
-*img=800x600* and all other settings set to their default values:
+Render the system as described in *scene.txt* at *t=10000*, *spp=2*,
+*img=800x600* and all other settings set to their default values. It the
+computation encounters erroneous heat paths, they will be dumped to VTK files
+named error_path_00000000.vtk, error_path_00000001.vtk, ...
 
-    $ stardis -M scene.txt -R t=1000:spp=2:img=800x600
+    $ stardis -M scene.txt -R t=10000:spp=2:img=800x600 -D error,error_path_
 
 
 COPYRIGHT

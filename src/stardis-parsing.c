@@ -836,7 +836,7 @@ parse_args
     if(args->mode & GREEN_MODE) {
       res = RES_BAD_ARG;
       logger_print(args->logger, LOG_ERROR,
-        "Option -%c can only be used in conjunction with -%c.\n",
+        "Option -%c cannot be used in conjunction with -%c.\n",
         mode_option(DUMP_PATHS), mode_option(GREEN_MODE));
       goto error;
     }

@@ -73,12 +73,35 @@ _______
 <medium-frontier>     ::= <solid-frontier>
                         | <fluid-frontier>
 
+<medium-boundary>     ::= <h-bound-for-solid>
+                        | <h-bound-for-fluid>
+                        | <t-bound-for-solid>
+                        | <t-bound-for-fluid>
+                        | <f-bound-for-solid>
+
+<media-connection>    ::= <solid-fluid-connect>
+
 <solid-frontier>      ::= "SOLID" <medium-name> <lambda> <rho> <cp> <delta> \
                           <initial-temp> <volumic-power> <triangle-sides>
 
-<fluid-frontier>      ::= "FLUID" <medium-name> <ka> <ks> <rho> <cp> \
-                          <initial-temp> <triangle-sides>
+<fluid-frontier>      ::= "FLUID" <medium-name> <rho> <cp> <initial-temp> <triangle-sides>
 
+<h-bound-for-solid>   ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <emissivity> \
+                          <specular-fraction> <hc> <external-temp> <triangles>
+
+<h-bound-for-fluid>   ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <emissivity> \
+                          <specular-fraction> <hc> <external-temperature> <triangles>
+
+<t-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> <triangles>
+
+<t-bound-for-fluid>   ::= "T_BOUNDARY_FOR_FLUID" <bound-name> <temperature> \
+                          <emissivity> <specular-fraction> <hc> <triangles>
+
+<f-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <flux> <triangles>
+
+<solid-fluid-connect> ::= "SOLID_FLUID_CONNECTION" <bound-name> <emissivity> \
+                          <specular-fraction> <hc> <triangles>
+						  
 -------------------------------------
 
 <medium-name>         ::= STRING # no space allowed
@@ -95,40 +118,7 @@ _______
 
 <volumic-power>       ::= REAL # in (-INF , INF)
 
-<ka>                  ::= REAL # in [0, INF)
-
-<ks>                  ::= REAL # in [0, INF)
-
 <triangle-sides>      ::= <side-specifier> <file-name> [ <triangle-sides> ]
-
--------------------------------------
-
-<side-specifier>      ::= "FRONT" | "BACK" | "BOTH"
-
-<file-name>           ::= STRING # no space allowed
-
--------------------------------------
-
-<medium-boundary>     ::= <h-bound-for-solid>
-                        | <h-bound-for-fluid>
-                        | <t-bound-for-solid>
-                        | <t-bound-for-fluid>
-                        | <f-bound-for-solid>
-
-<h-bound-for-solid>   ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <emissivity> \
-                          <specular-fraction> <hc> <external-temp> <triangles>
-
-<h-bound-for-fluid>   ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <emissivity> \
-                          <specular-fraction> <hc> <external-temperature> <triangles>
-
-<t-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> <triangles>
-
-<t-bound-for-fluid>   ::= "T_BOUNDARY_FOR_FLUID" <bound-name> <temperature> \
-                          <emissivity> <specular-fraction> <hc> <triangles>
-
-<f-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <flux> <triangles>
-
--------------------------------------
 
 <bound-name>          ::= STRING # no space allowed
 
@@ -146,10 +136,9 @@ _______
 
 -------------------------------------
 
-<media-connection>    ::= <solid-fluid-connect>
+<side-specifier>      ::= "FRONT" | "BACK" | "BOTH"
 
-<solid-fluid-connect> ::= "SOLID_FLUID_CONNECTION" <bound-name> <emissivity> \
-                          <specular-fraction> <hc> <triangles>
+<file-name>           ::= STRING # no space allowed
 
 ______________
 

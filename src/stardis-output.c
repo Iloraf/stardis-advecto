@@ -257,7 +257,7 @@ print_sample
   /* For each path, prints:
    * # end #power_terms #flux_terms power_term_1  ... power_term_n flux_term_1 ... flux_term_n
    * with:
-   * - end = end_type end_id; end_type = T | H | X | R | F | S
+   * - end = end_type end_id; end_type = T | H | X | A | F | S
    * - power_term_i = power_type_i power_id_i factor_i
    * - flux_term_i = flux_id_i factor_i
    */
@@ -291,10 +291,10 @@ print_sample
     type = sdis_medium_get_type(pt.data.mdmvert.medium);
     data = sdis_medium_get_data(pt.data.mdmvert.medium);
     if(pt.data.mdmvert.vertex.P[0] == INF) {
-      /* Radiative output */
+      /* Radiative output (ambient temperature)*/
       size_t sz = darray_descriptions_size_get(w_ctx->desc);
       ASSERT(sz <= UINT_MAX);
-      fprintf(w_ctx->stream, "R\t%u", (unsigned)sz);
+      fprintf(w_ctx->stream, "A\t%u", (unsigned)sz);
     }
     else if(type == SDIS_FLUID) {
       struct fluid* d__ = sdis_data_get(data);
@@ -483,6 +483,7 @@ dump_green
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct mat_fluid* fl;
+      if (desc->type != DESC_MAT_FLUID) continue;
       fl = &desc->d.fluid;
       fprintf(stream, "%u\t%s\t%g\t%g\n",
         i, str_cget(&fl->name), fl->rho, fl->cp);
@@ -505,7 +506,7 @@ dump_green
   }
   if(stardis->counts.hbound_count) {
     fprintf(stream, "# H Boundaries\n");
-    fprintf(stream, "# ID Name emissivity specular_fraction hc hc_max T_env\n");
+    fprintf(stream, "# ID Name emissivity specular_fraction hc T_env\n");
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct h_boundary* bd;
@@ -532,14 +533,14 @@ dump_green
 
   /* Radiative Temperatures */
   fprintf(stream, "# Radiative Temperatures\n");
-  fprintf(stream, "# ID Rad_Temp Lin_Temp\n");
+  fprintf(stream, "# ID Amb_Temp Lin_Temp\n");
   fprintf(stream, "%u\t%g\t%g\n",
     szd, stardis->ambient_temp, stardis->ref_temp);
 
   fprintf(stream, "# Samples\n");
   fprintf(stream,
     "# end #power_terms #flux_terms power_term_1 ... power_term_n flux_term_1 ... flux_term_n\n");
-  fprintf(stream, "# end = end_type end_id; end_type = T | H | X | R | F | S\n");
+  fprintf(stream, "# end = end_type end_id; end_type = T | H | X | A | F | S\n");
   fprintf(stream, "# power_term_i = power_type_i power_id_i factor_i\n");
   fprintf(stream, "# flux_term_i = flux_id_i factor_i\n");
 

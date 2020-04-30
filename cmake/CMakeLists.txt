@@ -14,7 +14,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 cmake_minimum_required(VERSION 3.0)
-project(stardis-app C)
+project(stardis C)
 
 set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 
@@ -137,32 +137,32 @@ rcmake_prepend_path(SDIS_FILES_SRC ${SDIS_SOURCE_DIR})
 rcmake_prepend_path(SDIS_FILES_INC ${SDIS_SOURCE_DIR})
 rcmake_prepend_path(SDIS_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
-add_executable(sdis-app
+add_executable(stardis
   ${SDIS_FILES_SRC}
   ${SDIS_FILES_INC})
 
 if(CMAKE_COMPILER_IS_GNUCC)
   set(MATH_LIB m)
-  set_target_properties(sdis-app PROPERTIES
+  set_target_properties(stardis PROPERTIES
     COMPILE_FLAGS "-std=c99"
     VERSION ${SDIS_VERSION})
 elseif(MSVC)
   set(GETOPT_LIB MuslGetopt)
-  set_target_properties(sdis-app PROPERTIES
+  set_target_properties(stardis PROPERTIES
     VERSION ${SDIS_VERSION})
 endif()
 
-target_link_libraries(sdis-app
+target_link_libraries(stardis
   Stardis StarGeom3D StarEnc3D StarSTL RSys ${GETOPT_LIB}  ${MATH_LIB})
 
 ###############################################################################
 # Define output & install directories
 ###############################################################################
-install(TARGETS sdis-app
+install(TARGETS stardis
   ARCHIVE DESTINATION bin
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
-install(FILES ${SDIS_FILES_DOC} DESTINATION share/doc/stardis-app)
+install(FILES ${SDIS_FILES_DOC} DESTINATION share/doc/stardis)
 
-rcmake_copy_runtime_libraries(sdis-app)
+rcmake_copy_runtime_libraries(stardis)

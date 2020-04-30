@@ -130,8 +130,9 @@ EXCLUSIVE OPTIONS
 *-R* [__sub-option__:...]::
   Render an infrared image of the system through a pinhole camera and write it
   to _standard output_ in VTK format. One can use all-default sub-options by
-  simply providing the colon character (*:*) alone as an argument. Available
-  sub-options are:
+  simply providing the colon character (*:*) alone as an argument. Please note
+  that the camera position must be outside the geometry or in a fluid.
+  Available sub-options are:
 
   **fov=**_angle_;;
     Horizontal field of view of the camera in [30, 120] degrees. By default
@@ -181,16 +182,21 @@ specifies a compute region (-F, -S, -s) has the effect to include the
 region in the output. This option cannot be used in conjunction with other
 options that write to  _standard output_ (-g, -h, -R, -v).
 
-*-D* _type,file_name_prefix_::
+*-D* _type,files_name_prefix_::
   Write sampled heat paths of the given *type* to files in VTK format, one
   file per path. Possible values for *type* are *error* (write paths ending
   in error), *success* (write successful paths), and *all* (write all paths).
-  Actual file names are produced by appending *file_name_prefix* and the path
+  Actual file names are produced by appending *files_name_prefix* and the path
   rank starting at index 00000000: prefix00000000.vtk, prefix00000001.vtk, ...
 +
-This option can only be used in conjuction with options that compute a 
-result (-F, -m, -P, -p, -R, -S, -s) and cannot be used in conjunction with the
--g option.
+This option can only be used in conjuction with options that compute a
+result (-F, -m, -P, -p, -R, -S, -s) and cannot be used in conjunction with
+options -g or -G.
+
+*-e*::
+  Use extended format to output Monte-Carlo results. Can only be used in
+  conjunction with options that compute a single Monte-Carlo (-F, -m, -P, -p,
+  or -s without options -g or -G).
 
 **-f** _factor_::
   Rescale the geometry by the given *factor* before sending it to the solver,
@@ -198,12 +204,22 @@ result (-F, -m, -P, -p, -R, -S, -s) and cannot be used in conjunction with the
   is @STARDIS_ARGS_DEFAULT_SCALE_FACTOR@.
 
 *-g*::
-  Write the green function at steady state to _standard output_ after the
-  specified computation.
+  Compute the Green function at steady state and write in ASCII to _standard
+  output_.
 +
 This option can only be used in conjunction with one these options: -p, -P,
--m, -s and cannot be used in conjunction with the -D option. Any compute time
+-m, -s and cannot be used in conjunction with option -D. Any compute time
 provided through one of these options is silently ignored.
+
+*-G* _file_name_::
+  Compute the Green function at steady state and write it to an binary file.
++
+This option can only be used in conjunction with one these options: -p, -P,
+-m, -s and cannot be used in conjunction with option -D. Any compute time
+provided through one of these options is silently ignored.
++
+The resulting file can be further used through the *sgreen*(1) command to apply
+different temperature, flux or volumic power values.
 
 *-h*::
   Output short help and exit.
@@ -220,14 +236,14 @@ provided through one of these options is silently ignored.
   Hint on the number of threads to use. By default use as many threads as CPU
   cores.
 
+*-v*::
+  Output version information and exit.
+
 *-V* _level_::
   Set the verbosity level. Possible values are *0* (no message), *1* (error
   messages only), *2* (error and warning messages), and *3* (error, warning
   and informative messages). All the messages are written to _standard error_.
   Default verbosity *level* is @STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL@.
-
-*-v*::
-  Output version information and exit.
 
 EXAMPLES
 --------
@@ -244,9 +260,10 @@ samples is set to *1000000*:
     $ stardis -M media.txt -M bounds.txt -p 0,0.5,0 -n 1000000
 
 Compute the mean temperature in the medium *med05* at *t=100* s. The system is
-read from the 2 files *media.txt* and *bounds.txt*:
+read from the 2 files *media.txt* and *bounds.txt* and the result is output
+with extended format:
 
-    $ stardis -M media.txt -M bounds.txt -m med05,100
+    $ stardis -M media.txt -M bounds.txt -m med05,100 -e
 
 Render the system as described in *scene.txt* with default settings:
 
@@ -270,4 +287,5 @@ permitted by law.
 SEE ALSO
 --------
 *stardis-input*(5),
-*stardis-output*(5)
+*stardis-output*(5),
+*sgreen*(1)

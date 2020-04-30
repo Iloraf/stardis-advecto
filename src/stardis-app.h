@@ -56,6 +56,11 @@ enum description_type {
   DESC_OUTSIDE
 };
 
+#define DESC_IS_H(D) \
+  ((D) == DESC_BOUND_H_FOR_SOLID || (D) == DESC_BOUND_H_FOR_FLUID)
+#define DESC_IS_T(D) \
+  ((D) == DESC_BOUND_T_FOR_SOLID || (D) == DESC_BOUND_T_FOR_FLUID)
+
 #define DARRAY_NAME interface_ptrs
 #define DARRAY_DATA struct sdis_interface*
 #include <rsys/dynamic_array.h>
@@ -298,8 +303,7 @@ print_h_boundary
    const enum description_type type)
 {
   res_T res = RES_OK;
-  ASSERT(str && b
-    && (type == DESC_BOUND_H_FOR_SOLID || type == DESC_BOUND_H_FOR_FLUID));
+  ASSERT(str && b && DESC_IS_H(type));
   ERR(str_printf(str,
     "H boundary for %s '%s': emissivity=%g specular_fraction=%g hc=%g T=%g "
     "(using medium %u as external medium)",
@@ -357,8 +361,7 @@ print_t_boundary
    const enum description_type type)
 {
   res_T res = RES_OK;
-  ASSERT(str && b
-    && (type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID));
+  ASSERT(str && b && DESC_IS_T(type));
   ERR(str_printf(str, "T boundary for %s' %s': T=%g ",
     (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
     str_cget(&b->name), b->imposed_temperature));
@@ -574,9 +577,9 @@ error:
   goto end;
 }
 
-static INLINE struct str*
+static INLINE const struct str*
 get_description_name
-  (struct description* desc)
+  (const struct description* desc)
 {
   ASSERT(desc);
   switch (desc->type) {
@@ -721,7 +724,7 @@ log_prt(const char* msg, void* ctx)
 }
 
 struct counts {
-  size_t smed_count, fmed_count, tbound_count, hbound_count,
+  unsigned smed_count, fmed_count, tbound_count, hbound_count,
     fbound_count, sfconnect_count;
 };
 #define COUNTS_NULL__ {\
@@ -761,7 +764,8 @@ struct stardis {
   struct compute_surface compute_surface; /* 2D compute region when mode is
                                              [FLUX_]BOUNDARY_COMPUTE
                                              or MAP_COMPUTE */
-  struct str out_filename;
+  struct str paths_filename;
+  struct str bin_green_filename;
   int mode;
   size_t samples;
   unsigned nthreads;

@@ -188,7 +188,7 @@ read_sides_and_files
       add_geom_ctx.properties[SG3D_BACK] = SG3D_UNSPECIFIED_PROPERTY;
       add_geom_ctx.properties[SG3D_INTFACE] = id;
     } else {
-      tk = strtok_r(NULL, " ", tok_ctx);
+      tk = strtok_r(NULL, " \t", tok_ctx);
       if(!tk) {
         if(file_count == 0) {
           /* At least 1 side */
@@ -220,7 +220,7 @@ read_sides_and_files
         goto error;
       }
     }
-    tk = strtok_r(NULL, " ", tok_ctx);
+    tk = strtok_r(NULL, " \t", tok_ctx);
     if(!tk) {
       if(!side_is_intface /* Has read a side */
         || !file_count) /* Need at least 1 file */
@@ -314,26 +314,30 @@ release_args(struct args* args)
 {
   ASSERT(args);
   darray_str_release(&args->model_files);
+  free(args);
 }
 
 char
 mode_option
-  (const enum stardis_mode m)
+  (const int m)
 {
   int found = 0;
   char res = '?';
-  if(m & PROBE_COMPUTE) { found++; res = 'p'; }
-  if(m & PROBE_COMPUTE_ON_INTERFACE) { found++; res = 'P'; }
-  if(m & MEDIUM_COMPUTE) { found++; res = 'm'; }
-  if(m & BOUNDARY_COMPUTE) { found++; res = 's'; }
-  if(m & FLUX_BOUNDARY_COMPUTE) { found++; res = 'F'; }
-  if(m & IR_COMPUTE) { found++; res = 'R'; }
-  if(m & MAP_COMPUTE) { found++; res = 'S'; }
-  if(m & DUMP_VTK) { found++; res = 'd'; }
-  if(m & DUMP_PATHS) { found++; res = 'D'; }
-  if(m & DUMP_HELP) { found++; res = 'h'; }
-  if(m & DUMP_VERSION) { found++; res = 'v'; }
-  if(m & GREEN_MODE) { found++; res = 'g'; }
+  if(m & MODE_DUMP_VTK) { found++; res = 'd'; }
+  if(m & MODE_DUMP_PATHS) { found++; res = 'D'; }
+  if(m & MODE_EXTENDED_RESULTS) { found++; res = 'e'; }
+  if(m & MODE_FLUX_BOUNDARY_COMPUTE) { found++; res = 'F'; }
+  if(m & MODE_GREEN) { found++; res = 'g'; }
+  if(m & MODE_BIN_GREEN) { found++; res = 'G'; }
+  if(m & MODE_DUMP_HELP) { found++; res = 'h'; }
+  if(m & MODE_MEDIUM_COMPUTE) { found++; res = 'm'; }
+  if(m & MODE_PROBE_COMPUTE) { found++; res = 'p'; }
+  if(m & MODE_PROBE_COMPUTE_ON_INTERFACE) { found++; res = 'P'; }
+  if(m & MODE_IR_COMPUTE) { found++; res = 'R'; }
+  if(m & MODE_BOUNDARY_COMPUTE) { found++; res = 's'; }
+  if(m & MODE_MAP_COMPUTE) { found++; res = 'S'; }
+  if(m & MODE_VERBOSITY) { found++; res = 'V'; }
+  if(m & MODE_DUMP_VERSION) { found++; res = 'v'; }
   ASSERT(found == 1);
   return res;
 }
@@ -424,14 +428,20 @@ short_help
   fprintf(stream, "\n  -d\n");
   fprintf(stream, "     Dump the geometry to stdout in VTK format along with various properties.\n");
 
-  fprintf(stream, "\n  -D TYPE\n");
-  fprintf(stream, "     Dump thermal paths of the given TYPE to stdout in VTK format.\n");
+  fprintf(stream, "\n  -D TYPE,FILE_NAMES_PREFIX\n");
+  fprintf(stream, "     Write thermal paths of the given TYPE in VTK format.\n");
+
+  fprintf(stream, "\n  -e\n");
+  fprintf(stream, "     Use extended format to output Monte-Carlo results.\n");
 
   fprintf(stream, "\n  -f SCALE_FACTOR\n");
   fprintf(stream, "     Rescale the geometry before sending it to the solver.\n");
 
   fprintf(stream, "\n  -g\n");
-  fprintf(stream, "     Change the required computation to produce the green function.\n");
+  fprintf(stream, "     Change the computation to produce the green function.\n");
+
+  fprintf(stream, "\n  -G BIN_FILE_NAME\n");
+  fprintf(stream, "     Change the computation to produce the green function.\n");
 
   fprintf(stream, "\n  -h\n");
   fprintf(stream, "     Print this help and exit.\n");
@@ -460,7 +470,7 @@ parse_args
 {
   int opt = 0, n_used = 0;
   size_t len = 0;
-  const char option_list[] = "a:dD:f:F:ghm:M:n:p:P:r:R:s:S:t:vV:";
+  const char option_list[] = "a:dD:ef:F:gG:hm:M:n:p:P:r:R:s:S:t:vV:";
   char buf[128];
   res_T res = RES_OK;
 
@@ -500,13 +510,17 @@ parse_args
     case 'd':
       if(args->mode & USE_STDOUT_MODES) {
         res = RES_BAD_ARG;
-        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_VTK);
+        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, MODE_DUMP_VTK);
         logger_print(args->logger, LOG_ERROR,
           "Option -%c cannot be used in conjunction with other dump options (%s).\n",
           (char)opt, buf);
         goto error;
       }
-      args->mode |= DUMP_VTK;
+      args->mode |= MODE_DUMP_VTK;
+      break;
+
+    case 'e':
+      args->mode |= MODE_EXTENDED_RESULTS;
       break;
 
     case 'D': {
@@ -514,7 +528,7 @@ parse_args
       if(!ptr || ptr != strchr(optarg, ','))
         res = RES_BAD_ARG; /* Single ',' expected */
       else {
-        args->out_filename = ptr + 1;
+        args->paths_filename = ptr + 1;
         *ptr = '\0';
       }
       if(res == RES_OK) {
@@ -535,7 +549,7 @@ parse_args
           opt, optarg);
         goto error;
       }
-      args->mode |= DUMP_PATHS;
+      args->mode |= MODE_DUMP_PATHS;
       break;
     }
 
@@ -555,19 +569,24 @@ parse_args
     /*case 'F': see 's' */
 
     case 'g':
-      args->mode |= GREEN_MODE;
+      args->mode |= MODE_GREEN;
+      break;
+
+    case 'G':
+      args->mode |= MODE_BIN_GREEN;
+      args->bin_green_filename = optarg;
       break;
 
     case 'h':
       if(args->mode & USE_STDOUT_MODES) {
         res = RES_BAD_ARG;
-        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_HELP);
+        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, MODE_DUMP_HELP);
         logger_print(args->logger, LOG_ERROR,
           "Option -%c cannot be used in conjunction with other dump options (%s).\n",
           (char)opt, buf);
         goto error;
       }
-      args->mode |= DUMP_HELP;
+      args->mode |= MODE_DUMP_HELP;
       break;
 
     case 'm': {
@@ -579,7 +598,7 @@ parse_args
           (char)opt, mode_option(args->mode));
         goto error;
       }
-      args->mode |= MEDIUM_COMPUTE;
+      args->mode |= MODE_MEDIUM_COMPUTE;
       ptr = strrchr(optarg, ',');
       if(ptr) {
         if(ptr != strchr(optarg, ','))
@@ -633,7 +652,7 @@ parse_args
           (char)opt, mode_option(args->mode));
         goto error;
       }
-      args->mode |= PROBE_COMPUTE;
+      args->mode |= MODE_PROBE_COMPUTE;
       res = cstr_to_list_double(optarg, ',', args->probe, &len, 4);
       if(res != RES_OK
         || len < 3
@@ -656,7 +675,7 @@ parse_args
           (char)opt, mode_option(args->mode));
         goto error;
       }
-      args->mode |= PROBE_COMPUTE_ON_INTERFACE;
+      args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
       res = cstr_to_list_double(optarg, ',', args->probe, &len, 4);
       if(res != RES_OK
         || len < 3
@@ -692,7 +711,7 @@ parse_args
           (char)opt, mode_option(args->mode));
         goto error;
       }
-      args->mode |= IR_COMPUTE;
+      args->mode |= MODE_IR_COMPUTE;
       args->camera = optarg;
       break;
 
@@ -709,13 +728,13 @@ parse_args
       }
       switch (opt) {
       case 's':
-        args->mode |= BOUNDARY_COMPUTE;
+        args->mode |= MODE_BOUNDARY_COMPUTE;
         break;
       case 'S':
-        args->mode |= MAP_COMPUTE;
+        args->mode |= MODE_MAP_COMPUTE;
         break;
       case 'F':
-        args->mode |= FLUX_BOUNDARY_COMPUTE;
+        args->mode |= MODE_FLUX_BOUNDARY_COMPUTE;
         break;
       }
       ptr = strrchr(optarg, ',');
@@ -755,13 +774,13 @@ parse_args
     case 'v':
       if(args->mode & USE_STDOUT_MODES) {
         res = RES_BAD_ARG;
-        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, DUMP_VERSION);
+        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, MODE_DUMP_VERSION);
         logger_print(args->logger, LOG_ERROR,
           "Option -%c cannot be used in conjunction with other dump options (%s).\n",
           (char)opt, buf);
         goto error;
       }
-      args->mode |= DUMP_VERSION;
+      args->mode |= MODE_DUMP_VERSION;
       break;
 
     case 'V':
@@ -806,7 +825,9 @@ parse_args
     goto error;
   }
 
-  if(args->mode & GREEN_MODE && !(args->mode & GREEN_COMPATIBLE_MODES)) {
+  if(args->mode & (MODE_BIN_GREEN | MODE_GREEN)
+    && !(args->mode & GREEN_COMPATIBLE_MODES))
+  {
     print_multiple_modes(buf, sizeof(buf), GREEN_COMPATIBLE_MODES, 0);
     logger_print(args->logger, LOG_ERROR,
       "Option -g can only be used in conjunction with: %s\n",
@@ -815,7 +836,7 @@ parse_args
     goto error;
   }
 
-  if(args->mode & IR_COMPUTE && n_used) {
+  if(args->mode & MODE_IR_COMPUTE && n_used) {
     logger_print(args->logger, LOG_ERROR,
       "The -n option has no effect in rendering mode;"
       " use rendering's SPP suboption instead.\n");
@@ -823,21 +844,42 @@ parse_args
     goto error;
   }
 
-  if(args->mode & DUMP_PATHS) {
+  if(args->mode & MODE_DUMP_PATHS) {
     if(!(args->mode & COMPUTE_MODES)) {
       res = RES_BAD_ARG;
       print_multiple_modes(buf, sizeof(buf), COMPUTE_MODES, 0);
       logger_print(args->logger, LOG_ERROR,
         "Option -%c can only be used in conjunction with an option"
         " that samples heat paths (%s).\n",
-        mode_option(DUMP_PATHS), buf);
+        mode_option(MODE_DUMP_PATHS), buf);
       goto error;
     }
-    if(args->mode & GREEN_MODE) {
+    if(args->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
       res = RES_BAD_ARG;
       logger_print(args->logger, LOG_ERROR,
-        "Option -%c cannot be used in conjunction with -%c.\n",
-        mode_option(DUMP_PATHS), mode_option(GREEN_MODE));
+        "Option -%c cannot be used in conjunction with -%c nor -%c.\n",
+        mode_option(MODE_DUMP_PATHS), mode_option(MODE_GREEN)
+        , mode_option(MODE_BIN_GREEN));
+      goto error;
+    }
+  }
+
+  if(args->mode & MODE_EXTENDED_RESULTS) {
+    if(!(args->mode & COMPUTE_MODES)) {
+      res = RES_BAD_ARG;
+      print_multiple_modes(buf, sizeof(buf), EXT_COMPATIBLE_MODES, 0);
+      logger_print(args->logger, LOG_ERROR,
+        "Option -%c can only be used in conjunction with an option"
+        " that computes a single Monte-Carlo (%s).\n",
+        mode_option(MODE_EXTENDED_RESULTS), buf);
+      goto error;
+    }
+    if(args->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+      res = RES_BAD_ARG;
+      logger_print(args->logger, LOG_ERROR,
+        "Option -%c cannot be used in conjunction with -%c nor -%c.\n",
+        mode_option(MODE_EXTENDED_RESULTS), mode_option(MODE_GREEN)
+        , mode_option(MODE_BIN_GREEN));
       goto error;
     }
   }
@@ -968,7 +1010,7 @@ process_h
   desc->d.h_boundary.mat_id = (unsigned)sz;
   desc->type = type;
 
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "h boundary name");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "h boundary name");
   ERR(str_set(&desc->d.h_boundary.name, tk));
   if(find_description_by_name(stardis, &desc->d.h_boundary.name, NULL)
     != desc)
@@ -979,7 +1021,7 @@ process_h
     goto end;
   }
 
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "emissivity");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
   res = cstr_to_double(tk, &desc->d.h_boundary.emissivity);
   if(res != RES_OK
     || desc->d.h_boundary.emissivity < 0
@@ -989,7 +1031,7 @@ process_h
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "specular fraction");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "specular fraction");
   res = cstr_to_double(tk, &desc->d.h_boundary.specular_fraction);
   if(res != RES_OK
     || desc->d.h_boundary.specular_fraction < 0
@@ -1000,7 +1042,7 @@ process_h
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "hc");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "hc");
   res = cstr_to_double(tk, &desc->d.h_boundary.hc);
   if(res != RES_OK
     || desc->d.h_boundary.hc < 0)
@@ -1009,7 +1051,7 @@ process_h
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "temperature");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature");
   res = cstr_to_double(tk, &desc->d.h_boundary.imposed_temperature);
   if(res != RES_OK
     || desc->d.h_boundary.imposed_temperature < 0)
@@ -1051,7 +1093,7 @@ process_t
   desc->d.t_boundary.mat_id = (unsigned)sz;
   desc->type = type;
 
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "temperature boundary name");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature boundary name");
   ERR(str_set(&desc->d.t_boundary.name, tk));
   if(find_description_by_name(stardis, &desc->d.t_boundary.name, NULL)
     != desc)
@@ -1062,7 +1104,7 @@ process_t
     goto end;
   }
 
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "temperature");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature");
   res = cstr_to_double(tk, &desc->d.t_boundary.imposed_temperature);
   if(res != RES_OK
     || desc->d.t_boundary.imposed_temperature < 0)
@@ -1072,7 +1114,7 @@ process_t
     goto end;
   }
   if(type == DESC_BOUND_T_FOR_FLUID) {
-    CHK_TOK(strtok_r(NULL, " ", tok_ctx), "emissivity");
+    CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
     res = cstr_to_double(tk, &desc->d.t_boundary.emissivity);
     if(res != RES_OK
       || desc->d.t_boundary.emissivity < 0
@@ -1082,7 +1124,7 @@ process_t
       if(res == RES_OK) res = RES_BAD_ARG;
       goto end;
     }
-    CHK_TOK(strtok_r(NULL, " ", tok_ctx), "specular fraction");
+    CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "specular fraction");
     res = cstr_to_double(tk, &desc->d.t_boundary.specular_fraction);
     if(res != RES_OK
       || desc->d.t_boundary.specular_fraction < 0
@@ -1093,7 +1135,7 @@ process_t
       if(res == RES_OK) res = RES_BAD_ARG;
       goto end;
     }
-    CHK_TOK(strtok_r(NULL, " ", tok_ctx), "hc");
+    CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "hc");
     res = cstr_to_double(tk, &desc->d.t_boundary.hc);
     if(res != RES_OK
       || desc->d.t_boundary.hc < 0)
@@ -1134,7 +1176,7 @@ process_flx
   desc->d.f_boundary.mat_id = (unsigned)sz;
   desc->type = DESC_BOUND_F_FOR_SOLID;
 
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "flux boundary name");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "flux boundary name");
   ERR(str_set(&desc->d.f_boundary.name, tk));
   if(find_description_by_name(stardis, &desc->d.f_boundary.name, NULL)
     != desc)
@@ -1145,10 +1187,12 @@ process_flx
     goto end;
   }
 
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "flux");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "flux");
   res = cstr_to_double(tk, &desc->d.f_boundary.imposed_flux);
-  if(res != RES_OK) {
-    /* Flux can be < 0 */
+  if(res != RES_OK
+    || desc->d.f_boundary.imposed_flux == SDIS_FLUX_NONE) {
+    /* Flux can be < 0 but not undefined */
+    if(res == RES_OK) res = RES_BAD_ARG;
     logger_print(stardis->logger, LOG_ERROR, "Invalid flux: %s\n", tk);
     goto end;
   }
@@ -1184,7 +1228,7 @@ process_sfc
   connection_id = (unsigned)sz;
   desc->type = DESC_SOLID_FLUID_CONNECT;
 
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "solid fluid connection name");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid fluid connection name");
   ERR(str_set(&desc->d.sf_connect.name, tk));
   if(find_description_by_name(stardis, &desc->d.sf_connect.name, NULL)
     != desc)
@@ -1195,7 +1239,7 @@ process_sfc
     goto end;
   }
 
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "emissivity");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
   res = cstr_to_double(tk, &desc->d.sf_connect.emissivity);
   if(res != RES_OK
     || desc->d.sf_connect.emissivity < 0
@@ -1205,7 +1249,7 @@ process_sfc
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "specular fraction");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "specular fraction");
   res = cstr_to_double(tk, &desc->d.sf_connect.specular_fraction);
   if(res != RES_OK
     || desc->d.sf_connect.specular_fraction < 0
@@ -1216,7 +1260,7 @@ process_sfc
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "hc");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "hc");
   res = cstr_to_double(tk, &desc->d.sf_connect.hc);
   if(res != RES_OK
     || desc->d.sf_connect.hc < 0)
@@ -1256,7 +1300,7 @@ process_solid
   desc->d.solid.solid_id = (unsigned)sz;
   desc->type = DESC_MAT_SOLID;
   
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "solid name");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid name");
   ERR(str_set(&desc->d.solid.name, tk));
   if(find_description_by_name(stardis, &desc->d.solid.name, NULL)
     != desc)
@@ -1267,7 +1311,7 @@ process_solid
     goto end;
   }
 
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "lambda");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "lambda");
   res = cstr_to_double(tk, &desc->d.solid.lambda);
   if(res != RES_OK
     || desc->d.solid.lambda <= 0)
@@ -1276,7 +1320,7 @@ process_solid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "rho");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "rho");
   res = cstr_to_double(tk, &desc->d.solid.rho);
   if(res != RES_OK
     || desc->d.solid.rho <= 0)
@@ -1285,7 +1329,7 @@ process_solid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "cp");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "cp");
   res = cstr_to_double(tk, &desc->d.solid.cp);
   if(res != RES_OK
     || desc->d.solid.cp <= 0)
@@ -1294,7 +1338,7 @@ process_solid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "delta");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "delta");
   res = cstr_to_double(tk, &desc->d.solid.delta);
   if(res != RES_OK
     || desc->d.solid.delta <= 0)
@@ -1303,7 +1347,7 @@ process_solid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "Tinit");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "Tinit");
   res = cstr_to_double(tk, &desc->d.solid.tinit);
   if(res != RES_OK
     || desc->d.solid.tinit < 0)
@@ -1312,7 +1356,7 @@ process_solid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "volumic power");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "volumic power");
   res = cstr_to_double(tk, &desc->d.solid.vpower);
   if(res != RES_OK) {
     /* VPower can be < 0 */
@@ -1350,7 +1394,7 @@ process_fluid
   desc->d.fluid.fluid_id = (unsigned)sz;
   desc->type = DESC_MAT_FLUID;
   
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "fluid name");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "fluid name");
   ERR(str_set(&desc->d.fluid.name, tk));
   if(find_description_by_name(stardis, &desc->d.fluid.name, NULL)
     != desc)
@@ -1361,7 +1405,7 @@ process_fluid
     goto end;
   }
 
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "rho");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "rho");
   res = cstr_to_double(tk, &desc->d.fluid.rho);
   if(res != RES_OK
     || desc->d.fluid.rho <= 0)
@@ -1370,7 +1414,7 @@ process_fluid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "cp");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "cp");
   res = cstr_to_double(tk, &desc->d.fluid.cp);
   if(res != RES_OK
     || desc->d.fluid.cp <= 0)
@@ -1379,7 +1423,7 @@ process_fluid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " ", tok_ctx), "Tinit");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "Tinit");
   res = cstr_to_double(tk, &desc->d.fluid.tinit);
   if(res != RES_OK
     || desc->d.fluid.tinit < 0)
@@ -1419,11 +1463,11 @@ process_model_line
   struct str keep;
   char* tk = NULL, * tok_ctx = NULL;
 
-  ASSERT(line && stardis);
+  ASSERT(file_name && line && stardis);
 
   str_init(stardis->allocator, &keep);
   ERR(str_set(&keep, line));
-  CHK_TOK(strtok_r(line, " ", &tok_ctx), "model line type");
+  CHK_TOK(strtok_r(line, " \t", &tok_ctx), "model line type");
   _strupr(tk);
   
   if(0 == strcmp(tk, "H_BOUNDARY_FOR_SOLID"))

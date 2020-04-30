@@ -53,7 +53,13 @@ dump_image
    FILE* stream);
 
 extern res_T
-dump_green
+dump_green_ascii
+  (struct sdis_green_function* green,
+   const struct stardis* stardis,
+   FILE* stream);
+
+extern res_T
+dump_green_bin
   (struct sdis_green_function* green,
    const struct stardis* stardis,
    FILE* stream);

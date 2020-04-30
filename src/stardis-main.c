@@ -22,6 +22,7 @@
 #include <rsys/mem_allocator.h>
 #include <rsys/logger.h>
 
+#include <stdlib.h>
 #include <stdio.h>
 
 int
@@ -52,11 +53,11 @@ main
   args_initialized = 1;
   ERR(parse_args(argc, argv, args));
 
-  if(args->mode & DUMP_HELP) {
+  if(args->mode & MODE_DUMP_HELP) {
     short_help(stdout, argv[0]);
     goto exit;
   }
-  else if(args->mode & DUMP_VERSION) {
+  else if(args->mode & MODE_DUMP_VERSION) {
     print_version(stdout);
     goto exit;
   }
@@ -74,7 +75,7 @@ main
   release_args(args);
   args_initialized = 0;
 
-  if(stardis.mode & DUMP_VTK) {
+  if(stardis.mode & MODE_DUMP_VTK) {
     /* Dump all the app-independent information */
     ERR(sg3d_geometry_dump_as_vtk(stardis.geometry.sg3d, stdout));
     /* Dump the compute region if any */

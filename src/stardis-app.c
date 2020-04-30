@@ -451,7 +451,8 @@ stardis_init
   stardis->counts = COUNTS_NULL;
   init_camera(&stardis->camera);
   str_init(stardis->allocator, &stardis->solve_name);
-  str_init(stardis->allocator, &stardis->out_filename);
+  str_init(stardis->allocator, &stardis->paths_filename);
+  str_init(stardis->allocator, &stardis->bin_green_filename);
   darray_size_t_init(stardis->allocator, &stardis->compute_surface.primitives);
   darray_sides_init(stardis->allocator, &stardis->compute_surface.sides);
   darray_uint_init(stardis->allocator, &stardis->compute_surface.err_triangles);
@@ -470,15 +471,15 @@ stardis_init
 
   /* If a dump is expected, we won't process any computation */
   is_for_compute =
-    (stardis->mode & COMPUTE_MODES) && !(stardis->mode & DUMP_VTK);
+    (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_VTK);
 
   ERR(init_geometry(stardis->logger, stardis->allocator, stardis->verbose,
     &stardis->geometry));
 
-  if(args->mode & IR_COMPUTE) {
+  if(args->mode & MODE_IR_COMPUTE) {
     ERR(parse_camera(stardis->logger, args->camera, &stardis->camera));
   }
-  else if(args->mode & MEDIUM_COMPUTE) {
+  else if(args->mode & MODE_MEDIUM_COMPUTE) {
     ERR(str_set(&stardis->solve_name, args->medium_name));
   }
   else if(args->mode & SURFACE_COMPUTE_MODES) {
@@ -492,7 +493,8 @@ stardis_init
   /* Create media and property holders for those found in descriptions */
   str_init(stardis->allocator, &str);
   for(i = 0; i < darray_descriptions_size_get(&stardis->descriptions); i++) {
-    ERR(create_holder(stardis, &dummies, i, stardis->mode & GREEN_MODE));
+    ERR(create_holder(stardis, &dummies, i,
+      stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)));
     str_clear(&str);
     str_printf(&str, "Description %d: ", i);
     ERR(print_description(&str,
@@ -525,8 +527,11 @@ stardis_init
     for(i = 0; i < tcount; ++i) {
       ERR(create_intface(stardis, i, &htable_interfaces));
     }
-    if(args->out_filename) {
-      ERR(str_set(&stardis->out_filename, args->out_filename));
+    if(args->paths_filename) {
+      ERR(str_set(&stardis->paths_filename, args->paths_filename));
+    }
+    if(args->bin_green_filename) {
+      ERR(str_set(&stardis->bin_green_filename, args->bin_green_filename));
     }
   }
 
@@ -554,7 +559,7 @@ stardis_init
     }
   }
   /* If computation is on a volume, check medium is known */
-  if(args->mode & MEDIUM_COMPUTE) {
+  if(args->mode & MODE_MEDIUM_COMPUTE) {
     if(!find_medium_by_name(stardis, &stardis->solve_name, NULL)) {
       logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
         "Cannot find medium '%s'\n", str_cget(&stardis->solve_name));
@@ -608,7 +613,8 @@ stardis_release(struct stardis* stardis)
   if(stardis->dev) SDIS(device_ref_put(stardis->dev));
   if(stardis->sdis_scn) SDIS(scene_ref_put(stardis->sdis_scn));
   str_release(&stardis->solve_name);
-  str_release(&stardis->out_filename);
+  str_release(&stardis->paths_filename);
+  str_release(&stardis->bin_green_filename);
   darray_descriptions_release(&stardis->descriptions);
   release_geometry(&stardis->geometry);
   darray_size_t_release(&stardis->compute_surface.primitives);

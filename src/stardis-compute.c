@@ -164,13 +164,14 @@ compute_probe(struct stardis* stardis)
   struct sdis_green_function* green = NULL;
   struct sdis_estimator* estimator = NULL;
   struct dump_path_context dump_ctx;
+  FILE* stream = NULL;
   
-  ASSERT(stardis && (stardis->mode & PROBE_COMPUTE));
+  ASSERT(stardis && (stardis->mode & MODE_PROBE_COMPUTE));
 
   d3_set(pos, stardis->probe);
   ERR(select_probe_type(stardis, 0, pos, &iprim, uv));
 
-  if(stardis->mode & GREEN_MODE) {
+  if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     ASSERT(iprim == SIZE_MAX);
     ERR(sdis_solve_probe_green_function(stardis->sdis_scn,
       stardis->samples,
@@ -179,7 +180,19 @@ compute_probe(struct stardis* stardis)
       stardis->ambient_temp,
       stardis->ref_temp,
       &green));
-    ERR(dump_green(green, stardis, stdout));
+    if(stardis->mode & MODE_BIN_GREEN) {
+      ASSERT(!str_is_empty(&stardis->bin_green_filename));
+      stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
+      if(!stream) {
+        res = RES_IO_ERR;
+        goto error;
+      }
+      ERR(dump_green_bin(green, stardis, stream));
+      fclose(stream); stream = NULL;
+    }
+    if(stardis->mode & MODE_GREEN) {
+      ERR(dump_green_ascii(green, stardis, stdout));
+    }
   } else {
     ASSERT(iprim == SIZE_MAX);
     d2_splat(time, stardis->probe[3]);
@@ -200,6 +213,7 @@ compute_probe(struct stardis* stardis)
   }
 
 end:
+  if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
   return res;
@@ -216,13 +230,14 @@ compute_probe_on_interface(struct stardis* stardis)
   struct sdis_estimator* estimator = NULL;
   struct sdis_green_function* green = NULL;
   struct dump_path_context dump_ctx;
+  FILE* stream = NULL;
 
-  ASSERT(stardis && (stardis->mode & PROBE_COMPUTE_ON_INTERFACE));
+  ASSERT(stardis && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
   d3_set(pos, stardis->probe);
   ERR(select_probe_type(stardis, 1, pos, &iprim, uv));
+  ASSERT(iprim != SIZE_MAX);
 
-  if(stardis->mode & GREEN_MODE) {
-    ASSERT(iprim == SIZE_MAX);
+  if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn,
       stardis->samples,
       iprim,
@@ -232,9 +247,20 @@ compute_probe_on_interface(struct stardis* stardis)
       stardis->ambient_temp,
       stardis->ref_temp,
       &green));
-    ERR(dump_green(green, stardis, stdout));
+    if(stardis->mode & MODE_BIN_GREEN) {
+      ASSERT(!str_is_empty(&stardis->bin_green_filename));
+      stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
+      if(!stream) {
+        res = RES_IO_ERR;
+        goto error;
+      }
+      ERR(dump_green_bin(green, stardis, stream));
+      fclose(stream); stream = NULL;
+    }
+    if(stardis->mode & MODE_GREEN) {
+      ERR(dump_green_ascii(green, stardis, stdout));
+    }
   } else {
-    ASSERT(iprim == SIZE_MAX);
     d2_splat(time, stardis->probe[3]);
     ERR(sdis_solve_probe_boundary(stardis->sdis_scn,
       stardis->samples,
@@ -255,6 +281,7 @@ compute_probe_on_interface(struct stardis* stardis)
   }
 
 end:
+  if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
   return res;
@@ -353,7 +380,8 @@ compute_camera(struct stardis* stardis)
   size_t ix, iy;
 
   ASSERT(stardis
-    && !(stardis->mode & GREEN_MODE) && (stardis->mode & IR_COMPUTE));
+    && !(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN))
+    && (stardis->mode & MODE_IR_COMPUTE));
 
   width = (size_t)stardis->camera.img_width;
   height = (size_t)stardis->camera.img_height;
@@ -420,8 +448,9 @@ compute_medium(struct stardis* stardis)
   struct sdis_estimator* estimator = NULL;
   struct sdis_green_function* green = NULL;
   struct dump_path_context dump_ctx;
+  FILE* stream = NULL;
 
-  ASSERT(stardis && (stardis->mode & MEDIUM_COMPUTE));
+  ASSERT(stardis && (stardis->mode & MODE_MEDIUM_COMPUTE));
 
   /* Find medium */
   medium = find_medium_by_name(stardis, &stardis->solve_name, NULL);
@@ -433,7 +462,7 @@ compute_medium(struct stardis* stardis)
     goto error;
   }
 
-  if(stardis->mode & GREEN_MODE) {
+  if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     ERR(sdis_solve_medium_green_function(stardis->sdis_scn,
       stardis->samples,
       medium,
@@ -441,7 +470,19 @@ compute_medium(struct stardis* stardis)
       stardis->ambient_temp,
       stardis->ref_temp,
       &green));
-    ERR(dump_green(green, stardis, stdout));
+    if(stardis->mode & MODE_BIN_GREEN) {
+      ASSERT(!str_is_empty(&stardis->bin_green_filename));
+      stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
+      if(!stream) {
+        res = RES_IO_ERR;
+        goto error;
+      }
+      ERR(dump_green_bin(green, stardis, stream));
+      fclose(stream); stream = NULL;
+    }
+    if(stardis->mode & MODE_GREEN) {
+      ERR(dump_green_ascii(green, stardis, stdout));
+    }
   } else {
     d2_splat(time, stardis->probe[3]);
     time[0] = time[1] = stardis->probe[3];
@@ -462,6 +503,7 @@ compute_medium(struct stardis* stardis)
   }
 
 end:
+  if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
   return res;
@@ -525,12 +567,13 @@ compute_boundary(struct stardis* stardis)
   struct sdis_green_function* green = NULL;
   struct sdis_estimator* estimator = NULL;
   struct dump_path_context dump_ctx;
+  FILE* stream = NULL;
 
-  ASSERT(stardis && (stardis->mode & BOUNDARY_COMPUTE));
+  ASSERT(stardis && (stardis->mode & MODE_BOUNDARY_COMPUTE));
 
   d3_set(pos, stardis->probe);
 
-  if(stardis->mode & GREEN_MODE) {
+  if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     ERR(sdis_solve_boundary_green_function(stardis->sdis_scn,
       stardis->samples,
       darray_size_t_cdata_get(&stardis->compute_surface.primitives),
@@ -540,7 +583,19 @@ compute_boundary(struct stardis* stardis)
       stardis->ambient_temp,
       stardis->ref_temp,
       &green));
-    ERR(dump_green(green, stardis, stdout));
+    if(stardis->mode & MODE_BIN_GREEN) {
+      ASSERT(!str_is_empty(&stardis->bin_green_filename));
+      stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
+      if(!stream) {
+        res = RES_IO_ERR;
+        goto error;
+      }
+      ERR(dump_green_bin(green, stardis, stream));
+      fclose(stream); stream = NULL;
+    }
+    if(stardis->mode & MODE_GREEN) {
+      ERR(dump_green_ascii(green, stardis, stdout));
+    }
   } else {
     d2_splat(time, stardis->probe[3]);
     ERR(sdis_solve_boundary(stardis->sdis_scn,
@@ -562,6 +617,7 @@ compute_boundary(struct stardis* stardis)
   }
 
 end:
+  if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
   return res;
@@ -578,7 +634,7 @@ compute_flux_boundary(struct stardis* stardis)
   struct sdis_estimator* estimator = NULL;
   struct dump_path_context dump_ctx;
 
-  ASSERT(stardis && (stardis->mode & FLUX_BOUNDARY_COMPUTE));
+  ASSERT(stardis && (stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE));
 
   d3_set(pos, stardis->probe);
   d2_splat(time, stardis->probe[3]);
@@ -617,7 +673,8 @@ compute_map(struct stardis* stardis)
   size_t p;
 
   ASSERT(stardis
-    && (stardis->mode & MAP_COMPUTE) && !(stardis->mode & GREEN_MODE));
+    && (stardis->mode & MODE_MAP_COMPUTE)
+    && !(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)));
 
   darray_estimators_init(stardis->allocator, &estimators);
   estimators_initialized = 1;
@@ -758,19 +815,19 @@ stardis_compute
   ASSERT(stardis && (stardis->mode & COMPUTE_MODES));
 
   /* Compute */
-  if(stardis->mode & PROBE_COMPUTE)
+  if(stardis->mode & MODE_PROBE_COMPUTE)
     ERR(compute_probe(stardis));
-  else if(stardis->mode & PROBE_COMPUTE_ON_INTERFACE)
+  else if(stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
     ERR(compute_probe_on_interface(stardis));
-  else if(stardis->mode & IR_COMPUTE)
+  else if(stardis->mode & MODE_IR_COMPUTE)
     ERR(compute_camera(stardis));
-  else if(stardis->mode & MEDIUM_COMPUTE)
+  else if(stardis->mode & MODE_MEDIUM_COMPUTE)
     ERR(compute_medium(stardis));
-  else if(stardis->mode & BOUNDARY_COMPUTE)
+  else if(stardis->mode & MODE_BOUNDARY_COMPUTE)
     ERR(compute_boundary(stardis));
-  else if(stardis->mode & FLUX_BOUNDARY_COMPUTE)
+  else if(stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE)
     ERR(compute_flux_boundary(stardis));
-  else if(stardis->mode & MAP_COMPUTE)
+  else if(stardis->mode & MODE_MAP_COMPUTE)
     ERR(compute_map(stardis));
   else FATAL("Unknown mode.\n");
 

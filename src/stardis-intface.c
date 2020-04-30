@@ -130,19 +130,22 @@ create_intface
     interface_props = sdis_data_get(data);
     interface_props->imposed_temperature = -1;
     interface_props->imposed_flux = SDIS_FLUX_NONE;
-    interface_props->front_boundary_id = UINT_MAX;
-    interface_props->back_boundary_id = UINT_MAX;
+    interface_props->front_medium_id = UINT_MAX;
+    interface_props->back_medium_id = UINT_MAX;
+    interface_props->connect_id = UINT_MAX;
 
     if(front_defined) {
       switch (descriptions[fd].type) {
       case DESC_MAT_SOLID:
         id = descriptions[fd].d.solid.solid_id;
         solid_count++;
+        interface_props->front_medium_id = id;
         front_med = media[id];
         break;
       case DESC_MAT_FLUID:
         fluid_count++;
         id = descriptions[fd].d.fluid.fluid_id;
+        interface_props->front_medium_id = id;
         front_med = media[id];
         fluid_side_shader = &interface_shader.front;
         break;
@@ -155,11 +158,13 @@ create_intface
       case DESC_MAT_SOLID:
         id = descriptions[bd].d.solid.solid_id;
         solid_count++;
+        interface_props->back_medium_id = id;
         back_med = media[id];
         break;
       case DESC_MAT_FLUID:
         fluid_count++;
         id = descriptions[bd].d.fluid.fluid_id;
+        interface_props->back_medium_id = id;
         back_med = media[id];
         fluid_side_shader = &interface_shader.back;
         break;
@@ -185,14 +190,14 @@ create_intface
             || descriptions[fd].type == DESC_MAT_FLUID);
           fluid_side_shader = (descriptions[fd].type == DESC_MAT_SOLID)
             ? &interface_shader.back : &interface_shader.front;
-          interface_props->front_boundary_id = cd;
+          interface_props->connect_id = cd;
         } else {
           ASSERT(back_defined);
           ASSERT(descriptions[bd].type == DESC_MAT_SOLID
             || descriptions[bd].type == DESC_MAT_FLUID);
           fluid_side_shader = (descriptions[bd].type == DESC_MAT_SOLID)
             ? &interface_shader.back : &interface_shader.front;
-          interface_props->back_boundary_id = cd;
+          interface_props->connect_id = cd;
         }
       }
       switch(connect->type) {

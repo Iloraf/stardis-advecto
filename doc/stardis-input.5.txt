@@ -41,7 +41,7 @@ part in the system is made from a single medium.
 
 Finally, description lines can be submitted to the *stardis*(1) program in
 any order and can be split accross more than one file, through multiple use
-of the *-M* option.
+of option *-M*.
 
 UNITS
 -----
@@ -55,7 +55,7 @@ In what follows, some lines end in *\*. This is used as a convenience to
 continue a description next line. However, this trick cannot be used in
 actual description files and actual description lines must be kept single-line.
 Also, text appearing between quote marks has to be used verbatim in the input,
-except the quote characters. Finally, text following the *#* character in
+except the quote characters. Finally, text introduced by the *#* character in
 descriptions, when not verbatim, is a comment and is not part of the
 description.
 
@@ -64,44 +64,46 @@ _______
 <thermal-system>      ::= <description-line>
                           [ <thermal-system> ]
 
-<description-line>    ::= [ <medium-frontier> ... ]
-                          [ <medium-boundary> ... ]
-                          [ <media-connection> ... ]
+<description-line>    ::= [ <medium-frontier> ] [ <comment> ]
+                        | [ <medium-boundary> ] [ <comment> ]
+                        | [ <media-connection> ] [ <comment> ]
 
 -------------------------------------
 
 <medium-frontier>     ::= <solid-frontier>
                         | <fluid-frontier>
 
-<medium-boundary>     ::= <h-bound-for-solid>
-                        | <h-bound-for-fluid>
-                        | <t-bound-for-solid>
+<medium-boundary>     ::= <t-bound-for-solid>
                         | <t-bound-for-fluid>
+                        | <h-bound-for-solid>
+                        | <h-bound-for-fluid>
                         | <f-bound-for-solid>
 
 <media-connection>    ::= <solid-fluid-connect>
+
+<comment>             ::= "#" Any text introduced by the # character
 
 <solid-frontier>      ::= "SOLID" <medium-name> <lambda> <rho> <cp> <delta> \
                           <initial-temp> <volumic-power> <triangle-sides>
 
 <fluid-frontier>      ::= "FLUID" <medium-name> <rho> <cp> <initial-temp> <triangle-sides>
 
-<h-bound-for-solid>   ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <emissivity> \
-                          <specular-fraction> <hc> <external-temp> <triangles>
-
-<h-bound-for-fluid>   ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <emissivity> \
-                          <specular-fraction> <hc> <external-temperature> <triangles>
-
 <t-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> <triangles>
 
 <t-bound-for-fluid>   ::= "T_BOUNDARY_FOR_FLUID" <bound-name> <temperature> \
                           <emissivity> <specular-fraction> <hc> <triangles>
 
-<f-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <flux> <triangles>
+<h-bound-for-solid>   ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <emissivity> \
+                          <specular-fraction> <hc> <outside-temperature> <triangles>
+
+<h-bound-for-fluid>   ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <emissivity> \
+                          <specular-fraction> <hc> <outside-temperature> <triangles>
+
+<f-bound-for-solid>   ::= "F_BOUNDARY_FOR_SOLID" <bound-name> <flux> <triangles>
 
 <solid-fluid-connect> ::= "SOLID_FLUID_CONNECTION" <bound-name> <emissivity> \
                           <specular-fraction> <hc> <triangles>
-						  
+
 -------------------------------------
 
 <medium-name>         ::= STRING # no space allowed
@@ -128,7 +130,7 @@ _______
 
 <hc>                  ::= REAL # in [0, INF)
 
-<external-temp>       ::= REAL # in [0, INF)
+<outside-temperature> ::= REAL # in [0, INF)
 
 <flux>                ::= REAL # in (-INF , INF)
 

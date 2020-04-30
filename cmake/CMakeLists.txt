@@ -53,10 +53,10 @@ set(STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL "1")
 configure_file(${SDIS_SOURCE_DIR}/../doc/stardis.1.txt.in
   ${CMAKE_CURRENT_BINARY_DIR}/doc/stardis.1.txt @ONLY)
 
-set(VERSION_MAJOR 0)
-set(VERSION_MINOR 4)
-set(VERSION_PATCH 0)
-set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+set(SDIS_VERSION_MAJOR 0)
+set(SDIS_VERSION_MINOR 4)
+set(SDIS_VERSION_PATCH 0)
+set(SDIS_VERSION ${SDIS_VERSION_MAJOR}.${SDIS_VERSION_MINOR}.${SDIS_VERSION_PATCH})
 
 configure_file(${SDIS_SOURCE_DIR}/stardis-default.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-default.h @ONLY)
@@ -114,10 +114,10 @@ set(SDIS_FILES_SRC
   stardis-compute.c
   stardis-fluid.c
   stardis-intface.c
+  stardis-main.c
   stardis-output.c
   stardis-parsing.c
-  stardis-solid.c
-  main.c)
+  stardis-solid.c)
 
 set(SDIS_FILES_INC
   stardis-app.h
@@ -145,11 +145,11 @@ if(CMAKE_COMPILER_IS_GNUCC)
   set(MATH_LIB m)
   set_target_properties(sdis-app PROPERTIES
     COMPILE_FLAGS "-std=c99"
-    VERSION ${VERSION})
+    VERSION ${SDIS_VERSION})
 elseif(MSVC)
   set(GETOPT_LIB MuslGetopt)
   set_target_properties(sdis-app PROPERTIES
-    VERSION ${VERSION})
+    VERSION ${SDIS_VERSION})
 endif()
 
 target_link_libraries(sdis-app

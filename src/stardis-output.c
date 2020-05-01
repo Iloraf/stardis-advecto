@@ -196,16 +196,7 @@ dump_path
   fprintf(stream, "%zu", vcount);
   FOR_EACH(i, 0, vcount) fprintf(stream, " %zu", i);
   fprintf(stream, "\n");
-  fprintf(stream, "POINT_DATA %zu\n", vcount);
-  /* Write the type of the random walk vertices */
-  fprintf(stream, "SCALARS Vertex_Type unsigned_char 1\n");
-  fprintf(stream, "LOOKUP_TABLE default\n");
-  FOR_EACH(i, 0, vcount) {
-    struct sdis_heat_vertex vtx;
-    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
-    ASSERT((size_t)vtx.type <= UCHAR_MAX);
-    fprintf(stream, "%d\n", vtx.type);
-  }
+
   /* Write path type */
   fprintf(stream, "CELL_DATA %d\n", 1);
   fprintf(stream, "SCALARS Path_Type unsigned_char 1\n");
@@ -215,6 +206,17 @@ dump_path
   case SDIS_HEAT_PATH_SUCCESS: fprintf(stream, "0\n"); break;
   case SDIS_HEAT_PATH_FAILURE: fprintf(stream, "1\n"); break;
   default: FATAL("Unreachable code.\n"); break;
+  }
+
+  fprintf(stream, "POINT_DATA %zu\n", vcount);
+  /* Write the type of the random walk vertices */
+  fprintf(stream, "SCALARS Vertex_Type unsigned_char 1\n");
+  fprintf(stream, "LOOKUP_TABLE default\n");
+  FOR_EACH(i, 0, vcount) {
+    struct sdis_heat_vertex vtx;
+    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
+    ASSERT((size_t)vtx.type <= UCHAR_MAX);
+    fprintf(stream, "%d\n", vtx.type);
   }
   /* Write the weights of the random walk vertices */
   fprintf(stream, "SCALARS Weight double 1\n");

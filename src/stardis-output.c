@@ -73,15 +73,15 @@ merge_flux_terms
   res_T res = RES_OK;
   struct sdis_data* data = NULL;
   struct intface* d__;
-  unsigned mid, cid;
+  unsigned cid;
   struct w_ctx* w_ctx = ctx;
   const struct description* descs;
 
   ASSERT(interf && w_ctx);
+  (void)side;
 
   data = sdis_interface_get_data(interf);
   d__ = sdis_data_get(data);
-  mid = (side == SDIS_FRONT) ? d__->front_medium_id : d__->back_medium_id;
   cid = d__->connect_id;
   descs = darray_descriptions_cdata_get(w_ctx->desc);
 
@@ -350,7 +350,7 @@ struct path_header {
   unsigned pcount, fcount;
 };
 
-res_T
+static res_T
 dump_sample
   (struct sdis_green_path* path,
    void* ctx)
@@ -382,11 +382,9 @@ dump_sample
   switch (pt.type) {
   case SDIS_FRAGMENT: {
     struct intface* d__;
-    unsigned mid, cid;
+    unsigned cid;
     data = sdis_interface_get_data(pt.data.itfrag.intface);
     d__ = sdis_data_get(data);
-    mid = (pt.data.itfrag.fragment.side == SDIS_FRONT)
-      ? d__->front_medium_id : d__->back_medium_id;
     cid = d__->connect_id;
     CHK(DESC_IS_T(descs[cid].type) || DESC_IS_H(descs[cid].type));
     header.id = cid;

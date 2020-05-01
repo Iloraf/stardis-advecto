@@ -840,8 +840,8 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
   /* Create enclosures
    * For dump results to be reproducible, we setup star-enclosures with a
    * single thread */
-  ERR(senc3d_device_create(stardis->logger, stardis->allocator, 1,
-    stardis->verbose, &senc_dev));
+  ERR(senc3d_device_create(stardis->logger, stardis->allocator,
+    SENC3D_NTHREADS_DEFAULT, stardis->verbose, &senc_dev));
   ERR(senc3d_scene_create(senc_dev,
     SENC3D_CONVENTION_NORMAL_BACK | SENC3D_CONVENTION_NORMAL_OUTSIDE,
     tsz, sg3d_sencXd_geometry_get_indices, sg3d_sencXd_geometry_get_media,

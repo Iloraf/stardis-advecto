@@ -69,19 +69,21 @@ select_probe_type
     d3_sub(dp, projected_pos, pos);
     d = d3_len(dp);
 
-    if(d == 0) {
-      /* Best possible match */
-      found = i;
-      logger_print(stardis->logger, LOG_OUTPUT,
-        "The probe is on the primitive %llu.\n", (long long int)*iprim);
-      break;
-    }
     if(d >= min_d) {
       /* No improvement */
       continue;
     }
     min_d = d;
     d2_set(min_uv, tmp_uv);
+
+    if(d == 0) {
+      /* Best possible match */
+      found = i;
+      d3_set(new_pos, projected_pos);
+      logger_print(stardis->logger, LOG_OUTPUT,
+        "The probe is on the primitive %llu.\n", (long long int) * iprim);
+      break;
+    }
 
     /* Find side */
     ERR(sg3d_geometry_get_unique_vertex(stardis->geometry.sg3d, indices[0], tmp));

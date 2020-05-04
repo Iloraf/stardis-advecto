@@ -1278,7 +1278,46 @@ error:
   goto end;
 }
 
-/* SOLID Name lambda rho cp delta Tinit volumic_power STL_filenames */
+static res_T
+read_imposed_temperature
+  (struct stardis* stardis,
+   double* imposed_temperature,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct str keep;
+  res_T res = RES_OK;
+
+  str_init(stardis->allocator, &keep);
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "imposed temperature");
+  ERR(str_set(&keep, tk));
+  if(RES_OK == cstr_to_double(tk, imposed_temperature)) {
+    /* Was a number */
+    if(imposed_temperature < 0) {
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  } else {
+    /* Could be 'unknown' */
+    _strupr(tk);
+    if(0 == strcmp(tk, "UNKNOWN")) {
+      /* Unknown for stadis solver is -1 */
+      *imposed_temperature = -1;
+    } else {
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+end:
+  str_release(&keep);
+  return res;
+error:
+  logger_print(stardis->logger, LOG_ERROR, "Invalid imposed temperature: %s\n",
+    str_cget(&keep));
+  goto end;
+}
+
+/* SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_filenames */
 static res_T
 process_solid
   (struct stardis* stardis,
@@ -1356,6 +1395,8 @@ process_solid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  ERR(read_imposed_temperature(stardis, &desc->d.solid.imposed_temperature,
+    tok_ctx));
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "volumic power");
   res = cstr_to_double(tk, &desc->d.solid.vpower);
   if(res != RES_OK) {
@@ -1372,7 +1413,7 @@ error:
   goto end;
 }
 
-/* FLUID Name rho cp Tinit STL_filenames */
+/* FLUID Name rho cp Tinit Timposed STL_filenames */
 static res_T
 process_fluid
   (struct stardis* stardis,
@@ -1433,6 +1474,9 @@ process_fluid
     goto end;
   }
 
+  ERR(read_imposed_temperature(stardis, &desc->d.fluid.imposed_temperature,
+    tok_ctx));
+
   ERR(read_sides_and_files(stardis, 0, desc->d.fluid.fluid_id, tok_ctx));
 
 end:
@@ -1442,8 +1486,8 @@ error:
 }
 
 /* Read medium or boundary line; should be one of:
- * SOLID Name lambda rho cp delta Tinit volumic_power STL_filenames
- * FLUID Name rho cp Tinit STL_filenames
+ * SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_filenames
+ * FLUID Name rho cp Tinit Timposed STL_filenames
  * H_BOUNDARY_FOR_SOLID Name emissivity specular_fraction hc T_env STL_filenames
  * H_BOUNDARY_FOR_FLUID Name emissivity specular_fraction hc T_env STL_filenames
  * T_BOUNDARY_FOR_SOLID Name T STL_filenames

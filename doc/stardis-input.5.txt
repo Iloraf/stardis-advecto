@@ -84,9 +84,11 @@ _______
 <comment>             ::= "#" Any text introduced by the # character
 
 <solid-frontier>      ::= "SOLID" <medium-name> <lambda> <rho> <cp> <delta> \
-                          <initial-temp> <volumic-power> <triangle-sides>
+                          <initial-temp> <imposed-temperature> <volumic-power> \
+                          <triangle-sides>
 
-<fluid-frontier>      ::= "FLUID" <medium-name> <rho> <cp> <initial-temp> <triangle-sides>
+<fluid-frontier>      ::= "FLUID" <medium-name> <rho> <cp> <initial-temp> \
+                          <imposed-temperature> <triangle-sides>
 
 <t-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> <triangles>
 
@@ -118,6 +120,11 @@ _______
 
 <initial-temp>        ::= REAL # in [0, INF)
 
+<imposed-temperature> ::= "UNKNOWN" # temperature has to be solved
+                        | REAL # in [0, INF)
+
+<outside-temperature> ::= REAL # in [0, INF)
+
 <volumic-power>       ::= REAL # in (-INF , INF)
 
 <triangle-sides>      ::= <side-specifier> <file-name> [ <triangle-sides> ]
@@ -129,8 +136,6 @@ _______
 <specular-fraction>   ::= REAL # in [0, 1]
 
 <hc>                  ::= REAL # in [0, INF)
-
-<outside-temperature> ::= REAL # in [0, INF)
 
 <flux>                ::= REAL # in (-INF , INF)
 
@@ -157,8 +162,9 @@ NAMES
 Names, either file names, medium names or boundary names, are a sequence of
 one or ore ASCII characters, including numbers and special characters like
 *.* *_* *-* as one may consider using in standard file names, *without any
-spacing* either escaped or not. Two different description lines cannot use
-the same name.
+spacing* either escaped or not. Names are case-sensitive anf two different
+description lines, either in the same description file or from different
+description files, cannot use the same name.
 
 EXAMPLES
 --------

@@ -33,124 +33,230 @@
  * Local Functions
  ******************************************************************************/
 
-/* Check probe position and move it to the closest point on an interface 
+/* Check probe position and move it to the closest point on an interface
  * if on_interface is set */
 static res_T
 select_probe_type
   (const struct stardis* stardis,
-   const int on_interface,
-   double pos[3], 
-   size_t* iprim, 
+   const int move2boundary,
+   double pos[3],
+   size_t* iprim,
    double uv[2])
 {
   res_T res = RES_OK;
-  double min_d = DBL_MAX, min_delta = DBL_MAX, new_pos[3], tmp_uv[2], min_uv[2];
-  const struct description *min_desc = NULL;
-  size_t found = SIZE_MAX;
-  enum description_type min_type = DESCRIPTION_TYPE_COUNT__;
+  double min_d = DBL_MAX, new_pos[3], tmp_uv[2], min_uv[2];
+  const struct description* min_desc = NULL;
   const struct description* descriptions;
-  unsigned i, tcount;
+  unsigned i, j, tcount, found_id = UINT_MAX;
+  int outside = 0, probe_on_boundary = 0;
 
   ASSERT(stardis && pos && iprim && uv);
   descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tcount));
   for(i = 0; i < tcount; ++i) {
     unsigned indices[3], properties[3];
-    double dp[3], d, projected_pos[3], nn[3], tmp[3];
-    float v0[3], v1[3], v2[3], e1[3], e2[3], n[3];
-    const struct description *desc = NULL;
+    double dp[3], d, projected_pos[3], c;
+    double v0[3], v1[3], v2[3], e1[3], e2[3], n[3];
     enum sdis_side s;
 
     ERR(sg3d_geometry_get_unique_triangle_vertices(stardis->geometry.sg3d, i,
       indices));
-
     ERR(sdis_scene_boundary_project_position(stardis->sdis_scn, i, pos, tmp_uv));
     ERR(sdis_scene_get_boundary_position(stardis->sdis_scn, i, tmp_uv, projected_pos));
     d3_sub(dp, projected_pos, pos);
     d = d3_len(dp);
 
-    if(d >= min_d) {
-      /* No improvement */
+    if(!(d < min_d
+      || (min_desc == NULL && d <= min_d * (1 + FLT_EPSILON))))
+    {
+      /* No improvement
+       * (accept to slightly increase distance to gain a description) */
       continue;
     }
+
+    /* Keep closest projection */
+    found_id = i;
     min_d = d;
     d2_set(min_uv, tmp_uv);
+    d3_set(new_pos, projected_pos);
 
-    if(d == 0) {
+    /* Boundary normal */
+    ERR(sg3d_geometry_get_unique_vertex(stardis->geometry.sg3d, indices[0], v0));
+    ERR(sg3d_geometry_get_unique_vertex(stardis->geometry.sg3d, indices[1], v1));
+    ERR(sg3d_geometry_get_unique_vertex(stardis->geometry.sg3d, indices[2], v2));
+    d3_sub(e1, v1, v0);
+    d3_sub(e2, v2, v0);
+    d3_cross(n, e1, e2);
+    ASSERT(d3_len(n));
+
+    /* Find side; Stardis solver convention is triangle normal is back side */
+    c = d3_dot(n, dp);
+
+    if(d == 0 || c == 0) {
       /* Best possible match */
-      found = i;
-      d3_set(new_pos, projected_pos);
-      logger_print(stardis->logger, LOG_OUTPUT,
-        "The probe is on the primitive %llu.\n", (long long int) * iprim);
+      min_desc = NULL;
+      probe_on_boundary = 1;
+      if(move2boundary)
+        logger_print(stardis->logger, LOG_OUTPUT,
+          "Probe is on primitive %u, uv = (%g, %g), not moved.\n",
+          found_id, SPLIT2(min_uv));
       break;
     }
 
-    /* Find side */
-    ERR(sg3d_geometry_get_unique_vertex(stardis->geometry.sg3d, indices[0], tmp));
-    f3_set_d3(v0, tmp);
-    ERR(sg3d_geometry_get_unique_vertex(stardis->geometry.sg3d, indices[1], tmp));
-    f3_set_d3(v1, tmp);
-    ERR(sg3d_geometry_get_unique_vertex(stardis->geometry.sg3d, indices[2], tmp));
-    f3_set_d3(v2, tmp);
-    f3_sub(e1, v1, v0);
-    f3_sub(e2, v2, v0);
-    f3_cross(n, e1, e2);
+    /* Try to determine material */
+    ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
+      found_id, properties));
+    if(properties[SDIS_FRONT] == properties[SDIS_BACK]) {
+      min_desc = descriptions + properties[SDIS_FRONT];
+      continue;
+    }
 
-    /* Stardis solver convention is triangle normal is back side */
-    d3_set_f3(nn, n);
-    s = (d3_dot(nn, dp) < 0) ? SDIS_BACK : SDIS_FRONT;
-
-    ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d, i,
-      properties));
-
-    if(s == SDIS_FRONT && properties[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY)
-      desc = descriptions + properties[SG3D_FRONT];
-    if(s == SDIS_BACK && properties[SDIS_BACK] != SG3D_UNSPECIFIED_PROPERTY)
-      desc = descriptions + properties[SG3D_BACK];
-
-    min_desc = desc;
-    if(!desc) continue;
-
-    min_type = desc->type;
-    if(desc->type == DESC_MAT_SOLID) {
-      found = i;
-      min_delta = desc->d.solid.delta;
-      d3_set(new_pos, projected_pos);
+#define COS_89_deg_99 1.7453e-4
+    if(fabs(c) < COS_89_deg_99 * d3_len(n) * d3_len(dp)
+      && properties[SDIS_FRONT] != properties[SDIS_BACK])
+#undef COS_89_deg_99
+    {
+      /* Side cannot be determined (n^dp > 89.99 degrees) */
+      min_desc = NULL;
+      outside = 0; /* Cannot be sure */
+    } else {
+      s = (c < 0) ? SDIS_BACK : SDIS_FRONT;
+      if(properties[s] == SG3D_UNSPECIFIED_PROPERTY) {
+        min_desc = NULL;
+        outside = 1;
+        continue;
+      }
+      min_desc = descriptions + properties[s];
+      outside = 0;
     }
   }
 
-  if(!min_desc) {
-    /* Doesn't handle the case where pos is outside the model
-     * but very close and could be considered on the boundary */
-    logger_print(stardis->logger, LOG_ERROR, "The probe is outside the model.\n");
-    return RES_BAD_ARG;
-  }
-
-  if(on_interface) {
-    *iprim = found;
-    if(min_type == DESC_MAT_FLUID)
-      logger_print(stardis->logger, LOG_OUTPUT, "Probe was on a fluid.\n");
-    logger_print(stardis->logger, LOG_OUTPUT,
-      "The probe is moved to %g,%g,%g (primitive %llu)\n",
-      SPLIT3(new_pos), (long long int)*iprim);
-    if(min_type == DESC_MAT_SOLID && min_d > min_delta)
+  if(move2boundary) {
+    /* Need to move probe to closest boundary */
+    int danger = 0;
+    if(outside) {
+      /* Not an error as probe moved to boundary */
       logger_print(stardis->logger, LOG_WARNING,
-        "The probe move is %.1f delta long.\n", min_d / min_delta);
+        "Probe was outside the model.\n");
+    }
+    if(!min_desc) {
+      /* Not an error as probe moved to boundary */
+      if(!probe_on_boundary)
+        logger_print(stardis->logger, LOG_WARNING,
+          "Could not determine the medium probe is in.\n");
+    } else {
+      if(min_desc->type == DESC_MAT_SOLID) {
+        double delta = min_desc->d.solid.delta;
+        logger_print(stardis->logger, LOG_OUTPUT,
+          "Probe was in solid '%s'.\n", str_cget(&min_desc->d.solid.name));
+        if(min_d > 2 * delta) {
+          logger_print(stardis->logger, LOG_ERROR,
+            "Probe moved to (%g, %g, %g), primitive %u, uv = (%g, %g).\n",
+            SPLIT3(new_pos), found_id, SPLIT2(min_uv));
+          logger_print(stardis->logger, LOG_ERROR,
+            "Move is %g delta long. Use -p instead of -P.\n",
+            min_d / delta);
+          res = RES_BAD_ARG;
+          goto error;
+        }
+        if(min_d > 0.5 * delta) {
+          logger_print(stardis->logger, LOG_WARNING,
+            "Probe was %g delta from closest boundary. "
+            "Consider using -P instead of -p.\n",
+            min_d / delta);
+        } else {
+          if(min_d != 0)
+            logger_print(stardis->logger, LOG_OUTPUT,
+              "Probe was %g delta from closest boundary.\n",
+              min_d / delta);
+        }
+      } else {
+        /* TODO: check move length wrt local geometry? */
+        logger_print(stardis->logger, LOG_OUTPUT,
+          "Probe was in fluid '%s'.\n", str_cget(&min_desc->d.fluid.name));
+        logger_print(stardis->logger, LOG_OUTPUT,
+          "Probe distance from closest boundary was %g.\n", min_d);
+      }
+    }
+    /* Check if moved to vertex/edge */
+    FOR_EACH(j, 0, 2) {
+      if(CLAMP(min_uv[j], 0.0005, 0.9995) != min_uv[j])
+        danger++;
+    }
+    if(danger) {
+      logger_print(stardis->logger, LOG_WARNING,
+        "Probe %s close to / on %s. "
+        "If computation fails, try moving it slightly.\n",
+        (min_d != 0 ? "moved" : "is"), (danger == 1 ? "an edge" : "a vertex"));
+    }
+    if(!probe_on_boundary)
+      logger_print(stardis->logger, LOG_OUTPUT,
+        "Probe moved to (%g, %g, %g), primitive %u, uv = (%g, %g).\n",
+        SPLIT3(new_pos), found_id, SPLIT2(min_uv));
     d3_set(pos, new_pos);
-    d2_set(uv, min_uv);
   } else {
-    if(min_type == DESC_MAT_FLUID)
+    /* Need to check medium */
+    if(outside) {
+      logger_print(stardis->logger, LOG_ERROR,
+        "Probe is outside the model.\n");
+      logger_print(stardis->logger, LOG_ERROR,
+        "Closest geometry is primitive %u, uv = (%g, %g), pos (%g, %g, %g).\n",
+        found_id, SPLIT2(min_uv), SPLIT3(new_pos));
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    if(probe_on_boundary) {
+      logger_print(stardis->logger, LOG_ERROR,
+        "Probe is on primitive %u, uv = (%g, %g). Use -P instead of -p.\n",
+        found_id, SPLIT2(min_uv));
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    if(!min_desc) {
+      logger_print(stardis->logger, LOG_ERROR,
+        "Could not determine the medium probe is in. "
+        "Try moving it slightly.\n");
+      logger_print(stardis->logger, LOG_ERROR,
+        "Closest geometry is primitive %u, uv = (%g, %g), distance %g.\n",
+        found_id, SPLIT2(min_uv), min_d);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    logger_print(stardis->logger, LOG_OUTPUT,
+      "Probe is in solid '%s'.\n", str_cget(&min_desc->d.solid.name));
+    if(min_desc->type == DESC_MAT_SOLID) {
+      double delta = min_desc->d.solid.delta;
+      if(min_d < 0.25 * delta) {
+        logger_print(stardis->logger, LOG_ERROR,
+          "Probe is %g delta from closest boundary. Use -P instead of -p.\n",
+          min_d / delta);
+        logger_print(stardis->logger, LOG_ERROR,
+          "Closest geometry is primitive %u, uv = (%g, %g).\n",
+          found_id, SPLIT2(min_uv));
+        res = RES_BAD_ARG;
+        goto error;
+      }
+      if(min_d < 0.5 * delta) {
+        logger_print(stardis->logger, LOG_WARNING,
+          "Probe is %g delta from closest boundary. "
+          "Consider using -P instead of -p.\n",
+          min_d / delta);
+      } else {
+        logger_print(stardis->logger, LOG_OUTPUT,
+          "Probe is %g delta from closest boundary.\n",
+          min_d / delta);
+      }
+    } else {
       logger_print(stardis->logger, LOG_WARNING,
-        "The probe is in a fluid: computing fluid temperature, not using a specific position.\n");
-    if(min_type == DESC_MAT_SOLID && min_d < min_delta) {
-      logger_print(stardis->logger, LOG_WARNING,
-        "The probe is very close to the primitive %llu (%.1f delta).\n",
-        (long long int)found, min_d / min_delta);
-      logger_print(stardis->logger, LOG_WARNING,
-        "To have this probe moved on the closest interface use -P instead of -p\n");
+        "Probe is in fluid '%s': computing fluid temperature, "
+        "not using a specific position.\n",
+        str_cget(&min_desc->d.fluid.name));
+      /* In fluid; TODO: check distance wrt local geometry (use 4V/S?) */
     }
   }
 
+  *iprim = found_id;
+  d2_set(uv, min_uv);
 end:
   return res;
 error:

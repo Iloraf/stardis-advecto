@@ -931,6 +931,12 @@ print_single_MC_result
   /* Fetch the estimation data */
   ERR(sdis_estimator_get_temperature(estimator, &result));
   ERR(sdis_estimator_get_failure_count(estimator, &nfailures));
+  if(nfailures == stardis->samples) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "All the %zu samples failed. No result to display.\n", nfailures);
+    res = RES_BAD_OP;
+    goto error;
+  }
 
   /* Print the results */
   switch (stardis->mode & COMPUTE_MODES) {

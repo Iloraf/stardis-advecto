@@ -1287,6 +1287,7 @@ read_imposed_temperature
   char* tk = NULL;
   struct str keep;
   res_T res = RES_OK;
+  ASSERT(stardis && imposed_temperature && tok_ctx);
 
   str_init(stardis->allocator, &keep);
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "imposed temperature");
@@ -1313,6 +1314,46 @@ end:
   return res;
 error:
   logger_print(stardis->logger, LOG_ERROR, "Invalid imposed temperature: %s\n",
+    str_cget(&keep));
+  goto end;
+}
+
+static res_T
+read_delta
+  (struct stardis* stardis,
+   double* delta,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct str keep;
+  res_T res = RES_OK;
+  ASSERT(stardis && delta && tok_ctx);
+
+  str_init(stardis->allocator, &keep);
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "delta");
+  ERR(str_set(&keep, tk));
+  if(RES_OK == cstr_to_double(tk, delta)) {
+    /* Was a number */
+    if(delta <= 0) {
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  } else {
+    /* Could be 'auto' */ 
+    _strupr(tk);
+    if(0 == strcmp(tk, "AUTO")) {
+      /* Set to -1 until actual value is substituted */
+      *delta = -1;
+    } else {
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+end:
+  str_release(&keep);
+  return res;
+error:
+  logger_print(stardis->logger, LOG_ERROR, "Invalid delta: %s\n",
     str_cget(&keep));
   goto end;
 }
@@ -1377,15 +1418,7 @@ process_solid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "delta");
-  res = cstr_to_double(tk, &desc->d.solid.delta);
-  if(res != RES_OK
-    || desc->d.solid.delta <= 0)
-  {
-    logger_print(stardis->logger, LOG_ERROR, "Invalid delta: %s\n", tk);
-    if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
-  }
+  ERR(read_delta(stardis, &desc->d.solid.delta, tok_ctx));
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "Tinit");
   res = cstr_to_double(tk, &desc->d.solid.tinit);
   if(res != RES_OK

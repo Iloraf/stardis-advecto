@@ -23,7 +23,6 @@
 #include <sdis.h>
 
 #include<star/senc3d.h>
-#include<star/sg3d_sencXd_helper.h>
 
 #include <rsys/math.h>
 #include <rsys/mem_allocator.h>
@@ -819,40 +818,26 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
 {
   res_T res = RES_OK;
   unsigned* trgs = NULL;
-  struct senc3d_scene* senc3d_scn = NULL;
-  struct senc3d_device* senc_dev = NULL;
   struct senc3d_enclosure* enc = NULL;
-  unsigned tsz, vsz, e, s, t, scount, ecount;
+  unsigned tsz, e, s, t, scount, ecount;
   int* enc_status = NULL;
   int invalid_enclosures_count = 0;
   ASSERT(stardis && stream);
 
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
-  ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vsz));
   trgs = MEM_CALLOC(stardis->allocator, tsz, sizeof(*trgs));
   if(!trgs) {
     res = RES_MEM_ERR;
     goto error;
   }
 
-  /* Create enclosures
-   * For dump results to be reproducible, we setup star-enclosures with a
-   * single thread */
-  ERR(senc3d_device_create(stardis->logger, stardis->allocator,
-    SENC3D_NTHREADS_DEFAULT, stardis->verbose, &senc_dev));
-  ERR(senc3d_scene_create(senc_dev,
-    SENC3D_CONVENTION_NORMAL_BACK | SENC3D_CONVENTION_NORMAL_OUTSIDE,
-    tsz, sg3d_sencXd_geometry_get_indices, sg3d_sencXd_geometry_get_media,
-    vsz, sg3d_sencXd_geometry_get_position, stardis->geometry.sg3d,
-    &senc3d_scn));
-
   /* Keep the segments involved in holes (not the vertices) */
-  ERR(senc3d_scene_get_frontier_segments_count(senc3d_scn, &scount));
+  ERR(senc3d_scene_get_frontier_segments_count(stardis->senc3d_scn, &scount));
   if(scount) {
     /* Room to store frontier triangles */
     FOR_EACH(s, 0, scount) {
       unsigned vrtc[2], trid;
-      ERR(senc3d_scene_get_frontier_segment(senc3d_scn, s, vrtc, &trid));
+      ERR(senc3d_scene_get_frontier_segment(stardis->senc3d_scn, s, vrtc, &trid));
       trgs[trid] = 1;
     }
     logger_print(stardis->logger, LOG_WARNING, "Model contains hole(s).\n");
@@ -862,7 +847,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
   }
 
   /* Dump enclosure information */
-  ERR(senc3d_scene_get_enclosure_count(senc3d_scn, &ecount));
+  ERR(senc3d_scene_get_enclosure_count(stardis->senc3d_scn, &ecount));
   enc_status = MEM_CALLOC(stardis->allocator, ecount, sizeof(*enc_status));
   if(!enc_status) {
     res = RES_MEM_ERR;
@@ -872,7 +857,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
     struct senc3d_enclosure_header header;
 
     enc_status[e] = NO_ENCLOSURE_ERROR;
-    ERR(senc3d_scene_get_enclosure(senc3d_scn, e, &enc));
+    ERR(senc3d_scene_get_enclosure(stardis->senc3d_scn, e, &enc));
     ERR(senc3d_enclosure_get_header(enc, &header));
     /* Check if anclosure is invalid regarding stardis solver requirements */
     if(!header.is_infinite) {
@@ -896,7 +881,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
   fprintf(stream, "Enclosure_ID %d %d unsigned_char\n", ecount, tsz);
   FOR_EACH(t, 0, tsz) {
     unsigned encs[2];
-    ERR(senc3d_scene_get_triangle_enclosures(senc3d_scn, t, encs));
+    ERR(senc3d_scene_get_triangle_enclosures(stardis->senc3d_scn, t, encs));
     FOR_EACH(e, 0, ecount) {
       if(e == encs[SENC3D_FRONT] || e == encs[SENC3D_BACK])
         fprintf(stream, "%d ", (char)enc_status[e]);
@@ -908,9 +893,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
 
 exit:
   MEM_RM(stardis->allocator, trgs);
-  MEM_RM(stardis->allocator,  enc_status);
-  if(senc3d_scn) senc3d_scene_ref_put(senc3d_scn);
-  if(senc_dev) senc3d_device_ref_put(senc_dev);
+  MEM_RM(stardis->allocator, enc_status);
   return res;
 error:
   goto exit;

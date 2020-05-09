@@ -20,6 +20,8 @@
 #include "stardis-fluid.h"
 #include "stardis-solid.h"
 
+#include<star/senc3d.h>
+#include<star/sg3d_sencXd_helper.h>
 #include <star/sg3d_sdisXd_helper.h>
 
 #include <rsys/text_reader.h>
@@ -288,6 +290,7 @@ create_holder
 {
   res_T res = RES_OK;
   struct description* description;
+  struct senc3d_enclosure* enc = NULL;
 
   ASSERT(stardis && dummies
     && idx < darray_descriptions_size_get(&stardis->descriptions));
@@ -378,7 +381,12 @@ create_holder
     ASSERT(description->d.sf_connect.emissivity >= 0);
     ASSERT(description->d.sf_connect.hc >= 0);
     break;
-  case DESC_MAT_SOLID:
+  case DESC_MAT_SOLID: {
+    unsigned e, ecount;
+    double ratio, delta_range[2] = { DBL_MAX, -DBL_MAX };
+    const double acceptance_ratio = 3;
+    struct senc3d_enclosure_header header;
+    /* Create solid to have ID informed */
     stardis->counts.smed_count++;
     ERR(create_stardis_solid(stardis,
       &description->d.solid.name,
@@ -392,7 +400,58 @@ create_holder
       description->d.solid.imposed_temperature,
       description->d.solid.vpower,
       &description->d.solid.solid_id));
+    /* Check if delta can fit possible multiple enclosures */
+    ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn,
+      description->d.solid.solid_id, &ecount));
+    if(ecount != 0) {
+      /* Can be unused if conflicts; in this case, avoid delta warnings */
+      int external = 0;
+      FOR_EACH(e, 0, ecount) {
+        ERR(senc3d_scene_get_enclosure_by_medium(stardis->senc3d_scn,
+          description->d.solid.solid_id, e, &enc));
+        ERR(senc3d_enclosure_get_header(enc, &header));
+        if(header.is_infinite) {
+          /* External solid, volume is negative and no delta walk expected */
+          external = 1;
+        } else {
+          double d = header.volume / (header.area * 6);
+          delta_range[0] = MMIN(delta_range[0], d);
+          delta_range[1] = MMAX(delta_range[1], d);
+        }
+        ERR(senc3d_enclosure_ref_put(enc));
+        enc = NULL;
+      }
+      if(ecount > 1 || !external) {
+        ASSERT(0 < delta_range[0] && delta_range[0] <= delta_range[1]);
+        ratio = delta_range[1] / delta_range[0];
+        if(ratio > acceptance_ratio)
+          logger_print(stardis->logger, LOG_WARNING,
+            "Solid %s is used in %u different enclosures that have different "
+            "delta requirements.\n",
+            str_cget(&description->d.solid.name), ecount);
+        /* Delta was AUTO and need to be computed */
+        if(description->d.solid.delta == -1) {
+          description->d.solid.delta = delta_range[0];
+          logger_print(stardis->logger, LOG_OUTPUT,
+            "Auto delta for solid %s set to %g\n",
+            str_cget(&description->d.solid.name), description->d.solid.delta);
+        } else {
+          int too_small
+            = (delta_range[0] > description->d.solid.delta * acceptance_ratio);
+          int too_big
+            = (delta_range[0] * acceptance_ratio < description->d.solid.delta);
+          /* Check if user delta is OK */
+          if(too_small || too_big)
+            logger_print(stardis->logger, LOG_WARNING,
+              "User delta for solid %s seems too %s: %g; "
+              "auto delta would have set it to %g.\n",
+              str_cget(&description->d.solid.name), (too_big ? "big" : "small"),
+              description->d.solid.delta, delta_range[0]);
+        }
+      }
+    }
     break;
+  }
   case DESC_MAT_FLUID:
     stardis->counts.fmed_count++;
     ERR(create_stardis_fluid(stardis,
@@ -410,6 +469,7 @@ create_holder
   }
 
 end:
+  if(enc) ERR(senc3d_enclosure_ref_put(enc));
   return res;
 error:
   goto end;
@@ -436,6 +496,7 @@ stardis_init
 
   ASSERT(args && logger && allocator && stardis);
 
+  str_init(allocator, &str);
   /* Init everithing that cannot fail */
   stardis->logger = logger;
   stardis->allocator = allocator;
@@ -447,6 +508,7 @@ stardis_init
   stardis->probe[3] = args->probe[3];
   stardis->dev = NULL;
   stardis->sdis_scn = NULL;
+  stardis->senc3d_scn = NULL;
   stardis->mode = args->mode;
   stardis->counts = COUNTS_NULL;
   init_camera(&stardis->camera);
@@ -490,20 +552,6 @@ stardis_init
   ERR(sdis_device_create(stardis->logger, stardis->allocator, args->nthreads,
     args->verbose, &stardis->dev));
 
-  /* Create media and property holders for those found in descriptions */
-  str_init(stardis->allocator, &str);
-  for(i = 0; i < darray_descriptions_size_get(&stardis->descriptions); i++) {
-    ERR(create_holder(stardis, &dummies, i,
-      stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)));
-    str_clear(&str);
-    str_printf(&str, "Description %d: ", i);
-    ERR(print_description(&str,
-      darray_descriptions_cdata_get(&stardis->descriptions) + i));
-    ERR(str_printf(&str, "\n"));
-    logger_print(stardis->logger, LOG_OUTPUT, "%s", str_cget(&str));
-  }
-  str_release(&str);
-
   create_context.geometry = stardis->geometry.sg3d;
   create_context.app_interface_getter = geometry_get_interface;
   create_context.app_interface_data = &stardis->geometry.interf_bytrg;
@@ -516,22 +564,10 @@ stardis_init
     stardis->geometry.sg3d, &count));
   if(count) {
     logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
-      "Properties conflicts found in the the model (%u triangles).\n", count);
+      "Properties conflicts found in the model (%u triangles).\n", count);
     if(is_for_compute) {
       res = RES_BAD_ARG;
       goto error;
-    }
-  }
-
-  if(is_for_compute) {
-    for(i = 0; i < tcount; ++i) {
-      ERR(create_intface(stardis, i, &htable_interfaces));
-    }
-    if(args->paths_filename) {
-      ERR(str_set(&stardis->paths_filename, args->paths_filename));
-    }
-    if(args->bin_green_filename) {
-      ERR(str_set(&stardis->bin_green_filename, args->bin_green_filename));
     }
   }
 
@@ -552,12 +588,40 @@ stardis_init
         str_cget(&stardis->solve_name));
       logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
         "The file contains %u triangles not in the model.\n", count - save_count);
-     if(is_for_compute) {
+      if(is_for_compute) {
         res = RES_BAD_ARG;
         goto error;
       }
     }
   }
+
+  /* Create enclosures */
+  ERR(init_enclosures(stardis));
+
+  /* Create media and property holders for those found in descriptions */
+  for (i = 0; i < darray_descriptions_size_get(&stardis->descriptions); i++) {
+    ERR(create_holder(stardis, &dummies, i,
+      stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)));
+    str_clear(&str);
+    str_printf(&str, "Description %d: ", i);
+    ERR(print_description(&str,
+      darray_descriptions_cdata_get(&stardis->descriptions) + i));
+    ERR(str_printf(&str, "\n"));
+    logger_print(stardis->logger, LOG_OUTPUT, "%s", str_cget(&str));
+  }
+
+  if(is_for_compute) {
+    for(i = 0; i < tcount; ++i) {
+      ERR(create_intface(stardis, i, &htable_interfaces));
+    }
+    if(args->paths_filename) {
+      ERR(str_set(&stardis->paths_filename, args->paths_filename));
+    }
+    if(args->bin_green_filename) {
+      ERR(str_set(&stardis->bin_green_filename, args->bin_green_filename));
+    }
+  }
+
   /* If computation is on a volume, check medium is known */
   if(args->mode & MODE_MEDIUM_COMPUTE) {
     if(!find_medium_by_name(stardis, &stardis->solve_name, NULL)) {
@@ -583,6 +647,9 @@ stardis_init
   if(is_for_compute) {
     ASSERT(darray_interface_ptrs_size_get(&stardis->geometry.interf_bytrg)
       == tcount);
+    /* Can release enclosures as they are no longer needed if compute */
+    SENC3D(scene_ref_put(stardis->senc3d_scn));
+    stardis->senc3d_scn = NULL;
     res = sdis_scene_create(stardis->dev, tcount,
       sg3d_sdisXd_geometry_get_indices,
       sg3d_sdisXd_geometry_get_interface,
@@ -596,6 +663,7 @@ stardis_init
   }
   
 exit:
+  str_release(&str);
   htable_intface_release(&htable_interfaces);
   return res;
 error:
@@ -604,7 +672,8 @@ error:
 }
 
 void
-stardis_release(struct stardis* stardis)
+stardis_release
+  (struct stardis* stardis)
 {
   size_t i;
 
@@ -612,6 +681,7 @@ stardis_release(struct stardis* stardis)
 
   if(stardis->dev) SDIS(device_ref_put(stardis->dev));
   if(stardis->sdis_scn) SDIS(scene_ref_put(stardis->sdis_scn));
+  if(stardis->senc3d_scn) SENC3D(scene_ref_put(stardis->senc3d_scn));
   str_release(&stardis->solve_name);
   str_release(&stardis->paths_filename);
   str_release(&stardis->bin_green_filename);
@@ -623,6 +693,30 @@ stardis_release(struct stardis* stardis)
   FOR_EACH(i, 0, darray_media_ptr_size_get(&stardis->media))
     SDIS(medium_ref_put(darray_media_ptr_data_get(&stardis->media)[i]));
   darray_media_ptr_release(&stardis->media);
+}
+
+res_T
+init_enclosures
+  (struct stardis* stardis)
+{
+  res_T res = RES_OK;
+  unsigned tsz, vsz;
+  struct senc3d_device* senc_dev = NULL;
+
+  ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
+  ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vsz));
+  ERR(senc3d_device_create(stardis->logger, stardis->allocator,
+    SENC3D_NTHREADS_DEFAULT, stardis->verbose, &senc_dev));
+  ERR(senc3d_scene_create(senc_dev,
+    SENC3D_CONVENTION_NORMAL_BACK | SENC3D_CONVENTION_NORMAL_OUTSIDE,
+    tsz, sg3d_sencXd_geometry_get_indices, sg3d_sencXd_geometry_get_media,
+    vsz, sg3d_sencXd_geometry_get_position, stardis->geometry.sg3d,
+    &stardis->senc3d_scn));
+exit:
+  if(senc_dev) senc3d_device_ref_put(senc_dev);
+  return res;
+error:
+  goto exit;
 }
 
 /*******************************************************************************
@@ -663,8 +757,8 @@ ensure_allocated(struct str* str, const size_t len, const char keep_old)
 
 res_T
 str_printf
-(struct str* str,
-  const char* fmt, ...)
+  (struct str* str,
+   const char* fmt, ...)
 {
   res_T res = RES_OK;
   size_t initial_len, left;

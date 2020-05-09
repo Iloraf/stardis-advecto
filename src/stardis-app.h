@@ -754,6 +754,7 @@ struct stardis {
   struct sdis_scene* sdis_scn; /* The solver scene */
   struct darray_descriptions descriptions;  /* Materials and boundaries */
   struct darray_media_ptr media;
+  struct senc3d_scene* senc3d_scn;
   struct counts counts;
 
   double probe[4]; /* x,y,z,t of probe when mode is PROBE_COMPUTE */
@@ -787,6 +788,11 @@ stardis_init
 
 extern LOCAL_SYM void
 stardis_release
+  (struct stardis* stardis);
+
+
+extern LOCAL_SYM res_T
+init_enclosures
   (struct stardis* stardis);
 
 #endif /*STARDIS-APP_H*/

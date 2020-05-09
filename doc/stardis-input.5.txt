@@ -116,7 +116,8 @@ _______
 
 <cp>                  ::= REAL # in ]0, INF)
 
-<delta>               ::= REAL # in ]0, INF)
+<delta>               ::= "AUTO" # delta is automatically set to V/6S
+                        | REAL # in [0, INF)
 
 <initial-temp>        ::= REAL # in [0, INF)
 

@@ -1309,7 +1309,7 @@ read_imposed_temperature
   ERR(str_set(&keep, tk));
   if(RES_OK == cstr_to_double(tk, imposed_temperature)) {
     /* Was a number */
-    if(imposed_temperature < 0) {
+    if(*imposed_temperature < 0) {
       res = RES_BAD_ARG;
       goto error;
     }
@@ -1349,7 +1349,7 @@ read_delta
   ERR(str_set(&keep, tk));
   if(RES_OK == cstr_to_double(tk, delta)) {
     /* Was a number */
-    if(delta <= 0) {
+    if(*delta <= 0) {
       res = RES_BAD_ARG;
       goto error;
     }

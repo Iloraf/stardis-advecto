@@ -280,7 +280,6 @@ compute_probe(struct stardis* stardis)
   ERR(select_probe_type(stardis, 0, pos, &iprim, uv));
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
-    ASSERT(iprim == SIZE_MAX);
     ERR(sdis_solve_probe_green_function(stardis->sdis_scn,
       stardis->samples,
       pos,
@@ -302,7 +301,6 @@ compute_probe(struct stardis* stardis)
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
-    ASSERT(iprim == SIZE_MAX);
     d2_splat(time, stardis->probe[3]);
     ERR(sdis_solve_probe(stardis->sdis_scn,
       stardis->samples,

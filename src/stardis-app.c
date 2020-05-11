@@ -469,7 +469,7 @@ create_holder
   }
 
 end:
-  if(enc) ERR(senc3d_enclosure_ref_put(enc));
+  if(enc) SENC3D(enclosure_ref_put(enc));
   return res;
 error:
   goto end;

@@ -170,6 +170,7 @@ read_sides_and_files
   int file_count = 0;
   struct sstl* sstl = NULL;
   struct add_geom_ctx add_geom_ctx;
+  unsigned current_merge_errors;
   struct sg3d_geometry_add_callbacks callbacks = SG3D_ADD_CALLBACKS_NULL__;
   res_T res = RES_OK;
 
@@ -179,10 +180,13 @@ read_sides_and_files
   callbacks.get_properties = add_geom_ctx_properties;
   callbacks.get_position = add_geom_ctx_position;
 
+  ERR(sg3d_geometry_get_unique_triangles_with_merge_conflict_count(
+    stardis->geometry.sg3d, &current_merge_errors));
+
   /* At least one side+name, no side without name */
   ERR(sstl_create(stardis->logger, stardis->allocator, 0, &sstl));
   for(;;) {
-    struct str name;
+    unsigned merge_errors;
     if(side_is_intface) {
       add_geom_ctx.properties[SG3D_FRONT] = SG3D_UNSPECIFIED_PROPERTY;
       add_geom_ctx.properties[SG3D_BACK] = SG3D_UNSPECIFIED_PROPERTY;
@@ -242,10 +246,6 @@ read_sides_and_files
     ERR(sstl_get_desc(sstl, &add_geom_ctx.stl_desc));
     ASSERT(add_geom_ctx.stl_desc.vertices_count <= UINT_MAX
       && add_geom_ctx.stl_desc.triangles_count <= UINT_MAX);
-    /* Keep file names for error reports */
-    str_init(stardis->allocator, &name);
-    ERR(str_set(&name, tk));
-    str_release(&name);
 
     res = sg3d_geometry_add(
       stardis->geometry.sg3d,
@@ -259,6 +259,21 @@ read_sides_and_files
         "Cannot add file content: '%s'\n", tk);
       goto error;
     }
+    /* Check conflicts */
+    ERR(sg3d_geometry_get_unique_triangles_with_merge_conflict_count(
+      stardis->geometry.sg3d, &merge_errors));
+    if(current_merge_errors != merge_errors) {
+      int is_for_compute =
+        (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_VTK);
+      logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
+        "Merge conflicts found reading file %s (%u triangles).\n",
+        tk, merge_errors - current_merge_errors);
+      if(is_for_compute) {
+        res = RES_BAD_ARG;
+        goto error;
+      }
+    }
+    current_merge_errors = merge_errors;
   }
 
 end:

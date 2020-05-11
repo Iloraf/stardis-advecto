@@ -632,18 +632,6 @@ stardis_init
     }
   }
 
-  /* Check conflicts */
-  ERR(sg3d_geometry_get_unique_triangles_with_merge_conflict_count(
-    stardis->geometry.sg3d, &count));
-  if(count) {
-    logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
-      "Merge conflicts found in the the model (%u triangles).\n", count);
-    if(is_for_compute) {
-      res = RES_BAD_ARG;
-      goto error;
-    }
-  }
-
   if(is_for_compute) {
     ASSERT(darray_interface_ptrs_size_get(&stardis->geometry.interf_bytrg)
       == tcount);

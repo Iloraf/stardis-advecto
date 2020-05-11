@@ -187,7 +187,8 @@ options that write to  _standard output_ (-g, -h, -R, -v).
   file per path. Possible values for *type* are *error* (write paths ending
   in error), *success* (write successful paths), and *all* (write all paths).
   Actual file names are produced by appending *files_name_prefix* and the path
-  rank starting at index 00000000: prefix00000000.vtk, prefix00000001.vtk, ...
+  rank starting at index 00000000, and possibly followed by *_err* for failure
+  paths: prefix00000000.vtk, prefix00000001_err.vtk, ...
 +
 This option can only be used in conjuction with options that compute a
 result (-F, -m, -P, -p, -R, -S, -s) and cannot be used in conjunction with

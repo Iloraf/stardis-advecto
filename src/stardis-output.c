@@ -163,14 +163,17 @@ dump_path
     && dump_ctx->stardis
     && !str_is_empty(&dump_ctx->stardis->paths_filename));
 
-  name_sz = 16 + str_len(&dump_ctx->stardis->paths_filename);
+  ERR(sdis_heat_path_get_status(path, &status));
+
+  name_sz = 20 + str_len(&dump_ctx->stardis->paths_filename);
   name = MEM_CALLOC(dump_ctx->stardis->allocator, name_sz, sizeof(*name));
   if(!name) {
     res = RES_MEM_ERR;
     goto error;
   }
-  snprintf(name, name_sz, "%s%08zu.vtk",
-    str_cget(&dump_ctx->stardis->paths_filename), dump_ctx->rank++);
+  snprintf(name, name_sz, "%s%08zu%s.vtk",
+    str_cget(&dump_ctx->stardis->paths_filename), dump_ctx->rank++,
+    (status == SDIS_HEAT_PATH_FAILURE ? "_err" : ""));
 
   stream = fopen(name, "w");
   if(!stream) {
@@ -200,7 +203,6 @@ dump_path
   fprintf(stream, "CELL_DATA %d\n", 1);
   fprintf(stream, "SCALARS Path_Type unsigned_char 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
-  ERR(sdis_heat_path_get_status(path, &status));
   switch (status) {
   case SDIS_HEAT_PATH_SUCCESS: fprintf(stream, "0\n"); break;
   case SDIS_HEAT_PATH_FAILURE: fprintf(stream, "1\n"); break;

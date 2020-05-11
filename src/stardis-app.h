@@ -775,7 +775,7 @@ struct stardis {
   struct mem_allocator* allocator;
   struct logger* logger;
   struct sdis_device* dev;
-  enum sdis_heat_path_flag dump_paths;
+  int dump_paths;
   int verbose;
 };
 

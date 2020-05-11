@@ -498,8 +498,8 @@ parse_args
     case '?': /* Unreconised option */
     {
       char* ptr = strchr(option_list, optopt);
+      res = RES_BAD_ARG;
       if(ptr && ptr[1] == ':') {
-        res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
           "Missing argument for option -%c\n",
           optopt);

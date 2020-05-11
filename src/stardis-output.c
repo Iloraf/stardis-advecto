@@ -886,7 +886,6 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
       if(e == encs[SENC3D_FRONT] || e == encs[SENC3D_BACK])
         fprintf(stream, "%d ", (char)enc_status[e]);
       else fprintf(stream, "0 ");
-
     }
     fprintf(stream, "\n");
   }

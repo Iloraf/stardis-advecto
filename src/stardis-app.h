@@ -42,6 +42,9 @@ struct sdis_medium;
 /* Utility macros */
 #define ERR(Expr) if((res = (Expr)) != RES_OK) goto error; else (void)0
 
+#define DELTA_AUTO INF /* Placeholder until actual value is substituted */
+#define UNKNOWN_MEDIUM_TEMPERATURE -1 /* Unknown for stadis solver is -1 */
+
 /* Different types of descriptions */
 enum description_type {
   DESC_MAT_SOLID,
@@ -775,9 +778,19 @@ struct stardis {
   struct mem_allocator* allocator;
   struct logger* logger;
   struct sdis_device* dev;
+  unsigned next_medium_id;
   int dump_paths;
   int verbose;
 };
+
+static INLINE void
+allocate_stardis_medium_id
+  (struct stardis* stardis,
+   unsigned* id)
+{
+  ASSERT(stardis && id);
+  *id = stardis->next_medium_id++;
+}
 
 extern LOCAL_SYM res_T
 stardis_init

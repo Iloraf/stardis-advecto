@@ -53,6 +53,6 @@ create_stardis_solid
    const double tinit,
    const double imposed_temperature,
    const double vpower,
-   unsigned* out_id);
+   const unsigned id);
 
 #endif

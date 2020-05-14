@@ -83,7 +83,7 @@ create_stardis_fluid
    const int is_outside,
    const double tinit,
    const double imposed_temperature,
-   unsigned* out_id)
+   const unsigned id)
 {
   res_T res = RES_OK;
   struct sdis_fluid_shader fluid_shader = SDIS_FLUID_SHADER_NULL;
@@ -91,7 +91,7 @@ create_stardis_fluid
   struct fluid* fluid_props;
   size_t sz;
 
-  ASSERT(stardis && rho >= 0 && cp >= 0 && out_id);
+  ASSERT(stardis && rho >= 0 && cp >= 0);
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
   fluid_shader.volumic_mass = fluid_get_volumic_mass;
   fluid_shader.temperature = fluid_get_temperature;
@@ -110,12 +110,11 @@ create_stardis_fluid
   fluid_props->imposed_temperature = imposed_temperature;
   fluid_props->is_green = is_green;
   fluid_props->is_outside = is_outside;
-  fluid_props->id = (unsigned)sz;
- 
-  ERR(darray_media_ptr_resize(&stardis->media, sz+1));
+  fluid_props->id = id;
+  ASSERT(id >= darray_media_ptr_size_get(&stardis->media));
+  ERR(darray_media_ptr_resize(&stardis->media, id + 1));
   ERR(sdis_fluid_create(stardis->dev, &fluid_shader, data,
-    darray_media_ptr_data_get(&stardis->media) + sz));
-  *out_id = fluid_props->id;
+    darray_media_ptr_data_get(&stardis->media) + id));
 
 end:
   if(data) SDIS(data_ref_put(data));

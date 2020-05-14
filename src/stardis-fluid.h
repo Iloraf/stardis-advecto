@@ -49,6 +49,6 @@ create_stardis_fluid
    const int is_outside,
    const double tinit,
    const double imposed_temperature,
-   unsigned* out_id);
+   const unsigned out_id);
 
 #endif

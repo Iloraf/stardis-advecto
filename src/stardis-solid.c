@@ -129,17 +129,15 @@ create_stardis_solid
    const double tinit,
    const double imposed_temperature,
    const double vpower,
-   unsigned* out_id)
+   const unsigned id)
 {
   res_T res = RES_OK;
   struct sdis_solid_shader solid_shader = SDIS_SOLID_SHADER_NULL;
   struct sdis_data* data = NULL;
   struct solid* solid_props;
-  size_t sz;
   /* Could be less restrictive if green output included positions/dates */
 
-  ASSERT(stardis && lambda >= 0 && rho >= 0 && cp >= 0 && delta > 0
-    && out_id);
+  ASSERT(stardis && lambda > 0 && rho > 0 && cp > 0 && delta > 0);
   solid_shader.calorific_capacity = solid_get_calorific_capacity;
   solid_shader.thermal_conductivity = solid_get_thermal_conductivity;
   solid_shader.volumic_mass = solid_get_volumic_mass;
@@ -151,8 +149,6 @@ create_stardis_solid
   ERR(sdis_data_create(stardis->dev, sizeof(struct solid), ALIGNOF(struct solid),
     NULL, &data));
 
-  sz = darray_media_ptr_size_get(&stardis->media);
-  ASSERT(sz < INT_MAX);
   solid_props = sdis_data_get(data); /* Fetch the allocated memory space */
   str_init(stardis->allocator, &solid_props->name);
   if(name) str_copy(&solid_props->name, name);
@@ -166,12 +162,12 @@ create_stardis_solid
   solid_props->vpower = vpower;
   solid_props->is_green = is_green;
   solid_props->is_outside = is_outside;
-  solid_props->id = (unsigned)sz;
+  solid_props->id = id;
   if(vpower != 0) solid_shader.volumic_power = solid_get_power;
-  ERR(darray_media_ptr_resize(&stardis->media, sz + 1));
+  ASSERT(id >= darray_media_ptr_size_get(&stardis->media));
+  ERR(darray_media_ptr_resize(&stardis->media, id + 1));
   ERR(sdis_solid_create(stardis->dev, &solid_shader, data,
-    darray_media_ptr_data_get(&stardis->media) + sz));
-  *out_id = solid_props->id;
+    darray_media_ptr_data_get(&stardis->media) + id));
 
 end:
   if(data) SDIS(data_ref_put(data));

@@ -300,9 +300,10 @@ create_holder
   case DESC_BOUND_H_FOR_SOLID:
     stardis->counts.hbound_count++;
     /* Create an external fluid with imposed temperature */
+    allocate_stardis_medium_id(stardis, &description->d.h_boundary.mat_id);
     ERR(create_stardis_fluid(stardis, NULL, 1, 1, is_green, 1, -1,
       description->d.h_boundary.imposed_temperature,
-      &description->d.h_boundary.mat_id));
+      description->d.h_boundary.mat_id));
     logger_print(stardis->logger, LOG_OUTPUT,
       "External fluid (id=%u): rho=1 cp=1 T=%g\n",
       description->d.h_boundary.mat_id,
@@ -316,10 +317,11 @@ create_holder
     } else {
       /* Create dummy solid */
       size_t sz = darray_media_ptr_size_get(&stardis->media);
+      allocate_stardis_medium_id(stardis, &description->d.h_boundary.mat_id);
       ERR(create_stardis_solid(stardis, NULL, 1, 1, 1, 1, is_green, 1, -1,
-        -1, 0, &description->d.t_boundary.mat_id));
+        -1, 0, description->d.h_boundary.mat_id));
       dummies->dummy_solid = darray_media_ptr_data_get(&stardis->media)[sz];
-      dummies->dummy_solid_id = description->d.t_boundary.mat_id;
+      dummies->dummy_solid_id = description->d.h_boundary.mat_id;
       logger_print(stardis->logger, LOG_OUTPUT,
         "Dummy solid (id=%u): lambda=1 rho=1 cp=1\n",
         dummies->dummy_solid_id);
@@ -333,8 +335,9 @@ create_holder
     } else {
       /* Create dummy fluid */
       size_t sz = darray_media_ptr_size_get(&stardis->media);
+      allocate_stardis_medium_id(stardis, &description->d.t_boundary.mat_id);
       ERR(create_stardis_fluid(stardis, NULL, 1, 1, is_green, 1, -1,
-        -1, &description->d.t_boundary.mat_id));
+        -1, description->d.t_boundary.mat_id));
       dummies->dummy_fluid = darray_media_ptr_data_get(&stardis->media)[sz];
       dummies->dummy_fluid_id = description->d.t_boundary.mat_id;
       logger_print(stardis->logger, LOG_OUTPUT,
@@ -349,8 +352,9 @@ create_holder
     } else {
       /* Create dummy solid */
       size_t sz = darray_media_ptr_size_get(&stardis->media);
+      allocate_stardis_medium_id(stardis, &description->d.t_boundary.mat_id);
       ERR(create_stardis_solid(stardis, NULL, 1, 1, 1, 1, is_green, 1, -1,
-        -1, 0, &description->d.t_boundary.mat_id));
+        -1, 0, description->d.t_boundary.mat_id));
       dummies->dummy_solid = darray_media_ptr_data_get(&stardis->media)[sz];
       dummies->dummy_solid_id = description->d.t_boundary.mat_id;
       logger_print(stardis->logger, LOG_OUTPUT,
@@ -366,8 +370,9 @@ create_holder
     } else {
       /* Create dummy fluid */
       size_t sz = darray_media_ptr_size_get(&stardis->media);
+      allocate_stardis_medium_id(stardis, &description->d.f_boundary.mat_id);
       ERR(create_stardis_fluid(stardis, NULL, 1, 1, is_green, 1, -1, -1,
-        &description->d.f_boundary.mat_id));
+        description->d.f_boundary.mat_id));
       dummies->dummy_fluid = darray_media_ptr_data_get(&stardis->media)[sz];
       dummies->dummy_fluid_id = description->d.f_boundary.mat_id;
       logger_print(stardis->logger, LOG_OUTPUT,
@@ -388,18 +393,7 @@ create_holder
     struct senc3d_enclosure_header header;
     /* Create solid to have ID informed */
     stardis->counts.smed_count++;
-    ERR(create_stardis_solid(stardis,
-      &description->d.solid.name,
-      description->d.solid.lambda,
-      description->d.solid.rho,
-      description->d.solid.cp,
-      description->d.solid.delta,
-      is_green,
-      0,
-      description->d.solid.tinit,
-      description->d.solid.imposed_temperature,
-      description->d.solid.vpower,
-      &description->d.solid.solid_id));
+    allocate_stardis_medium_id(stardis, &description->d.solid.solid_id);
     /* Check if delta can fit possible multiple enclosures */
     ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn,
       description->d.solid.solid_id, &ecount));
@@ -415,6 +409,7 @@ create_holder
           external = 1;
         } else {
           double d = header.volume / (header.area * 6);
+          ASSERT(d >= 0);
           delta_range[0] = MMIN(delta_range[0], d);
           delta_range[1] = MMAX(delta_range[1], d);
         }
@@ -429,8 +424,8 @@ create_holder
             "Solid %s is used in %u different enclosures that have different "
             "delta requirements.\n",
             str_cget(&description->d.solid.name), ecount);
-        /* Delta was AUTO and need to be computed */
-        if(description->d.solid.delta == -1) {
+        /* Delta needs to be substituted with actual value */
+        if(description->d.solid.delta == DELTA_AUTO) {
           description->d.solid.delta = delta_range[0];
           logger_print(stardis->logger, LOG_OUTPUT,
             "Auto delta for solid %s set to %g\n",
@@ -450,10 +445,23 @@ create_holder
         }
       }
     }
+    ERR(create_stardis_solid(stardis,
+      &description->d.solid.name,
+      description->d.solid.lambda,
+      description->d.solid.rho,
+      description->d.solid.cp,
+      description->d.solid.delta,
+      is_green,
+      0,
+      description->d.solid.tinit,
+      description->d.solid.imposed_temperature,
+      description->d.solid.vpower,
+      description->d.solid.solid_id));
     break;
   }
   case DESC_MAT_FLUID:
     stardis->counts.fmed_count++;
+    allocate_stardis_medium_id(stardis, &description->d.fluid.fluid_id);
     ERR(create_stardis_fluid(stardis,
       &description->d.fluid.name,
       description->d.fluid.rho,
@@ -462,7 +470,7 @@ create_holder
       0,
       description->d.fluid.tinit,
       description->d.fluid.imposed_temperature,
-      &description->d.fluid.fluid_id));
+      description->d.fluid.fluid_id));
     break;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
@@ -528,6 +536,7 @@ stardis_init
     stardis->dump_paths |= SDIS_HEAT_PATH_FAILURE;
   if(args->dump_paths & DUMP_SUCCESS)
     stardis->dump_paths |= SDIS_HEAT_PATH_SUCCESS;
+  stardis->next_medium_id = 0;
   stardis->verbose = args->verbose;
   darray_media_ptr_init(stardis->allocator, &stardis->media);
 

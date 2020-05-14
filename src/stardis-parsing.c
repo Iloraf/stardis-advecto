@@ -1317,8 +1317,7 @@ read_imposed_temperature
     /* Could be 'unknown' */
     _strupr(tk);
     if(0 == strcmp(tk, "UNKNOWN")) {
-      /* Unknown for stadis solver is -1 */
-      *imposed_temperature = -1;
+      *imposed_temperature = UNKNOWN_MEDIUM_TEMPERATURE;
     } else {
       res = RES_BAD_ARG;
       goto error;
@@ -1357,8 +1356,8 @@ read_delta
     /* Could be 'auto' */ 
     _strupr(tk);
     if(0 == strcmp(tk, "AUTO")) {
-      /* Set to -1 until actual value is substituted */
-      *delta = -1;
+      /* Set to DELTA_AUTO until actual value is substituted */
+      *delta = DELTA_AUTO;
     } else {
       res = RES_BAD_ARG;
       goto error;

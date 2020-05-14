@@ -927,7 +927,7 @@ print_single_MC_result
   case MODE_PROBE_COMPUTE:
   case MODE_PROBE_COMPUTE_ON_INTERFACE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
-      fprintf(stream, "Temperature at [%g, %g, %g] at t=%g = %g +/- %g\n",
+      fprintf(stream, "Boundary temperature at [%g, %g, %g] at t=%g = %g +/- %g\n",
         SPLIT4(stardis->probe),
         result.E, /* Expected value */
         result.SE); /* Standard error */
@@ -937,7 +937,7 @@ print_single_MC_result
     break;
   case MODE_MEDIUM_COMPUTE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
-      fprintf(stream, "Temperature in medium %s at t=%g = %g +/- %g\n",
+      fprintf(stream, "Temperature in medium '%s' at t=%g = %g +/- %g\n",
         str_cget(&stardis->solve_name), stardis->probe[3],
         result.E, /* Expected value */
         result.SE); /* Standard error */

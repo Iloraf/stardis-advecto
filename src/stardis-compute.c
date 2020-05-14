@@ -36,7 +36,7 @@
 /* Check probe position and move it to the closest point on an interface
  * if on_interface is set */
 static res_T
-select_probe_type
+check_probe_conform_to_type
   (const struct stardis* stardis,
    const int move2boundary,
    double pos[3],
@@ -267,7 +267,7 @@ static res_T
 compute_probe(struct stardis* stardis)
 {
   res_T res = RES_OK;
-  double time[2], pos[3], uv[2] = { 0,0 };
+  double time[2], uv[2] = { 0,0 };
   size_t iprim = SIZE_MAX;
   struct sdis_green_function* green = NULL;
   struct sdis_estimator* estimator = NULL;
@@ -276,13 +276,12 @@ compute_probe(struct stardis* stardis)
   
   ASSERT(stardis && (stardis->mode & MODE_PROBE_COMPUTE));
 
-  d3_set(pos, stardis->probe);
-  ERR(select_probe_type(stardis, 0, pos, &iprim, uv));
+  ERR(check_probe_conform_to_type(stardis, 0, stardis->probe, &iprim, uv));
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     ERR(sdis_solve_probe_green_function(stardis->sdis_scn,
       stardis->samples,
-      pos,
+      stardis->probe,
       stardis->scale_factor,
       stardis->ambient_temp,
       stardis->ref_temp,
@@ -304,7 +303,7 @@ compute_probe(struct stardis* stardis)
     d2_splat(time, stardis->probe[3]);
     ERR(sdis_solve_probe(stardis->sdis_scn,
       stardis->samples,
-      pos,
+      stardis->probe,
       time,
       stardis->scale_factor,
       stardis->ambient_temp,
@@ -331,7 +330,7 @@ static res_T
 compute_probe_on_interface(struct stardis* stardis)
 {
   res_T res = RES_OK;
-  double time[2], pos[3], uv[2] = { 0,0 };
+  double time[2], uv[2] = { 0,0 };
   size_t iprim = SIZE_MAX;
   struct sdis_estimator* estimator = NULL;
   struct sdis_green_function* green = NULL;
@@ -339,8 +338,7 @@ compute_probe_on_interface(struct stardis* stardis)
   FILE* stream = NULL;
 
   ASSERT(stardis && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
-  d3_set(pos, stardis->probe);
-  ERR(select_probe_type(stardis, 1, pos, &iprim, uv));
+  ERR(check_probe_conform_to_type(stardis, 1, stardis->probe, &iprim, uv));
   ASSERT(iprim != SIZE_MAX);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
@@ -669,15 +667,13 @@ static res_T
 compute_boundary(struct stardis* stardis)
 {
   res_T res = RES_OK;
-  double time[2], pos[3];
+  double time[2];
   struct sdis_green_function* green = NULL;
   struct sdis_estimator* estimator = NULL;
   struct dump_path_context dump_ctx;
   FILE* stream = NULL;
 
   ASSERT(stardis && (stardis->mode & MODE_BOUNDARY_COMPUTE));
-
-  d3_set(pos, stardis->probe);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     ERR(sdis_solve_boundary_green_function(stardis->sdis_scn,
@@ -735,14 +731,13 @@ static res_T
 compute_flux_boundary(struct stardis* stardis)
 {
   res_T res = RES_OK;
-  double time[2], pos[3];
+  double time[2];
   struct sdis_green_function* green = NULL;
   struct sdis_estimator* estimator = NULL;
   struct dump_path_context dump_ctx;
 
   ASSERT(stardis && (stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE));
 
-  d3_set(pos, stardis->probe);
   d2_splat(time, stardis->probe[3]);
   ERR(sdis_solve_boundary_flux(stardis->sdis_scn,
     stardis->samples,
@@ -772,7 +767,7 @@ static res_T
 compute_map(struct stardis* stardis)
 {
   res_T res = RES_OK;
-  double time[2], pos[3];
+  double time[2];
   struct sdis_green_function* green = NULL;
   struct darray_estimators estimators;
   int estimators_initialized = 0;
@@ -784,7 +779,6 @@ compute_map(struct stardis* stardis)
 
   darray_estimators_init(stardis->allocator, &estimators);
   estimators_initialized = 1;
-  d3_set(pos, stardis->probe);
   d2_splat(time, stardis->probe[3]);
 
   ERR(darray_estimators_resize(&estimators,

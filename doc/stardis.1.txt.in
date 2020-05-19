@@ -144,7 +144,7 @@ EXCLUSIVE OPTIONS
 
   **pos=**_x_**,**_y_**,**_z_;;
     Position of the camera. By default it is set to
-    {@STARDIS_ARGS_DEFAULT_RENDERING_POS@} or it is automatically computed to
+    { @STARDIS_ARGS_DEFAULT_RENDERING_POS@ } or it is automatically computed to
     ensure that the whole scene is visible, whether *tgt* is set or not,
     respectively.
 
@@ -158,19 +158,19 @@ EXCLUSIVE OPTIONS
 
   **tgt=**_x_**,**_y_**,**_z_;;
     Position targeted by the camera. By default, it is set to
-    {@STARDIS_ARGS_DEFAULT_RENDERING_TGT@} or it is automatically computed to
+    { @STARDIS_ARGS_DEFAULT_RENDERING_TGT@ } or it is automatically computed to
     ensure that the whole scene is visible, whether *pos* is set or not,
     respectively.
 
   **up=**_x_**,**_y_**,**_z_;;
     Up vector of the camera. By default, it is set to
-    {@STARDIS_ARGS_DEFAULT_RENDERING_UP@}.
+    { @STARDIS_ARGS_DEFAULT_RENDERING_UP@ }.
 
 OTHER OPTIONS
 -------------
 *-a* _ambient_::
   Set the ambient radiative temperature for the whole system. By default
-  *ambient* is @STARDIS_ARGS_DEFAULT_AMBIANT_TEMP@.
+  *ambient* is @STARDIS_ARGS_DEFAULT_AMBIENT_TEMP@.
 
 *-d*::
   Write the geometry to _standard output_ in VTK format along with various

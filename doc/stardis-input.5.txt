@@ -116,7 +116,8 @@ _______
 
 <cp>                  ::= REAL # in ]0, INF)
 
-<delta>               ::= "AUTO" # delta is automatically set to V/6S
+<delta>               ::= "AUTO" # delta is automatically set to V/6A (V and A being
+                                 # respectively the solid volume and its boundary area)
                         | REAL # in [0, INF)
 
 <initial-temp>        ::= REAL # in [0, INF)

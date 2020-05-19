@@ -15,15 +15,14 @@
 
 :toc:
 
-stardis-output(5)
-==================
+= stardis-output(5)
 
-NAME
-----
+== NAME
+
 stardis-output - output format of stardis(1) results
 
-DESCRIPTION
------------
+== DESCRIPTION
+
 *stardis-output* describes the output format of the *stardis*(1) program.
 Any *stardis*(1) result is written to _standard output_, even though some
 additional information can be written in files.
@@ -41,13 +40,13 @@ Finaly, some special options (*-v*, *-h* or *-d*) that does not involve any
 computation produce output including information on the *stardis*(1) software
 (their ouputs will not be described thereafter) or the provided thermal system.
 
-UNITS
------
+== UNITS
+
 As with the values in *stardis-input*(5), any physical quantity in output is in
 the International System of Units (second, metre, kilogram, kelvin).
 
-OPTIONS
--------
+== OPTIONS
+
 Every top-level item of the output listed below is produced by one or more
 specific options of the *stardis*(1) program. The following list gives the
 correspondance:
@@ -69,8 +68,8 @@ correspondance:
 
 *-d*: produces <geometry-dump>
 
-GRAMMAR
--------
+== GRAMMAR
+
 In what follows, some lines end in *\*. This is used as a convenience to
 continue a description next line. However, this trick is not part of the
 actual output, that continues on a single line. On the other hand, multiple
@@ -82,8 +81,7 @@ and '***', when not verbatim, are used with the usual meaning (like in
 #something+1). Finally, text introduced by the *#* character in a description,
 when neither verbatim nor count, is a comment and is not part of the output.
 
-OUTPUT
-------
+== OUTPUT
 
 [verse]
 _______
@@ -95,8 +93,8 @@ _______
                      | <infrared-image>
 _______
 
-SINGLE MONTE CARLO
-------------------
+== SINGLE MONTE CARLO
+
 When *stardis*(1) is used to produce a single Monte-Carlo result, either
 temperature or flux, this result is output first to _standard output_, possibly
 followed by some of the heat paths involved in the computation if option *-D*
@@ -159,17 +157,19 @@ _______
 
 _______
 
-ASCII GREEN
------------
-The Green function is generated when a green-compatible *stardis*(1) simulation
-option is used in conjuction with the *-&#8288;g* option. For every successful
-heat path sampled carrying out the simulation, the solver records all the
-elements of the path history relevant to link the various imposed temperature,
-fluxe and volumic power values to the simulation result. Note that to be able
-to explore different values of volumic power when applying the Green function,
-it must have been generated with these values being non-zero. On the other
-hand, any temperature or flux value in boundary descriptions can be modified
-when applying the Green function, as well as the ambient temperature.
+== GREEN
+
+The Green function is generated, either in binary or ascii format, when a
+green-compatible *stardis*(1) simulation option is used in conjuction with
+option *-G* for a binary outpur, or option *-g* for an ascii output. For
+every successful heat path sampled carrying out the simulation, the solver
+records all the elements of the path history relevant to link the various
+imposed temperature, fluxe and volumic power values to the simulation result.
+Note that to be able to explore different values of volumic power when
+applying the Green function, it must have been generated with these values
+being non-zero. On the other hand, any temperature or flux value in boundary
+descriptions can be modified when applying the Green function, as well as the
+ambient temperature.
 
 The output in green mode is made of tables containing the different media and
 boundaries and their imposed temperature, flux and volumic power values,
@@ -184,144 +184,283 @@ follows:
 * Add the temperature gain of each power term;
 * Add the temperature gain of each flux term.
 
+=== BINARY GREEN
+
+Thereafter is the format of binary Green outputs. This output is produced by
+fwrite calls and does not take care of endianness. Comments include the C type
+of the written data.
+
 [verse]
 _______
-<ascii-green>        ::= "---BEGIN GREEN---"
-                         "# #solids #fluids #t_boundaries #h_boundaries #f_boundaries \
-                         #ok #failures"
-                         #solids #fluids #t_boundaries #h_boundaries #f_boundaries #ok \
-                         #failures
-                         "# Solids"
-                         "# ID Name lambda rho cp power"
-                         <solids>
-                         "# Fluids"
-                         "# ID Name rho cp"
-                         <fluids>
-                         "# T Boundaries"
-                         "# ID Name temperature"
-                         <t-bounds>
-                         "# H Boundaries"
-                         "# ID Name emissivity specular_fraction hc T_env"
-                         <h-bounds>
-                         "# F Boundaries"
-                         "# ID Name flux"
-                         <f-bounds>
-                         "# Radiative Temperatures"
-                         "# ID Rad_Temp Lin_Temp"
-                         <rad-temps>
-                         "# Samples"
-                         "# end #power_terms #flux_terms power_term_1 ... power_term_n \
-                         flux_term_1 ... flux_term_n"
-                         "# end = end_type end_id; end_type = T | H | X | R | F | S"
-                         "# power_term_i = power_id_i factor_i"
-                         "# flux_term_i = flux_id_i factor_i"
-                         <samples>
-                         "---END GREEN---"
+<binary-green> ::= "BINGREEN" # char[8]
+                   #descriptions # unsigned
+                   #solids # unsigned
+                   #fluids # unsigned
+                   #t-boundaries # unsigned
+                   #h-boundaries # unsigned
+                   #flux-boundaries # unsigned
+                   #solid-fluid-connections # unsigned
+                   names-pool-size # size of concatenated description names: unsigned
+                   #ok-samples # size_t
+                   #failed-samples # size_t
+                   <descriptions>
+                   <concatenated-names> # char[names-pool-size]
+                   ambient-temperature # double
+                   reference-temperature # double
+                   <samples>
 
-<solids>             ::= <solid>
-                         <solids> # #solids solid descriptions
+<descriptions> ::= description # struct description
+                   <descriptions> # #descriptions descriptions
 
-<fluids>             ::= <fluid>
-                         <fluids> # #fluids fluid descriptions
+<samples>      ::= <sample>
+                   <samples> # #ok-samples samples
 
-<t-bounds>           ::= <t-bound>
-                         <t-bounds> # #t-bounds t-bound descriptions
+---------------------
 
-<h-bounds>           ::= <h-bound>
-                         <h-bounds> # #h-bounds h-bound descriptions
+<sample>       ::= <sample-header> # struct path_header
+                   <ids> # unsigned[header.pcount + header.fcount]
+                   <weights> # double[header.pcount + header.fcount]			
+_______
 
-<f-bounds>           ::= <f-bound>
-                         <f-bounds> # #f-bounds f-bound descriptions
+[literal]
+ /* The content of stuct str name members in descriptions is meaningless.
+  * The name of the ith description is the ith nul-terminated string in
+  * <concatenated-names>.
+  * As a convenience, one could use char* baz to store a pointer to the
+  * description's name into <concatenated-names>. */
+ struct str {
+   void* foo;
+   size_t bar;
+   char* baz;
+   char qux[16];
+ };
 
-<rad-temps>          ::= <green-id> <rad-temp> <lin-temp>
+ struct mat_fluid {
+   struct str name;
+   unsigned fluid_id;
+   double rho;
+   double cp;
+   double tinit;
+   double imposed_temperature;
+ };
 
-<samples>            ::= <sample>
-                         <samples> # #samples sample descriptions
+ struct mat_solid {
+   struct str name;
+   unsigned solid_id;
+   double lambda;
+   double rho;
+   double cp;
+   double delta;
+   double tinit;
+   double imposed_temperature;
+   double vpower;
+ };
+
+ struct t_boundary {
+   struct str name;
+   unsigned mat_id;
+   double emissivity;
+   double specular_fraction;
+   double hc;
+   double imposed_temperature;
+ };
+
+ struct h_boundary {
+   struct str name;
+   unsigned mat_id;
+   double emissivity;
+   double specular_fraction;
+   double hc;
+   double imposed_temperature;
+ };
+
+ struct solid_fluid_connect {
+   struct str name;
+   double emissivity;
+   double specular_fraction;
+   double hc;
+ };
+
+ enum description_type {
+   DESC_MAT_SOLID,
+   DESC_MAT_FLUID,
+   DESC_BOUND_H_FOR_FLUID,
+   DESC_BOUND_H_FOR_SOLID,
+   DESC_BOUND_T_FOR_FLUID,
+   DESC_BOUND_T_FOR_SOLID,
+   DESC_BOUND_F_FOR_SOLID,
+   DESC_SOLID_FLUID_CONNECT,
+   DESCRIPTION_TYPE_COUNT__,
+   DESC_OUTSIDE
+ };
+
+ struct f_boundary {
+   struct str name;
+   unsigned mat_id;
+   double imposed_flux;
+ };
+
+ struct description {
+   enum description_type type;
+   union {
+     struct mat_fluid fluid;
+     struct mat_solid solid;
+     struct t_boundary t_boundary;
+     struct f_boundary f_boundary;
+     struct h_boundary h_boundary;
+     struct solid_fluid_connect sf_connect;
+   } d;
+ };
+
+ struct path_header {
+   unsigned id;
+   unsigned pcount, fcount;
+ };
+
+=== ASCII GREEN
+
+Thereafter is the format of ascii Green outputs.
+
+[verse]
+_______
+<ascii-green>       ::= "---BEGIN GREEN---"
+                        "# #solids #fluids #t_boundaries #h_boundaries #f_boundaries \
+                        #ok #failures"
+                        #solids #fluids #t_boundaries #h_boundaries #f_boundaries \
+                        #ok #failures
+                        "# Solids"
+                        "# ID Name lambda rho cp power"
+                        <solids>
+                        "# Fluids"
+                        "# ID Name rho cp"
+                        <fluids>
+                        "# T Boundaries"
+                        "# ID Name temperature"
+                        <t-bounds>
+                        "# H Boundaries"
+                        "# ID Name emissivity specular_fraction hc T_env"
+                        <h-bounds>
+                        "# F Boundaries"
+                        "# ID Name flux"
+                        <f-bounds>
+                        "# Radiative Temperatures"
+                        "# ID Rad_Temp Lin_Temp"
+                        <rad-temps>
+                        "# Samples"
+                        "# end #power_terms #flux_terms power_term_1 ... power_term_n \
+                        flux_term_1 ... flux_term_n"
+                        "# end = end_type end_id; end_type = T | H | X | R | F | S"
+                        "# power_term_i = power_id_i factor_i"
+                        "# flux_term_i = flux_id_i factor_i"
+                        <samples>
+                        "---END GREEN---"
+
+<solids>            ::= <solid>
+                        <solids> # #solids solid descriptions
+
+<fluids>            ::= <fluid>
+                        <fluids> # #fluids fluid descriptions
+
+<t-bounds>          ::= <t-bound>
+                        <t-bounds> # #t-bounds t-bound descriptions
+
+<h-bounds>          ::= <h-bound>
+                        <h-bounds> # #h-bounds h-bound descriptions
+
+<f-bounds>          ::= <f-bound>
+                        <f-bounds> # #f-bounds f-bound descriptions
+
+<rad-temps>         ::= <green-id> <rad-temp> <lin-temp>
+
+<samples>           ::= <sample>
+                        <samples> # #samples sample descriptions
 
 -------------------------------------
 
-<sample>             ::= <end-spec> <power-count> <flux-count> <power-terms> <flux-terms>
+<sample>            ::= <end-spec> <power-count> <flux-count> <power-terms> <flux-terms>
 
-<solid>              ::= <green-id> <name> <lambda> <rho> <cp> <power>
+<solid>             ::= <green-id> <name> <lambda> <rho> <cp> <power>
 
-<fluid>              ::= <green-id> <name> <rho> <cp>
+<fluid>             ::= <green-id> <name> <rho> <cp>
 
-<t-bound>            ::= <green-id> <name> <temperature>
+<t-bound>           ::= <green-id> <name> <temperature>
 
-<h-bound>            ::= <green-id> <name> <emissivity> <specular_fraction> <hc> \
-                         <temperature>
+<h-bound>           ::= <green-id> <name> <emissivity> <specular_fraction> <hc> \
+                        <temperature>
 
-<f-bound>            ::= <green-id> <name> <flux>
+<f-bound>           ::= <green-id> <name> <flux>
 
-<rad-temps>          ::= <green-id> <ambient-temp> <lin-temp>
+<rad-temps>         ::= <green-id> <ambient-temp> <lin-temp>
 
-<name>               ::= STRING # no space allowed
+<name>              ::= STRING # no space allowed
 
-<lambda>             ::= REAL # in ]0, INF)
+<lambda>            ::= REAL # in ]0, INF)
 
-<rho>                ::= REAL # in ]0, INF)
+<rho>               ::= REAL # in ]0, INF)
 
-<cp>                 ::= REAL # in ]0, INF)
+<cp>                ::= REAL # in ]0, INF)
 
-<power>              ::= REAL # in (-INF , INF)
+<power>             ::= REAL # in (-INF , INF)
 
-<temperature>        ::= REAL # in [0, INF)
+<temperature>       ::= REAL # in [0, INF)
 
-<emissivity>         ::= REAL # in [0, 1]
+<emissivity>        ::= REAL # in [0, 1]
 
-<specular-fraction>  ::= REAL # in [0, 1]
+<specular-fraction> ::= REAL # in [0, 1]
 
-<hc>                 ::= REAL # in [0, INF)
+<hc>                ::= REAL # in [0, INF)
 
-<flux>               ::= REAL # in (-INF , INF)
+<flux>              ::= REAL # in (-INF , INF)
 
-<ambient-temp>       ::= REAL # in [0, INF)
+<ambient-temp>      ::= REAL # in [0, INF)
 
-<lin-temp>           ::= REAL # in [0, INF)
+<lin-temp>          ::= REAL # in [0, INF)
 
-<green-id>           ::= INTEGER # in [0 #solids]
-
--------------------------------------
-
-<end-spec>           ::= <end-type> <green-id>
-<end-type>           ::= "T" # sample ends at an t-bound
-                       | "H" # sample ends at an h-bound
-                             # a sample cannot end at an f-bound
-                       | "A" # sample ends with ambient temperature
-                       | "F" # sample ends in a fluid with known temperature
-                       | "S" # sample ends in a solid with known temperature
-
-<power-count>        ::= INTEGER # in [0 INF)
-
-<flux-count>         ::=  INTEGER # in [0 INF)
-
-<power-terms>        ::= <power-term>
-                       | <power-terms> # <power-count> power terms
-
-<flux-terms>         ::= <flux-term>
-                       | <flux-terms> # <flux-count> flux terms
+<green-id>          ::= INTEGER # in [0 #solids]
 
 -------------------------------------
 
-<power-term>         ::= "S" <green-id> <power-factor>
+<end-spec>          ::= <end-type> <green-id>
+<end-type>          ::= "T" # sample ends at an t-bound
+                      | "H" # sample ends at an h-bound
+                            # a sample cannot end at an f-bound
+                      | "A" # sample ends with ambient temperature
+                      | "F" # sample ends in a fluid with known temperature
+                      | "S" # sample ends in a solid with known temperature
 
-<flux-term>          ::= <green-id> <flux-factor>
+<power-count>       ::= INTEGER # in [0 INF)
 
-<power-factor>       ::= REAL # in ]0, INF); the temperature gain is power-factor * Power(green-id)
+<flux-count>        ::=  INTEGER # in [0 INF)
 
-<flux-factor>        ::= REAL # in ]0, INF);  the temperature gain is flux-factor * Flux(green-id)
+<power-terms>       ::= <power-term>
+                      | <power-terms> # <power-count> power terms
+
+<flux-terms>        ::= <flux-term>
+                      | <flux-terms> # <flux-count> flux terms
+
+-------------------------------------
+
+<power-term>        ::= "S" <green-id> <power-factor>
+
+<flux-term>         ::= <green-id> <flux-factor>
+
+<power-factor>      ::= REAL # in ]0, INF)
+                             # the temperature gain is power-factor * Power(green-id)
+
+<flux-factor>       ::= REAL # in ]0, INF)
+                             # the temperature gain is flux-factor * Flux(green-id)
 
 
 _______
 
-GEOMETRY DUMP
--------------
+== GEOMETRY DUMP
+
 A *geometry-file* is generated when *stardis*(1) is invoked with option *-d*.
 In this mode, *stardis*(1) outputs the system geometry, as submitted in
-*stardis-input*(5) description, to _standard output_ in the VTK [1] format.
+*stardis-input*(5) description, to _standard output_ in VTK [1] format.
 The output geometry is not the concatenation of the various geometry files
 used in *stardis-input*(5) description. It is the result of a deduplication
-process that removes duplicate and degenerated triangles in the submited
+process that removes duplicate and degenerated triangles from the submited
 geometry.
 
 Additionaly, as permitted by the VTK [1] format, the output geometry is
@@ -332,80 +471,164 @@ If errors are detected, some optional error-related data fields are included
 in the geometry file. Some errors report a by-triangle error status, other
 errors report a by-enclosure error status.
 
+Also, holes in the geometry, if any, are reported in geometry dumps. A hole is
+defined by its frontier that is a collection of triangles surrounding the hole.
+Such triangles are detected as having their 2 sides in the same enclosure, but
+with a different medium on each side.
+
 [verse]
 _______
-<geometry-file>      ::= "# vtk DataFile Version 2.0"
-                         "Dump of star-geometry-3d geometry"
-                         "ASCII"
-                         "DATASET POLYDATA"
-                         "POINTS" #vertices "double"
-                         <geometry-vertices>
-                         "POLYGONS" #triangles #triangles*4
-                         <geometry-triangles>
-                         "CELL_DATA" #triangles
-                         "SCALARS Front_medium unsigned_int 1"
-                         "LOOKUP_TABLE default"
-                         <front_medium_ids>
+<geometry-file>       ::= "# vtk DataFile Version 2.0"
+                          "Dump of star-geometry-3d geometry"
+                          "ASCII"
+                          "DATASET POLYDATA"
+                          <vertices>
+                          <triangles>
+                          "CELL_DATA" #triangles
+                          <front-media>
+                          <back-media>
+                          <interfaces>
+                          <unique-ids>
+                          <user-ids>
+                        [ <merge-conflicts> ] # if some merge conflict occured
+                        [ <property-conflicts> ] # if some property conflict occured
+                          <file-ranks>
+                        [ <holes> ] # if there are holes
+                          <enclosures>
 
-<front_medium_ids>   ::= UNSIGNED # in [0, INF)
-                         <front_medium_ids> # #media ids
+<vertices>            ::= "POINTS" #vertices "double"
+                          <vertex-list>
 
-<trg-conflict-code>                ::= NO_CONFLICT
-                                     | BOUND_H_FOR_FLUID_BETWEEN_2_DEFS
-                                     | BOUND_H_FOR_FLUID_BETWEEN_2_UNDEFS
-                                     | BOUND_H_FOR_FLUID_ENCLOSING_SOLID
-                                     | BOUND_H_FOR_SOLID_BETWEEN_2_DEFS
-                                     | BOUND_H_FOR_SOLID_BETWEEN_2_UNDEFS
-                                     | BOUND_H_FOR_SOLID_ENCLOSING_FLUID
-                                     | BOUND_T_FOR_FLUID_BETWEEN_2_DEFS
-                                     | BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS
-                                     | BOUND_T_FOR_FLUID_ENCLOSING_SOLID
-                                     | BOUND_T_FOR_SOLID_BETWEEN_2_DEFS
-                                     | BOUND_T_FOR_SOLID_BETWEEN_2_UNDEFS
-                                     | BOUND_T_FOR_SOLID_ENCLOSING_FLUID
-                                     | BOUND_F_FOR_SOLID_BETWEEN_2_DEFS
-                                     | BOUND_F_FOR_SOLID_BETWEEN_2_UNDEFS
-                                     | BOUND_F_FOR_SOLID_ENCLOSING_FLUID
-                                     | SFCONNECT_BETWEEN_2_SOLIDS
-                                     | SFCONNECT_BETWEEN_2_FLUIDS
-                                     | SFCONNECT_USED_AS_BOUNDARY
-                                     | SFCONNECT_BETWEEN_2_UNDEFS
-                                     | NO_CONNECTION_BETWEEN_2_FLUIDS
-                                     | NO_CONNECTION_BETWEEN_SOLID_AND_FLUID
-                                     | NO_BOUND_BETWEEN_FLUID_AND_UNDEF
-                                     | NO_BOUND_BETWEEN_SOLID_AND_UNDEF
+<triangles>           ::= "POLYGONS" #triangles #triangles*4
+                          <triangle-list>
 
-TRG_WITH_NO_PROPERTY
+<front-media>         ::= "SCALARS Front_medium unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <front-medium-ids>
 
-NO_CONFLICT                        ::= 0
-BOUND_H_FOR_FLUID_BETWEEN_2_DEFS   ::= 1
-BOUND_H_FOR_FLUID_BETWEEN_2_UNDEFS ::= 2
-BOUND_H_FOR_FLUID_ENCLOSING_SOLID  ::= 3
-BOUND_H_FOR_SOLID_BETWEEN_2_DEFS   ::= 4
-BOUND_H_FOR_SOLID_BETWEEN_2_UNDEFS ::= 5
-BOUND_H_FOR_SOLID_ENCLOSING_FLUID  ::= 6
-BOUND_T_FOR_FLUID_BETWEEN_2_DEFS   ::= 7
-BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS ::= 8
-BOUND_T_FOR_FLUID_ENCLOSING_SOLID  ::= 9
-BOUND_T_FOR_SOLID_BETWEEN_2_DEFS   ::= 10
-BOUND_T_FOR_SOLID_BETWEEN_2_UNDEFS ::= 11
-BOUND_T_FOR_SOLID_ENCLOSING_FLUID  ::= 12
-BOUND_F_FOR_SOLID_BETWEEN_2_DEFS   ::= 13
-BOUND_F_FOR_SOLID_BETWEEN_2_UNDEFS ::= 14
-BOUND_F_FOR_SOLID_ENCLOSING_FLUID  ::= 15
-SFCONNECT_BETWEEN_2_SOLIDS         ::= 16
-SFCONNECT_BETWEEN_2_FLUIDS         ::= 17
-SFCONNECT_USED_AS_BOUNDARY         ::= 18
-SFCONNECT_BETWEEN_2_UNDEFS         ::= 19
-NO_CONNECTION_BETWEEN_2_FLUIDS     ::= 20
-NO_CONNECTION_BETWEEN_SOLID_AND_FLUID   ::= 21
-NO_BOUND_BETWEEN_FLUID_AND_UNDEF   ::= 22
-NO_BOUND_BETWEEN_SOLID_AND_UNDEF   ::= 23
+<back-media>          ::= "SCALARS Back_medium unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <back-medium-ids>
+
+<interfaces>          ::= "SCALARS Interface unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <interface-ids>
+
+<unique-ids>          ::= "SCALARS Unique_ID unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <trg-unique-ids>
+
+<user-ids>            ::= "SCALARS User_ID unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                         <trg-user-ids>
+
+<merge-conflicts>     ::= "SCALARS Merge_conflict int 1"
+                          "LOOKUP_TABLE default"
+                          <trg-merge-conflicts>
+
+<property-conflicts>  ::= "SCALARS Property_conflict int 1"
+                          "LOOKUP_TABLE default"
+                          <trg-prop-conflicts>
+
+<file-ids>            ::= "SCALARS Created_at_sg3d_geometry_add unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <file-ranks>
+
+<holes>               ::= "SCALARS Hole_frontiers unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <hole-memberships>
+
+<enclosures>          ::= "FIELD FieldData 1"
+                          "Enclosure_ID" #enclosures #triangles "unsigned_char"
+                          <encl-memberships>
+
+-----------------
+
+<vertex-list>         ::= "3" <vertice_id> <vertice_id> <vertice_id>
+                          <vertex-list> # #vertices vertices
+
+<triangle-list>       ::= <real3>
+                          <triangle-list> # #triangles triangles
+
+<front-medium-ids>    ::= <medium-id> | <undef-medium>
+                          <front-medium-ids> # #triangles ids
+
+<back-medium-ids>     ::= <medium-id> | <undef-medium>
+                          <back-medium-ids> # #triangles ids
+
+<interface-ids>       ::= INTEGER # in [0 #interface[
+                          <interface-ids> # #triangles ids
+
+<trg-unique-ids>      ::= INTEGER # in [0 #triangles[
+                          <trg-unique-ids> # #triangles ids
+
+<trg-user-ids>        ::= INTEGER # in [0 #submitted triangles[
+                          <trg-user-ids> # #triangles ids
+
+<trg-merge-conflicts> ::= "0" # triangle without any merge conflict
+                        | "1" # triangle with a merge conflict
+                          <trg-merge-conflicts> # #triangles statuses
+
+<trg-prop-conflicts>  ::= "0" # triangle with no property conflict
+                        | "1" # H_BOUNDARY_FOR_FLUID between 2 defined media
+                        | "2" # H_BOUNDARY_FOR_FLUID between 2 undefined media
+                        | "3" # H_BOUNDARY_FOR_FLUID enclosing a solid
+                        | "4" # H_BOUNDARY_FOR_SOLID between 2 defined media
+                        | "5" # H_BOUNDARY_FOR_SOLID between 2 undefined media
+                        | "6" # H_BOUNDARY_FOR_SOLID enclosing a fluid
+                        | "7" # T_BOUNDARY_FOR_FLUID between 2 defined media
+                        | "8" # T_BOUNDARY_FOR_FLUID between 2 undefined media
+                        | "9" # T_BOUNDARY_FOR_FLUID enclosing a solid
+                        | "10" # T_BOUNDARY_FOR_SOLID between 2 defined media
+                        | "11" # T_BOUNDARY_FOR_SOLID between 2 undefined media
+                        | "12" # T_BOUNDARY_FOR_SOLID enclosing a fluid
+                        | "13" # F_BOUNDARY_FOR_FLUID between 2 defined media
+                        | "14" # F_BOUNDARY_FOR_FLUID between 2 undefined media
+                        | "15" # F_BOUNDARY_FOR_SOLID enclosing a fluid
+                        | "16" # SOLID_FLUID_CONNECTION between 2 solids
+                        | "17" # SOLID_FLUID_CONNECTION between 2 fluids
+                        | "18" # SOLID_FLUID_CONNECTION used as boundary
+                        | "19" # SOLID_FLUID_CONNECTION between 2 undefined media
+                        | "20" # no connexion between 2 fluids
+                        | "21" # no connexion between a solid and a fluid
+                        | "22" # no boundary around a fluid
+                        | "23" # no boundary around a solid
+                        | "24" # invalid part of a compute surface
+                          <trg-prop-conflicts> # #triangles statuses
+
+<real3>               ::= REAL REAL REAL
+
+<vertice-id>          ::= INTEGER # in [0 #vertices[
+
+<file-ranks>          ::= INTEGER # in [0 #submitted files[
+                         <file-ranks> # #triangles ranks
+
+<hole-memberships>    ::= "0" # triangle not surrounding a hole
+                        | "1" # triangle surrounding a hole
+                          <hole-memberships> # #triangles hole memberships
+
+<encl-memberships>    ::= <enclosure-status 0> ... <enclosure-status #enclosures-1>
+                          <encl-memberships> # #triangles enclosure memberships
+
+<medium-id>           ::= INTEGER # in [0, #medium[
+
+<undef-medium>        ::= "4294967295"
+
+-----------------
+
+<enclosure-status i>  ::= <not-member> # the triangle is not part of the ith enclosure
+                        | <member> # the triangle is part of the ith enclosure
+
+<not-member>          ::= "0"
+
+<member>              ::= "1" # valid enclosure
+                        | "3" # invalid enclosure: more than 1 medium
+                        | "5" # invalid enclosure: some triangles with no defined medium
+                        | "7" # invalid enclosure: more than 1 "medium", including undefined
 
 _______
 
-INFRARED IMAGE
---------------
+== INFRARED IMAGE
 
 When invoked with option *-R*, *stardis*(1) generates an infrared image of
 the system and write it to _standard output_ in VTK [1] file format. The image
@@ -459,8 +682,8 @@ _______
                          <failures_counts> # <image-width>*<image-height> failures_counts
 _______
 
-DUMP HEAT PATHS
----------------
+== DUMP HEAT PATHS
+
 When the *stardis*(1) option *-D* is used in conjunction with an option that
 computes a result, some of the heat paths (successful paths, erroneous paths,
 or both) sampled during the simulation are written to files. Each path is
@@ -490,7 +713,7 @@ _______
                       "SCALARS Weight double 1"
                       "LOOKUP_TABLE default"
                       <weigths>
-                    [ <vertices-time> ]
+                    [ <vertices-time> ] # if not steady
 
 <path-vertices>   ::= <real3>
                       <path-vertices> # #vertices vertices
@@ -514,24 +737,24 @@ _______
 <durations>       ::= REAL # in [0, INF)
                       <durations> # #vertices durations
 
-<vertice-type>    ::= 0 # CONDUCTION
-                    | 1 # CONVECTION
-                    | 2 # RADIATIVE
+<vertice-type>    ::= "0" # CONDUCTION
+                    | "1" # CONVECTION
+                    | "2" # RADIATIVE
 
-<path-type>       ::= 0 # SUCCESS
-                    | 1 # FAILURE
+<path-type>       ::= "0" # SUCCESS
+                    | "1" # FAILURE
 
 _______
 
-NOTES
------
+== NOTES
+
 1. VTK file format -
   <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
 
 2. Paraview softawre -
   <https://www.paraview.org/>
 
-SEE ALSO
---------
+== SEE ALSO
+
 *stardis*(1),
 *stardis-input*(5)

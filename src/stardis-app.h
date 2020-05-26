@@ -168,7 +168,7 @@ release_fluid(struct mat_fluid* fluid)
 }
 
 static res_T
-print_fluid
+str_print_fluid
   (struct str* str,
    const struct mat_fluid* f)
 {
@@ -234,7 +234,7 @@ release_solid(struct mat_solid* solid)
 }
 
 static res_T
-print_solid
+str_print_solid
   (struct str* str,
    const struct mat_solid* s)
 {
@@ -300,7 +300,7 @@ release_h_boundary(struct h_boundary* bound)
 }
 
 static res_T
-print_h_boundary
+str_print_h_boundary
   (struct str* str,
    const struct h_boundary* b,
    const enum description_type type)
@@ -358,7 +358,7 @@ release_t_boundary(struct t_boundary* bound)
 }
 
 static res_T
-print_t_boundary
+str_print_t_boundary
   (struct str* str,
    const struct t_boundary* b,
    const enum description_type type)
@@ -414,7 +414,7 @@ release_f_boundary(struct f_boundary* bound)
 }
 
 static res_T
-print_f_boundary
+str_print_f_boundary
   (struct str* str,
    const struct f_boundary* b)
 {
@@ -462,7 +462,7 @@ init_sf(struct mem_allocator* allocator, struct solid_fluid_connect* dst)
 }
 
 static res_T
-print_sf_connect
+str_print_sf_connect
   (struct str* str,
    const struct solid_fluid_connect* c)
 {
@@ -544,7 +544,7 @@ release_description(struct description* desc)
 }
 
 static INLINE res_T
-print_description
+str_print_description
   (struct str* str,
    const struct description* desc)
 {
@@ -552,24 +552,24 @@ print_description
   ASSERT(str && desc);
   switch (desc->type) {
   case DESC_MAT_SOLID:
-    ERR(print_solid(str, &desc->d.solid));
+    ERR(str_print_solid(str, &desc->d.solid));
     break;
   case DESC_MAT_FLUID:
-    ERR(print_fluid(str, &desc->d.fluid));
+    ERR(str_print_fluid(str, &desc->d.fluid));
     break;
   case DESC_BOUND_T_FOR_SOLID:
   case DESC_BOUND_T_FOR_FLUID:
-    ERR(print_t_boundary(str, &desc->d.t_boundary, desc->type));
+    ERR(str_print_t_boundary(str, &desc->d.t_boundary, desc->type));
     break;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
-    ERR(print_h_boundary(str, &desc->d.h_boundary, desc->type));
+    ERR(str_print_h_boundary(str, &desc->d.h_boundary, desc->type));
     break;
   case DESC_BOUND_F_FOR_SOLID:
-    ERR(print_f_boundary(str, &desc->d.f_boundary));
+    ERR(str_print_f_boundary(str, &desc->d.f_boundary));
     break;
   case DESC_SOLID_FLUID_CONNECT:
-    ERR(print_sf_connect(str, &desc->d.sf_connect));
+    ERR(str_print_sf_connect(str, &desc->d.sf_connect));
     break;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
@@ -691,7 +691,7 @@ init_camera(struct camera* cam) {
 }
 
 static INLINE void
-log_err(const char* msg, void* ctx)
+log_err_fn(const char* msg, void* ctx)
 {
   ASSERT(msg);
   (void)ctx;
@@ -703,7 +703,7 @@ log_err(const char* msg, void* ctx)
 }
 
 static INLINE void
-log_warn(const char* msg, void* ctx)
+log_warn_fn(const char* msg, void* ctx)
 {
   ASSERT(msg);
   (void)ctx;
@@ -715,7 +715,7 @@ log_warn(const char* msg, void* ctx)
 }
 
 static INLINE void
-log_prt(const char* msg, void* ctx)
+log_prt_fn(const char* msg, void* ctx)
 {
   ASSERT(msg);
   (void)ctx;

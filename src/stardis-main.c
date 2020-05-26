@@ -45,9 +45,9 @@ main
   ERR(logger_init(&allocator, &logger));
   logger_initialized = 1;
   /* Active loggin for args pasing */
-  logger_set_stream(&logger, LOG_OUTPUT, log_prt, NULL);
-  logger_set_stream(&logger, LOG_ERROR, log_err, NULL);
-  logger_set_stream(&logger, LOG_WARNING, log_warn, NULL);
+  logger_set_stream(&logger, LOG_ERROR, log_err_fn, NULL);
+  logger_set_stream(&logger, LOG_WARNING, log_warn_fn, NULL);
+  logger_set_stream(&logger, LOG_OUTPUT, log_prt_fn, NULL);
 
   ERR(init_args(&logger, &allocator, &args));
   args_initialized = 1;

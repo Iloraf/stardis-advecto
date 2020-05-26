@@ -558,7 +558,7 @@ stardis_init
   }
   ERR(read_model(&args->model_files, stardis));
 
-  ERR(sdis_device_create(stardis->logger, stardis->allocator, args->nthreads,
+  ERR(sdis_device_create(stardis->logger, stardis->allocator, stardis->nthreads,
     args->verbose, &stardis->dev));
 
   create_context.geometry = stardis->geometry.sg3d;
@@ -613,7 +613,7 @@ stardis_init
       stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)));
     str_clear(&str);
     str_printf(&str, "Description %d: ", i);
-    ERR(print_description(&str,
+    ERR(str_print_description(&str,
       darray_descriptions_cdata_get(&stardis->descriptions) + i));
     ERR(str_printf(&str, "\n"));
     logger_print(stardis->logger, LOG_OUTPUT, "%s", str_cget(&str));

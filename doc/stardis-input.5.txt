@@ -46,8 +46,13 @@ of option *-M*.
 UNITS
 -----
 Any physical quantity involved in descriptions is expected in the
-International System of Units (second, metre, kilogram, kelvin); the same
-applies to *stardis(1)* outputs as described in *stardis-output(5)*.
+International System of Units (second, metre, kilogram, kelvin, watt, joule);
+the same applies to *stardis(1)* outputs as described in *stardis-output(5)*.
+
+However, the geometry provided to *stardis*(1) can be described in any unit,
+multiple of meters or not, with the scaling factor provided through option
+*-f*. The constraint this feature sets to stardis input is that the product
+delta*scaling_factor must be in meters.
 
 GRAMMAR
 -------
@@ -110,24 +115,24 @@ _______
 
 <medium-name>         ::= STRING # no space allowed
 
-<lambda>              ::= REAL # in ]0, INF)
+<lambda>              ::= REAL # conductivity in W/(m.K); in ]0, INF)
 
-<rho>                 ::= REAL # in ]0, INF)
+<rho>                 ::= REAL # volumic mass,in kg/m3; in ]0, INF)
 
-<cp>                  ::= REAL # in ]0, INF)
+<cp>                  ::= REAL # capacity, in J/(kg.K) or kg.m2/(s2.K); in ]0, INF)
 
 <delta>               ::= "AUTO" # delta is automatically set to V/6A (V and A being
                                  # respectively the solid volume and its boundary area)
-                        | REAL # in [0, INF)
+                        | REAL # delta*scale_factor in m; in [0, INF)
 
-<initial-temp>        ::= REAL # in [0, INF)
+<initial-temp>        ::= REAL # in K; in [0, INF)
 
 <imposed-temperature> ::= "UNKNOWN" # temperature has to be solved
-                        | REAL # in [0, INF)
+                        | REAL # in K; in [0, INF)
 
-<outside-temperature> ::= REAL # in [0, INF)
+<outside-temperature> ::= REAL # in K; in [0, INF)
 
-<volumic-power>       ::= REAL # in (-INF , INF)
+<volumic-power>       ::= REAL # in W/m3; in (-INF , INF)
 
 <triangle-sides>      ::= <side-specifier> <file-name> [ <triangle-sides> ]
 
@@ -137,9 +142,9 @@ _______
 
 <specular-fraction>   ::= REAL # in [0, 1]
 
-<hc>                  ::= REAL # in [0, INF)
+<hc>                  ::= REAL # in W/(m2.K); in [0, INF)
 
-<flux>                ::= REAL # in (-INF , INF)
+<flux>                ::= REAL # in W/m2; in (-INF , INF)
 
 <triangles>           ::= <file-name> [ <triangles> ]
 

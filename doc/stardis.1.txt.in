@@ -200,9 +200,13 @@ options -g or -G.
   or -s without options -g or -G).
 
 **-f** _factor_::
-  Rescale the geometry by the given *factor* before sending it to the solver,
-  expected length unit being meter. Default rescale *factor*
-  is @STARDIS_ARGS_DEFAULT_SCALE_FACTOR@.
+  Define the scaling factor to apply to the geometry to have it expressed
+  in meters (e.g. 1e-3 if the geometry is in mm). Default scaling *factor* is
+  @STARDIS_ARGS_DEFAULT_SCALE_FACTOR@.
++
+If this option is used, any input data provided to stardis must be scaled
+accordingly (see *stardis-input*(5)). Also, if option *-p* or *-P* is used to
+provide a probe point, this point must be in the same unit as the geometry.
 
 *-g*::
   Compute the Green function at steady state and write in ASCII to _standard
@@ -277,7 +281,12 @@ named error_path_00000000.vtk, error_path_00000001.vtk, ...
 
     $ stardis -M scene.txt -R t=10000:spp=2:img=800x600 -D error,error_path_
 
+Compute the temperature at the probe point *0, 0.5, 0* at steady state, in a
+model whose dimensions are in mm, including the coordinates of the probe point.
+The system is read from the file *model.txt*:
 
+    $ stardis -M model.txt -p 0,0.5,0 -f 0.001
+    
 COPYRIGHT
 ---------
 Copyright &copy; 2018-2020 |Meso|Star>. License GPLv3+: GNU GPL

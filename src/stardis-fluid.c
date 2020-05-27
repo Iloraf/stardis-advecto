@@ -89,7 +89,6 @@ create_stardis_fluid
   struct sdis_fluid_shader fluid_shader = SDIS_FLUID_SHADER_NULL;
   struct sdis_data* data = NULL;
   struct fluid* fluid_props;
-  size_t sz;
 
   ASSERT(stardis && rho >= 0 && cp >= 0);
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
@@ -98,8 +97,6 @@ create_stardis_fluid
   ERR(sdis_data_create(stardis->dev, sizeof(struct fluid), ALIGNOF(struct fluid),
     NULL, &data));
 
-  sz = darray_media_ptr_size_get(&stardis->media);
-  ASSERT(sz < INT_MAX);
   fluid_props = sdis_data_get(data); /* Fetch the allocated memory space */
   str_init(stardis->allocator, &fluid_props->name);
   if(name) str_copy(&fluid_props->name, name);

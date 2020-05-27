@@ -202,7 +202,10 @@ create_intface
       }
       switch(connect->type) {
       case DESC_BOUND_H_FOR_FLUID:
-        if(sdis_medium_get_type(def_medium) != SDIS_FLUID) { res = RES_BAD_ARG; goto error; }
+        if(sdis_medium_get_type(def_medium) != SDIS_FLUID) {
+          res = RES_BAD_ARG;
+          goto error;
+        }
         type_checked = 1;
         ASSERT(connect->d.h_boundary.imposed_temperature >= 0);
         interface_props->imposed_temperature
@@ -237,7 +240,10 @@ create_intface
         }
         break;
       case DESC_BOUND_T_FOR_FLUID:
-        if(sdis_medium_get_type(def_medium) != SDIS_FLUID) { res = RES_BAD_ARG; goto error; }
+        if(sdis_medium_get_type(def_medium) != SDIS_FLUID) {
+          res = RES_BAD_ARG;
+          goto error;
+        }
         type_checked = 1;
         interface_shader.convection_coef_upper_bound = connect->d.t_boundary.hc;
         interface_props->hc = connect->d.t_boundary.hc;
@@ -282,7 +288,10 @@ create_intface
           = connect->d.t_boundary.imposed_temperature;
         break;
       case DESC_BOUND_F_FOR_SOLID:
-        if(sdis_medium_get_type(def_medium) != SDIS_SOLID) { res = RES_BAD_ARG; goto error; }
+        if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
+          res = RES_BAD_ARG;
+          goto error;
+        }
         connection_count++;
         boundary_count++;
         if(front_defined) {

@@ -28,10 +28,13 @@ DESCRIPTION
 thermal system. It relies on a line-based ad-hoc syntax.
 
 A thermal system is composed of lines of text, each one describing either a
-medium (solid or fluid) frontier or a boundary (limit condition or
-connection between two media). In either case, a description line includes a
-list of file names that constitute the limit or boundary. The current version
-of *stardis* only accepts triangle mesh geometry files in *VTK* format.
+medium (solid or fluid) frontier, a boundary (limit condition or connection
+between two media), or the scale of the geometry. In the medium or boundary
+cases, description lines include a list of file names that constitute the
+limit or boundary. The current version of *stardis* only accepts triangle
+mesh geometry files in *STL* format. If a scale is  specified, it defines the
+scaling factor to apply to the geometry to have it expressed in meters (e.g.
+1e-3 if the geometry is in mm).
 
 A medium limit or a boundary description can be split accross files and a
 single file or description line can describe more than one frontier (more than
@@ -50,9 +53,7 @@ International System of Units (second, metre, kilogram, kelvin, watt, joule);
 the same applies to *stardis(1)* outputs as described in *stardis-output(5)*.
 
 However, the geometry provided to *stardis*(1) can be described in any unit,
-multiple of meters or not, with the scaling factor provided through option
-*-f*. The constraint this feature sets to stardis input is that the product
-delta*scaling_factor must be in meters.
+multiple of meters or not, as long as  the scaling factor is provided.
 
 GRAMMAR
 -------
@@ -66,12 +67,17 @@ description.
 
 [verse]
 _______
-<thermal-system>      ::= <description-line>
-                          [ <thermal-system> ]
+<thermal-system>      ::= <description-lines>
+                        [ <scaling-factor> ]
+
+<description-lines>   ::= <description-line>
+                        [ <description-lines> ]
 
 <description-line>    ::= [ <medium-frontier> ] [ <comment> ]
                         | [ <medium-boundary> ] [ <comment> ]
                         | [ <media-connection> ] [ <comment> ]
+
+<scaling-factor>      ::= "SCALE" <scaling_factor> [ <comment> ]
 
 -------------------------------------
 
@@ -87,6 +93,8 @@ _______
 <media-connection>    ::= <solid-fluid-connect>
 
 <comment>             ::= "#" Any text introduced by the # character
+
+<scaling_factor>      ::= REAL # scaling factor to apply to the geometry ; in ]0 INF)
 
 <solid-frontier>      ::= "SOLID" <medium-name> <lambda> <rho> <cp> <delta> \
                           <initial-temp> <imposed-temperature> <volumic-power> \
@@ -123,7 +131,7 @@ _______
 
 <delta>               ::= "AUTO" # delta is automatically set to V/6A (V and A being
                                  # respectively the solid volume and its boundary area)
-                        | REAL # delta*scale_factor in m; in [0, INF)
+                        | REAL # delta*scaling_factor in m; in [0, INF)
 
 <initial-temp>        ::= REAL # in K; in [0, INF)
 

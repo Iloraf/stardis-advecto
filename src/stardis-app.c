@@ -111,6 +111,8 @@ read_model
     txtrdr = NULL;
     fclose(f);
     f = NULL;
+    if(stardis->scale_factor <= 0)
+      stardis->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
   }
 
   ASSERT(!f && !txtrdr);
@@ -528,7 +530,7 @@ stardis_init
   darray_uint_init(stardis->allocator, &stardis->compute_surface.err_triangles);
   stardis->samples = args->samples;
   stardis->nthreads = args->nthreads;
-  stardis->scale_factor = args->scale_factor;
+  stardis->scale_factor = -1; /* invalid value */
   stardis->ambient_temp = args->ambient_temp;
   stardis->ref_temp = args->ref_temp;
   stardis->dump_paths = SDIS_HEAT_PATH_NONE;

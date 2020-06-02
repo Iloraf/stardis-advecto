@@ -102,7 +102,6 @@ struct args {
   unsigned nthreads;
   double probe[4];
   enum stardis_mode mode;
-  double scale_factor;
   double ambient_temp, ref_temp;
   char* camera;
   enum dump_path_type dump_paths;

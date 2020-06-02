@@ -43,7 +43,8 @@ computation produce output including information on the *stardis*(1) software
 == UNITS
 
 As with the values in *stardis-input*(5), any physical quantity in output is in
-the International System of Units (second, metre, kilogram, kelvin).
+the International System of Units (second, metre, kilogram, kelvin) except the
+coordinates that are in same system as the geometry.
 
 == OPTIONS
 

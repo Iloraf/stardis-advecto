@@ -310,7 +310,6 @@ init_args
   args->samples = STARDIS_DEFAULT_SAMPLES_COUNT;
   args->nthreads = DEFAULT_NTHREADS;
   args->probe[3] = STARDIS_DEFAULT_COMPUTE_TIME;
-  args->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
   args->ambient_temp = STARDIS_DEFAULT_AMBIENT_TEMP;
   args->ref_temp = STARDIS_DEFAULT_REFERENCE_TEMP;
   args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;
@@ -449,9 +448,6 @@ short_help
   fprintf(stream, "\n  -e\n");
   fprintf(stream, "     Use extended format to output Monte-Carlo results.\n");
 
-  fprintf(stream, "\n  -f SCALE_FACTOR\n");
-  fprintf(stream, "     Rescale the geometry before sending it to the solver.\n");
-
   fprintf(stream, "\n  -g\n");
   fprintf(stream, "     Change the computation to produce the green function.\n");
 
@@ -485,7 +481,7 @@ parse_args
 {
   int opt = 0, n_used = 0;
   size_t len = 0;
-  const char option_list[] = "a:dD:ef:F:gG:hm:M:n:p:P:r:R:s:S:t:vV:";
+  const char option_list[] = "a:dD:eF:gG:hm:M:n:p:P:r:R:s:S:t:vV:";
   char buf[128];
   res_T res = RES_OK;
 
@@ -567,19 +563,6 @@ parse_args
       args->mode |= MODE_DUMP_PATHS;
       break;
     }
-
-    case 'f':
-      res = cstr_to_double(optarg, &args->scale_factor);
-      if(res != RES_OK
-        || args->scale_factor <= 0)
-      {
-        if(res == RES_OK) res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
-      break;
 
     /*case 'F': see 's' */
 
@@ -1532,6 +1515,40 @@ error:
   goto end;
 }
 
+/* SCALE scale_factor */
+static res_T
+process_scale
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  if(stardis->scale_factor > 0) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "SCALE cannot be specified twice\n");
+    res = RES_BAD_ARG;
+    goto end;
+  }
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "scale factor");
+  res = cstr_to_double(tk, &stardis->scale_factor);
+  if(res != RES_OK
+    || stardis->scale_factor <= 0)
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid scale factor: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+
+end:
+  return res;
+error:
+  goto end;
+}
+
 /* Read medium or boundary line; should be one of:
  * SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_filenames
  * FLUID Name rho cp Tinit Timposed STL_filenames
@@ -1541,6 +1558,7 @@ error:
  * T_BOUNDARY_FOR_FLUID Name T hc STL_filenames
  * F_BOUNDARY_FOR_SOLID Name F STL_filenames
  * SOLID_FLUID_CONNECTION Name emissivity specular_fraction hc STL_filenames
+ * SCALE scale_factor
  *
  * STL_filenames = { { FRONT | BACK | BOTH } STL_filename }+
  */
@@ -1577,6 +1595,8 @@ process_model_line
     ERR(process_solid(stardis, &tok_ctx));
   else if(0 == strcmp(tk, "FLUID"))
     ERR(process_fluid(stardis, &tok_ctx));
+  else if(0 == strcmp(tk, "SCALE"))
+    ERR(process_scale(stardis, &tok_ctx));
   else {
     logger_print(stardis->logger, LOG_ERROR,
       "Unknown description type: %s\n", tk);

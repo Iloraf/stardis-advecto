@@ -113,6 +113,8 @@ read_model
     f = NULL;
     if(stardis->scale_factor <= 0)
       stardis->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
+    logger_print(stardis->logger, LOG_OUTPUT,
+      "Scaling factor is %g\n", stardis->scale_factor);
   }
 
   ASSERT(!f && !txtrdr);

@@ -925,7 +925,7 @@ print_single_MC_result
   /* Print the results */
   switch (stardis->mode & COMPUTE_MODES) {
   case MODE_PROBE_COMPUTE:
-    if (stardis->mode & MODE_EXTENDED_RESULTS) {
+    if(stardis->mode & MODE_EXTENDED_RESULTS) {
       fprintf(stream, "Temperature at [%g, %g, %g] at t=%g = %g +/- %g\n",
         SPLIT4(stardis->probe),
         result.E, /* Expected value */

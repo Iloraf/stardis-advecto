@@ -117,23 +117,29 @@ struct add_geom_ctx {
 
 /* Possible callbacks for sg3d_geometry_add calls
  * when void* context is a struct add_geom_ctx */
-extern LOCAL_SYM  void
+extern LOCAL_SYM void
 add_geom_ctx_indices
   (const unsigned itri,
    unsigned ids[3],
    void* context);
 
-extern LOCAL_SYM  void
+extern LOCAL_SYM void
 add_geom_ctx_properties
   (const unsigned itri,
    unsigned prop[3],
    void* context);
 
-extern LOCAL_SYM  void
+extern LOCAL_SYM void
 add_geom_ctx_position
   (const unsigned ivert,
    double pos[3],
    void* context);
+
+extern LOCAL_SYM res_T
+add_geom_count_degenerate
+(const unsigned itri,
+  void* context,
+  int* abort);
 
 #ifdef NDEBUG
 #define DEFAULT_NTHREADS SDIS_NTHREADS_DEFAULT

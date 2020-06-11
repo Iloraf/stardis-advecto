@@ -159,6 +159,21 @@ add_geom_ctx_position
   d3_set_f3(pos, v);
 }
 
+res_T
+add_geom_keep_degenerated
+  (const unsigned itri,
+   void* context,
+   int* abort)
+{
+  const struct add_geom_ctx* ctx = context;
+  struct darray_uint* degenerated;
+
+  ASSERT(abort && ctx && ctx->custom);
+  ASSERT(itri < ctx->stl_desc.triangles_count);
+  degenerated = ctx->custom;
+  return darray_uint_push_back(degenerated, &itri);
+}
+
 static res_T
 read_sides_and_files
   (struct stardis* stardis,
@@ -172,13 +187,19 @@ read_sides_and_files
   struct add_geom_ctx add_geom_ctx;
   unsigned current_merge_errors;
   struct sg3d_geometry_add_callbacks callbacks = SG3D_ADD_CALLBACKS_NULL__;
+  struct darray_uint degenerated;
+  struct str str;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
 
+  darray_uint_init(stardis->allocator, &degenerated);
+  str_init(stardis->allocator, &str);
   callbacks.get_indices = add_geom_ctx_indices;
   callbacks.get_properties = add_geom_ctx_properties;
   callbacks.get_position = add_geom_ctx_position;
+  callbacks.degenerated_triangle = add_geom_keep_degenerated;
+  add_geom_ctx.custom = &degenerated;
 
   ERR(sg3d_geometry_get_unique_triangles_with_merge_conflict_count(
     stardis->geometry.sg3d, &current_merge_errors));
@@ -253,6 +274,18 @@ read_sides_and_files
       (unsigned)add_geom_ctx.stl_desc.triangles_count,
       &callbacks,
       &add_geom_ctx);
+    if(darray_uint_size_get(&degenerated)) {
+      size_t c, n;
+      const unsigned* ids = darray_uint_cdata_get(&degenerated);
+      c = darray_uint_size_get(&degenerated);
+      logger_print(stardis->logger, LOG_WARNING,
+        "File '%s' included %zu degenerated triangles (removed)\n", tk, c);
+      ERR(str_printf(&str, "Degenerated triangles IDs: %u", ids[0]));
+      FOR_EACH(n, 1, c) ERR(str_printf(&str, ", %u", ids[n]));
+      ERR(str_printf(&str, "\n", ids[n]));
+      logger_print(stardis->logger, LOG_OUTPUT, str_cget(&str));
+      darray_uint_clear(&degenerated);
+    }
 
     if(res != RES_OK) {
       logger_print(stardis->logger, LOG_ERROR,
@@ -266,7 +299,7 @@ read_sides_and_files
       int is_for_compute =
         (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_VTK);
       logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
-        "Merge conflicts found reading file %s (%u triangles).\n",
+        "Merge conflicts found reading file '%s' (%u triangles).\n",
         tk, merge_errors - current_merge_errors);
       if(is_for_compute) {
         res = RES_BAD_ARG;
@@ -277,6 +310,8 @@ read_sides_and_files
   }
 
 end:
+  darray_uint_release(&degenerated);
+  str_release(&str);
   if(sstl) SSTL(ref_put(sstl));
   return res;
 error:

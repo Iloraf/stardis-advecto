@@ -714,7 +714,7 @@ init_enclosures
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vsz));
   ERR(senc3d_device_create(stardis->logger, stardis->allocator,
-    SENC3D_NTHREADS_DEFAULT, stardis->verbose, &senc_dev));
+    stardis->nthreads, stardis->verbose, &senc_dev));
   ERR(senc3d_scene_create(senc_dev,
     SENC3D_CONVENTION_NORMAL_BACK | SENC3D_CONVENTION_NORMAL_OUTSIDE,
     tsz, sg3d_sencXd_geometry_get_indices, sg3d_sencXd_geometry_get_media,

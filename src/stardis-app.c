@@ -623,7 +623,7 @@ stardis_init
     ERR(create_holder(stardis, &dummies, i,
       stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)));
     str_clear(&str);
-    str_printf(&str, "Description %d: ", i);
+    ERR(str_printf(&str, "Description %d: ", i));
     ERR(str_print_description(&str,
       darray_descriptions_cdata_get(&stardis->descriptions) + i));
     ERR(str_printf(&str, "\n"));

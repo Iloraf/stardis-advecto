@@ -159,7 +159,7 @@ add_geom_ctx_position
   d3_set_f3(pos, v);
 }
 
-res_T
+static res_T
 add_geom_keep_degenerated
   (const unsigned itri,
    void* context,
@@ -168,7 +168,7 @@ add_geom_keep_degenerated
   const struct add_geom_ctx* ctx = context;
   struct darray_uint* degenerated;
 
-  ASSERT(abort && ctx && ctx->custom);
+  ASSERT(abort && ctx && ctx->custom); (void)abort;
   ASSERT(itri < ctx->stl_desc.triangles_count);
   degenerated = ctx->custom;
   return darray_uint_push_back(degenerated, &itri);
@@ -282,8 +282,7 @@ read_sides_and_files
         "File '%s' included %zu degenerated triangles (removed)\n", tk, c);
       ERR(str_printf(&str, "Degenerated triangles IDs: %u", ids[0]));
       FOR_EACH(n, 1, c) ERR(str_printf(&str, ", %u", ids[n]));
-      ERR(str_printf(&str, "\n", ids[n]));
-      logger_print(stardis->logger, LOG_OUTPUT, str_cget(&str));
+      logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
       darray_uint_clear(&degenerated);
     }
 

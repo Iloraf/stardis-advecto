@@ -821,7 +821,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
   res_T res = RES_OK;
   unsigned* trgs = NULL;
   struct senc3d_enclosure* enc = NULL;
-  unsigned tsz, e, s, t, scount, ecount;
+  unsigned tsz, e, s, t, scount, ecount, ocount;
   int* enc_status = NULL;
   int invalid_enclosures_count = 0;
   ASSERT(stardis && stream);
@@ -844,6 +844,20 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
     }
     logger_print(stardis->logger, LOG_WARNING, "Model contains hole(s).\n");
     fprintf(stream, "SCALARS Hole_frontiers unsigned_int 1\n");
+    fprintf(stream, "LOOKUP_TABLE default\n");
+    FOR_EACH(t, 0, tsz) fprintf(stream, "%u\n", trgs[t]);
+  }
+
+  /* Dump overlapping triangles information */
+  ERR(senc3d_scene_get_overlapping_triangles_count(stardis->senc3d_scn, &ocount));
+  if(ocount) {
+    FOR_EACH(t, 0, tsz) trgs[t] = 0;
+    FOR_EACH(t, 0, ocount) {
+      unsigned trid;
+      ERR(senc3d_scene_get_overlapping_triangle(stardis->senc3d_scn, t, &trid));
+      trgs[trid] = 1;
+    }
+    fprintf(stream, "SCALARS Overlapping_triangles unsigned_int 1\n");
     fprintf(stream, "LOOKUP_TABLE default\n");
     FOR_EACH(t, 0, tsz) fprintf(stream, "%u\n", trgs[t]);
   }

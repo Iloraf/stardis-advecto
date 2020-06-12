@@ -37,6 +37,7 @@ main
   int err = EXIT_SUCCESS;
   struct mem_allocator allocator;
   struct logger logger;
+  int mode = 0;
   res_T res = RES_OK;
 
   ERR(mem_init_proxy_allocator(&allocator, &mem_default_allocator));
@@ -52,12 +53,13 @@ main
   ERR(init_args(&logger, &allocator, &args));
   args_initialized = 1;
   ERR(parse_args(argc, argv, args));
+  mode = args->mode;
 
-  if(args->mode & MODE_DUMP_HELP) {
+  if(mode & MODE_DUMP_HELP) {
     short_help(stdout, argv[0]);
     goto exit;
   }
-  else if(args->mode & MODE_DUMP_VERSION) {
+  else if(mode & MODE_DUMP_VERSION) {
     print_version(stdout);
     goto exit;
   }
@@ -75,11 +77,11 @@ main
   release_args(args);
   args_initialized = 0;
 
-  if(stardis.mode & MODE_DUMP_VTK) {
+  if(mode & MODE_DUMP_VTK) {
     /* Dump all the app-independent information */
     ERR(sg3d_geometry_dump_as_vtk(stardis.geometry.sg3d, stdout));
     /* Dump the compute region if any */
-    if(stardis.mode & REGION_COMPUTE_MODES) {
+    if(mode & REGION_COMPUTE_MODES) {
       ERR(dump_compute_region_at_the_end_of_vtk(&stardis, stdout));
     }
     /* Dump enclosures and related information
@@ -91,7 +93,7 @@ main
     goto exit;
   }
 
-  ASSERT(stardis.mode & COMPUTE_MODES);
+  ASSERT(mode & COMPUTE_MODES);
   ERR(stardis_compute(&stardis));
 
 exit:
@@ -110,6 +112,9 @@ exit:
   }
   return err;
 error:
+  if(mode & COMPUTE_MODES)
+    logger_print(&logger, LOG_ERROR,
+      "No computation possible.\n");
   err = EXIT_FAILURE;
   goto exit;
 }

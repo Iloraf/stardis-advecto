@@ -506,7 +506,7 @@ stardis_init
   struct dummies dummies = DUMMIES_NULL;
   struct htable_intface htable_interfaces;
   struct str str;
-  unsigned i, vcount, tcount, count;
+  unsigned i, vcount, tcount, ocount, count;
   int is_for_compute;
 
   ASSERT(args && logger && allocator && stardis);
@@ -617,6 +617,16 @@ stardis_init
     res = tmp_res;
     goto error;
   }
+  ERR(senc3d_scene_get_overlapping_triangles_count(stardis->senc3d_scn, &ocount));
+    if(ocount) {
+      logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
+        "Scene contains %u overlapping triangles.\n",
+        ocount);
+      if(is_for_compute) {
+        res = RES_BAD_ARG;
+        goto error;
+      }
+  }
 
   /* Create media and property holders for those found in descriptions */
   for(i = 0; i < darray_descriptions_size_get(&stardis->descriptions); i++) {
@@ -665,11 +675,11 @@ stardis_init
       &create_context, &stardis->sdis_scn);
     if(res != RES_OK) {
       logger_print(stardis->logger, LOG_ERROR,
-        "Cannot create the stardis solver scene, no computation possible.\n");
+        "Cannot create the stardis solver scene.\n");
       goto error;
     }
   }
-  
+
 exit:
   str_release(&str);
   htable_intface_release(&htable_interfaces);

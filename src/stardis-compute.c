@@ -141,7 +141,7 @@ check_probe_conform_to_type
     }
     if(!min_desc) {
       /* Not an error as probe moved to boundary */
-      if(!probe_on_boundary)
+      if(!probe_on_boundary && !outside)
         logger_print(stardis->logger, LOG_WARNING,
           "Could not determine the medium probe is in.\n");
     } else {

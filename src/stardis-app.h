@@ -78,8 +78,18 @@ struct dummies {
   NULL, UINT_MAX, NULL, UINT_MAX\
 }
 
+static FINLINE void
+init_media_ptr
+  (struct mem_allocator* alloc,
+   struct sdis_medium** data)
+{
+  ASSERT(data); (void)alloc;
+  *data = NULL;
+}
+
 #define DARRAY_NAME media_ptr
 #define DARRAY_DATA struct sdis_medium*
+#define DARRAY_FUNCTOR_INIT init_media_ptr
 #include <rsys/dynamic_array.h>
 
 struct geometry {

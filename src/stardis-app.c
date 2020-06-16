@@ -613,7 +613,7 @@ stardis_init
 
   /* Create enclosures */
   tmp_res = init_enclosures(stardis);
-  if(res != RES_OK && is_for_compute) {
+  if(tmp_res != RES_OK && is_for_compute) {
     res = tmp_res;
     goto error;
   }
@@ -630,14 +630,17 @@ stardis_init
 
   /* Create media and property holders for those found in descriptions */
   for(i = 0; i < darray_descriptions_size_get(&stardis->descriptions); i++) {
-    ERR(create_holder(stardis, &dummies, i,
-      stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)));
+    tmp_res = create_holder(stardis, &dummies, i,
+      stardis->mode & (MODE_BIN_GREEN | MODE_GREEN));
+    if(tmp_res != RES_OK && is_for_compute) {
+      res = tmp_res;
+      goto error;
+    }
     str_clear(&str);
     ERR(str_printf(&str, "Description %d: ", i));
     ERR(str_print_description(&str,
       darray_descriptions_cdata_get(&stardis->descriptions) + i));
-    ERR(str_printf(&str, "\n"));
-    logger_print(stardis->logger, LOG_OUTPUT, "%s", str_cget(&str));
+    logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
   }
 
   if(is_for_compute) {
@@ -708,8 +711,10 @@ stardis_release
   darray_size_t_release(&stardis->compute_surface.primitives);
   darray_sides_release(&stardis->compute_surface.sides);
   darray_uint_release(&stardis->compute_surface.err_triangles);
-  FOR_EACH(i, 0, darray_media_ptr_size_get(&stardis->media))
-    SDIS(medium_ref_put(darray_media_ptr_data_get(&stardis->media)[i]));
+  FOR_EACH(i, 0, darray_media_ptr_size_get(&stardis->media)) {
+    if(darray_media_ptr_data_get(&stardis->media)[i])
+      SDIS(medium_ref_put(darray_media_ptr_data_get(&stardis->media)[i]));
+  }
   darray_media_ptr_release(&stardis->media);
 }
 

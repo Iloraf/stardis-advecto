@@ -84,11 +84,7 @@ main
     if(mode & REGION_COMPUTE_MODES) {
       ERR(dump_compute_region_at_the_end_of_vtk(&stardis, stdout));
     }
-    /* Dump enclosures and related information
-     * If enclosures creation failed, just skip it */
-    if(stardis.senc3d_scn) {
-      ERR(dump_enclosure_related_stuff_at_the_end_of_vtk(&stardis, stdout));
-    }
+    ERR(dump_enclosure_related_stuff_at_the_end_of_vtk(&stardis, stdout));
 
     /* If dump flag set exit after dump done */
     goto exit;

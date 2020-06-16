@@ -1172,7 +1172,7 @@ dump_compute_region_at_the_end_of_vtk
       ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
         i, prop));
       /* For triangles in compute volume,
-       * v==1 if FRONT, v==2 for BACK, v==3 for BOTH */
+       * v==1 if FRONT, v==2 for BACK */
       if(prop[SG3D_FRONT] == medium_id && prop[SG3D_BACK] == medium_id)
         ; /* Keep v==0, not really a boundary */
       else if(prop[SG3D_FRONT] == medium_id)

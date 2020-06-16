@@ -220,7 +220,7 @@ _______
 
 <sample>       ::= <sample-header> # struct path_header
                    <ids> # unsigned[header.pcount + header.fcount]
-                   <weights> # double[header.pcount + header.fcount]			
+                   <weights> # double[header.pcount + header.fcount]
 _______
 
 [literal]
@@ -494,8 +494,8 @@ _______
                         [ <merge-conflicts> ] # if some merge conflict occured
                         [ <property-conflicts> ] # if some property conflict occured
                           <file-ranks>
-                        [ <holes> ] # if there are holes
-                          <enclosures>
+                        [ <compute-region> ] # if defined
+                          <encl-or-overlaps>
 
 <vertices>            ::= "POINTS" #vertices "double"
                           <vertex-list>
@@ -534,6 +534,13 @@ _______
 <file-ids>            ::= "SCALARS Created_at_sg3d_geometry_add unsigned_int 1"
                           "LOOKUP_TABLE default"
                           <file-ranks>
+
+<compute-region>      ::= "SCALARS Compute_region unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <region-membership>
+
+<encl-or-overlaps>    ::= <encl-information> # if enclosure extraction was possible
+                        | <overlaps> # if overlapping triangles where detected
 
 <holes>               ::= "SCALARS Hole_frontiers unsigned_int 1"
                           "LOOKUP_TABLE default"
@@ -604,6 +611,17 @@ _______
 <file-ranks>          ::= INTEGER # in [0 #submitted files[
                          <file-ranks> # #triangles ranks
 
+<region-membership>   ::= <reg-not-member> # triangle not part of the compute region
+                        | <reg-member> # triangle is part of the compute region
+                          <region-membership> # #triangles membership status
+
+<encl-information>    ::= [ <holes> ] # if there are holes
+                          <enclosures>
+
+<overlaps>            ::= "SCALARS Overlapping_triangles unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <overlapping-status>
+
 <hole-memberships>    ::= "0" # triangle not surrounding a hole
                         | "1" # triangle surrounding a hole
                           <hole-memberships> # #triangles hole memberships
@@ -617,12 +635,22 @@ _______
 
 -----------------
 
-<enclosure-status i>  ::= <not-member> # the triangle is not part of the ith enclosure
-                        | <member> # the triangle is part of the ith enclosure
+<reg-not-member>      ::= "0"
 
-<not-member>          ::= "0"
+<reg-member>          ::= "1" # the FRONT side is member of the region
+                        | "2" # the BACK side is member of the region
+                        | "4294967295" # the triangle is an invalid part of the region
 
-<member>              ::= "1" # valid enclosure
+<overlapping-status>  ::= "0" # triangle not overlapping another triangle
+                        | "1" # triangle overlapping another triangle
+                          <overlapping-status> # #triangles overlapping status
+
+<enclosure-status i>  ::= <encl-not-member> # the triangle is not part of the ith enclosure
+                        | <encl-member> # the triangle is part of the ith enclosure
+
+<encl-not-member>     ::= "0"
+
+<encl-member>         ::= "1" # valid enclosure
                         | "3" # invalid enclosure: more than 1 medium
                         | "5" # invalid enclosure: some triangles with no defined medium
                         | "7" # invalid enclosure: more than 1 "medium", including undefined

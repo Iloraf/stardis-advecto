@@ -417,7 +417,7 @@ _______
 
 <lin-temp>          ::= REAL # in [0, INF)
 
-<green-id>          ::= INTEGER # in [0 #solids]
+<green-id>          ::= INTEGER # in [0 #green-sources[
 
 -------------------------------------
 
@@ -431,17 +431,17 @@ _______
 
 <power-count>       ::= INTEGER # in [0 INF)
 
-<flux-count>        ::=  INTEGER # in [0 INF)
+<flux-count>        ::= INTEGER # in [0 INF)
 
 <power-terms>       ::= <power-term>
-                      | <power-terms> # <power-count> power terms
+                        <power-terms> # <power-count> power terms
 
 <flux-terms>        ::= <flux-term>
-                      | <flux-terms> # <flux-count> flux terms
+                        <flux-terms> # <flux-count> flux terms
 
 -------------------------------------
 
-<power-term>        ::= "S" <green-id> <power-factor>
+<power-term>        ::= <green-id> <power-factor>
 
 <flux-term>         ::= <green-id> <flux-factor>
 

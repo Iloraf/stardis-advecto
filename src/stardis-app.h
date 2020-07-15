@@ -813,7 +813,6 @@ extern LOCAL_SYM void
 stardis_release
   (struct stardis* stardis);
 
-
 extern LOCAL_SYM res_T
 init_enclosures
   (struct stardis* stardis);

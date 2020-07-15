@@ -168,7 +168,7 @@ validate_properties
     switch (intface->type) {
     case DESC_BOUND_H_FOR_FLUID:
       if(!(solid_count == 0 && fluid_count == 1)) {
-       if(solid_count + fluid_count == 2)
+        if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_DEFS;
         else if(solid_count + fluid_count == 0)
           *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_UNDEFS;
@@ -192,7 +192,7 @@ validate_properties
       break;
     case DESC_BOUND_T_FOR_FLUID:
       if(!(solid_count == 0 && fluid_count == 1)) {
-      if(solid_count + fluid_count == 2)
+        if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_DEFS;
         else if(solid_count + fluid_count == 0)
           *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS;
@@ -204,7 +204,7 @@ validate_properties
       break;
     case DESC_BOUND_T_FOR_SOLID:
       if(!(solid_count == 1 && fluid_count == 0)) {
-       if(solid_count + fluid_count == 2)
+        if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_DEFS;
         else if(solid_count + fluid_count == 0)
           *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_UNDEFS;
@@ -618,14 +618,14 @@ stardis_init
     goto error;
   }
   ERR(senc3d_scene_get_overlapping_triangles_count(stardis->senc3d_scn, &ocount));
-    if(ocount) {
-      logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
-        "Scene contains %u overlapping triangles.\n",
-        ocount);
-      if(is_for_compute) {
-        res = RES_BAD_ARG;
-        goto error;
-      }
+  if(ocount) {
+    logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
+      "Scene contains %u overlapping triangles.\n",
+      ocount);
+    if(is_for_compute) {
+      res = RES_BAD_ARG;
+      goto error;
+    }
   }
 
   /* Create media and property holders for those found in descriptions */

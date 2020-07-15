@@ -317,7 +317,7 @@ create_holder
     stardis->counts.hbound_count++;
     if(dummies->dummy_solid) {
       /* Reuse external dummy solid */
-      description->d.t_boundary.mat_id = dummies->dummy_solid_id;
+      description->d.h_boundary.mat_id = dummies->dummy_solid_id;
     } else {
       /* Create dummy solid */
       size_t sz = darray_media_ptr_size_get(&stardis->media);

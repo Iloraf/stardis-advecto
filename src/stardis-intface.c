@@ -166,40 +166,41 @@ create_intface
         id = descriptions[bd].d.fluid.fluid_id;
         interface_props->back_medium_id = id;
         back_med = media[id];
+        /* Can overwrite fluid_side_shader. However it would imply two
+         * fluids and this case lead to an error */
         fluid_side_shader = &interface_shader.back;
         break;
       default:
         FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
       }
     }
+    if(fluid_count == 2) {
+      res = RES_BAD_ARG;
+      goto error;
+    }
     if(connect_defined) {
       const struct description* connect = descriptions + cd;
       int type_checked = 0;
       struct sdis_medium* def_medium = NULL;
       unsigned ext_id;
-      if(connect->type == DESC_SOLID_FLUID_CONNECT) {
-        if(solid_count != 1 || fluid_count != 1) { res = RES_BAD_ARG; goto error; }
-        ASSERT(front_defined && back_defined);
-        fluid_side_shader = (descriptions[fd].type == DESC_MAT_SOLID)
-          ? &interface_shader.back : &interface_shader.front;
-      } else {
-        if(front_defined == back_defined) { res = RES_BAD_ARG; goto error; }
-        def_medium = front_defined ? front_med : back_med;
-        if(front_defined) {
-          ASSERT(descriptions[fd].type == DESC_MAT_SOLID
-            || descriptions[fd].type == DESC_MAT_FLUID);
-          fluid_side_shader = (descriptions[fd].type == DESC_MAT_SOLID)
-            ? &interface_shader.back : &interface_shader.front;
-          interface_props->connect_id = cd;
-        } else {
-          ASSERT(back_defined);
-          ASSERT(descriptions[bd].type == DESC_MAT_SOLID
-            || descriptions[bd].type == DESC_MAT_FLUID);
-          fluid_side_shader = (descriptions[bd].type == DESC_MAT_SOLID)
-            ? &interface_shader.back : &interface_shader.front;
-          interface_props->connect_id = cd;
-        }
+      if(connect->type != DESC_SOLID_FLUID_CONNECT
+        && front_defined == back_defined)
+      {
+        /* 1 and only 1 defined */
+        res = RES_BAD_ARG;
+        goto error;
       }
+      if(front_defined) {
+        def_medium = front_med;
+        fluid_side_shader = (descriptions[fd].type == DESC_MAT_FLUID)
+          ? &interface_shader.front : &interface_shader.back;
+      } else {
+        ASSERT(back_defined);
+        def_medium = back_med;
+        fluid_side_shader = (descriptions[bd].type == DESC_MAT_FLUID)
+          ? &interface_shader.back : &interface_shader.front;
+      }
+      interface_props->connect_id = cd;
       switch(connect->type) {
       case DESC_BOUND_H_FOR_FLUID:
         if(sdis_medium_get_type(def_medium) != SDIS_FLUID) {
@@ -210,6 +211,7 @@ create_intface
         ASSERT(connect->d.h_boundary.imposed_temperature >= 0);
         interface_props->imposed_temperature
           = connect->d.h_boundary.imposed_temperature;
+        ASSERT(fluid_side_shader);
         fluid_side_shader->temperature = interface_get_temperature;
         /* fall through */
       case DESC_BOUND_H_FOR_SOLID:
@@ -263,7 +265,8 @@ create_intface
         if(!type_checked
           &&  sdis_medium_get_type(def_medium) != SDIS_SOLID)
         {
-          res = RES_BAD_ARG; goto error;
+          res = RES_BAD_ARG;
+          goto error;
         }
         ext_id = connect->d.t_boundary.mat_id; /* External material id */
         ASSERT(ext_id < darray_media_ptr_size_get(&stardis->media));
@@ -271,15 +274,20 @@ create_intface
           == (connect->type == DESC_BOUND_T_FOR_FLUID ? SDIS_SOLID: SDIS_FLUID));
         connection_count++;
         boundary_count++;
-        if(front_defined)
+        if(front_defined) {
+          ASSERT(!back_med);
           back_med = media[ext_id];
-        else front_med = media[ext_id];
+        } else {
+          ASSERT(!front_med);
+          front_med = media[ext_id];
+        }
         /* The imposed T is for the 2 sides (until there is contact resistnces) */
         interface_shader.front.temperature = interface_get_temperature;
         interface_shader.back.temperature = interface_get_temperature;
         if(connect->type == DESC_BOUND_T_FOR_SOLID) {
           /* Set emissivity to 1 to allow radiative paths comming from
            * a possible external fluid to 'see' the imposed T */
+          ASSERT(fluid_side_shader);
           fluid_side_shader->emissivity = interface_get_emissivity;
           interface_props->emissivity = 1;
         }
@@ -305,8 +313,12 @@ create_intface
         interface_props->imposed_flux = connect->d.f_boundary.imposed_flux;
         break;
       case DESC_SOLID_FLUID_CONNECT:
-        /* Both front and back should be defined;
-         * if not will raise an error below */
+        /* Both front and back should be defined */
+        if(solid_count != 1 || fluid_count != 1) {
+          res = RES_BAD_ARG;
+          goto error;
+        }
+        ASSERT(front_defined && back_defined);
         connection_count++;
         solid_fluid_connection_count++;
         interface_shader.convection_coef_upper_bound = connect->d.sf_connect.hc;
@@ -327,13 +339,11 @@ create_intface
       }
     }
 
-    if((fluid_count == 2)
-      || (fluid_count + solid_count + connection_count < 2)
-      || (boundary_count ?
-      (fluid_count + solid_count != 1) : (fluid_count + solid_count != 2))
-      || (solid_fluid_connection_count && (fluid_count != 1 || solid_count != 1)))
+    if((fluid_count + solid_count + connection_count < 2)
+      || (boundary_count && (fluid_count + solid_count != 1)))
     {
-      res = RES_BAD_ARG; goto error;
+      res = RES_BAD_ARG;
+      goto error;
     }
 
     ERR(sdis_interface_create(stardis->dev, front_med, back_med,

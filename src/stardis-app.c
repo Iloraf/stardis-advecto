@@ -20,8 +20,8 @@
 #include "stardis-fluid.h"
 #include "stardis-solid.h"
 
-#include<star/senc3d.h>
-#include<star/sg3d_sencXd_helper.h>
+#include <star/senc3d.h>
+#include <star/sg3d_sencXd_helper.h>
 #include <star/sg3d_sdisXd_helper.h>
 
 #include <rsys/text_reader.h>

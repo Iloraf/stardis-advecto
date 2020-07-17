@@ -22,7 +22,8 @@
 #include <sdis.h>
 #include <sdis_version.h>
 
-#include <star/sg3d_sdisXd_helper.h>
+#include <star/s3d.h>
+#include <star/sg3d_sXd_helper.h>
 
 #include <rsys/double3.h>
 #include <rsys/double2.h>
@@ -32,6 +33,137 @@
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
+
+struct filter_ctx {
+  const struct stardis* stardis;
+  unsigned prim;
+  const struct description* desc;
+  float pos[3];
+  float dist;
+  int outside;
+  int probe_on_boundary;
+};
+
+#define FILTER_CTX_DEFAULT__ \
+ { NULL, S3D_INVALID_ID, NULL, { 0, 0, 0 }, FLT_MAX, 0, 0 }
+
+/* Filter used from a point query to determine not only one of the closest
+ * point, but the better one if there are more than one. In some circumstances
+ * it is not possible to determine the medium we are in using a given hit, but
+ * it is possible using another equidistant hit :
+ *
+ *
+ *   P             C
+ *   +.............+---trg 1---
+ *                 |
+ *   medium 1    trg 2  medium 2
+ *                 |
+ *
+ * C is the closest point from P, and 2 different hits at C are possible (one
+ * on each triangle). However, only hit on trg 2 allows to find out that P is
+ * in medium 1 using sign(PC.Ntrg1) as PC.Ntrg2 = 0.
+ * The following filter function aims at selecting the hit on trg2 regardless
+ * of the order in which the 2 triangles are checked.
+ * One unexpected case cannot be decided though, but it implies that the
+ * closest triangle has 2 different media on its sides and that P lies on the
+ * triangle's plane :
+ *
+ *   P       C  medium 1
+ *   +       +---trg---
+ *              medium 2
+ */
+static int
+hit_filter
+  (const struct s3d_hit* hit,
+   const float ray_org[3],
+   const float* invalid_, /* In closest_point queries ray_dir is not informed */
+   void* ray_data,
+   void* filter_data)
+{
+  struct filter_ctx* filter_ctx = ray_data;
+  float s, dir[3];
+  enum senc3d_side hit_side;
+  struct s3d_attrib interf_pos;
+  const struct description* descriptions;
+  unsigned properties[3];
+  const struct stardis* stardis;
+
+  (void)ray_org; (void)invalid_; (void)filter_data;
+  ASSERT(hit && filter_ctx);
+  ASSERT(hit->uv[0] == CLAMP(hit->uv[0], 0, 1));
+  ASSERT(hit->uv[1] == CLAMP(hit->uv[1], 0, 1));
+
+  if(filter_ctx->dist == hit->distance && filter_ctx->desc) {
+    /* Cannot improve: keep previous!
+     * Or we could end with a NULL desc */
+    return 1; /* Skip */
+  }
+
+  stardis = filter_ctx->stardis;
+  descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
+
+  CHK(s3d_primitive_get_attrib(&hit->prim, S3D_POSITION, hit->uv, &interf_pos)
+    == RES_OK);
+
+  if(hit->distance == 0) {
+    filter_ctx->prim = hit->prim.prim_id;
+    filter_ctx->desc = NULL; /* Not apply */
+    f3_set(filter_ctx->pos, interf_pos.value);
+    filter_ctx->dist = hit->distance;
+    filter_ctx->outside = 0;
+    filter_ctx->probe_on_boundary = 1;
+    return 0; /* Keep */
+  }
+
+  CHK(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
+    hit->prim.prim_id, properties) == RES_OK);
+
+  if(properties[SDIS_FRONT] == properties[SG3D_BACK]) {
+    /* Don't need to bother with sides */
+    filter_ctx->prim = hit->prim.prim_id;
+    filter_ctx->desc = (properties[SDIS_FRONT] == SG3D_UNSPECIFIED_PROPERTY)
+      ? NULL : descriptions + properties[SG3D_FRONT];
+    f3_set(filter_ctx->pos, interf_pos.value);
+    filter_ctx->dist = hit->distance;
+    filter_ctx->outside = (properties[SG3D_FRONT] == SG3D_UNSPECIFIED_PROPERTY);
+    filter_ctx->probe_on_boundary = 0;
+    return 0; /* Keep */
+  }
+
+  f3_sub(dir, interf_pos.value, ray_org);
+  s = f3_dot(dir, hit->normal);
+
+  if(s == 0) {
+    filter_ctx->prim = hit->prim.prim_id;
+    filter_ctx->desc = NULL; /* Cannot decide side */
+    f3_set(filter_ctx->pos, interf_pos.value);
+    filter_ctx->dist = hit->distance;
+    filter_ctx->outside = 0;
+    filter_ctx->probe_on_boundary = 0;
+  }
+
+  /* Determine which side was hit
+   * Warning: following Embree 2 convention for geometrical normals,
+   * the Star3D hit normals are left-handed */
+  hit_side = (s > 0) ? SG3D_BACK : SG3D_FRONT;
+  if(properties[hit_side] == SG3D_UNSPECIFIED_PROPERTY) {
+    filter_ctx->prim = hit->prim.prim_id;
+    filter_ctx->desc = NULL;
+    f3_set(filter_ctx->pos, interf_pos.value);
+    filter_ctx->dist = hit->distance;
+    filter_ctx->outside = 1;
+    filter_ctx->probe_on_boundary = 0;
+  } else {
+    filter_ctx->prim = hit->prim.prim_id;
+    filter_ctx->desc = descriptions + properties[hit_side];
+    f3_set(filter_ctx->pos, interf_pos.value);
+    filter_ctx->dist = hit->distance;
+    filter_ctx->outside = 0;
+    filter_ctx->probe_on_boundary = 0;
+  }
+
+  return 0; /* Keep */
+}
 
 /* Check probe position and move it to the closest point on an interface
  * if on_interface is set */
@@ -44,220 +176,188 @@ check_probe_conform_to_type
    double uv[2])
 {
   res_T res = RES_OK;
-  double min_d = DBL_MAX, new_pos[3], tmp_uv[2], min_uv[2];
-  const struct description* min_desc = NULL;
-  const struct description* descriptions;
-  unsigned i, j, tcount, found_id = UINT_MAX;
-  int outside = 0, probe_on_boundary = 0;
+  struct s3d_device* s3d = NULL;
+  struct s3d_scene* s3d_scn = NULL;
+  struct s3d_shape* s3d_shp = NULL;
+  struct s3d_scene_view* s3d_view = NULL;
+  struct s3d_hit hit = S3D_HIT_NULL;
+  struct s3d_vertex_data attribs;
+  struct filter_ctx filter_ctx = FILTER_CTX_DEFAULT__;
+  float origin[3];
+  unsigned vcount, tcount, j;
 
   ASSERT(stardis && pos && iprim && uv);
-  descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
+
+  attribs.type = S3D_FLOAT3;
+  attribs.usage = S3D_POSITION;
+  attribs.get = sg3d_sXd_geometry_get_position;
+
+  ERR(s3d_device_create(stardis->logger, stardis->allocator, 0, &s3d));
+  ERR(s3d_scene_create(s3d, &s3d_scn));
+  ERR(s3d_shape_create_mesh(s3d, &s3d_shp));
+
+  /* Back to s3d API type for ntris and nverts */
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tcount));
-  for(i = 0; i < tcount; ++i) {
-    unsigned indices[3], properties[3];
-    double dp[3], d, projected_pos[3], c;
-    double v0[3], v1[3], v2[3], e1[3], e2[3], n[3];
-    enum sdis_side s;
+  ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));
+  ERR(s3d_mesh_setup_indexed_vertices(s3d_shp,
+    tcount, sg3d_sXd_geometry_get_indices,
+    vcount, &attribs, 1, stardis->geometry.sg3d));
+  /* Need a filter to sort out some tricky configurations (see filter comments) */
+  ERR(s3d_mesh_set_hit_filter_function(s3d_shp, hit_filter, NULL));
+  ERR(s3d_scene_attach_shape(s3d_scn, s3d_shp));
+  ERR(s3d_scene_view_create(s3d_scn, S3D_TRACE, &s3d_view));
 
-    ERR(sg3d_geometry_get_unique_triangle_vertices(stardis->geometry.sg3d, i,
-      indices));
-    ERR(sdis_scene_boundary_project_position(stardis->sdis_scn, i, pos, tmp_uv));
-    ERR(sdis_scene_get_boundary_position(stardis->sdis_scn, i, tmp_uv, projected_pos));
-    d3_sub(dp, projected_pos, pos);
-    d = d3_len(dp);
+  S3D(device_ref_put(s3d)); s3d = NULL;
+  S3D(scene_ref_put(s3d_scn)); s3d_scn = NULL;
+  S3D(shape_ref_put(s3d_shp)); s3d_shp = NULL;
 
-    if(!(d < min_d
-      || (min_desc == NULL && d <= min_d * (1 + FLT_EPSILON))))
-    {
-      /* No improvement
-       * (accept to slightly increase distance to gain a description) */
-      continue;
-    }
-
-    /* Keep closest projection */
-    found_id = i;
-    min_d = d;
-    d2_set(min_uv, tmp_uv);
-    d3_set(new_pos, projected_pos);
-
-    /* Boundary normal */
-    ERR(sg3d_geometry_get_unique_vertex(stardis->geometry.sg3d, indices[0], v0));
-    ERR(sg3d_geometry_get_unique_vertex(stardis->geometry.sg3d, indices[1], v1));
-    ERR(sg3d_geometry_get_unique_vertex(stardis->geometry.sg3d, indices[2], v2));
-    d3_sub(e1, v1, v0);
-    d3_sub(e2, v2, v0);
-    d3_cross(n, e1, e2);
-    ASSERT(d3_len(n));
-
-    /* Find side; Stardis solver convention is triangle normal is back side */
-    c = d3_dot(n, dp);
-
-    if(d == 0 || c == 0) {
-      /* Best possible match */
-      min_desc = NULL;
-      probe_on_boundary = 1;
-      if(move2boundary)
-        logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe is on primitive %u, uv = (%g, %g), not moved.\n",
-          found_id, SPLIT2(min_uv));
-      break;
-    }
-
-    /* Try to determine material */
-    ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
-      found_id, properties));
-    if(properties[SDIS_FRONT] == properties[SDIS_BACK]) {
-      min_desc = descriptions + properties[SDIS_FRONT];
-      continue;
-    }
-
-#define COS_89_deg_99 1.7453e-4
-    if(fabs(c) < COS_89_deg_99 * d3_len(n) * d3_len(dp)
-      && properties[SDIS_FRONT] != properties[SDIS_BACK])
-#undef COS_89_deg_99
-    {
-      /* Side cannot be determined (n^dp > 89.99 degrees) */
-      min_desc = NULL;
-      outside = 0; /* Cannot be sure */
-    } else {
-      s = (c < 0) ? SDIS_BACK : SDIS_FRONT;
-      if(properties[s] == SG3D_UNSPECIFIED_PROPERTY) {
-        min_desc = NULL;
-        outside = 1;
-        continue;
-      }
-      min_desc = descriptions + properties[s];
-      outside = 0;
-    }
+  f3_set_d3(origin, pos);
+  filter_ctx.stardis = stardis;
+  ERR(s3d_scene_view_closest_point(s3d_view, origin, FLT_MAX, &filter_ctx, &hit));
+  S3D(scene_view_ref_put(s3d_view)); s3d_view = NULL;
+  if(S3D_HIT_NONE(&hit)) {
+    res = RES_BAD_ARG;
+    goto error;
   }
+  ASSERT(filter_ctx.dist == hit.distance);
 
   if(move2boundary) {
     /* Need to move probe to closest boundary */
     int danger = 0;
-    if(outside) {
+    if(filter_ctx.outside) {
       /* Not an error as probe moved to boundary */
       logger_print(stardis->logger, LOG_WARNING,
         "Probe was outside the model.\n");
     }
-    if(!min_desc) {
+    if(!filter_ctx.desc) {
       /* Not an error as probe moved to boundary */
-      if(!probe_on_boundary && !outside)
+      if(!filter_ctx.probe_on_boundary && !filter_ctx.outside)
         logger_print(stardis->logger, LOG_WARNING,
           "Could not determine the medium probe is in.\n");
     } else {
-      if(min_desc->type == DESC_MAT_SOLID) {
-        double delta = min_desc->d.solid.delta;
+      if(filter_ctx.desc->type == DESC_MAT_SOLID) {
+        double delta = filter_ctx.desc->d.solid.delta;
         logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe was in solid '%s'.\n", str_cget(&min_desc->d.solid.name));
-        if(min_d > 2 * delta) {
+          "Probe was in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid.name));
+        if(filter_ctx.dist > 2 * delta) {
           logger_print(stardis->logger, LOG_ERROR,
             "Probe moved to (%g, %g, %g), primitive %u, uv = (%g, %g).\n",
-            SPLIT3(new_pos), found_id, SPLIT2(min_uv));
+            SPLIT3(filter_ctx.pos), hit.prim.prim_id, SPLIT2(hit.uv));
           logger_print(stardis->logger, LOG_ERROR,
             "Move is %g delta long. Use -p instead of -P.\n",
-            min_d / delta);
+            filter_ctx.dist / delta);
           res = RES_BAD_ARG;
           goto error;
         }
-        if(min_d > 0.5 * delta) {
+        if(filter_ctx.dist > 0.5 * delta) {
           logger_print(stardis->logger, LOG_WARNING,
             "Probe was %g delta from closest boundary. "
             "Consider using -P instead of -p.\n",
-            min_d / delta);
+            filter_ctx.dist / delta);
         } else {
-          if(min_d != 0)
+          if(filter_ctx.dist != 0)
             logger_print(stardis->logger, LOG_OUTPUT,
               "Probe was %g delta from closest boundary.\n",
-              min_d / delta);
+              filter_ctx.dist / delta);
         }
       } else {
         /* TODO: check move length wrt local geometry? */
         logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe was in fluid '%s'.\n", str_cget(&min_desc->d.fluid.name));
+          "Probe was in fluid '%s'.\n", str_cget(&filter_ctx.desc->d.fluid.name));
         logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe distance from closest boundary was %g.\n", min_d);
+          "Probe distance from closest boundary was %g.\n", filter_ctx.dist);
       }
     }
     /* Check if moved to vertex/edge */
     FOR_EACH(j, 0, 2) {
-      if(CLAMP(min_uv[j], 0.0005, 0.9995) != min_uv[j])
+      if(CLAMP(hit.uv[j], 0.0005, 0.9995) != hit.uv[j])
         danger++;
     }
     if(danger) {
       logger_print(stardis->logger, LOG_WARNING,
         "Probe %s close to / on %s. "
         "If computation fails, try moving it slightly.\n",
-        (min_d != 0 ? "moved" : "is"), (danger == 1 ? "an edge" : "a vertex"));
+        (filter_ctx.dist != 0 ? "moved" : "is"), (danger == 1 ? "an edge" : "a vertex"));
     }
-    if(!probe_on_boundary)
+    if(filter_ctx.probe_on_boundary) {
+      logger_print(stardis->logger, LOG_OUTPUT,
+        "Probe is on primitive %u, uv = (%g, %g), not moved.\n",
+        hit.prim.prim_id, SPLIT2(hit.uv));
+    } else {
       logger_print(stardis->logger, LOG_OUTPUT,
         "Probe moved to (%g, %g, %g), primitive %u, uv = (%g, %g).\n",
-        SPLIT3(new_pos), found_id, SPLIT2(min_uv));
-    d3_set(pos, new_pos);
+        SPLIT3(filter_ctx.pos), hit.prim.prim_id, SPLIT2(hit.uv));
+    }
+    d3_set_f3(pos, filter_ctx.pos);
   } else {
     /* Need to check medium */
-    if(outside) {
+    if(filter_ctx.outside) {
       logger_print(stardis->logger, LOG_ERROR,
         "Probe is outside the model.\n");
       logger_print(stardis->logger, LOG_ERROR,
         "Closest geometry is primitive %u, uv = (%g, %g), pos (%g, %g, %g).\n",
-        found_id, SPLIT2(min_uv), SPLIT3(new_pos));
+        hit.prim.prim_id, SPLIT2(hit.uv), SPLIT3(filter_ctx.pos));
       res = RES_BAD_ARG;
       goto error;
     }
-    if(probe_on_boundary) {
+    if(filter_ctx.probe_on_boundary) {
       logger_print(stardis->logger, LOG_ERROR,
         "Probe is on primitive %u, uv = (%g, %g). Use -P instead of -p.\n",
-        found_id, SPLIT2(min_uv));
+        hit.prim.prim_id, SPLIT2(hit.uv));
       res = RES_BAD_ARG;
       goto error;
     }
-    if(!min_desc) {
+    if(!filter_ctx.desc) {
       logger_print(stardis->logger, LOG_ERROR,
         "Could not determine the medium probe is in. "
         "Try moving it slightly.\n");
       logger_print(stardis->logger, LOG_ERROR,
         "Closest geometry is primitive %u, uv = (%g, %g), distance %g.\n",
-        found_id, SPLIT2(min_uv), min_d);
+        hit.prim.prim_id, SPLIT2(hit.uv), filter_ctx.dist);
       res = RES_BAD_ARG;
       goto error;
     }
     logger_print(stardis->logger, LOG_OUTPUT,
-      "Probe is in solid '%s'.\n", str_cget(&min_desc->d.solid.name));
-    if(min_desc->type == DESC_MAT_SOLID) {
-      double delta = min_desc->d.solid.delta;
-      if(min_d < 0.25 * delta) {
+      "Probe is in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid.name));
+    if(filter_ctx.desc->type == DESC_MAT_SOLID) {
+      double delta = filter_ctx.desc->d.solid.delta;
+      if(filter_ctx.dist < 0.25 * delta) {
         logger_print(stardis->logger, LOG_ERROR,
           "Probe is %g delta from closest boundary. Use -P instead of -p.\n",
-          min_d / delta);
+          filter_ctx.dist / delta);
         logger_print(stardis->logger, LOG_ERROR,
           "Closest geometry is primitive %u, uv = (%g, %g).\n",
-          found_id, SPLIT2(min_uv));
+          hit.prim.prim_id, SPLIT2(hit.uv));
         res = RES_BAD_ARG;
         goto error;
       }
-      if(min_d < 0.5 * delta) {
+      if(filter_ctx.dist < 0.5 * delta) {
         logger_print(stardis->logger, LOG_WARNING,
           "Probe is %g delta from closest boundary. "
           "Consider using -P instead of -p.\n",
-          min_d / delta);
+          filter_ctx.dist / delta);
       } else {
         logger_print(stardis->logger, LOG_OUTPUT,
           "Probe is %g delta from closest boundary.\n",
-          min_d / delta);
+          filter_ctx.dist / delta);
       }
     } else {
       logger_print(stardis->logger, LOG_WARNING,
         "Probe is in fluid '%s': computing fluid temperature, "
         "not using a specific position.\n",
-        str_cget(&min_desc->d.fluid.name));
+        str_cget(&filter_ctx.desc->d.fluid.name));
       /* In fluid; TODO: check distance wrt local geometry (use 4V/S?) */
     }
   }
 
-  *iprim = found_id;
-  d2_set(uv, min_uv);
+  *iprim = hit.prim.prim_id;
+  d2_set_f2(uv, hit.uv);
 end:
+  if(s3d) S3D(device_ref_put(s3d));
+  if(s3d_scn) S3D(scene_ref_put(s3d_scn));
+  if(s3d_shp) S3D(shape_ref_put(s3d_shp));
+  if(s3d_view) S3D(scene_view_ref_put(s3d_view));
+
   return res;
 error:
   goto end;

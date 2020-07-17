@@ -205,7 +205,7 @@ read_sides_and_files
     stardis->geometry.sg3d, &current_merge_errors));
 
   /* At least one side+name, no side without name */
-  ERR(sstl_create(stardis->logger, stardis->allocator, 0, &sstl));
+  ERR(sstl_create(stardis->logger, stardis->allocator, 1, &sstl));
   for(;;) {
     unsigned merge_errors;
     if(side_is_intface) {

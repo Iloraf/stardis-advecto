@@ -477,6 +477,15 @@ defined by its frontier that is a collection of triangles surrounding the hole.
 Such triangles are detected as having their 2 sides in the same enclosure, but
 with a different medium on each side.
 
+Media information is provided in two different flavours. First the medium on
+front and back sides of triangles can be found through the Front_medium and
+Back_medium fields. These fields use the special value 4294967295 (INT_MAX) for
+sides with no defined medium, as one can expect on boundary triangles. On the
+other hand, medium information provided by the Enclosures_internal_media
+field displays the id of the medium created to hold boundary information for
+boundary triangles. In either case, media numbering information can be found
+in log messages if option -V 3 is used in conjunction with the -d dump option.
+
 [verse]
 _______
 <geometry-file>       ::= "# vtk DataFile Version 2.0"
@@ -493,7 +502,8 @@ _______
                           <user-ids>
                         [ <merge-conflicts> ] # if some merge conflict occured
                         [ <property-conflicts> ] # if some property conflict occured
-                          <file-ranks>
+                          <file-ids>
+                          <boundaries>
                         [ <compute-region> ] # if defined
                           <encl-or-overlaps>
 
@@ -535,20 +545,16 @@ _______
                           "LOOKUP_TABLE default"
                           <file-ranks>
 
+<boundaries>          ::= "SCALARS Boundaries unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <boundary-ids>
+
 <compute-region>      ::= "SCALARS Compute_region unsigned_int 1"
                           "LOOKUP_TABLE default"
                           <region-membership>
 
 <encl-or-overlaps>    ::= <encl-information> # if enclosure extraction was possible
                         | <overlaps> # if overlapping triangles where detected
-
-<holes>               ::= "SCALARS Hole_frontiers unsigned_int 1"
-                          "LOOKUP_TABLE default"
-                          <hole-memberships>
-
-<enclosures>          ::= "FIELD FieldData 1"
-                          "Enclosure_ID" #enclosures #triangles "unsigned_char"
-                          <encl-memberships>
 
 -----------------
 
@@ -611,6 +617,9 @@ _______
 <file-ranks>          ::= INTEGER # in [0 #submitted files[
                          <file-ranks> # #triangles ranks
 
+<boundary-ids>        ::= INTEGER # in [0 #submitted descriptions[
+                         <boundary-ids> # #triangles ids
+
 <region-membership>   ::= <reg-not-member> # triangle not part of the compute region
                         | <reg-member> # triangle is part of the compute region
                           <region-membership> # #triangles membership status
@@ -622,6 +631,18 @@ _______
                           "LOOKUP_TABLE default"
                           <overlapping-status>
 
+<holes>               ::= "SCALARS Hole_frontiers unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <hole-memberships>
+
+<enclosures>          ::= "FIELD FieldData 2"
+                          "Enclosures" #enclosures #triangles "unsigned_char"
+                          <encl-memberships>
+                          "Enclosures_internal_media" #enclosures #triangles "unsigned_int"
+                          <encl-media>
+
+-----------------
+
 <hole-memberships>    ::= "0" # triangle not surrounding a hole
                         | "1" # triangle surrounding a hole
                           <hole-memberships> # #triangles hole memberships
@@ -629,16 +650,18 @@ _______
 <encl-memberships>    ::= <enclosure-status 0> ... <enclosure-status #enclosures-1>
                           <encl-memberships> # #triangles enclosure memberships
 
+<encl-media>          ::= <enclosure 0 medium> ... <enclosure #enclosures-1 medium>
+                          <encl-media> # #triangles enclosure media
+
 <medium-id>           ::= INTEGER # in [0, #medium[
 
 <undef-medium>        ::= "4294967295"
-
------------------
 
 <reg-not-member>      ::= "0"
 
 <reg-member>          ::= "1" # the FRONT side is member of the region
                         | "2" # the BACK side is member of the region
+                        | "3" # both sides are member of the region
                         | "4294967295" # the triangle is an invalid part of the region
 
 <overlapping-status>  ::= "0" # triangle not overlapping another triangle
@@ -647,6 +670,16 @@ _______
 
 <enclosure-status i>  ::= <encl-not-member> # the triangle is not part of the ith enclosure
                         | <encl-member> # the triangle is part of the ith enclosure
+
+<enclosure i medium>  ::= <medium-id> # the triangle is part of the ith enclosure and
+                                      # has this medium in the involved side(s)
+                        | "4294967293" # the triangle is part of the ith enclosure and
+                                       # has no defined medium in the involved side(s)
+                        | "4294967294" # the 2 sides of the triangle are part of the ith
+                                       # enclosure, but have 2 different media
+                        | "4294967295" # the triangle is not part of the ith enclosure
+
+-----------------
 
 <encl-not-member>     ::= "0"
 

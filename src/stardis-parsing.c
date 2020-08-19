@@ -177,8 +177,8 @@ add_geom_keep_degenerated
 static res_T
 read_sides_and_files
   (struct stardis* stardis,
-   const int side_is_intface, /* if 1, don't read side */
-   const unsigned id,
+   const int descr_is_intface, /* if 1, don't read side */
+   const unsigned description_id,
    char** tok_ctx)
 {
   char* tk = NULL;
@@ -208,10 +208,10 @@ read_sides_and_files
   ERR(sstl_create(stardis->logger, stardis->allocator, 1, &sstl));
   for(;;) {
     unsigned merge_errors;
-    if(side_is_intface) {
+    if(descr_is_intface) {
       add_geom_ctx.properties[SG3D_FRONT] = SG3D_UNSPECIFIED_PROPERTY;
       add_geom_ctx.properties[SG3D_BACK] = SG3D_UNSPECIFIED_PROPERTY;
-      add_geom_ctx.properties[SG3D_INTFACE] = id;
+      add_geom_ctx.properties[SG3D_INTFACE] = description_id;
     } else {
       tk = strtok_r(NULL, " \t", tok_ctx);
       if(!tk) {
@@ -227,16 +227,16 @@ read_sides_and_files
       _strupr(tk);
       add_geom_ctx.properties[SG3D_INTFACE] = SG3D_UNSPECIFIED_PROPERTY;
       if(0 == strcmp(tk, "FRONT")) {
-        add_geom_ctx.properties[SG3D_FRONT] = id;
+        add_geom_ctx.properties[SG3D_FRONT] = description_id;
         add_geom_ctx.properties[SG3D_BACK] = SG3D_UNSPECIFIED_PROPERTY;
       }
       else if(0 == strcmp(tk, "BACK")) {
         add_geom_ctx.properties[SG3D_FRONT] = SG3D_UNSPECIFIED_PROPERTY;
-        add_geom_ctx.properties[SG3D_BACK] = id;
+        add_geom_ctx.properties[SG3D_BACK] = description_id;
       }
       else if(0 == strcmp(tk, "BOTH")) {
-        add_geom_ctx.properties[SG3D_FRONT] = id;
-        add_geom_ctx.properties[SG3D_BACK] = id;
+        add_geom_ctx.properties[SG3D_FRONT] = description_id;
+        add_geom_ctx.properties[SG3D_BACK] = description_id;
       }
       else {
         logger_print(stardis->logger, LOG_ERROR,
@@ -247,7 +247,7 @@ read_sides_and_files
     }
     tk = strtok_r(NULL, " \t", tok_ctx);
     if(!tk) {
-      if(!side_is_intface /* Has read a side */
+      if(!descr_is_intface /* Has read a side */
         || !file_count) /* Need at least 1 file */
       {
         logger_print(stardis->logger, LOG_ERROR,
@@ -342,7 +342,7 @@ init_args
   darray_str_init(allocator, &args->model_files);
   /* Set default values */
   args->samples = STARDIS_DEFAULT_SAMPLES_COUNT;
-  args->nthreads = DEFAULT_NTHREADS;
+  args->nthreads = SDIS_NTHREADS_DEFAULT;
   args->probe[3] = STARDIS_DEFAULT_COMPUTE_TIME;
   args->ambient_temp = STARDIS_DEFAULT_AMBIENT_TEMP;
   args->ref_temp = STARDIS_DEFAULT_REFERENCE_TEMP;
@@ -1023,6 +1023,7 @@ find_description_by_name
 static res_T
 process_h
   (struct stardis* stardis,
+   struct dummies* dummies,
    const enum description_type type,
    char** tok_ctx)
 {
@@ -1034,12 +1035,21 @@ process_h
   ASSERT(stardis && tok_ctx);
 
   sz = darray_descriptions_size_get(&stardis->descriptions);
-  ASSERT(sz <= UINT_MAX);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz+1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_h(stardis->allocator, &desc->d.h_boundary);
 
-  desc->d.h_boundary.mat_id = (unsigned)sz;
+  if(type == DESC_BOUND_H_FOR_SOLID) {
+    /* Need a dedicated fluid */
+    allocate_stardis_medium_id(stardis, &desc->d.h_boundary.mat_id);
+  } else {
+    /* Can use dummy solid */
+    if(dummies->dummy_solid_id == UINT_MAX) {
+      /* Allocate an ID for dummy solid */
+      allocate_stardis_medium_id(stardis, &dummies->dummy_solid_id);
+    }
+    desc->d.h_boundary.mat_id = dummies->dummy_solid_id;
+  }
   desc->type = type;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "h boundary name");
@@ -1093,7 +1103,8 @@ process_h
     goto end;
   }
 
-  ERR(read_sides_and_files(stardis, 1, desc->d.h_boundary.mat_id, tok_ctx));
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
 end:
   return res;
@@ -1106,6 +1117,7 @@ error:
 static res_T
 process_t
   (struct stardis* stardis,
+   struct dummies* dummies,
    const enum description_type type,
    char** tok_ctx)
 {
@@ -1117,12 +1129,10 @@ process_t
   ASSERT(stardis && tok_ctx);
 
   sz = darray_descriptions_size_get(&stardis->descriptions);
-  ASSERT(sz <= UINT_MAX);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_t(stardis->allocator, &desc->d.t_boundary);
 
-  desc->d.t_boundary.mat_id = (unsigned)sz;
   desc->type = type;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature boundary name");
@@ -1146,6 +1156,11 @@ process_t
     goto end;
   }
   if(type == DESC_BOUND_T_FOR_FLUID) {
+    if(dummies->dummy_solid_id == UINT_MAX) {
+      /* Allocate an ID for dummy solid */
+      allocate_stardis_medium_id(stardis, &dummies->dummy_solid_id);
+    }
+    desc->d.t_boundary.mat_id = dummies->dummy_solid_id;
     CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
     res = cstr_to_double(tk, &desc->d.t_boundary.emissivity);
     if(res != RES_OK
@@ -1176,9 +1191,16 @@ process_t
       if(res == RES_OK) res = RES_BAD_ARG;
       goto end;
     }
+  } else {
+    if(dummies->dummy_fluid_id == UINT_MAX) {
+      /* Allocate an ID for dummy fluid */
+      allocate_stardis_medium_id(stardis, &dummies->dummy_fluid_id);
+    }
+    desc->d.t_boundary.mat_id = dummies->dummy_fluid_id;
   }
 
-  ERR(read_sides_and_files(stardis, 1, desc->d.t_boundary.mat_id, tok_ctx));
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
 end:
   return res;
@@ -1190,6 +1212,7 @@ error:
 static res_T
 process_flx
   (struct stardis* stardis,
+   struct dummies* dummies,
    char** tok_ctx)
 {
   char* tk = NULL;
@@ -1200,12 +1223,15 @@ process_flx
   ASSERT(stardis && tok_ctx);
 
   sz = darray_descriptions_size_get(&stardis->descriptions);
-  ASSERT(sz <= UINT_MAX);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_f(stardis->allocator, &desc->d.f_boundary);
 
-  desc->d.f_boundary.mat_id = (unsigned)sz;
+  if(dummies->dummy_fluid_id == UINT_MAX) {
+    /* Allocate an ID for dummy fluid */
+    allocate_stardis_medium_id(stardis, &dummies->dummy_fluid_id);
+  }
+  desc->d.f_boundary.mat_id = dummies->dummy_fluid_id;
   desc->type = DESC_BOUND_F_FOR_SOLID;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "flux boundary name");
@@ -1229,7 +1255,8 @@ process_flx
     goto end;
   }
 
-  ERR(read_sides_and_files(stardis, 1, desc->d.f_boundary.mat_id, tok_ctx));
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
 end:
   return res;
@@ -1246,18 +1273,19 @@ process_sfc
   char* tk = NULL;
   struct description* desc;
   size_t sz;
-  unsigned connection_id;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
 
   sz = darray_descriptions_size_get(&stardis->descriptions);
-  ASSERT(sz <= UINT_MAX);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_sf(stardis->allocator, &desc->d.sf_connect);
 
-  connection_id = (unsigned)sz;
+  /* Use a medium ID even if there is no medium here
+   * As other cases use media IDs as unique IDs for read_sides_and_files calls
+   * we continue the trend to ensure connection ID is OK */
+  allocate_stardis_medium_id(stardis, &desc->d.sf_connect.connection_id);
   desc->type = DESC_SOLID_FLUID_CONNECT;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid fluid connection name");
@@ -1302,7 +1330,8 @@ process_sfc
     goto end;
   }
 
-  ERR(read_sides_and_files(stardis, 1, connection_id, tok_ctx));
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
 end:
   return res;
@@ -1403,12 +1432,11 @@ process_solid
   ASSERT(stardis && tok_ctx);
 
   sz = darray_descriptions_size_get(&stardis->descriptions);
-  ASSERT(sz <= UINT_MAX);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_solid(stardis->allocator, &desc->d.solid);
 
-  desc->d.solid.solid_id = (unsigned)sz;
+  allocate_stardis_medium_id(stardis, &desc->d.solid.solid_id);
   desc->type = DESC_MAT_SOLID;
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid name");
@@ -1469,7 +1497,8 @@ process_solid
     goto end;
   }
 
-  ERR(read_sides_and_files(stardis, 0, desc->d.solid.solid_id, tok_ctx));
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
 
 end:
   return res;
@@ -1491,12 +1520,11 @@ process_fluid
   ASSERT(stardis && tok_ctx);
 
   sz = darray_descriptions_size_get(&stardis->descriptions);
-  ASSERT(sz <= UINT_MAX);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_fluid(stardis->allocator, &desc->d.fluid);
 
-  desc->d.fluid.fluid_id = (unsigned)sz;
+  allocate_stardis_medium_id(stardis, &desc->d.fluid.fluid_id);
   desc->type = DESC_MAT_FLUID;
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "fluid name");
@@ -1541,7 +1569,8 @@ process_fluid
   ERR(read_imposed_temperature(stardis, &desc->d.fluid.imposed_temperature,
     tok_ctx));
 
-  ERR(read_sides_and_files(stardis, 0, desc->d.fluid.fluid_id, tok_ctx));
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
 
 end:
   return res;
@@ -1600,7 +1629,8 @@ res_T
 process_model_line
   (const char* file_name,
    char* line,
-   struct stardis* stardis)
+   struct stardis* stardis,
+   struct dummies* dummies)
 {
   res_T res = RES_OK;
   struct str keep;
@@ -1614,15 +1644,15 @@ process_model_line
   _strupr(tk);
   
   if(0 == strcmp(tk, "H_BOUNDARY_FOR_SOLID"))
-    ERR(process_h(stardis, DESC_BOUND_H_FOR_SOLID, &tok_ctx));
+    ERR(process_h(stardis, dummies, DESC_BOUND_H_FOR_SOLID, &tok_ctx));
   else if(0 == strcmp(tk, "H_BOUNDARY_FOR_FLUID"))
-    ERR(process_h(stardis, DESC_BOUND_H_FOR_FLUID, &tok_ctx));
+    ERR(process_h(stardis, dummies, DESC_BOUND_H_FOR_FLUID, &tok_ctx));
   else if(0 == strcmp(tk, "T_BOUNDARY_FOR_SOLID"))
-    ERR(process_t(stardis, DESC_BOUND_T_FOR_SOLID, &tok_ctx));
+    ERR(process_t(stardis, dummies, DESC_BOUND_T_FOR_SOLID, &tok_ctx));
   else if(0 == strcmp(tk, "T_BOUNDARY_FOR_FLUID"))
-    ERR(process_t(stardis, DESC_BOUND_T_FOR_FLUID, &tok_ctx));
+    ERR(process_t(stardis, dummies, DESC_BOUND_T_FOR_FLUID, &tok_ctx));
   else if(0 == strcmp(tk, "F_BOUNDARY_FOR_SOLID"))
-    ERR(process_flx(stardis, &tok_ctx));
+    ERR(process_flx(stardis, dummies, &tok_ctx));
   else if(0 == strcmp(tk, "SOLID_FLUID_CONNECTION"))
     ERR(process_sfc(stardis, &tok_ctx));
   else if(0 == strcmp(tk, "SOLID"))

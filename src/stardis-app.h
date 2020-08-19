@@ -45,6 +45,35 @@ struct sdis_medium;
 #define DELTA_AUTO INF /* Placeholder until actual value is substituted */
 #define UNKNOWN_MEDIUM_TEMPERATURE -1 /* Unknown for stadis solver is -1 */
 
+enum properties_conflict_t {
+  NO_PROPERTY_CONFLICT,
+  BOUND_H_FOR_FLUID_BETWEEN_2_DEFS,
+  BOUND_H_FOR_FLUID_BETWEEN_2_UNDEFS,
+  BOUND_H_FOR_FLUID_ENCLOSING_SOLID,
+  BOUND_H_FOR_SOLID_BETWEEN_2_DEFS,
+  BOUND_H_FOR_SOLID_BETWEEN_2_UNDEFS,
+  BOUND_H_FOR_SOLID_ENCLOSING_FLUID,
+  BOUND_T_FOR_FLUID_BETWEEN_2_DEFS,
+  BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS,
+  BOUND_T_FOR_FLUID_ENCLOSING_SOLID,
+  BOUND_T_FOR_SOLID_BETWEEN_2_DEFS,
+  BOUND_T_FOR_SOLID_BETWEEN_2_UNDEFS,
+  BOUND_T_FOR_SOLID_ENCLOSING_FLUID,
+  BOUND_F_FOR_SOLID_BETWEEN_2_DEFS,
+  BOUND_F_FOR_SOLID_BETWEEN_2_UNDEFS,
+  BOUND_F_FOR_SOLID_ENCLOSING_FLUID,
+  SFCONNECT_BETWEEN_2_SOLIDS,
+  SFCONNECT_BETWEEN_2_FLUIDS,
+  SFCONNECT_USED_AS_BOUNDARY,
+  SFCONNECT_BETWEEN_2_UNDEFS,
+  NO_CONNECTION_BETWEEN_2_FLUIDS,
+  NO_CONNECTION_BETWEEN_SOLID_AND_FLUID,
+  NO_BOUND_BETWEEN_FLUID_AND_UNDEF,
+  NO_BOUND_BETWEEN_SOLID_AND_UNDEF,
+  TRG_WITH_NO_PROPERTY,
+  PROPERTIES_CONFLICT_COUNT__
+};
+
 /* Different types of descriptions */
 enum description_type {
   DESC_MAT_SOLID,
@@ -63,6 +92,12 @@ enum description_type {
   ((D) == DESC_BOUND_H_FOR_SOLID || (D) == DESC_BOUND_H_FOR_FLUID)
 #define DESC_IS_T(D) \
   ((D) == DESC_BOUND_T_FOR_SOLID || (D) == DESC_BOUND_T_FOR_FLUID)
+#define DESC_IS_F(D) \
+  ((D) == DESC_BOUND_F_FOR_SOLID)
+#define DESC_IS_MEDIUM(D) \
+  ((D) == DESC_MAT_SOLID || (D) == DESC_MAT_FLUID)
+#define DESC_IS_BOUNDARY(D) \
+ (DESC_IS_H(D) || DESC_IS_T(D) || DESC_IS_F(D))
 
 #define DARRAY_NAME interface_ptrs
 #define DARRAY_DATA struct sdis_interface*
@@ -192,6 +227,7 @@ str_print_fluid
   if(f->imposed_temperature >= 0) {
     ERR(str_printf(str, " Temp=%g", f->imposed_temperature));
   }
+  ERR(str_printf(str, " (it is medium %u)", f->fluid_id));
 end:
   return res;
 error:
@@ -261,6 +297,7 @@ str_print_solid
   if(s->imposed_temperature >= 0) {
     ERR(str_printf(str, " Temp=%g", s->imposed_temperature));
   }
+  ERR(str_printf(str, " (it is medium %u)", s->solid_id));
 end:
   return res;
 error:
@@ -450,6 +487,7 @@ cp_f_boundary(struct f_boundary* dst, const struct f_boundary* src)
 
 struct solid_fluid_connect {
   struct str name;
+  unsigned connection_id;
   double emissivity;
   double specular_fraction;
   double hc;
@@ -465,6 +503,7 @@ static FINLINE res_T
 init_sf(struct mem_allocator* allocator, struct solid_fluid_connect* dst)
 {
   str_init(allocator, &dst->name);
+  dst->connection_id = UINT_MAX;
   dst->emissivity = 0;
   dst->specular_fraction = 0;
   dst->hc = 0;
@@ -491,6 +530,7 @@ static FINLINE res_T
 cp_sf_connect(struct solid_fluid_connect* dst, const struct solid_fluid_connect* src)
 {
   str_copy(&dst->name, &src->name);
+  dst->connection_id = src->connection_id;
   dst->specular_fraction = src->specular_fraction;
   dst->emissivity = src->emissivity;
   dst->hc = src->hc;
@@ -676,6 +716,36 @@ error:
   goto end;
 }
 
+static FINLINE void
+description_get_medium_id
+  (const struct description* desc,
+   unsigned* id)
+{
+  ASSERT(desc && id);
+  switch (desc->type) {
+  case DESC_MAT_SOLID:
+    *id = desc->d.solid.solid_id;
+    return;
+  case DESC_MAT_FLUID:
+    *id = desc->d.fluid.fluid_id;
+    return;
+  case DESC_BOUND_H_FOR_SOLID:
+  case DESC_BOUND_H_FOR_FLUID:
+    *id = desc->d.h_boundary.mat_id;
+    return;
+  case DESC_BOUND_T_FOR_SOLID:
+  case DESC_BOUND_T_FOR_FLUID:
+    *id = desc->d.t_boundary.mat_id;
+    return;
+  case DESC_BOUND_F_FOR_SOLID:
+    *id = desc->d.f_boundary.mat_id;
+    return;
+  case DESC_SOLID_FLUID_CONNECT: /* No medium linked to SF */
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
+  }
+}
+
 struct camera {
   double pos[3];
   double tgt[3];
@@ -789,6 +859,7 @@ struct stardis {
   struct logger* logger;
   struct sdis_device* dev;
   unsigned next_medium_id;
+  unsigned undefined_medium_behind_boundary_id;
   int dump_paths;
   int verbose;
 };
@@ -816,5 +887,12 @@ stardis_release
 extern LOCAL_SYM res_T
 init_enclosures
   (struct stardis* stardis);
+
+extern LOCAL_SYM res_T
+validate_properties
+  (const unsigned itri,
+   const unsigned properties[SG3D_PROP_TYPES_COUNT__],
+   void* context,
+   int* properties_conflict_status);
 
 #endif /*STARDIS-APP_H*/

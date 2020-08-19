@@ -27,6 +27,7 @@ struct camera;
 struct logger;
 struct mem_allocator;
 struct stardis;
+struct dummies;
 
 /* Utility macros */
 #define CHK_TOK(x, Name) if((tk = (x)) == NULL) {\
@@ -136,18 +137,6 @@ add_geom_ctx_position
    void* context);
 
 extern LOCAL_SYM res_T
-add_geom_count_degenerate
-(const unsigned itri,
-  void* context,
-  int* abort);
-
-#ifdef NDEBUG
-#define DEFAULT_NTHREADS SDIS_NTHREADS_DEFAULT
-#else
-#define DEFAULT_NTHREADS 1
-#endif
-
-extern LOCAL_SYM res_T
 init_args
   (struct logger* logger,
    struct mem_allocator* mem,
@@ -193,6 +182,7 @@ extern LOCAL_SYM res_T
 process_model_line
   (const char* file_name,
    char* line,
-   struct stardis* stardis);
+   struct stardis* stardis,
+   struct dummies* dummies);
 
 #endif /*ARGS_H*/

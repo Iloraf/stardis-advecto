@@ -66,7 +66,7 @@ dump_green_bin
 
 extern res_T
 dump_enclosure_related_stuff_at_the_end_of_vtk
-  (const struct stardis* stardis,
+  (struct stardis* stardis,
    FILE* stream);
 
 extern res_T
@@ -79,6 +79,11 @@ extern void
 dump_map
   (const struct stardis* stardis,
    const struct darray_estimators* estimators,
+   FILE* stream);
+
+extern res_T
+dump_boundaries_at_the_end_of_vtk
+  (const struct stardis* stardis,
    FILE* stream);
 
 extern res_T

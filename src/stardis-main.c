@@ -80,6 +80,9 @@ main
   if(mode & MODE_DUMP_VTK) {
     /* Dump all the app-independent information */
     ERR(sg3d_geometry_dump_as_vtk(stardis.geometry.sg3d, stdout));
+    /* Dump boundaries
+     * Should we dump connections too? */
+    ERR(dump_boundaries_at_the_end_of_vtk(&stardis, stdout));
     /* Dump the compute region if any */
     if(mode & REGION_COMPUTE_MODES) {
       ERR(dump_compute_region_at_the_end_of_vtk(&stardis, stdout));

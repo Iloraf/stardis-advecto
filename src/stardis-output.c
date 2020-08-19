@@ -23,6 +23,7 @@
 #include <sdis.h>
 
 #include<star/senc3d.h>
+#include<star/sg3d.h>
 
 #include <rsys/math.h>
 #include <rsys/mem_allocator.h>
@@ -54,8 +55,8 @@ struct w_ctx {
  ******************************************************************************/
 enum enclosure_errors_t {
   NO_ENCLOSURE_ERROR = BIT(0),
-  INTERNAL_ENCLOSURE_WITH_N_MEDIA = BIT(1),
-  INTERNAL_ENCLOSURE_WITH_UNDEF_MEDIUM = BIT(2)
+  ENCLOSURE_WITH_N_MEDIA = BIT(1),
+  ENCLOSURE_WITH_UNDEF_MEDIUM = BIT(2)
 };
 
 /*******************************************************************************
@@ -814,8 +815,40 @@ error:
 }
 
 res_T
-dump_enclosure_related_stuff_at_the_end_of_vtk
+dump_boundaries_at_the_end_of_vtk
   (const struct stardis* stardis,
+   FILE* stream)
+{
+  res_T res = RES_OK;
+  const struct description* descriptions;
+  unsigned tsz, t;
+  ASSERT(stardis && stream);
+
+  ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
+  descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
+
+  fprintf(stream, "SCALARS Boundaries unsigned_int 1\n");
+  fprintf(stream, "LOOKUP_TABLE default\n");
+  FOR_EACH(t, 0, tsz) {
+    unsigned descr[SG3D_PROP_TYPES_COUNT__];
+    ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d, t,
+      descr));
+    if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
+      && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+      /* Descriptions are numbered from 1 in the log (so the 1+ below) */
+      fprintf(stream, "%u\n", 1 + descr[SG3D_INTFACE]);
+    else fprintf(stream, "%u\n", SG3D_UNSPECIFIED_PROPERTY);
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+res_T
+dump_enclosure_related_stuff_at_the_end_of_vtk
+  (struct stardis* stardis,
    FILE* stream)
 {
   res_T res = RES_OK;
@@ -823,9 +856,11 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
   struct senc3d_enclosure* enc = NULL;
   unsigned tsz, e, s, t, scount, ecount, ocount;
   int* enc_status = NULL;
+  const struct description* descriptions;
   int invalid_enclosures_count = 0;
   ASSERT(stardis && stream);
 
+  descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
   trgs = MEM_CALLOC(stardis->allocator, tsz, sizeof(*trgs));
   if(!trgs) {
@@ -870,42 +905,190 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
     res = RES_MEM_ERR;
     goto error;
   }
+  ASSERT(stardis->undefined_medium_behind_boundary_id != SENC3D_UNSPECIFIED_MEDIUM);
   FOR_EACH(e, 0, ecount) {
     struct senc3d_enclosure_header header;
+    unsigned tid, med, enc_fst_med = SENC3D_UNSPECIFIED_MEDIUM;
+    int is_fst_med = 1, is_err_cs = 0;
 
     enc_status[e] = NO_ENCLOSURE_ERROR;
     ERR(senc3d_scene_get_enclosure(stardis->senc3d_scn, e, &enc));
     ERR(senc3d_enclosure_get_header(enc, &header));
-    /* Check if anclosure is invalid regarding stardis solver requirements */
-    if(!header.is_infinite) {
-      unsigned m, med;
-      if(header.enclosed_media_count != 1)
-        enc_status[e] |= INTERNAL_ENCLOSURE_WITH_N_MEDIA;
-      FOR_EACH(m, 0, header.enclosed_media_count) {
-        ERR(senc3d_enclosure_get_medium(enc, m, &med));
-        if(med==SENC3D_UNSPECIFIED_MEDIUM)
-          enc_status[e] |= INTERNAL_ENCLOSURE_WITH_UNDEF_MEDIUM;
+
+    FOR_EACH(t, 0, header.unique_primitives_count) {
+      unsigned prop[SG3D_PROP_TYPES_COUNT__];
+      enum senc3d_side side;
+      size_t j;
+      ERR(senc3d_enclosure_get_triangle_id(enc, t, &tid, &side));
+      FOR_EACH(j, 0, darray_uint_size_get(&stardis->compute_surface.err_triangles))
+      {
+        unsigned prim
+          = darray_uint_cdata_get(&stardis->compute_surface.err_triangles)[j];
+        if (prim == tid) {
+          is_err_cs = 1;
+          break;
+        }
       }
-      if(enc_status[e] != NO_ENCLOSURE_ERROR) invalid_enclosures_count++;
+      if(is_err_cs)
+        /* Don't flag an enclosure invalid because of a triangle that is
+         * considered not member of it */
+        continue;
+
+      ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
+        tid, prop));
+
+      if(prop[side] != SG3D_UNSPECIFIED_PROPERTY) {
+        ASSERT(prop[side] < darray_descriptions_size_get(&stardis->descriptions));
+        description_get_medium_id(descriptions + prop[side], &med);
+      } else  {
+        /* If unspecified behind a boundary, use a specific ID to avoid to flag
+         * using different boundaries for a given enclosure as invalid */
+        int properties_conflict_status;
+        validate_properties(t, prop, stardis, &properties_conflict_status);
+        if(properties_conflict_status == NO_PROPERTY_CONFLICT)
+          med = stardis->undefined_medium_behind_boundary_id;
+        else {
+          enc_status[e] |= ENCLOSURE_WITH_UNDEF_MEDIUM;
+          continue; /* Don't flag N_MEDIA at the same time */
+        }
+      }
+      if(is_fst_med) {
+        is_fst_med = 0;
+        enc_fst_med = med;
+      } else {
+        if(enc_fst_med != med)
+          enc_status[e] |= ENCLOSURE_WITH_N_MEDIA;
+      }
     }
+    /* The external (infinite) enclosure is always valid */
+    if(enc_status[e] != NO_ENCLOSURE_ERROR && !header.is_infinite)
+      invalid_enclosures_count++;
     ERR(senc3d_enclosure_ref_put(enc));
   }
   if(invalid_enclosures_count) {
     logger_print(stardis->logger, LOG_WARNING,
       "Found %d invalid enclosure(s).\n", invalid_enclosures_count);
   }
-  fprintf(stream, "FIELD FieldData 1\n");
-  fprintf(stream, "Enclosure_ID %d %d unsigned_char\n", ecount, tsz);
+  fprintf(stream, "FIELD EnclosuresData 2\n");
+  fprintf(stream, "Enclosures %d %d unsigned_char\n", ecount, tsz);
   FOR_EACH(t, 0, tsz) {
-    unsigned encs[2];
+    unsigned encs[2], is_err_cs = 0;
+    size_t j;
+    FOR_EACH(j, 0, darray_uint_size_get(&stardis->compute_surface.err_triangles))
+    {
+      unsigned prim
+        = darray_uint_cdata_get(&stardis->compute_surface.err_triangles)[j];
+      if(prim == t) {
+        is_err_cs = 1;
+        break;
+      }
+    }
+    if(is_err_cs) {
+      /* Triangles in compute surface with error are considered member of no
+       * enclosure */
+      FOR_EACH(e, 1, ecount) fprintf(stream, "0 ");
+      fprintf(stream, "0\n");
+      continue;
+    }
     ERR(senc3d_scene_get_triangle_enclosures(stardis->senc3d_scn, t, encs));
     FOR_EACH(e, 0, ecount) {
-      if(e == encs[SENC3D_FRONT] || e == encs[SENC3D_BACK])
-        fprintf(stream, "%d ", (char)enc_status[e]);
-      else fprintf(stream, "0 ");
+      unsigned c = (e == encs[SENC3D_FRONT] || e == encs[SENC3D_BACK])
+        ? (unsigned char)enc_status[e] : 0;
+      if(e == ecount - 1)
+        fprintf(stream, "%u\n", c);
+      else fprintf(stream, "%u ", c);
     }
-    fprintf(stream, "\n");
   }
+
+#define ENC_NOT_MEMBER SENC3D_UNSPECIFIED_MEDIUM
+#define ENC_MEMBER_2_DISTINT_MEDIA (ENC_NOT_MEMBER - 1)
+#define ENC_MEMBER_NO_MEDIUM (ENC_NOT_MEMBER - 2)
+
+  fprintf(stream, "Enclosures_internal_media %d %d unsigned_int\n", ecount, tsz);
+  FOR_EACH(t, 0, tsz) {
+    unsigned descr[SG3D_PROP_TYPES_COUNT__];
+    unsigned encs[2];
+    unsigned is_err_cs = 0;
+    size_t j;
+    ERR(senc3d_scene_get_triangle_enclosures(stardis->senc3d_scn, t, encs));
+    ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d, t,
+      descr));
+
+    /* Special value for triangles in compute surface with error */
+    FOR_EACH(j, 0, darray_uint_size_get(&stardis->compute_surface.err_triangles))
+    {
+      unsigned prim
+        = darray_uint_cdata_get(&stardis->compute_surface.err_triangles)[j];
+      if(prim == t) {
+        is_err_cs = 1;
+        break;
+      }
+    }
+    if(is_err_cs) {
+      /* Triangles in compute surface with error are considered member of no
+       * enclosure */
+      FOR_EACH(e, 1, ecount) fprintf(stream, "%u ", ENC_NOT_MEMBER);
+      fprintf(stream, "%u\n", ENC_NOT_MEMBER);
+      continue;
+    }
+    FOR_EACH(e, 0, ecount) {
+      unsigned mid;
+      if(e == encs[SENC3D_FRONT] && e == encs[SENC3D_BACK]) {
+        /* Both sides of this triangle are in enclosure #e */
+        unsigned fmid, bmid;
+        if(descr[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY)
+          description_get_medium_id(descriptions + descr[SG3D_FRONT], &fmid);
+        else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
+          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+        {
+          description_get_medium_id(descriptions + descr[SG3D_INTFACE], &fmid);
+        }
+        else fmid = ENC_MEMBER_NO_MEDIUM;
+        if(descr[SENC3D_BACK] != SG3D_UNSPECIFIED_PROPERTY)
+          description_get_medium_id(descriptions + descr[SENC3D_BACK], &bmid);
+        else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
+          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+        {
+          description_get_medium_id(descriptions + descr[SG3D_INTFACE], &bmid);
+        }
+        else bmid = ENC_MEMBER_NO_MEDIUM;
+        mid = (fmid == bmid) ? fmid : ENC_MEMBER_2_DISTINT_MEDIA;
+      }
+      else if(e == encs[SENC3D_FRONT]) {
+        /* Member of enclosure #e (front side only) */
+        if(descr[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY)
+          description_get_medium_id(descriptions + descr[SG3D_FRONT], &mid);
+        else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
+          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+        {
+          description_get_medium_id(descriptions + descr[SG3D_INTFACE], &mid);
+        }
+        else mid = ENC_MEMBER_NO_MEDIUM;
+      }
+      else if(e == encs[SENC3D_BACK]) {
+        /* Member of enclosure #e  (back side only) */
+        if(descr[SENC3D_BACK] != SG3D_UNSPECIFIED_PROPERTY)
+          description_get_medium_id(descriptions + descr[SENC3D_BACK], &mid);
+        else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
+          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+        {
+          description_get_medium_id(descriptions + descr[SG3D_INTFACE], &mid);
+        }
+        else mid = ENC_MEMBER_NO_MEDIUM;
+      } else {
+        /* Not member of enclosure #e */
+        mid = ENC_NOT_MEMBER;
+      }
+      if(e == ecount - 1)
+        fprintf(stream, "%u\n", mid);
+      else fprintf(stream, "%u ", mid);
+    }
+  }
+
+#undef ENC_NOT_MEMBER
+#undef ENC_ERR_COMPUTE_SURFACE
+#undef ENC_MEMBER_2_DISTINT_MEDIA
+#undef ENC_MEMBER_NO_MEDIUM
 
 exit:
   MEM_RM(stardis->allocator, trgs);
@@ -1132,10 +1315,10 @@ dump_compute_region_at_the_end_of_vtk
   res_T res = RES_OK;
   unsigned char* v = NULL;
   unsigned tsz, i;
-  size_t j;
+  size_t j, psz;
   ASSERT(stardis && stream);
-  ASSERT(darray_size_t_size_get(&stardis->compute_surface.primitives)
-  == darray_sides_size_get(&stardis->compute_surface.sides));
+  psz = darray_size_t_size_get(&stardis->compute_surface.primitives);
+  ASSERT(psz == darray_sides_size_get(&stardis->compute_surface.sides));
 
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
   /* For triangles not in compute region v==0 */
@@ -1147,37 +1330,51 @@ dump_compute_region_at_the_end_of_vtk
 
   if(stardis->mode & SURFACE_COMPUTE_MODES) {
     /* For triangles in compute surface, v==1 if FRONT or v==2 for BACK */
-    FOR_EACH(j, 0, darray_size_t_size_get(&stardis->compute_surface.primitives)) {
-      size_t prim = darray_size_t_cdata_get(&stardis->compute_surface.primitives)[j];
-      enum sdis_side side = darray_sides_cdata_get(&stardis->compute_surface.sides)[j];
+    FOR_EACH(j, 0, psz) {
+      size_t prim
+        = darray_size_t_cdata_get(&stardis->compute_surface.primitives)[j];
+      enum sdis_side side
+        = darray_sides_cdata_get(&stardis->compute_surface.sides)[j];
       ASSERT(prim <= tsz);
       v[(unsigned)prim] =
         (unsigned char)(v[(unsigned)prim] | (side == SDIS_FRONT ? 1 : 2));
     }
 
     /* For triangles in compute surface with error v==MAX */
-    FOR_EACH(j, 0, darray_uint_size_get(&stardis->compute_surface.err_triangles)) {
-      unsigned prim = darray_uint_cdata_get(&stardis->compute_surface.err_triangles)[j];
+    FOR_EACH(j, 0, darray_uint_size_get(&stardis->compute_surface.err_triangles))
+    {
+      unsigned prim
+        = darray_uint_cdata_get(&stardis->compute_surface.err_triangles)[j];
       ASSERT(prim <= tsz);
       v[(unsigned)prim] = UCHAR_MAX;
     }
   } else {
-    unsigned prop[SG3D_PROP_TYPES_COUNT__];
+    unsigned descr[SG3D_PROP_TYPES_COUNT__];
     struct sdis_medium* medium;
+    const struct description* descriptions;
     unsigned medium_id;
     ASSERT(stardis->mode & MODE_MEDIUM_COMPUTE);
     medium = find_medium_by_name(stardis, &stardis->solve_name, &medium_id);
     ASSERT(medium != NULL); (void)medium;
+    descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
     FOR_EACH(i, 0, tsz) {
+      unsigned f_mid, b_mid;
+      /* Get the description IDs for this triangle */
       ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
-        i, prop));
+        i, descr));
       /* For triangles in compute volume,
        * v==1 if FRONT, v==2 for BACK */
-      if(prop[SG3D_FRONT] == medium_id && prop[SG3D_BACK] == medium_id)
+      if(descr[SG3D_FRONT] == SG3D_UNSPECIFIED_PROPERTY)
+        f_mid = UINT_MAX;
+      else description_get_medium_id(descriptions + descr[SG3D_FRONT], &f_mid);
+      if(descr[SG3D_BACK] == SG3D_UNSPECIFIED_PROPERTY)
+        b_mid = UINT_MAX;
+      else description_get_medium_id(descriptions + descr[SG3D_BACK], &b_mid);
+      if(f_mid == medium_id && b_mid == medium_id)
         ; /* Keep v==0, not really a boundary */
-      else if(prop[SG3D_FRONT] == medium_id)
+      else if(f_mid == medium_id)
         v[i] = 1;
-      else if(prop[SG3D_BACK] == medium_id)
+      else if(b_mid == medium_id)
         v[i] = 2;
     }
   }

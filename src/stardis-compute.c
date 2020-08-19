@@ -85,7 +85,7 @@ hit_filter
   enum senc3d_side hit_side;
   struct s3d_attrib interf_pos;
   const struct description* descriptions;
-  unsigned properties[3];
+  unsigned descr[SG3D_PROP_TYPES_COUNT__];
   const struct stardis* stardis;
 
   (void)ray_org; (void)invalid_; (void)filter_data;
@@ -115,17 +115,18 @@ hit_filter
     return 0; /* Keep */
   }
 
+  /* Get the description IDs for this triangle */
   CHK(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
-    hit->prim.prim_id, properties) == RES_OK);
+    hit->prim.prim_id, descr) == RES_OK);
 
-  if(properties[SDIS_FRONT] == properties[SG3D_BACK]) {
+  if(descr[SG3D_FRONT] == descr[SG3D_BACK]) {
     /* Don't need to bother with sides */
     filter_ctx->prim = hit->prim.prim_id;
-    filter_ctx->desc = (properties[SDIS_FRONT] == SG3D_UNSPECIFIED_PROPERTY)
-      ? NULL : descriptions + properties[SG3D_FRONT];
+    filter_ctx->desc = (descr[SG3D_FRONT] == SG3D_UNSPECIFIED_PROPERTY)
+      ? NULL : descriptions + descr[SG3D_FRONT];
     f3_set(filter_ctx->pos, interf_pos.value);
     filter_ctx->dist = hit->distance;
-    filter_ctx->outside = (properties[SG3D_FRONT] == SG3D_UNSPECIFIED_PROPERTY);
+    filter_ctx->outside = (descr[SG3D_FRONT] == SG3D_UNSPECIFIED_PROPERTY);
     filter_ctx->probe_on_boundary = 0;
     return 0; /* Keep */
   }
@@ -146,7 +147,7 @@ hit_filter
    * Warning: following Embree 2 convention for geometrical normals,
    * the Star3D hit normals are left-handed */
   hit_side = (s > 0) ? SG3D_BACK : SG3D_FRONT;
-  if(properties[hit_side] == SG3D_UNSPECIFIED_PROPERTY) {
+  if(descr[hit_side] == SG3D_UNSPECIFIED_PROPERTY) {
     filter_ctx->prim = hit->prim.prim_id;
     filter_ctx->desc = NULL;
     f3_set(filter_ctx->pos, interf_pos.value);
@@ -155,7 +156,7 @@ hit_filter
     filter_ctx->probe_on_boundary = 0;
   } else {
     filter_ctx->prim = hit->prim.prim_id;
-    filter_ctx->desc = descriptions + properties[hit_side];
+    filter_ctx->desc = descriptions + descr[hit_side];
     f3_set(filter_ctx->pos, interf_pos.value);
     filter_ctx->dist = hit->distance;
     filter_ctx->outside = 0;
@@ -237,6 +238,7 @@ check_probe_conform_to_type
     } else {
       if(filter_ctx.desc->type == DESC_MAT_SOLID) {
         double delta = filter_ctx.desc->d.solid.delta;
+        ASSERT(delta < INF);
         logger_print(stardis->logger, LOG_OUTPUT,
           "Probe was in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid.name));
         if(filter_ctx.dist > 2 * delta) {

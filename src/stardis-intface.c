@@ -92,7 +92,7 @@ create_intface
   struct sdis_medium* back_med = NULL;
   struct sdis_interface_side_shader* fluid_side_shader = NULL;
   struct sdis_data* data = NULL;
-  unsigned fd, bd, cd, properties[3];
+  unsigned fd, bd, cd, descr[SG3D_PROP_TYPES_COUNT__];
   int fluid_count = 0, solid_count = 0;
   int solid_fluid_connection_count = 0, connection_count = 0, boundary_count = 0;
   const struct description* descriptions;
@@ -100,17 +100,18 @@ create_intface
   res_T res = RES_OK;
 
   ASSERT(stardis && htable_interfaces);
-  
+
+  /* Get the description IDs for this triangle */
   ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
-    itri, properties));
+    itri, descr));
 
   descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
   media = darray_media_ptr_data_get(&stardis->media);
 
   /* Create key */
-  int_descs.front = fd = properties[SG3D_FRONT];
-  int_descs.back = bd = properties[SG3D_BACK];
-  int_descs.connect = cd = properties[SG3D_INTFACE];
+  int_descs.front = fd = descr[SG3D_FRONT];
+  int_descs.back = bd = descr[SG3D_BACK];
+  int_descs.connect = cd = descr[SG3D_INTFACE];
 
   /* Search if interface already exists, or create it */
   p_intface = htable_intface_find(htable_interfaces, &int_descs);

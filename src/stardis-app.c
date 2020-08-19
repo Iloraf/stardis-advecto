@@ -34,52 +34,13 @@ static const struct dummies DUMMIES_NULL = DUMMIES_NULL__;
 static const struct counts COUNTS_NULL = COUNTS_NULL__;
 
 /*******************************************************************************
- * Local Type; for documentation purpose
- * These values are used in dumps
- ******************************************************************************/
-enum properties_conflict_t {
-  NO_PROPERTY_CONFLICT,
-  BOUND_H_FOR_FLUID_BETWEEN_2_DEFS,
-  BOUND_H_FOR_FLUID_BETWEEN_2_UNDEFS,
-  BOUND_H_FOR_FLUID_ENCLOSING_SOLID,
-  BOUND_H_FOR_SOLID_BETWEEN_2_DEFS,
-  BOUND_H_FOR_SOLID_BETWEEN_2_UNDEFS,
-  BOUND_H_FOR_SOLID_ENCLOSING_FLUID,
-  BOUND_T_FOR_FLUID_BETWEEN_2_DEFS,
-  BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS,
-  BOUND_T_FOR_FLUID_ENCLOSING_SOLID,
-  BOUND_T_FOR_SOLID_BETWEEN_2_DEFS,
-  BOUND_T_FOR_SOLID_BETWEEN_2_UNDEFS,
-  BOUND_T_FOR_SOLID_ENCLOSING_FLUID,
-  BOUND_F_FOR_SOLID_BETWEEN_2_DEFS,
-  BOUND_F_FOR_SOLID_BETWEEN_2_UNDEFS,
-  BOUND_F_FOR_SOLID_ENCLOSING_FLUID,
-  SFCONNECT_BETWEEN_2_SOLIDS,
-  SFCONNECT_BETWEEN_2_FLUIDS,
-  SFCONNECT_USED_AS_BOUNDARY,
-  SFCONNECT_BETWEEN_2_UNDEFS,
-  NO_CONNECTION_BETWEEN_2_FLUIDS,
-  NO_CONNECTION_BETWEEN_SOLID_AND_FLUID,
-  NO_BOUND_BETWEEN_FLUID_AND_UNDEF,
-  NO_BOUND_BETWEEN_SOLID_AND_UNDEF,
-  TRG_WITH_NO_PROPERTY,
-  PROPERTIES_CONFLICT_COUNT__
-};
-
-enum enclosure_errors_t {
-  NO_ENCLOSURE_ERROR,
-  INTERNAL_ENCLOSURE_WITH_N_MEDIA,
-  ENCLOSURE_ERRORS_COUNT__
-};
-
-/*******************************************************************************
  * Local Functions
  ******************************************************************************/
-
 static res_T
 read_model
   (const struct darray_str* model_files,
-   struct stardis* stardis)
+   struct stardis* stardis,
+   struct dummies* dummies)
 {
   res_T res = RES_OK;
   const struct str* files = NULL;
@@ -105,7 +66,7 @@ read_model
       ERR(txtrdr_read_line(txtrdr));
       line = txtrdr_get_line(txtrdr);
       if(!line) break;
-      ERR(process_model_line(name, line, stardis));
+      ERR(process_model_line(name, line, stardis, dummies));
     }
     txtrdr_ref_put(txtrdr);
     txtrdr = NULL;
@@ -125,155 +86,6 @@ error:
   if(txtrdr) txtrdr_ref_put(txtrdr);
   goto exit;
 }
-
-#define COUNT_SIDE(Rank) {\
-  if(properties[(Rank)] == SG3D_UNSPECIFIED_PROPERTY) undef_count++;\
-  else {\
-    ASSERT(properties[(Rank)] < darray_descriptions_size_get(&stardis->descriptions));\
-    ASSERT(descs[properties[(Rank)]].type == DESC_MAT_SOLID\
-      || descs[properties[(Rank)]].type == DESC_MAT_FLUID);\
-    if(descs[properties[(Rank)]].type == DESC_MAT_SOLID) solid_count++;\
-    else fluid_count++;\
-  }\
-}
-static res_T
-validate_properties
-  (const unsigned itri,
-   const unsigned properties[SG3D_PROP_TYPES_COUNT__],
-   void* context,
-   int* properties_conflict_status)
-{
-  res_T res = RES_OK;
-  struct stardis* stardis = context;
-  unsigned undef_count, solid_count, fluid_count, intface_count;
-  const struct description* descs;
-  const struct description* intface = NULL;
-
-  (void)itri;
-  ASSERT(stardis && properties_conflict_status);
-  descs = darray_descriptions_cdata_get(&stardis->descriptions);
-  undef_count = solid_count = fluid_count = intface_count = 0;
-
-  COUNT_SIDE(SG3D_FRONT);
-  COUNT_SIDE(SG3D_BACK);
-  if(properties[SG3D_INTFACE] == SG3D_UNSPECIFIED_PROPERTY)
-    undef_count++;
-  else intface_count++;
-
-  ASSERT(solid_count <= 2 && fluid_count <= 2 && intface_count <= 1);
-  ASSERT(undef_count + solid_count + fluid_count + intface_count == 3);
-  if(intface_count) {
-    ASSERT(properties[SG3D_INTFACE] < darray_descriptions_size_get(&stardis->descriptions));
-    intface = descs + properties[SG3D_INTFACE];
-    switch (intface->type) {
-    case DESC_BOUND_H_FOR_FLUID:
-      if(!(solid_count == 0 && fluid_count == 1)) {
-        if(solid_count + fluid_count == 2)
-          *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_DEFS;
-        else if(solid_count + fluid_count == 0)
-          *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_UNDEFS;
-        else if(solid_count == 1)
-          *properties_conflict_status = BOUND_H_FOR_FLUID_ENCLOSING_SOLID;
-        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
-        goto end;
-      }
-      break;
-    case DESC_BOUND_H_FOR_SOLID:
-      if(!(solid_count == 1 && fluid_count == 0)) {
-        if(solid_count + fluid_count == 2)
-          *properties_conflict_status = BOUND_H_FOR_SOLID_BETWEEN_2_DEFS;
-        else if(solid_count + fluid_count == 0)
-          *properties_conflict_status = BOUND_H_FOR_SOLID_BETWEEN_2_UNDEFS;
-        else if(fluid_count == 1)
-          *properties_conflict_status = BOUND_H_FOR_SOLID_ENCLOSING_FLUID;
-        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
-        goto end;
-      }
-      break;
-    case DESC_BOUND_T_FOR_FLUID:
-      if(!(solid_count == 0 && fluid_count == 1)) {
-        if(solid_count + fluid_count == 2)
-          *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_DEFS;
-        else if(solid_count + fluid_count == 0)
-          *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS;
-        else if(solid_count == 1)
-          *properties_conflict_status = BOUND_T_FOR_FLUID_ENCLOSING_SOLID;
-        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
-        goto end;
-      }
-      break;
-    case DESC_BOUND_T_FOR_SOLID:
-      if(!(solid_count == 1 && fluid_count == 0)) {
-        if(solid_count + fluid_count == 2)
-          *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_DEFS;
-        else if(solid_count + fluid_count == 0)
-          *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_UNDEFS;
-        else if(fluid_count == 1)
-          *properties_conflict_status = BOUND_T_FOR_SOLID_ENCLOSING_FLUID;
-        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
-        goto end;
-      }
-      break;
-    case DESC_BOUND_F_FOR_SOLID:
-      if(!(solid_count == 1 && fluid_count == 0)) {
-        if(solid_count + fluid_count == 2)
-          *properties_conflict_status = BOUND_F_FOR_SOLID_BETWEEN_2_DEFS;
-        else if(solid_count + fluid_count == 0)
-          *properties_conflict_status = BOUND_F_FOR_SOLID_BETWEEN_2_UNDEFS;
-        else if(fluid_count == 1)
-          *properties_conflict_status = BOUND_F_FOR_SOLID_ENCLOSING_FLUID;
-        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
-        goto end;
-      }
-      break;
-    case DESC_SOLID_FLUID_CONNECT:
-      if(solid_count != 1 || fluid_count != 1) {
-        if(solid_count == 2)
-          *properties_conflict_status = SFCONNECT_BETWEEN_2_SOLIDS;
-        else if(fluid_count == 2)
-          *properties_conflict_status = SFCONNECT_BETWEEN_2_FLUIDS;
-        else if(solid_count + fluid_count == 1)
-          *properties_conflict_status = SFCONNECT_USED_AS_BOUNDARY;
-        else if(solid_count + fluid_count == 0)
-          *properties_conflict_status = SFCONNECT_BETWEEN_2_UNDEFS;
-        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
-        goto end;
-      }
-      break;
-    default:
-      FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
-    }
-  } else {
-    /* No interface defined */
-    ASSERT(intface_count == 0 && undef_count >= 1);
-    if(undef_count == 3) {
-      *properties_conflict_status = TRG_WITH_NO_PROPERTY;
-      goto end;
-    }
-    if(fluid_count == 2) {
-      *properties_conflict_status = NO_CONNECTION_BETWEEN_2_FLUIDS;
-      goto end;
-    }
-    if(undef_count == 2) {
-      ASSERT(fluid_count + solid_count == 1);
-      if(fluid_count)
-        *properties_conflict_status = NO_BOUND_BETWEEN_FLUID_AND_UNDEF;
-      else *properties_conflict_status = NO_BOUND_BETWEEN_SOLID_AND_UNDEF;
-      goto end;
-    }
-    if(undef_count == 1 && solid_count == 1 && fluid_count == 1) {
-      *properties_conflict_status = NO_CONNECTION_BETWEEN_SOLID_AND_FLUID;
-      goto end;
-    }
-    /* Undef interface between solids is OK */
-    CHK(solid_count == 2);
-  }
-  
-end:
-  return res;
-}
-
-#undef COUNT_SIDE
 
 static struct sdis_interface*
 geometry_get_interface
@@ -304,87 +116,89 @@ create_holder
   case DESC_BOUND_H_FOR_SOLID:
     stardis->counts.hbound_count++;
     /* Create an external fluid with imposed temperature */
-    allocate_stardis_medium_id(stardis, &description->d.h_boundary.mat_id);
+    ASSERT(description->d.h_boundary.mat_id != UINT_MAX);
     ERR(create_stardis_fluid(stardis, NULL, 1, 1, is_green, 1, -1,
       description->d.h_boundary.imposed_temperature,
       description->d.h_boundary.mat_id));
     logger_print(stardis->logger, LOG_OUTPUT,
-      "External fluid (id=%u): rho=1 cp=1 T=%g\n",
-      description->d.h_boundary.mat_id,
-      description->d.h_boundary.imposed_temperature);
+      "External fluid: rho=1 cp=1 T=%g (it is medium %u)\n",
+      description->d.h_boundary.imposed_temperature,
+      description->d.h_boundary.mat_id);
     break;
   case DESC_BOUND_H_FOR_FLUID:
     stardis->counts.hbound_count++;
+    ASSERT(dummies->dummy_solid_id != UINT_MAX);
     if(dummies->dummy_solid) {
       /* Reuse external dummy solid */
       description->d.h_boundary.mat_id = dummies->dummy_solid_id;
     } else {
       /* Create dummy solid */
-      size_t sz = darray_media_ptr_size_get(&stardis->media);
-      allocate_stardis_medium_id(stardis, &description->d.h_boundary.mat_id);
+      description->d.h_boundary.mat_id = dummies->dummy_solid_id;
       ERR(create_stardis_solid(stardis, NULL, 1, 1, 1, 1, is_green, 1, -1,
         -1, 0, description->d.h_boundary.mat_id));
-      dummies->dummy_solid = darray_media_ptr_data_get(&stardis->media)[sz];
-      dummies->dummy_solid_id = description->d.h_boundary.mat_id;
+      dummies->dummy_solid
+        = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_solid_id];
       logger_print(stardis->logger, LOG_OUTPUT,
-        "Dummy solid (id=%u): lambda=1 rho=1 cp=1\n",
+        "Dummy solid: lambda=1 rho=1 cp=1 (it is medium %u)\n",
         dummies->dummy_solid_id);
     }
     break;
   case DESC_BOUND_T_FOR_SOLID:
     stardis->counts.tbound_count++;
+    ASSERT(dummies->dummy_fluid_id != UINT_MAX);
     if(dummies->dummy_fluid) {
       /* Reuse external dummy fluid */
       description->d.t_boundary.mat_id = dummies->dummy_fluid_id;
     } else {
       /* Create dummy fluid */
-      size_t sz = darray_media_ptr_size_get(&stardis->media);
-      allocate_stardis_medium_id(stardis, &description->d.t_boundary.mat_id);
+      description->d.t_boundary.mat_id = dummies->dummy_fluid_id;
       ERR(create_stardis_fluid(stardis, NULL, 1, 1, is_green, 1, -1,
         -1, description->d.t_boundary.mat_id));
-      dummies->dummy_fluid = darray_media_ptr_data_get(&stardis->media)[sz];
-      dummies->dummy_fluid_id = description->d.t_boundary.mat_id;
+      dummies->dummy_fluid
+        = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_fluid_id];
       logger_print(stardis->logger, LOG_OUTPUT,
-        "Dummy fluid (id=%u): rho=1 cp=1\n", dummies->dummy_fluid_id);
+        "Dummy fluid: rho=1 cp=1 (it is medium %u)\n",
+        dummies->dummy_fluid_id);
     }
     break;
   case DESC_BOUND_T_FOR_FLUID:
     stardis->counts.tbound_count++;
+    ASSERT(dummies->dummy_solid_id != UINT_MAX);
     if(dummies->dummy_solid) {
       /* Reuse external dummy solid */
       description->d.t_boundary.mat_id = dummies->dummy_solid_id;
     } else {
       /* Create dummy solid */
-      size_t sz = darray_media_ptr_size_get(&stardis->media);
-      allocate_stardis_medium_id(stardis, &description->d.t_boundary.mat_id);
+      description->d.t_boundary.mat_id = dummies->dummy_solid_id;
       ERR(create_stardis_solid(stardis, NULL, 1, 1, 1, 1, is_green, 1, -1,
         -1, 0, description->d.t_boundary.mat_id));
-      dummies->dummy_solid = darray_media_ptr_data_get(&stardis->media)[sz];
-      dummies->dummy_solid_id = description->d.t_boundary.mat_id;
+      dummies->dummy_solid
+        = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_solid_id];
       logger_print(stardis->logger, LOG_OUTPUT,
-        "Dummy solid (id=%u): lambda=1 rho=1 cp=1\n",
+        "Dummy solid: lambda=1 rho=1 cp=1 (it is medium %u)\n",
         dummies->dummy_solid_id);
     }
     break;
   case DESC_BOUND_F_FOR_SOLID:
     stardis->counts.fbound_count++;
+    ASSERT(dummies->dummy_fluid_id != UINT_MAX);
     if(dummies->dummy_fluid) {
       /* Reuse external dummy fluid */
       description->d.f_boundary.mat_id = dummies->dummy_fluid_id;
     } else {
       /* Create dummy fluid */
-      size_t sz = darray_media_ptr_size_get(&stardis->media);
-      allocate_stardis_medium_id(stardis, &description->d.f_boundary.mat_id);
+      description->d.f_boundary.mat_id = dummies->dummy_fluid_id;
       ERR(create_stardis_fluid(stardis, NULL, 1, 1, is_green, 1, -1, -1,
         description->d.f_boundary.mat_id));
-      dummies->dummy_fluid = darray_media_ptr_data_get(&stardis->media)[sz];
-      dummies->dummy_fluid_id = description->d.f_boundary.mat_id;
+      dummies->dummy_fluid
+        = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_fluid_id];
       logger_print(stardis->logger, LOG_OUTPUT,
-        "Dummy fluid (id=%u): rho=1 cp=1\n", dummies->dummy_fluid_id);
+        "Dummy fluid: rho=1 cp=1 (it is medium %u)\n", dummies->dummy_fluid_id);
     }
     break;
   case DESC_SOLID_FLUID_CONNECT:
     stardis->counts.sfconnect_count++;
+    ASSERT(description->d.sf_connect.connection_id != UINT_MAX);
     ASSERT(description->d.sf_connect.specular_fraction >= 0
       && description->d.sf_connect.specular_fraction <= 1);
     ASSERT(description->d.sf_connect.emissivity >= 0);
@@ -396,19 +210,23 @@ create_holder
     struct senc3d_enclosure_header header;
     /* Create solid to have ID informed */
     stardis->counts.smed_count++;
-    allocate_stardis_medium_id(stardis, &description->d.solid.solid_id);
+    ASSERT(description->d.solid.solid_id != UINT_MAX);
     /* Check if delta can fit possible multiple enclosures */
     if(stardis->senc3d_scn) {
       /* Due to previous errors, senc3d_scn can be unavailable */
       unsigned e, ecount = 0;
-      ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn,
-        description->d.solid.solid_id, &ecount));
+
+      /* At this stage we use a geometry that was created using description ids
+       * as media ids. As a consequence we thereafter use description ids in
+       * APIs calls requiring a medium id */
+      ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn, idx,
+        &ecount));
       if(ecount != 0) {
         /* Can be unused if conflicts; in this case, avoid delta warnings */
         int external = 0;
         FOR_EACH(e, 0, ecount) {
-          ERR(senc3d_scene_get_enclosure_by_medium(stardis->senc3d_scn,
-            description->d.solid.solid_id, e, &enc));
+          ERR(senc3d_scene_get_enclosure_by_medium(stardis->senc3d_scn, idx, e,
+            &enc));
           ERR(senc3d_enclosure_get_header(enc, &header));
           if(header.is_infinite) {
             /* External solid, volume is negative and no delta walk expected */
@@ -468,7 +286,7 @@ create_holder
   }
   case DESC_MAT_FLUID:
     stardis->counts.fmed_count++;
-    allocate_stardis_medium_id(stardis, &description->d.fluid.fluid_id);
+    ASSERT(description->d.fluid.fluid_id != UINT_MAX);
     ERR(create_stardis_fluid(stardis,
       &description->d.fluid.name,
       description->d.fluid.rho,
@@ -544,6 +362,7 @@ stardis_init
   if(args->dump_paths & DUMP_SUCCESS)
     stardis->dump_paths |= SDIS_HEAT_PATH_SUCCESS;
   stardis->next_medium_id = 0;
+  stardis->undefined_medium_behind_boundary_id = SENC3D_UNSPECIFIED_MEDIUM;
   stardis->verbose = args->verbose;
   darray_media_ptr_init(stardis->allocator, &stardis->media);
 
@@ -563,7 +382,7 @@ stardis_init
   else if(args->mode & SURFACE_COMPUTE_MODES) {
     ERR(str_set(&stardis->solve_name, args->solve_filename));
   }
-  ERR(read_model(&args->model_files, stardis));
+  ERR(read_model(&args->model_files, stardis, &dummies));
 
   ERR(sdis_device_create(stardis->logger, stardis->allocator, stardis->nthreads,
     args->verbose, &stardis->dev));
@@ -574,13 +393,14 @@ stardis_init
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tcount));
 
+  
   ERR(sg3d_geometry_validate_properties(stardis->geometry.sg3d,
      validate_properties, stardis));
   ERR(sg3d_geometry_get_unique_triangles_with_properties_conflict_count(
     stardis->geometry.sg3d, &count));
   if(count) {
     logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
-      "Properties conflicts found in the model (%u triangles).\n", count);
+      "Property conflicts found in the model (%u triangles).\n", count);
     if(is_for_compute) {
       res = RES_BAD_ARG;
       goto error;
@@ -730,6 +550,8 @@ init_enclosures
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vsz));
   ERR(senc3d_device_create(stardis->logger, stardis->allocator,
     stardis->nthreads, stardis->verbose, &senc_dev));
+  allocate_stardis_medium_id(stardis,
+    &stardis->undefined_medium_behind_boundary_id);
   ERR(senc3d_scene_create(senc_dev,
     SENC3D_CONVENTION_NORMAL_BACK | SENC3D_CONVENTION_NORMAL_OUTSIDE,
     tsz, sg3d_sencXd_geometry_get_indices, sg3d_sencXd_geometry_get_media,
@@ -741,6 +563,158 @@ exit:
 error:
   goto exit;
 }
+
+#define COUNT_SIDE(Rank) {\
+  if(properties[(Rank)] == SG3D_UNSPECIFIED_PROPERTY) undef_count++;\
+  else {\
+    ASSERT(properties[(Rank)] < darray_descriptions_size_get(&stardis->descriptions));\
+    ASSERT(descs[properties[(Rank)]].type == DESC_MAT_SOLID\
+      || descs[properties[(Rank)]].type == DESC_MAT_FLUID);\
+    if(descs[properties[(Rank)]].type == DESC_MAT_SOLID) solid_count++;\
+    else fluid_count++;\
+  }\
+}
+
+res_T
+validate_properties
+  (const unsigned itri,
+   const unsigned properties[SG3D_PROP_TYPES_COUNT__],
+   void* context,
+   int* properties_conflict_status)
+{
+  res_T res = RES_OK;
+  struct stardis* stardis = context;
+  unsigned undef_count, solid_count, fluid_count, intface_count;
+  const struct description* descs;
+  const struct description* intface = NULL;
+
+  (void)itri;
+  ASSERT(stardis && properties_conflict_status);
+  descs = darray_descriptions_cdata_get(&stardis->descriptions);
+  *properties_conflict_status = NO_PROPERTY_CONFLICT;
+  undef_count = solid_count = fluid_count = intface_count = 0;
+
+  COUNT_SIDE(SG3D_FRONT);
+  COUNT_SIDE(SG3D_BACK);
+  if(properties[SG3D_INTFACE] == SG3D_UNSPECIFIED_PROPERTY)
+    undef_count++;
+  else intface_count++;
+
+  ASSERT(solid_count <= 2 && fluid_count <= 2 && intface_count <= 1);
+  ASSERT(undef_count + solid_count + fluid_count + intface_count == 3);
+  if(intface_count) {
+    ASSERT(properties[SG3D_INTFACE]
+      < darray_descriptions_size_get(&stardis->descriptions));
+    intface = descs + properties[SG3D_INTFACE];
+    switch (intface->type) {
+    case DESC_BOUND_H_FOR_FLUID:
+      if(!(solid_count == 0 && fluid_count == 1)) {
+        if(solid_count + fluid_count == 2)
+          *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_DEFS;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_UNDEFS;
+        else if(solid_count == 1)
+          *properties_conflict_status = BOUND_H_FOR_FLUID_ENCLOSING_SOLID;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_BOUND_H_FOR_SOLID:
+      if(!(solid_count == 1 && fluid_count == 0)) {
+        if(solid_count + fluid_count == 2)
+          *properties_conflict_status = BOUND_H_FOR_SOLID_BETWEEN_2_DEFS;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = BOUND_H_FOR_SOLID_BETWEEN_2_UNDEFS;
+        else if(fluid_count == 1)
+          *properties_conflict_status = BOUND_H_FOR_SOLID_ENCLOSING_FLUID;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_BOUND_T_FOR_FLUID:
+      if(!(solid_count == 0 && fluid_count == 1)) {
+        if(solid_count + fluid_count == 2)
+          *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_DEFS;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS;
+        else if(solid_count == 1)
+          *properties_conflict_status = BOUND_T_FOR_FLUID_ENCLOSING_SOLID;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_BOUND_T_FOR_SOLID:
+      if(!(solid_count == 1 && fluid_count == 0)) {
+        if(solid_count + fluid_count == 2)
+          *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_DEFS;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_UNDEFS;
+        else if(fluid_count == 1)
+          *properties_conflict_status = BOUND_T_FOR_SOLID_ENCLOSING_FLUID;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_BOUND_F_FOR_SOLID:
+      if(!(solid_count == 1 && fluid_count == 0)) {
+        if(solid_count + fluid_count == 2)
+          *properties_conflict_status = BOUND_F_FOR_SOLID_BETWEEN_2_DEFS;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = BOUND_F_FOR_SOLID_BETWEEN_2_UNDEFS;
+        else if(fluid_count == 1)
+          *properties_conflict_status = BOUND_F_FOR_SOLID_ENCLOSING_FLUID;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_SOLID_FLUID_CONNECT:
+      if(solid_count != 1 || fluid_count != 1) {
+        if(solid_count == 2)
+          *properties_conflict_status = SFCONNECT_BETWEEN_2_SOLIDS;
+        else if(fluid_count == 2)
+          *properties_conflict_status = SFCONNECT_BETWEEN_2_FLUIDS;
+        else if(solid_count + fluid_count == 1)
+          *properties_conflict_status = SFCONNECT_USED_AS_BOUNDARY;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = SFCONNECT_BETWEEN_2_UNDEFS;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    default:
+      FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
+    }
+  } else {
+    /* No interface defined */
+    ASSERT(intface_count == 0 && undef_count >= 1);
+    if(undef_count == 3) {
+      *properties_conflict_status = TRG_WITH_NO_PROPERTY;
+      goto end;
+    }
+    if(fluid_count == 2) {
+      *properties_conflict_status = NO_CONNECTION_BETWEEN_2_FLUIDS;
+      goto end;
+    }
+    if(undef_count == 2) {
+      ASSERT(fluid_count + solid_count == 1);
+      if(fluid_count)
+        *properties_conflict_status = NO_BOUND_BETWEEN_FLUID_AND_UNDEF;
+      else *properties_conflict_status = NO_BOUND_BETWEEN_SOLID_AND_UNDEF;
+      goto end;
+    }
+    if(undef_count == 1 && solid_count == 1 && fluid_count == 1) {
+      *properties_conflict_status = NO_CONNECTION_BETWEEN_SOLID_AND_FLUID;
+      goto end;
+    }
+    /* Undef interface between solids is OK */
+    CHK(solid_count == 2);
+  }
+  
+end:
+  return res;
+}
+
+#undef COUNT_SIDE
 
 /*******************************************************************************
  * rsys/str additions

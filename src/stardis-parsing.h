@@ -44,21 +44,22 @@ struct dummies;
 enum stardis_mode {
   /* Ordered so that print_multiple_modes() prints in alphabetical order */
   UNDEF_MODE = 0,
-  MODE_DUMP_PATHS = BIT(0), /* -D */
-  MODE_DUMP_VTK = BIT(1), /* -d */
-  MODE_EXTENDED_RESULTS = BIT(2), /* -e */
-  MODE_FLUX_BOUNDARY_COMPUTE = BIT(3), /* -F */
-  MODE_BIN_GREEN = BIT(4), /* -G */
-  MODE_GREEN = BIT(5), /* -g */
-  MODE_DUMP_HELP = BIT(6), /* -h */
-  MODE_MEDIUM_COMPUTE = BIT(7), /* -m */
-  MODE_PROBE_COMPUTE_ON_INTERFACE = BIT(8), /* -P */
-  MODE_PROBE_COMPUTE = BIT(9), /* -p */
-  MODE_IR_COMPUTE = BIT(10), /* -R */
-  MODE_MAP_COMPUTE = BIT(11), /* -S */
-  MODE_BOUNDARY_COMPUTE = BIT(12), /* -s */
-  MODE_VERBOSITY = BIT(13), /* -V */
-  MODE_DUMP_VERSION = BIT(14), /* -v */
+  MODE_DUMP_C_CHUNKS = BIT(0), /* -c */
+  MODE_DUMP_PATHS = BIT(1), /* -D */
+  MODE_DUMP_VTK = BIT(2), /* -d */
+  MODE_EXTENDED_RESULTS = BIT(3), /* -e */
+  MODE_FLUX_BOUNDARY_COMPUTE = BIT(4), /* -F */
+  MODE_BIN_GREEN = BIT(5), /* -G */
+  MODE_GREEN = BIT(6), /* -g */
+  MODE_DUMP_HELP = BIT(7), /* -h */
+  MODE_MEDIUM_COMPUTE = BIT(8), /* -m */
+  MODE_PROBE_COMPUTE_ON_INTERFACE = BIT(9), /* -P */
+  MODE_PROBE_COMPUTE = BIT(10), /* -p */
+  MODE_IR_COMPUTE = BIT(11), /* -R */
+  MODE_MAP_COMPUTE = BIT(12), /* -S */
+  MODE_BOUNDARY_COMPUTE = BIT(13), /* -s */
+  MODE_VERBOSITY = BIT(14), /* -V */
+  MODE_DUMP_VERSION = BIT(15), /* -v */
 
   GREEN_COMPATIBLE_MODES
     = MODE_PROBE_COMPUTE | MODE_PROBE_COMPUTE_ON_INTERFACE | MODE_MEDIUM_COMPUTE
@@ -78,7 +79,8 @@ enum stardis_mode {
   SHORT_EXIT_MODES = MODE_DUMP_HELP | MODE_DUMP_VERSION,
 
   USE_STDOUT_MODES
-  = MODE_DUMP_VTK | MODE_DUMP_HELP | MODE_DUMP_VERSION | MODE_IR_COMPUTE | MODE_GREEN
+  = MODE_DUMP_C_CHUNKS | MODE_DUMP_VTK | MODE_DUMP_HELP | MODE_DUMP_VERSION
+  | MODE_IR_COMPUTE | MODE_GREEN
 };
 
 STATIC_ASSERT(GREEN_COMPATIBLE_MODES == (COMPUTE_MODES & GREEN_COMPATIBLE_MODES), 
@@ -99,6 +101,7 @@ struct args {
   char* solve_filename;
   char* bin_green_filename;
   char* paths_filename;
+  char* chunks_prefix;
   size_t samples;
   unsigned nthreads;
   double probe[4];

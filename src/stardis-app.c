@@ -348,6 +348,7 @@ stardis_init
   str_init(stardis->allocator, &stardis->solve_name);
   str_init(stardis->allocator, &stardis->paths_filename);
   str_init(stardis->allocator, &stardis->bin_green_filename);
+  str_init(stardis->allocator, &stardis->chunks_prefix);
   darray_size_t_init(stardis->allocator, &stardis->compute_surface.primitives);
   darray_sides_init(stardis->allocator, &stardis->compute_surface.sides);
   darray_uint_init(stardis->allocator, &stardis->compute_surface.err_triangles);
@@ -382,6 +383,9 @@ stardis_init
   else if(args->mode & SURFACE_COMPUTE_MODES) {
     ERR(str_set(&stardis->solve_name, args->solve_filename));
   }
+  else if(args->mode & MODE_DUMP_C_CHUNKS) {
+    ERR(str_set(&stardis->chunks_prefix, args->chunks_prefix));
+  }
   ERR(read_model(&args->model_files, stardis, &dummies));
 
   ERR(sdis_device_create(stardis->logger, stardis->allocator, stardis->nthreads,
@@ -393,7 +397,6 @@ stardis_init
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tcount));
 
-  
   ERR(sg3d_geometry_validate_properties(stardis->geometry.sg3d,
      validate_properties, stardis));
   ERR(sg3d_geometry_get_unique_triangles_with_properties_conflict_count(
@@ -526,6 +529,7 @@ stardis_release
   str_release(&stardis->solve_name);
   str_release(&stardis->paths_filename);
   str_release(&stardis->bin_green_filename);
+  str_release(&stardis->chunks_prefix);
   darray_descriptions_release(&stardis->descriptions);
   release_geometry(&stardis->geometry);
   darray_size_t_release(&stardis->compute_surface.primitives);

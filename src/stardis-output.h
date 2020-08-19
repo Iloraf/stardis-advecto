@@ -91,4 +91,9 @@ dump_compute_region_at_the_end_of_vtk
   (struct stardis* stardis,
    FILE* stream);
 
+extern res_T
+dump_model_as_c_chunks
+  (struct stardis* stardis,
+   FILE* stream);
+
 #endif

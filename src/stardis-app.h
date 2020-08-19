@@ -850,6 +850,7 @@ struct stardis {
                                              or MAP_COMPUTE */
   struct str paths_filename;
   struct str bin_green_filename;
+  struct str chunks_prefix;
   int mode;
   size_t samples;
   unsigned nthreads;

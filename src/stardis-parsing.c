@@ -371,6 +371,7 @@ mode_option
 {
   int found = 0;
   char res = '?';
+  if(m & MODE_DUMP_C_CHUNKS) { found++; res = 'c'; }
   if(m & MODE_DUMP_VTK) { found++; res = 'd'; }
   if(m & MODE_DUMP_PATHS) { found++; res = 'D'; }
   if(m & MODE_EXTENDED_RESULTS) { found++; res = 'e'; }
@@ -471,7 +472,10 @@ short_help
   fprintf(stream, "-------------------\n");
 
   fprintf(stream, "\n  -a AMBIENT_TEMP\n");
-  fprintf(stream, "     Set the ambient radiative temperature .\n");
+  fprintf(stream, "     Set the ambient radiative temperature.\n");
+
+  fprintf(stream, "\n  -c NAMES_PREFIX\n");
+  fprintf(stream, "     Dump the geometry and property ids to stdout as C chunks.\n");
 
   fprintf(stream, "\n  -d\n");
   fprintf(stream, "     Dump the geometry to stdout in VTK format along with various properties.\n");
@@ -515,7 +519,7 @@ parse_args
 {
   int opt = 0, n_used = 0;
   size_t len = 0;
-  const char option_list[] = "a:dD:eF:gG:hm:M:n:p:P:r:R:s:S:t:vV:";
+  const char option_list[] = "a:c:dD:eF:gG:hm:M:n:p:P:r:R:s:S:t:vV:";
   char buf[128];
   res_T res = RES_OK;
 
@@ -550,6 +554,19 @@ parse_args
           opt, optarg);
         goto error;
       }
+      break;
+
+    case 'c':
+      if(args->mode & USE_STDOUT_MODES) {
+        res = RES_BAD_ARG;
+        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, MODE_DUMP_C_CHUNKS);
+        logger_print(args->logger, LOG_ERROR,
+          "Option -%c cannot be used in conjunction with other dump options (%s).\n",
+          (char)opt, buf);
+        goto error;
+      }
+      args->chunks_prefix = optarg;
+      args->mode |= MODE_DUMP_C_CHUNKS;
       break;
 
     case 'd':

@@ -924,7 +924,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
       {
         unsigned prim
           = darray_uint_cdata_get(&stardis->compute_surface.err_triangles)[j];
-        if (prim == tid) {
+        if(prim == tid) {
           is_err_cs = 1;
           break;
         }
@@ -1386,6 +1386,77 @@ dump_compute_region_at_the_end_of_vtk
 
 exit:
   MEM_RM(stardis->allocator, v);
+  return res;
+error:
+  goto exit;
+}
+
+res_T
+dump_model_as_c_chunks
+  (struct stardis* stardis,
+   FILE* stream)
+{
+  res_T res = RES_OK;
+  const char* prefix;
+  unsigned n, vcount, tcount;
+
+  ASSERT(stardis && stream);
+
+  prefix = str_cget(&stardis->chunks_prefix);
+  ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));
+  ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tcount));
+
+  fprintf(stream, "#define %s_UNSPECIFIED_PROPERTY %u\n\n",
+    prefix, SG3D_UNSPECIFIED_PROPERTY);
+
+  fprintf(stream, "static const unsigned\n");
+  fprintf(stream, "%s_vertices_count = %u;\n\n", prefix, vcount);
+
+  fprintf(stream, "static const unsigned\n");
+  fprintf(stream, "%s_triangles_count = %u;\n\n", prefix, tcount);
+
+  fprintf(stream, "static const double\n");
+  fprintf(stream, "%s_vertices[%u][3] = {\n", prefix, vcount);
+  for(n = 0; n < vcount; n++) {
+    double vertex[3];
+    ERR(sg3d_geometry_get_unique_vertex(stardis->geometry.sg3d, n,
+      vertex));
+    fprintf(stream, "   { %g, %g, %g }%c\n",
+      SPLIT3(vertex), (n == vcount - 1 ? ' ' : ','));
+  }
+  fprintf(stream, "};\n\n");
+
+  fprintf(stream, "static const unsigned\n");
+  fprintf(stream, "%s_triangles[%u][3] = {\n", prefix, tcount);
+  for(n = 0; n < tcount; n++) {
+    unsigned triangle[3];
+    ERR(sg3d_geometry_get_unique_triangle_vertices(stardis->geometry.sg3d, n,
+      triangle));
+    fprintf(stream, "   { %u, %u, %u }%c\n",
+      SPLIT3(triangle), (n == tcount - 1 ? ' ' : ','));
+  }
+  fprintf(stream, "};\n\n");
+
+  fprintf(stream, "static const unsigned\n");
+  fprintf(stream, "%s_properties[%u][3] = {\n", prefix, tcount);
+  for(n = 0; n < tcount; n++) {
+    unsigned properties[SG3D_PROP_TYPES_COUNT__];
+    ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d, n,
+      properties));
+    if(properties[0] == SG3D_UNSPECIFIED_PROPERTY)
+      fprintf(stream, "   { %s_UNSPECIFIED_PROPERTY, ", prefix);
+    else fprintf(stream, "   { %u, ", properties[0]);
+    if(properties[1] == SG3D_UNSPECIFIED_PROPERTY)
+      fprintf(stream, "%s_UNSPECIFIED_PROPERTY, ", prefix);
+    else fprintf(stream, "%u, ", properties[1]);
+    if(properties[2] == SG3D_UNSPECIFIED_PROPERTY)
+      fprintf(stream, "%s_UNSPECIFIED_PROPERTY }", prefix);
+    else fprintf(stream, "%u }", properties[2]);
+    if(n == tcount - 1) fprintf(stream, "\n"); else fprintf(stream, ",\n");
+  }
+  fprintf(stream, "};\n\n");
+
+exit:
   return res;
 error:
   goto exit;

@@ -89,7 +89,12 @@ main
     }
     ERR(dump_enclosure_related_stuff_at_the_end_of_vtk(&stardis, stdout));
 
-    /* If dump flag set exit after dump done */
+    /* If dump, exit after dump done */
+    goto exit;
+  }
+  else if(mode & MODE_DUMP_C_CHUNKS) {
+    ERR(dump_model_as_c_chunks(&stardis, stdout));
+    /* If dump, exit after dump done */
     goto exit;
   }
 

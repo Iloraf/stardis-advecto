@@ -68,7 +68,7 @@ configure_file(${SDIS_SOURCE_DIR}/stardis-version.h.in
 # Check dependencies
 ###############################################################################
 find_package(RCMake 0.4 REQUIRED)
-find_package(RSys 0.9 REQUIRED)
+find_package(RSys 0.9.1 REQUIRED)
 find_package(StarGeom3D 0.1 REQUIRED)
 find_package(Star3D 0.7.1 REQUIRED)
 find_package(StarEnc3D 0.4.2 REQUIRED)

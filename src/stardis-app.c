@@ -24,6 +24,7 @@
 #include <star/sg3d_sencXd_helper.h>
 #include <star/sg3d_sdisXd_helper.h>
 
+#include <rsys/str.h>
 #include <rsys/text_reader.h>
 #include <rsys/logger.h>
 
@@ -459,9 +460,7 @@ stardis_init
       res = tmp_res;
       goto error;
     }
-    str_clear(&str);
-    ERR(str_printf(&str, "Description %d: ", i));
-    ERR(str_print_description(&str,
+    ERR(str_print_description(&str, i,
       darray_descriptions_cdata_get(&stardis->descriptions) + i));
     logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
   }
@@ -718,74 +717,25 @@ end:
   return res;
 }
 
-#undef COUNT_SIDE
-
-/*******************************************************************************
- * rsys/str additions
- ******************************************************************************/
-static res_T
-ensure_allocated(struct str* str, const size_t len, const char keep_old)
-{
-  char* buf = NULL;
-  const size_t alloc_granularity = 32;
-  size_t mod = 0;
-  size_t new_len = 0;
-  size_t new_size = 0;
-  ASSERT(str);
-
-  if(len * sizeof(char) <= str->allocated)
-    return RES_OK;
-
-  mod = len % alloc_granularity;
-  new_len = !mod ? len : len - mod + alloc_granularity;
-  new_size = new_len * sizeof(char);
-  buf = MEM_ALLOC(str->allocator, new_size);
-  if(!buf)
-    return RES_MEM_ERR;
-
-  if(keep_old) {
-    strncpy(buf, str->cstr, new_len - 1);
-    buf[new_len - 1] = '\0';
-  }
-
-  str->allocated = new_len * sizeof(char);
-  if(str->cstr != str->buffer)
-    MEM_RM(str->allocator, str->cstr);
-
-  str->cstr = buf;
-  return RES_OK;
-}
-
 res_T
-str_printf
-  (struct str* str,
-   const char* fmt, ...)
+str_append_printf
+  (struct str* accum, const char* fmt, ...)
 {
+  struct str tmp;
+  va_list ap;
   res_T res = RES_OK;
-  size_t initial_len, left;
-  va_list args_cp;
-  size_t needed = 0;
-  va_list args;
-  ASSERT(str && fmt);
-  va_start(args, fmt);
+  ASSERT(accum && fmt);
+  str_init(accum->allocator, &tmp);
+  va_start(ap, fmt);
+  ERR(str_printf(&tmp, fmt, ap));
+  va_end(ap);
+  ERR(str_append(accum, str_cget(&tmp)));
 
-  initial_len = str_len(str);
-  ASSERT(str->allocated >= initial_len);
-  left = str->allocated - initial_len;
-  if(left) {
-    VA_COPY(args_cp, args);
-    needed = (size_t)vsnprintf(str->cstr + initial_len, left, fmt, args_cp);
-  }
-  if(needed >= left) {
-    ERR(ensure_allocated(str, initial_len + needed + 1, 1));
-    ASSERT(str->allocated >= initial_len);
-    left = str->allocated - initial_len;
-    needed = (size_t)vsnprintf(str->cstr + initial_len, left, fmt, args);
-    CHK(needed < left);
-  }
-  va_end(args);
 end:
+  str_release(&tmp);
   return res;
 error:
   goto end;
 }
+
+#undef COUNT_SIDE

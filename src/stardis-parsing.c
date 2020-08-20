@@ -281,7 +281,7 @@ read_sides_and_files
       logger_print(stardis->logger, LOG_WARNING,
         "File '%s' included %zu degenerated triangles (removed)\n", tk, c);
       ERR(str_printf(&str, "Degenerated triangles IDs: %u", ids[0]));
-      FOR_EACH(n, 1, c) ERR(str_printf(&str, ", %u", ids[n]));
+      FOR_EACH(n, 1, c) ERR(str_append_printf(&str, ", %u", ids[n]));
       logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
       darray_uint_clear(&degenerated);
     }

@@ -172,17 +172,10 @@ error:
   goto exit;
 }
 
-/*******************************************************************************
- * rsys/str addition
- ******************************************************************************/
 extern LOCAL_SYM res_T
-str_printf
-  (struct str* str,
-   const char* fmt, ...)
-#ifdef COMPILER_GCC
-  __attribute((format(printf, 2, 3)))
-#endif
-  ;
+str_append_printf
+(struct str* accum, const char* fmt, ...);
+
 /******************************************************************************/
 
 struct mat_fluid {
@@ -219,15 +212,15 @@ str_print_fluid
 {
   res_T res = RES_OK;
   ASSERT(str && f);
-  ERR(str_printf(str, "Fluid '%s': rho=%g cp=%g",
+  ERR(str_append_printf(str, "Fluid '%s': rho=%g cp=%g",
     str_cget(&f->name), f->rho, f->cp));
   if(f->tinit >= 0) {
-    ERR(str_printf(str, " Tinit=%g", f->tinit));
+    ERR(str_append_printf(str, " Tinit=%g", f->tinit));
   }
   if(f->imposed_temperature >= 0) {
-    ERR(str_printf(str, " Temp=%g", f->imposed_temperature));
+    ERR(str_append_printf(str, " Temp=%g", f->imposed_temperature));
   }
-  ERR(str_printf(str, " (it is medium %u)", f->fluid_id));
+  ERR(str_append_printf(str, " (it is medium %u)", f->fluid_id));
 end:
   return res;
 error:
@@ -286,18 +279,18 @@ str_print_solid
 {
   res_T res = RES_OK;
   ASSERT(str && s);
-  ERR(str_printf(str, "Solid '%s': lambda=%g rho=%g cp=%g delta=%g",
+  ERR(str_append_printf(str, "Solid '%s': lambda=%g rho=%g cp=%g delta=%g",
     str_cget(&s->name), s->lambda, s->rho, s->cp, s->delta));
   if(s->vpower != 0) {
-    ERR(str_printf(str, " VPower=%g", s->vpower));
+    ERR(str_append_printf(str, " VPower=%g", s->vpower));
   }
   if(s->tinit >= 0) {
-    ERR(str_printf(str, " Tinit=%g", s->tinit));
+    ERR(str_append_printf(str, " Tinit=%g", s->tinit));
   }
   if(s->imposed_temperature >= 0) {
-    ERR(str_printf(str, " Temp=%g", s->imposed_temperature));
+    ERR(str_append_printf(str, " Temp=%g", s->imposed_temperature));
   }
-  ERR(str_printf(str, " (it is medium %u)", s->solid_id));
+  ERR(str_append_printf(str, " (it is medium %u)", s->solid_id));
 end:
   return res;
 error:
@@ -354,7 +347,7 @@ str_print_h_boundary
 {
   res_T res = RES_OK;
   ASSERT(str && b && DESC_IS_H(type));
-  ERR(str_printf(str,
+  ERR(str_append_printf(str,
     "H boundary for %s '%s': emissivity=%g specular_fraction=%g hc=%g T=%g "
     "(using medium %u as external medium)",
     (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"), str_cget(&b->name),
@@ -412,15 +405,15 @@ str_print_t_boundary
 {
   res_T res = RES_OK;
   ASSERT(str && b && DESC_IS_T(type));
-  ERR(str_printf(str, "T boundary for %s' %s': T=%g ",
+  ERR(str_append_printf(str, "T boundary for %s' %s': T=%g ",
     (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
     str_cget(&b->name), b->imposed_temperature));
 
   if(type == DESC_BOUND_T_FOR_FLUID) {
-    ERR(str_printf(str, "emissivity=%g, specular_fraction=%g hc=%g ",
+    ERR(str_append_printf(str, "emissivity=%g, specular_fraction=%g hc=%g ",
       b->emissivity, b->specular_fraction, b->hc));
   }
-  ERR(str_printf(str, "(using medium %u as external medium)", b->mat_id));
+  ERR(str_append_printf(str, "(using medium %u as external medium)", b->mat_id));
 end:
   return res;
 error:
@@ -467,7 +460,7 @@ str_print_f_boundary
 {
   res_T res = RES_OK;
   ASSERT(str && b);
-  ERR(str_printf(str,
+  ERR(str_append_printf(str,
     "F boundary for SOLID '%s': flux=%g (using medium %u as external medium)",
     str_cget(&b->name), b->imposed_flux, b->mat_id));
 end:
@@ -517,8 +510,8 @@ str_print_sf_connect
 {
   res_T res = RES_OK;
   ASSERT(str && c);
-  ERR(str_printf(str, "Solid-Fluid connection '%s':", str_cget(&c->name)));
-  ERR(str_printf(str, " emissivity=%g, specular_fraction=%g hc=%g",
+  ERR(str_append_printf(str, "Solid-Fluid connection '%s':", str_cget(&c->name)));
+  ERR(str_append_printf(str, " emissivity=%g, specular_fraction=%g hc=%g",
       c->emissivity, c->specular_fraction, c->hc));
 end:
   return res;
@@ -527,7 +520,8 @@ error:
 }
 
 static FINLINE res_T
-cp_sf_connect(struct solid_fluid_connect* dst, const struct solid_fluid_connect* src)
+cp_sf_connect
+  (struct solid_fluid_connect* dst, const struct solid_fluid_connect* src)
 {
   str_copy(&dst->name, &src->name);
   dst->connection_id = src->connection_id;
@@ -538,7 +532,8 @@ cp_sf_connect(struct solid_fluid_connect* dst, const struct solid_fluid_connect*
 }
 
 static FINLINE res_T
-cp_release_sf_connect(struct solid_fluid_connect* dst, struct solid_fluid_connect* src)
+cp_release_sf_connect
+  (struct solid_fluid_connect* dst, struct solid_fluid_connect* src)
 {
   return cp_sf_connect(dst, src);
 }
@@ -596,10 +591,13 @@ release_description(struct description* desc)
 static INLINE res_T
 str_print_description
   (struct str* str,
+   const unsigned rank,
    const struct description* desc)
 {
   res_T res = RES_OK;
   ASSERT(str && desc);
+  str_clear(str);
+  ERR(str_printf(str, "Description %u: ", rank));
   switch (desc->type) {
   case DESC_MAT_SOLID:
     ERR(str_print_solid(str, &desc->d.solid));

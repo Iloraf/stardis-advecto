@@ -133,7 +133,7 @@ create_intface
     interface_props->imposed_flux = SDIS_FLUX_NONE;
     interface_props->front_medium_id = UINT_MAX;
     interface_props->back_medium_id = UINT_MAX;
-    interface_props->connect_id = UINT_MAX;
+    interface_props->desc_id = UINT_MAX;
 
     if(front_defined) {
       switch (descriptions[fd].type) {
@@ -201,7 +201,7 @@ create_intface
         fluid_side_shader = (descriptions[bd].type == DESC_MAT_FLUID)
           ? &interface_shader.back : &interface_shader.front;
       }
-      interface_props->connect_id = cd;
+      interface_props->desc_id = cd;
       switch(connect->type) {
       case DESC_BOUND_H_FOR_FLUID:
         if(sdis_medium_get_type(def_medium) != SDIS_FLUID) {

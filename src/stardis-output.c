@@ -73,7 +73,7 @@ merge_flux_terms
   res_T res = RES_OK;
   struct sdis_data* data = NULL;
   struct intface* d__;
-  unsigned cid;
+  unsigned desc_id;
   struct w_ctx* w_ctx = ctx;
   const struct description* descs;
 
@@ -82,10 +82,10 @@ merge_flux_terms
 
   data = sdis_interface_get_data(interf);
   d__ = sdis_data_get(data);
-  cid = d__->connect_id;
+  desc_id = d__->desc_id;
   descs = darray_descriptions_cdata_get(w_ctx->desc);
 
-  switch (descs[cid].type) {
+  switch (descs[desc_id].type) {
   case DESC_BOUND_T_FOR_SOLID:
   case DESC_BOUND_T_FOR_FLUID:
   case DESC_BOUND_H_FOR_SOLID:
@@ -93,9 +93,9 @@ merge_flux_terms
     FATAL("Cannot have a flux term here.\n"); break;
   case DESC_BOUND_F_FOR_SOLID: {
     double* w;
-    w = htable_weigth_find(&w_ctx->flux, &cid);
+    w = htable_weigth_find(&w_ctx->flux, &desc_id);
     if(w) *w += flux_term;
-    else ERR(htable_weigth_set(&w_ctx->flux, &cid, &flux_term));
+    else ERR(htable_weigth_set(&w_ctx->flux, &desc_id, &flux_term));
     break;
   }
   default: FATAL("Unreachable code.\n"); break;
@@ -130,7 +130,7 @@ merge_power_terms
   case SDIS_SOLID: {
     struct solid* d__ = sdis_data_get(data);
     double* w;
-    unsigned mid = d__->id;
+    unsigned mid = d__->solid_id;
     w = htable_weigth_find(&w_ctx->pw, &mid);
     if(w) *w += power_term;
     else ERR(htable_weigth_set(&w_ctx->pw, &mid, &power_term));
@@ -384,12 +384,12 @@ dump_sample
   switch (pt.type) {
   case SDIS_FRAGMENT: {
     struct intface* d__;
-    unsigned cid;
+    unsigned desc_id;
     data = sdis_interface_get_data(pt.data.itfrag.intface);
     d__ = sdis_data_get(data);
-    cid = d__->connect_id;
-    CHK(DESC_IS_T(descs[cid].type) || DESC_IS_H(descs[cid].type));
-    header.id = cid;
+    desc_id = d__->desc_id;
+    CHK(DESC_IS_T(descs[desc_id].type) || DESC_IS_H(descs[desc_id].type));
+    header.id = desc_id;
     break;
   }
   case SDIS_VERTEX:
@@ -403,12 +403,12 @@ dump_sample
     }
     else if(type == SDIS_FLUID) {
       struct fluid* d__ = sdis_data_get(data);
-      header.id = d__->id;
+      header.id = d__->desc_id;
     } else {
       struct solid* d__ = sdis_data_get(data);
       ASSERT(type == SDIS_SOLID);
       ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
-      header.id = d__->id;
+      header.id = d__->desc_id;
     }
     break;
   default: FATAL("Unreachable code.\n"); break;
@@ -524,7 +524,7 @@ dump_green_bin
     pool_ptr += len + 1;
   }
   ASSERT(pool_ptr == name_pool + name_pool_sz);
-  /*Write Green string */
+  /* Write Green string */
   FW(green_string, sizeof(green_string));
 
   /* Write counts */
@@ -573,7 +573,7 @@ print_sample
   struct sdis_data* data = NULL;
   enum sdis_medium_type type;
   struct htable_weigth_iterator it, end;
-  unsigned mid, cid;
+  unsigned desc_id;
   size_t pcount, fcount;
   struct w_ctx* w_ctx = ctx;
   const struct description* descs;
@@ -595,18 +595,15 @@ print_sample
     struct intface* d__;
     data = sdis_interface_get_data(pt.data.itfrag.intface);
     d__ = sdis_data_get(data);
-    mid = (pt.data.itfrag.fragment.side == SDIS_FRONT)
-      ? d__->front_medium_id : d__->back_medium_id;
-    cid = d__->connect_id;
-    ASSERT(mid != UINT_MAX);
-    switch (descs[cid].type) {
+    desc_id = d__->desc_id;
+    switch (descs[desc_id].type) {
     case DESC_BOUND_T_FOR_SOLID:
     case DESC_BOUND_T_FOR_FLUID:
-      fprintf(w_ctx->stream, "T\t%u", cid);
+      fprintf(w_ctx->stream, "T\t%u", desc_id);
       break;
     case DESC_BOUND_H_FOR_SOLID:
     case DESC_BOUND_H_FOR_FLUID:
-      fprintf(w_ctx->stream, "H\t%u", cid);
+      fprintf(w_ctx->stream, "H\t%u", desc_id);
       break;
     case DESC_BOUND_F_FOR_SOLID:
       FATAL("Heat path cannot end at a flux boundary.\n"); break;
@@ -626,19 +623,19 @@ print_sample
     }
     else if(type == SDIS_FLUID) {
       struct fluid* d__ = sdis_data_get(data);
-      mid = d__->id;
+      desc_id = d__->desc_id;
       if(d__->is_outside)
         /* If outside the model and in a fluid with known temperature,
          * its a fluid attached to a H boundary */
-        fprintf(w_ctx->stream, "H\t%u", mid);
+        fprintf(w_ctx->stream, "H\t%u", desc_id);
       /* In a standard fluid with known temperature */
-      else fprintf(w_ctx->stream, "F\t%u", mid);
+      else fprintf(w_ctx->stream, "F\t%u", desc_id);
     } else {
       struct solid* d__ = sdis_data_get(data);
       ASSERT(type == SDIS_SOLID);
-      mid = d__->id;
       ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
-      fprintf(w_ctx->stream, "S\t%u", mid);
+      desc_id = d__->desc_id;
+      fprintf(w_ctx->stream, "S\t%u", desc_id);
     }
     break;
   default: FATAL("Unreachable code.\n"); break;
@@ -718,10 +715,10 @@ dump_green_ascii
   /* List Media */
   if(stardis->counts.smed_count) {
     fprintf(stream, "# Solids\n");
-    fprintf(stream, "# ID Name lambda rho cp power\n");
+    fprintf(stream, "# ID Name lambda rho cp power Temp\n");
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
-      const struct mat_solid* sl;
+      const struct solid* sl;
       if(desc->type != DESC_MAT_SOLID) continue;
       sl = &desc->d.solid;
       fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\n",
@@ -730,10 +727,10 @@ dump_green_ascii
   }
   if(stardis->counts.fmed_count) {
     fprintf(stream, "# Fluids\n");
-    fprintf(stream, "# ID Name rho cp\n");
+    fprintf(stream, "# ID Name rho cp Temp\n");
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
-      const struct mat_fluid* fl;
+      const struct fluid* fl;
       if(desc->type != DESC_MAT_FLUID) continue;
       fl = &desc->d.fluid;
       fprintf(stream, "%u\t%s\t%g\t%g\n",

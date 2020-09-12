@@ -281,7 +281,7 @@ read_sides_and_files
       logger_print(stardis->logger, LOG_WARNING,
         "File '%s' included %zu degenerated triangles (removed)\n", tk, c);
       ERR(str_printf(&str, "Degenerated triangles IDs: %u", ids[0]));
-      FOR_EACH(n, 1, c) ERR(str_append_printf(&str, ", %u", ids[n]));
+      FOR_EACH(n, 1, c) { STR_APPEND_PRINTF(&str, ", %u", ids[n]); }
       logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
       darray_uint_clear(&degenerated);
     }
@@ -1051,22 +1051,13 @@ process_h
 
   ASSERT(stardis && tok_ctx);
 
+  stardis->counts.hbound_count++;
+
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz+1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_h(stardis->allocator, &desc->d.h_boundary);
 
-  if(type == DESC_BOUND_H_FOR_SOLID) {
-    /* Need a dedicated fluid */
-    allocate_stardis_medium_id(stardis, &desc->d.h_boundary.mat_id);
-  } else {
-    /* Can use dummy solid */
-    if(dummies->dummy_solid_id == UINT_MAX) {
-      /* Allocate an ID for dummy solid */
-      allocate_stardis_medium_id(stardis, &dummies->dummy_solid_id);
-    }
-    desc->d.h_boundary.mat_id = dummies->dummy_solid_id;
-  }
   desc->type = type;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "h boundary name");
@@ -1120,6 +1111,26 @@ process_h
     goto end;
   }
 
+  if(type == DESC_BOUND_H_FOR_FLUID)
+    desc->d.h_boundary.mat_id = get_dummy_solid_id(stardis, dummies);
+  else {
+    struct fluid fluid_props;
+    init_fluid(stardis->allocator, &fluid_props);
+    fluid_props.fluid_id = allocate_stardis_medium_id(stardis);
+    desc->d.h_boundary.mat_id = fluid_props.fluid_id;
+    ASSERT(sz <= UINT_MAX);
+    fluid_props.desc_id = (unsigned)sz;
+    fluid_props.imposed_temperature
+      = desc->d.h_boundary.imposed_temperature;
+    fluid_props.is_outside = 1;
+    fluid_props.is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+    ERR(create_solver_fluid(stardis, &fluid_props));
+    logger_print(stardis->logger, LOG_OUTPUT,
+      "External fluid created: T=%g (it is medium %u)\n",
+      fluid_props.imposed_temperature,
+      fluid_props.fluid_id);
+  }
+
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
@@ -1145,12 +1156,16 @@ process_t
 
   ASSERT(stardis && tok_ctx);
 
+  stardis->counts.tbound_count++;
+
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_t(stardis->allocator, &desc->d.t_boundary);
 
   desc->type = type;
+  desc->d.t_boundary.mat_id = (type == DESC_BOUND_T_FOR_FLUID)
+    ? get_dummy_solid_id(stardis, dummies) : get_dummy_fluid_id(stardis, dummies);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature boundary name");
   ERR(str_set(&desc->d.t_boundary.name, tk));
@@ -1173,11 +1188,6 @@ process_t
     goto end;
   }
   if(type == DESC_BOUND_T_FOR_FLUID) {
-    if(dummies->dummy_solid_id == UINT_MAX) {
-      /* Allocate an ID for dummy solid */
-      allocate_stardis_medium_id(stardis, &dummies->dummy_solid_id);
-    }
-    desc->d.t_boundary.mat_id = dummies->dummy_solid_id;
     CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
     res = cstr_to_double(tk, &desc->d.t_boundary.emissivity);
     if(res != RES_OK
@@ -1208,12 +1218,6 @@ process_t
       if(res == RES_OK) res = RES_BAD_ARG;
       goto end;
     }
-  } else {
-    if(dummies->dummy_fluid_id == UINT_MAX) {
-      /* Allocate an ID for dummy fluid */
-      allocate_stardis_medium_id(stardis, &dummies->dummy_fluid_id);
-    }
-    desc->d.t_boundary.mat_id = dummies->dummy_fluid_id;
   }
 
   ASSERT(sz <= UINT_MAX);
@@ -1239,17 +1243,15 @@ process_flx
 
   ASSERT(stardis && tok_ctx);
 
+  stardis->counts.fbound_count++;
+
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_f(stardis->allocator, &desc->d.f_boundary);
 
-  if(dummies->dummy_fluid_id == UINT_MAX) {
-    /* Allocate an ID for dummy fluid */
-    allocate_stardis_medium_id(stardis, &dummies->dummy_fluid_id);
-  }
-  desc->d.f_boundary.mat_id = dummies->dummy_fluid_id;
   desc->type = DESC_BOUND_F_FOR_SOLID;
+  desc->d.f_boundary.mat_id = get_dummy_fluid_id(stardis, dummies);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "flux boundary name");
   ERR(str_set(&desc->d.f_boundary.name, tk));
@@ -1294,6 +1296,8 @@ process_sfc
 
   ASSERT(stardis && tok_ctx);
 
+  stardis->counts.sfconnect_count++;
+
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
@@ -1302,8 +1306,8 @@ process_sfc
   /* Use a medium ID even if there is no medium here
    * As other cases use media IDs as unique IDs for read_sides_and_files calls
    * we continue the trend to ensure connection ID is OK */
-  allocate_stardis_medium_id(stardis, &desc->d.sf_connect.connection_id);
   desc->type = DESC_SOLID_FLUID_CONNECT;
+  desc->d.sf_connect.connection_id = allocate_stardis_medium_id(stardis);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid fluid connection name");
   ERR(str_set(&desc->d.sf_connect.name, tk));
@@ -1448,13 +1452,19 @@ process_solid
 
   ASSERT(stardis && tok_ctx);
 
+  stardis->counts.smed_count++;
+
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_solid(stardis->allocator, &desc->d.solid);
 
-  allocate_stardis_medium_id(stardis, &desc->d.solid.solid_id);
   desc->type = DESC_MAT_SOLID;
+  desc->d.solid.solid_id = allocate_stardis_medium_id(stardis);
+  desc->d.solid.is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  desc->d.solid.is_outside = 0;
+  ASSERT(sz <= UINT_MAX);
+  desc->d.solid.desc_id = (unsigned)sz;
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid name");
   ERR(str_set(&desc->d.solid.name, tk));
@@ -1514,6 +1524,9 @@ process_solid
     goto end;
   }
 
+  /* Actual solid creation is defered until geometry is read to allow
+   * enclosure shape VS delta analysis (and auto delta computation) */
+
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
 
@@ -1536,13 +1549,19 @@ process_fluid
 
   ASSERT(stardis && tok_ctx);
 
+  stardis->counts.fmed_count++;
+
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_fluid(stardis->allocator, &desc->d.fluid);
 
-  allocate_stardis_medium_id(stardis, &desc->d.fluid.fluid_id);
   desc->type = DESC_MAT_FLUID;
+  desc->d.fluid.fluid_id = allocate_stardis_medium_id(stardis);
+  desc->d.fluid.is_outside = 0;
+  desc->d.fluid.is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  ASSERT(sz <= UINT_MAX);
+  desc->d.fluid.desc_id = (unsigned)sz;
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "fluid name");
   ERR(str_set(&desc->d.fluid.name, tk));
@@ -1585,6 +1604,8 @@ process_fluid
 
   ERR(read_imposed_temperature(stardis, &desc->d.fluid.imposed_temperature,
     tok_ctx));
+
+  ERR(create_solver_fluid(stardis, &desc->d.fluid));
 
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
@@ -1693,4 +1714,48 @@ error:
     "Invalid description line in model file '%s':\n", file_name);
   logger_print(stardis->logger, LOG_ERROR, "%s\n", str_cget(&keep));
   goto end;
+}
+
+unsigned
+get_dummy_solid_id
+  (struct stardis* stardis,
+   struct dummies* dummies)
+{
+  struct solid dummy;
+  if(dummies->dummy_solid)
+    return dummies->dummy_solid_id;
+  dummies->dummy_solid_id = allocate_stardis_medium_id(stardis);
+  init_solid(stardis->allocator, &dummy);
+  dummy.solid_id = dummies->dummy_solid_id;
+  dummy.is_outside = 1;
+  dummy.is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  create_solver_solid(stardis, &dummy);
+  dummies->dummy_solid
+    = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_solid_id];
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Dummy solid created: (it is medium %u)\n",
+    dummies->dummy_solid_id);
+  return dummies->dummy_solid_id;
+}
+
+unsigned
+get_dummy_fluid_id
+  (struct stardis* stardis,
+   struct dummies* dummies)
+{
+  struct fluid dummy;
+  if(dummies->dummy_fluid)
+    return dummies->dummy_fluid_id;
+  dummies->dummy_fluid_id = allocate_stardis_medium_id(stardis);
+  init_fluid(stardis->allocator, &dummy);
+  dummy.fluid_id = dummies->dummy_fluid_id;
+  dummy.is_outside = 1;
+  dummy.is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  create_solver_fluid(stardis, &dummy);
+  dummies->dummy_fluid
+    = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_fluid_id];
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Dummy fluid created: (it is medium %u)\n",
+    dummies->dummy_fluid_id);
+  return dummies->dummy_fluid_id;
 }

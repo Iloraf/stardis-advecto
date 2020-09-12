@@ -74,48 +74,91 @@ fluid_get_temperature
  ******************************************************************************/
 
 res_T
-create_stardis_fluid
+create_solver_fluid
   (struct stardis* stardis,
-   const struct str* name, /* Can be NULL */
-   const double rho,
-   const double cp,
-   const int is_green,
-   const int is_outside,
-   const double tinit,
-   const double imposed_temperature,
-   const unsigned id)
+   const struct fluid* fluid_props)
 {
   res_T res = RES_OK;
   struct sdis_fluid_shader fluid_shader = SDIS_FLUID_SHADER_NULL;
   struct sdis_data* data = NULL;
-  struct fluid* fluid_props;
+  struct fluid* props;
 
-  ASSERT(stardis && rho >= 0 && cp >= 0);
+  ASSERT(stardis && fluid_props);
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
   fluid_shader.volumic_mass = fluid_get_volumic_mass;
   fluid_shader.temperature = fluid_get_temperature;
   ERR(sdis_data_create(stardis->dev, sizeof(struct fluid), ALIGNOF(struct fluid),
     NULL, &data));
 
-  fluid_props = sdis_data_get(data); /* Fetch the allocated memory space */
-  str_init(stardis->allocator, &fluid_props->name);
-  if(name) str_copy(&fluid_props->name, name);
-  fluid_props->t0 = 0;
-  fluid_props->cp = cp;
-  fluid_props->rho = rho;
-  fluid_props->tinit = tinit;
-  fluid_props->imposed_temperature = imposed_temperature;
-  fluid_props->is_green = is_green;
-  fluid_props->is_outside = is_outside;
-  fluid_props->id = id;
-  ASSERT(id >= darray_media_ptr_size_get(&stardis->media));
-  ERR(darray_media_ptr_resize(&stardis->media, id + 1));
+  props = sdis_data_get(data); /* Fetch the allocated memory space */
+  init_fluid(stardis->allocator, props);
+  cp_fluid(props, fluid_props);
+  if(fluid_props->fluid_id >= darray_media_ptr_size_get(&stardis->media)) {
+    ERR(darray_media_ptr_resize(&stardis->media, fluid_props->fluid_id + 1));
+  }
+  ASSERT(darray_media_ptr_data_get(&stardis->media)[fluid_props->fluid_id] == NULL);
   ERR(sdis_fluid_create(stardis->dev, &fluid_shader, data,
-    darray_media_ptr_data_get(&stardis->media) + id));
+    darray_media_ptr_data_get(&stardis->media) + fluid_props->fluid_id));
 
 end:
   if(data) SDIS(data_ref_put(data));
   return res;
 error:
   goto end;
+}
+
+void
+init_fluid(struct mem_allocator* allocator, struct fluid* dst)
+{
+  str_init(allocator, &dst->name);
+  dst->rho = 1;
+  dst->cp = 1;
+  dst->tinit = -1;
+  dst->imposed_temperature = -1;
+  dst->t0 = 0;
+  dst->is_outside = 0;
+  dst->is_green = 0;
+  dst->desc_id = UINT_MAX;
+  dst->fluid_id = UINT_MAX;
+}
+
+void
+release_fluid(struct fluid* fluid)
+{
+  str_release(&fluid->name);
+}
+
+res_T
+str_print_fluid(struct str* str, const struct fluid* f)
+{
+  res_T res = RES_OK;
+  ASSERT(str && f);
+  STR_APPEND_PRINTF(str, "Fluid '%s': rho=%g cp=%g",
+    str_cget(&f->name), f->rho, f->cp);
+  if(f->tinit >= 0) {
+    STR_APPEND_PRINTF(str, " Tinit=%g", f->tinit);
+  }
+  if(f->imposed_temperature >= 0) {
+    STR_APPEND_PRINTF(str, " Temp=%g", f->imposed_temperature);
+  }
+  STR_APPEND_PRINTF(str, " (it is medium %u)", f->fluid_id);
+end:
+  return res;
+error:
+  goto end;
+}
+
+res_T
+cp_fluid(struct fluid* dst, const struct fluid* src)
+{
+  dst->rho = src->rho;
+  dst->cp = src->cp;
+  dst->tinit = src->tinit;
+  dst->imposed_temperature = src->imposed_temperature;
+  dst->t0 = src->t0;
+  dst->is_outside = src->is_outside;
+  dst->is_green = src->is_green;
+  dst->desc_id = src->desc_id;
+  dst->fluid_id = src->fluid_id;
+  return str_copy(&dst->name, &src->name);
 }

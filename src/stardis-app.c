@@ -49,7 +49,7 @@ read_model
   FILE* f = NULL;
   struct txtrdr* txtrdr = NULL;
 
-  ASSERT(model_files && stardis);
+  ASSERT(model_files && stardis && dummies);
   files = darray_str_cdata_get(model_files);
   FOR_EACH(i, 0, darray_str_size_get(model_files)) {
     const char* name = str_cget(files + i);
@@ -99,208 +99,79 @@ geometry_get_interface
 }
 
 static res_T
-create_holder
+check_delta_and_create_solid
   (struct stardis* stardis,
-   struct dummies* dummies,
-   const unsigned idx,
-   const int is_green)
+   struct description* description)
 {
   res_T res = RES_OK;
-  struct description* description;
   struct senc3d_enclosure* enc = NULL;
+  double ratio, delta_range[2] = { DBL_MAX, -DBL_MAX };
+  const double acceptance_ratio = 3;
+  struct senc3d_enclosure_header header;
 
-  ASSERT(stardis && dummies
-    && idx < darray_descriptions_size_get(&stardis->descriptions));
+  ASSERT(stardis && description && description->type == DESC_MAT_SOLID);
 
-  description = darray_descriptions_data_get(&stardis->descriptions) + idx;
-  switch (description->type) {
-  case DESC_BOUND_H_FOR_SOLID:
-    stardis->counts.hbound_count++;
-    /* Create an external fluid with imposed temperature */
-    ASSERT(description->d.h_boundary.mat_id != UINT_MAX);
-    ERR(create_stardis_fluid(stardis, NULL, 1, 1, is_green, 1, -1,
-      description->d.h_boundary.imposed_temperature,
-      description->d.h_boundary.mat_id));
-    logger_print(stardis->logger, LOG_OUTPUT,
-      "External fluid: rho=1 cp=1 T=%g (it is medium %u)\n",
-      description->d.h_boundary.imposed_temperature,
-      description->d.h_boundary.mat_id);
-    break;
-  case DESC_BOUND_H_FOR_FLUID:
-    stardis->counts.hbound_count++;
-    ASSERT(dummies->dummy_solid_id != UINT_MAX);
-    if(dummies->dummy_solid) {
-      /* Reuse external dummy solid */
-      description->d.h_boundary.mat_id = dummies->dummy_solid_id;
-    } else {
-      /* Create dummy solid */
-      description->d.h_boundary.mat_id = dummies->dummy_solid_id;
-      ERR(create_stardis_solid(stardis, NULL, 1, 1, 1, 1, is_green, 1, -1,
-        -1, 0, description->d.h_boundary.mat_id));
-      dummies->dummy_solid
-        = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_solid_id];
-      logger_print(stardis->logger, LOG_OUTPUT,
-        "Dummy solid: lambda=1 rho=1 cp=1 (it is medium %u)\n",
-        dummies->dummy_solid_id);
-    }
-    break;
-  case DESC_BOUND_T_FOR_SOLID:
-    stardis->counts.tbound_count++;
-    ASSERT(dummies->dummy_fluid_id != UINT_MAX);
-    if(dummies->dummy_fluid) {
-      /* Reuse external dummy fluid */
-      description->d.t_boundary.mat_id = dummies->dummy_fluid_id;
-    } else {
-      /* Create dummy fluid */
-      description->d.t_boundary.mat_id = dummies->dummy_fluid_id;
-      ERR(create_stardis_fluid(stardis, NULL, 1, 1, is_green, 1, -1,
-        -1, description->d.t_boundary.mat_id));
-      dummies->dummy_fluid
-        = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_fluid_id];
-      logger_print(stardis->logger, LOG_OUTPUT,
-        "Dummy fluid: rho=1 cp=1 (it is medium %u)\n",
-        dummies->dummy_fluid_id);
-    }
-    break;
-  case DESC_BOUND_T_FOR_FLUID:
-    stardis->counts.tbound_count++;
-    ASSERT(dummies->dummy_solid_id != UINT_MAX);
-    if(dummies->dummy_solid) {
-      /* Reuse external dummy solid */
-      description->d.t_boundary.mat_id = dummies->dummy_solid_id;
-    } else {
-      /* Create dummy solid */
-      description->d.t_boundary.mat_id = dummies->dummy_solid_id;
-      ERR(create_stardis_solid(stardis, NULL, 1, 1, 1, 1, is_green, 1, -1,
-        -1, 0, description->d.t_boundary.mat_id));
-      dummies->dummy_solid
-        = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_solid_id];
-      logger_print(stardis->logger, LOG_OUTPUT,
-        "Dummy solid: lambda=1 rho=1 cp=1 (it is medium %u)\n",
-        dummies->dummy_solid_id);
-    }
-    break;
-  case DESC_BOUND_F_FOR_SOLID:
-    stardis->counts.fbound_count++;
-    ASSERT(dummies->dummy_fluid_id != UINT_MAX);
-    if(dummies->dummy_fluid) {
-      /* Reuse external dummy fluid */
-      description->d.f_boundary.mat_id = dummies->dummy_fluid_id;
-    } else {
-      /* Create dummy fluid */
-      description->d.f_boundary.mat_id = dummies->dummy_fluid_id;
-      ERR(create_stardis_fluid(stardis, NULL, 1, 1, is_green, 1, -1, -1,
-        description->d.f_boundary.mat_id));
-      dummies->dummy_fluid
-        = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_fluid_id];
-      logger_print(stardis->logger, LOG_OUTPUT,
-        "Dummy fluid: rho=1 cp=1 (it is medium %u)\n", dummies->dummy_fluid_id);
-    }
-    break;
-  case DESC_SOLID_FLUID_CONNECT:
-    stardis->counts.sfconnect_count++;
-    ASSERT(description->d.sf_connect.connection_id != UINT_MAX);
-    ASSERT(description->d.sf_connect.specular_fraction >= 0
-      && description->d.sf_connect.specular_fraction <= 1);
-    ASSERT(description->d.sf_connect.emissivity >= 0);
-    ASSERT(description->d.sf_connect.hc >= 0);
-    break;
-  case DESC_MAT_SOLID: {
-    double ratio, delta_range[2] = { DBL_MAX, -DBL_MAX };
-    const double acceptance_ratio = 3;
-    struct senc3d_enclosure_header header;
-    /* Create solid to have ID informed */
-    stardis->counts.smed_count++;
-    ASSERT(description->d.solid.solid_id != UINT_MAX);
-    /* Check if delta can fit possible multiple enclosures */
-    if(stardis->senc3d_scn) {
-      /* Due to previous errors, senc3d_scn can be unavailable */
-      unsigned e, ecount = 0;
+  /* Create solid to have ID informed */
+  /* Check if delta can fit possible multiple enclosures */
+  if(stardis->senc3d_scn) {
+    /* Due to previous errors, senc3d_scn can be unavailable */
+    unsigned e, ecount = 0;
+    const unsigned desc_id = description->d.solid.desc_id;
 
-      /* At this stage we use a geometry that was created using description ids
-       * as media ids. As a consequence we thereafter use description ids in
-       * APIs calls requiring a medium id */
-      ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn, idx,
-        &ecount));
-      if(ecount != 0) {
-        /* Can be unused if conflicts; in this case, avoid delta warnings */
-        int external = 0;
-        FOR_EACH(e, 0, ecount) {
-          ERR(senc3d_scene_get_enclosure_by_medium(stardis->senc3d_scn, idx, e,
-            &enc));
-          ERR(senc3d_enclosure_get_header(enc, &header));
-          if(header.is_infinite) {
-            /* External solid, volume is negative and no delta walk expected */
-            external = 1;
-          } else {
-            double d = header.volume / (header.area * 6);
-            ASSERT(d >= 0);
-            delta_range[0] = MMIN(delta_range[0], d);
-            delta_range[1] = MMAX(delta_range[1], d);
-          }
-          ERR(senc3d_enclosure_ref_put(enc));
-          enc = NULL;
-        }
-        if(ecount > 1 || !external) {
-          ASSERT(0 < delta_range[0] && delta_range[0] <= delta_range[1]);
-          ratio = delta_range[1] / delta_range[0];
-          if(ratio > acceptance_ratio)
-            logger_print(stardis->logger, LOG_WARNING,
-              "Solid %s is used in %u different enclosures that have different "
-              "delta requirements.\n",
-              str_cget(&description->d.solid.name), ecount);
-          /* Delta needs to be substituted with actual value */
-          if(description->d.solid.delta == DELTA_AUTO) {
-            description->d.solid.delta = delta_range[0];
-            logger_print(stardis->logger, LOG_OUTPUT,
-              "Auto delta for solid %s set to %g\n",
-              str_cget(&description->d.solid.name), description->d.solid.delta);
-          } else {
-            int too_small
-              = (delta_range[0] > description->d.solid.delta * acceptance_ratio);
-            int too_big
-              = (delta_range[0] * acceptance_ratio < description->d.solid.delta);
-            /* Check if user delta is OK */
-            if(too_small || too_big)
-              logger_print(stardis->logger, LOG_WARNING,
-                "User delta for solid %s seems too %s: %g; "
-                "auto delta would have set it to %g.\n",
-                str_cget(&description->d.solid.name), (too_big ? "big" : "small"),
-                description->d.solid.delta, delta_range[0]);
-          }
+    /* The enclosures where created using description ids */
+    ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn,
+      desc_id, &ecount));
+    CHK(ecount != 0); /* This solid cannot be unused */
+    /* Can be unused if conflicts; in this case, avoid delta warnings */
+    int external = 0;
+    FOR_EACH(e, 0, ecount) {
+      ERR(senc3d_scene_get_enclosure_by_medium(stardis->senc3d_scn, desc_id,
+        e, &enc));
+      ERR(senc3d_enclosure_get_header(enc, &header));
+      if(header.is_infinite) {
+        /* External solid, volume is negative and no delta walk expected */
+        external = 1;
+      } else {
+        double d = header.volume / (header.area * 6);
+        ASSERT(d >= 0);
+        delta_range[0] = MMIN(delta_range[0], d);
+        delta_range[1] = MMAX(delta_range[1], d);
+      }
+      ERR(senc3d_enclosure_ref_put(enc));
+      enc = NULL;
+    }
+    if(ecount > 1 || !external) {
+      ASSERT(0 < delta_range[0] && delta_range[0] <= delta_range[1]);
+      ratio = delta_range[1] / delta_range[0];
+      if(ratio > acceptance_ratio)
+        logger_print(stardis->logger, LOG_WARNING,
+          "Solid %s is used in %u different enclosures that have different "
+          "delta requirements.\n",
+          str_cget(&description->d.solid.name), ecount);
+      /* Delta needs to be substituted with actual value */
+      if(description->d.solid.delta == DELTA_AUTO) {
+        description->d.solid.delta = delta_range[0];
+        logger_print(stardis->logger, LOG_OUTPUT,
+          "Auto delta for solid %s set to %g\n",
+          str_cget(&description->d.solid.name), description->d.solid.delta);
+      } else {
+        int too_small
+          = (delta_range[0] > description->d.solid.delta * acceptance_ratio);
+        int too_big
+          = (delta_range[0] * acceptance_ratio < description->d.solid.delta);
+        /* Check if user delta is OK */
+        if(too_small || too_big) {
+          logger_print(stardis->logger, LOG_WARNING,
+            "User delta for solid %s seems too %s: %g; "
+            "auto delta would have set it to %g.\n",
+            str_cget(&description->d.solid.name), (too_big ? "big" : "small"),
+            description->d.solid.delta, delta_range[0]);
         }
       }
     }
-    ERR(create_stardis_solid(stardis,
-      &description->d.solid.name,
-      description->d.solid.lambda,
-      description->d.solid.rho,
-      description->d.solid.cp,
-      description->d.solid.delta,
-      is_green,
-      0,
-      description->d.solid.tinit,
-      description->d.solid.imposed_temperature,
-      description->d.solid.vpower,
-      description->d.solid.solid_id));
-    break;
+
   }
-  case DESC_MAT_FLUID:
-    stardis->counts.fmed_count++;
-    ASSERT(description->d.fluid.fluid_id != UINT_MAX);
-    ERR(create_stardis_fluid(stardis,
-      &description->d.fluid.name,
-      description->d.fluid.rho,
-      description->d.fluid.cp,
-      is_green,
-      0,
-      description->d.fluid.tinit,
-      description->d.fluid.imposed_temperature,
-      description->d.fluid.fluid_id));
-    break;
-  default:
-    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
-  }
+  ERR(create_solver_solid(stardis, &description->d.solid));
 
 end:
   if(enc) SENC3D(enclosure_ref_put(enc));
@@ -372,6 +243,9 @@ stardis_init
   is_for_compute =
     (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_VTK);
 
+  ERR(sdis_device_create(stardis->logger, stardis->allocator, stardis->nthreads,
+    args->verbose, &stardis->dev));
+
   ERR(init_geometry(stardis->logger, stardis->allocator, stardis->verbose,
     &stardis->geometry));
 
@@ -388,9 +262,6 @@ stardis_init
     ERR(str_set(&stardis->chunks_prefix, args->chunks_prefix));
   }
   ERR(read_model(&args->model_files, stardis, &dummies));
-
-  ERR(sdis_device_create(stardis->logger, stardis->allocator, stardis->nthreads,
-    args->verbose, &stardis->dev));
 
   create_context.geometry = stardis->geometry.sg3d;
   create_context.app_interface_getter = geometry_get_interface;
@@ -452,16 +323,18 @@ stardis_init
     }
   }
 
-  /* Create media and property holders for those found in descriptions */
+  /* Create solids and log model information */
   for(i = 0; i < darray_descriptions_size_get(&stardis->descriptions); i++) {
-    tmp_res = create_holder(stardis, &dummies, i,
-      stardis->mode & (MODE_BIN_GREEN | MODE_GREEN));
-    if(tmp_res != RES_OK && is_for_compute) {
-      res = tmp_res;
-      goto error;
+    struct description* desc =
+      darray_descriptions_data_get(&stardis->descriptions) + i;
+    if(desc->type == DESC_MAT_SOLID) {
+      tmp_res = check_delta_and_create_solid(stardis, desc);
+      if(tmp_res != RES_OK && is_for_compute) {
+        res = tmp_res;
+        goto error;
+      }
     }
-    ERR(str_print_description(&str, i,
-      darray_descriptions_cdata_get(&stardis->descriptions) + i));
+    ERR(str_print_description(&str, i, desc));
     logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
   }
 
@@ -553,8 +426,8 @@ init_enclosures
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vsz));
   ERR(senc3d_device_create(stardis->logger, stardis->allocator,
     stardis->nthreads, stardis->verbose, &senc_dev));
-  allocate_stardis_medium_id(stardis,
-    &stardis->undefined_medium_behind_boundary_id);
+  stardis->undefined_medium_behind_boundary_id
+    = allocate_stardis_medium_id(stardis);
   ERR(senc3d_scene_create(senc_dev,
     SENC3D_CONVENTION_NORMAL_BACK | SENC3D_CONVENTION_NORMAL_OUTSIDE,
     tsz, sg3d_sencXd_geometry_get_indices, sg3d_sencXd_geometry_get_media,
@@ -715,27 +588,6 @@ validate_properties
   
 end:
   return res;
-}
-
-res_T
-str_append_printf
-  (struct str* accum, const char* fmt, ...)
-{
-  struct str tmp;
-  va_list ap;
-  res_T res = RES_OK;
-  ASSERT(accum && fmt);
-  str_init(accum->allocator, &tmp);
-  va_start(ap, fmt);
-  ERR(str_printf(&tmp, fmt, ap));
-  va_end(ap);
-  ERR(str_append(accum, str_cget(&tmp)));
-
-end:
-  str_release(&tmp);
-  return res;
-error:
-  goto end;
 }
 
 #undef COUNT_SIDE

@@ -18,6 +18,8 @@
 
 #include "stardis-parsing.h"
 #include "stardis-default.h"
+#include "stardis-solid.h"
+#include "stardis-fluid.h"
 
 #include <star/sstl.h>
 #include <star/sg3d.h>
@@ -41,6 +43,16 @@ struct sdis_medium;
 
 /* Utility macros */
 #define ERR(Expr) if((res = (Expr)) != RES_OK) goto error; else (void)0
+
+#define STR_APPEND_PRINTF(accum, fmt, ...) \
+{ \
+  struct str tmp; \
+  str_init((accum)->allocator, &tmp); \
+  res = str_printf(&tmp, (fmt), ##__VA_ARGS__);\
+  if(res == RES_OK) res = str_append((accum), str_cget(&tmp)); \
+  str_release(&tmp); \
+  if(res != RES_OK) goto error; \
+} (void)0
 
 #define DELTA_AUTO INF /* Placeholder until actual value is substituted */
 #define UNKNOWN_MEDIUM_TEMPERATURE -1 /* Unknown for stadis solver is -1 */
@@ -172,165 +184,26 @@ error:
   goto exit;
 }
 
-extern LOCAL_SYM res_T
-str_append_printf
-(struct str* accum, const char* fmt, ...);
-
 /******************************************************************************/
-
-struct mat_fluid {
-  struct str name;
-  unsigned fluid_id;
-  double rho;
-  double cp;
-  double tinit;
-  double imposed_temperature;
-};
-
-static FINLINE res_T
-init_fluid(struct mem_allocator* allocator, struct mat_fluid* dst)
-{
-  str_init(allocator, &dst->name);
-  dst->fluid_id = UINT_MAX;
-  dst->rho = 0;
-  dst->cp = 0;
-  dst->tinit = 0;
-  dst->imposed_temperature = -1;
-  return RES_OK;
-}
-
-static FINLINE void
-release_fluid(struct mat_fluid* fluid)
-{
-  str_release(&fluid->name);
-}
-
-static res_T
-str_print_fluid
-  (struct str* str,
-   const struct mat_fluid* f)
-{
-  res_T res = RES_OK;
-  ASSERT(str && f);
-  ERR(str_append_printf(str, "Fluid '%s': rho=%g cp=%g",
-    str_cget(&f->name), f->rho, f->cp));
-  if(f->tinit >= 0) {
-    ERR(str_append_printf(str, " Tinit=%g", f->tinit));
-  }
-  if(f->imposed_temperature >= 0) {
-    ERR(str_append_printf(str, " Temp=%g", f->imposed_temperature));
-  }
-  ERR(str_append_printf(str, " (it is medium %u)", f->fluid_id));
-end:
-  return res;
-error:
-  goto end;
-}
-
-static FINLINE res_T
-cp_fluid(struct mat_fluid* dst, const struct mat_fluid* src)
-{
-  str_copy(&dst->name, &src->name);
-  dst->fluid_id = src->fluid_id;
-  dst->rho = src->rho;
-  dst->cp = src->cp;
-  dst->tinit = src->tinit;
-  dst->imposed_temperature = src->imposed_temperature;
-  return RES_OK;
-}
-
-struct mat_solid {
-  struct str name;
-  unsigned solid_id;
-  double lambda;
-  double rho;
-  double cp;
-  double delta;
-  double tinit;
-  double imposed_temperature;
-  double vpower;
-};
-
-static FINLINE res_T
-init_solid(struct mem_allocator* allocator, struct mat_solid* dst)
-{
-  str_init(allocator, &dst->name);
-  dst->solid_id = UINT_MAX;
-  dst->lambda = 0;
-  dst->rho = 0;
-  dst->cp = 0;
-  dst->delta = 0;
-  dst->tinit = -1;
-  dst->imposed_temperature = -1;
-  dst->vpower = 0;
-  return RES_OK;
-}
-
-static FINLINE void
-release_solid(struct mat_solid* solid)
-{
-  str_release(&solid->name);
-}
-
-static res_T
-str_print_solid
-  (struct str* str,
-   const struct mat_solid* s)
-{
-  res_T res = RES_OK;
-  ASSERT(str && s);
-  ERR(str_append_printf(str, "Solid '%s': lambda=%g rho=%g cp=%g delta=%g",
-    str_cget(&s->name), s->lambda, s->rho, s->cp, s->delta));
-  if(s->vpower != 0) {
-    ERR(str_append_printf(str, " VPower=%g", s->vpower));
-  }
-  if(s->tinit >= 0) {
-    ERR(str_append_printf(str, " Tinit=%g", s->tinit));
-  }
-  if(s->imposed_temperature >= 0) {
-    ERR(str_append_printf(str, " Temp=%g", s->imposed_temperature));
-  }
-  ERR(str_append_printf(str, " (it is medium %u)", s->solid_id));
-end:
-  return res;
-error:
-  goto end;
-}
-
-static FINLINE res_T
-cp_solid(struct mat_solid* dst, const struct mat_solid* src)
-{
-  str_copy(&dst->name, &src->name);
-  dst->solid_id = src->solid_id;
-  dst->lambda = src->lambda;
-  dst->rho = src->rho;
-  dst->cp = src->cp;
-  dst->delta = src->delta;
-  dst->tinit = src->tinit;
-  dst->imposed_temperature = src->imposed_temperature;
-  dst->vpower = src->vpower;
-  return RES_OK;
-}
 
 struct h_boundary {
   struct str name;
-  unsigned mat_id;
   double emissivity;
   double specular_fraction;
   double hc;
   double imposed_temperature;
+  unsigned mat_id;
 };
 
-static FINLINE res_T
+static FINLINE void
 init_h(struct mem_allocator* allocator, struct h_boundary* dst)
 {
   str_init(allocator, &dst->name);
-  dst->mat_id = UINT_MAX;
   dst->emissivity = 0;
   dst->specular_fraction = 0;
   dst->hc = 0;
   dst->imposed_temperature = -1;
-  return RES_OK;
+  dst->mat_id = UINT_MAX;
 }
 
 static FINLINE void
@@ -347,11 +220,11 @@ str_print_h_boundary
 {
   res_T res = RES_OK;
   ASSERT(str && b && DESC_IS_H(type));
-  ERR(str_append_printf(str,
+  STR_APPEND_PRINTF(str,
     "H boundary for %s '%s': emissivity=%g specular_fraction=%g hc=%g T=%g "
     "(using medium %u as external medium)",
     (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"), str_cget(&b->name),
-    b->emissivity, b->specular_fraction, b->hc, b->imposed_temperature, b->mat_id));
+    b->emissivity, b->specular_fraction, b->hc, b->imposed_temperature, b->mat_id);
 end:
   return res;
 error:
@@ -361,34 +234,32 @@ error:
 static FINLINE res_T
 cp_h_boundary(struct h_boundary* dst, const struct h_boundary* src)
 {
-  str_copy(&dst->name, &src->name);
-  dst->mat_id = src->mat_id;
   dst->specular_fraction = src->specular_fraction;
   dst->imposed_temperature = src->imposed_temperature;
   dst->emissivity = src->emissivity;
   dst->hc = src->hc;
-  return RES_OK;
+  dst->mat_id = src->mat_id;
+  return str_copy(&dst->name, &src->name);
 }
 
 struct t_boundary {
   struct str name;
-  unsigned mat_id;
   double emissivity;
   double specular_fraction;
   double hc;
   double imposed_temperature;
+  unsigned mat_id;
 };
 
-static FINLINE res_T
+static FINLINE void
 init_t(struct mem_allocator* allocator, struct t_boundary* dst)
 {
   str_init(allocator, &dst->name);
-  dst->mat_id = UINT_MAX;
   dst->emissivity = 0;
   dst->specular_fraction = 0;
   dst->hc = 0;
   dst->imposed_temperature = -1;
-  return RES_OK;
+  dst->mat_id = UINT_MAX;
 }
 
 static FINLINE void
@@ -405,15 +276,15 @@ str_print_t_boundary
 {
   res_T res = RES_OK;
   ASSERT(str && b && DESC_IS_T(type));
-  ERR(str_append_printf(str, "T boundary for %s' %s': T=%g ",
+  STR_APPEND_PRINTF(str, "T boundary for %s' %s': T=%g ",
     (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
-    str_cget(&b->name), b->imposed_temperature));
+    str_cget(&b->name), b->imposed_temperature);
 
   if(type == DESC_BOUND_T_FOR_FLUID) {
-    ERR(str_append_printf(str, "emissivity=%g, specular_fraction=%g hc=%g ",
-      b->emissivity, b->specular_fraction, b->hc));
+    STR_APPEND_PRINTF(str, "emissivity=%g, specular_fraction=%g hc=%g ",
+      b->emissivity, b->specular_fraction, b->hc);
   }
-  ERR(str_append_printf(str, "(using medium %u as external medium)", b->mat_id));
+  STR_APPEND_PRINTF(str, "(using medium %u as external medium)", b->mat_id);
 end:
   return res;
 error:
@@ -423,28 +294,26 @@ error:
 static FINLINE res_T
 cp_t_boundary(struct t_boundary* dst, const struct t_boundary* src)
 {
-  str_copy(&dst->name, &src->name);
-  dst->mat_id = src->mat_id;
   dst->emissivity = src->emissivity;
   dst->specular_fraction = src->specular_fraction;
   dst->hc = src->hc;
   dst->imposed_temperature = src->imposed_temperature;
-  return RES_OK;
+  dst->mat_id = src->mat_id;
+  return str_copy(&dst->name, &src->name);
 }
 
 struct f_boundary {
   struct str name;
-  unsigned mat_id;
   double imposed_flux;
+  unsigned mat_id;
 };
 
-static FINLINE res_T
+static FINLINE void
 init_f(struct mem_allocator* allocator, struct f_boundary* dst)
 {
   str_init(allocator, &dst->name);
   dst->mat_id = UINT_MAX;
   dst->imposed_flux = -1;
-  return RES_OK;
 }
 
 static FINLINE void
@@ -460,9 +329,9 @@ str_print_f_boundary
 {
   res_T res = RES_OK;
   ASSERT(str && b);
-  ERR(str_append_printf(str,
+  STR_APPEND_PRINTF(str,
     "F boundary for SOLID '%s': flux=%g (using medium %u as external medium)",
-    str_cget(&b->name), b->imposed_flux, b->mat_id));
+    str_cget(&b->name), b->imposed_flux, b->mat_id);
 end:
   return res;
 error:
@@ -472,18 +341,17 @@ error:
 static FINLINE res_T
 cp_f_boundary(struct f_boundary* dst, const struct f_boundary* src)
 {
-  str_copy(&dst->name, &src->name);
-  dst->mat_id = src->mat_id;
   dst->imposed_flux = src->imposed_flux;
-  return RES_OK;
+  dst->mat_id = src->mat_id;
+  return str_copy(&dst->name, &src->name);
 }
 
 struct solid_fluid_connect {
   struct str name;
-  unsigned connection_id;
   double emissivity;
   double specular_fraction;
   double hc;
+  unsigned connection_id;
 };
 
 static FINLINE void
@@ -492,15 +360,14 @@ release_sf_connect(struct solid_fluid_connect* connect)
   str_release(&connect->name);
 }
 
-static FINLINE res_T
+static FINLINE void
 init_sf(struct mem_allocator* allocator, struct solid_fluid_connect* dst)
 {
   str_init(allocator, &dst->name);
-  dst->connection_id = UINT_MAX;
   dst->emissivity = 0;
   dst->specular_fraction = 0;
   dst->hc = 0;
-  return RES_OK;
+  dst->connection_id = UINT_MAX;
 }
 
 static res_T
@@ -510,9 +377,9 @@ str_print_sf_connect
 {
   res_T res = RES_OK;
   ASSERT(str && c);
-  ERR(str_append_printf(str, "Solid-Fluid connection '%s':", str_cget(&c->name)));
-  ERR(str_append_printf(str, " emissivity=%g, specular_fraction=%g hc=%g",
-      c->emissivity, c->specular_fraction, c->hc));
+  STR_APPEND_PRINTF(str, "Solid-Fluid connection '%s':", str_cget(&c->name));
+  STR_APPEND_PRINTF(str, " emissivity=%g, specular_fraction=%g hc=%g",
+      c->emissivity, c->specular_fraction, c->hc);
 end:
   return res;
 error:
@@ -523,12 +390,11 @@ static FINLINE res_T
 cp_sf_connect
   (struct solid_fluid_connect* dst, const struct solid_fluid_connect* src)
 {
-  str_copy(&dst->name, &src->name);
   dst->connection_id = src->connection_id;
   dst->specular_fraction = src->specular_fraction;
   dst->emissivity = src->emissivity;
   dst->hc = src->hc;
-  return RES_OK;
+  return str_copy(&dst->name, &src->name);
 }
 
 static FINLINE res_T
@@ -541,8 +407,8 @@ cp_release_sf_connect
 struct description {
   enum description_type type;
   union {
-    struct mat_fluid fluid;
-    struct mat_solid solid;
+    struct fluid fluid;
+    struct solid solid;
     struct t_boundary t_boundary;
     struct f_boundary f_boundary;
     struct h_boundary h_boundary;
@@ -664,14 +530,14 @@ cp_description
   case DESC_MAT_SOLID:
     if(dst->type == DESCRIPTION_TYPE_COUNT__) {
       dst->type = src->type;
-      ERR(init_solid(src->d.solid.name.allocator, &dst->d.solid));
+      init_solid(src->d.solid.name.allocator, &dst->d.solid);
     }
     ERR(cp_solid(&dst->d.solid, &src->d.solid));
     break;
   case DESC_MAT_FLUID:
     if(dst->type == DESCRIPTION_TYPE_COUNT__) {
       dst->type = src->type;
-      ERR(init_fluid(src->d.fluid.name.allocator, &dst->d.fluid));
+      init_fluid(src->d.fluid.name.allocator, &dst->d.fluid);
     }
     ERR(cp_fluid(&dst->d.fluid, &src->d.fluid));
     break;
@@ -679,7 +545,7 @@ cp_description
   case DESC_BOUND_H_FOR_FLUID:
     if(dst->type == DESCRIPTION_TYPE_COUNT__) {
       dst->type = src->type;
-      ERR(init_h(src->d.h_boundary.name.allocator, &dst->d.h_boundary));
+      init_h(src->d.h_boundary.name.allocator, &dst->d.h_boundary);
     }
     ERR(cp_h_boundary(&dst->d.h_boundary, &src->d.h_boundary));
     break;
@@ -687,21 +553,21 @@ cp_description
   case DESC_BOUND_T_FOR_FLUID:
     if(dst->type == DESCRIPTION_TYPE_COUNT__) {
       dst->type = src->type;
-      ERR(init_t(src->d.t_boundary.name.allocator, &dst->d.t_boundary));
+      init_t(src->d.t_boundary.name.allocator, &dst->d.t_boundary);
     }
     ERR(cp_t_boundary(&dst->d.t_boundary, &src->d.t_boundary));
     break;
   case DESC_BOUND_F_FOR_SOLID:
     if(dst->type == DESCRIPTION_TYPE_COUNT__) {
       dst->type = src->type;
-      ERR(init_f(src->d.f_boundary.name.allocator, &dst->d.f_boundary));
+      init_f(src->d.f_boundary.name.allocator, &dst->d.f_boundary);
     }
     ERR(cp_f_boundary(&dst->d.f_boundary, &src->d.f_boundary));
     break;
   case DESC_SOLID_FLUID_CONNECT:
     if(dst->type == DESCRIPTION_TYPE_COUNT__) {
       dst->type = src->type;
-      ERR(init_sf(src->d.sf_connect.name.allocator, &dst->d.sf_connect));
+      init_sf(src->d.sf_connect.name.allocator, &dst->d.sf_connect);
     }
     ERR(cp_sf_connect(&dst->d.sf_connect, &src->d.sf_connect));
     break;
@@ -863,13 +729,11 @@ struct stardis {
   int verbose;
 };
 
-static INLINE void
-allocate_stardis_medium_id
-  (struct stardis* stardis,
-   unsigned* id)
+static INLINE unsigned
+allocate_stardis_medium_id(struct stardis* stardis)
 {
-  ASSERT(stardis && id);
-  *id = stardis->next_medium_id++;
+  ASSERT(stardis);
+  return stardis->next_medium_id++;
 }
 
 extern LOCAL_SYM res_T

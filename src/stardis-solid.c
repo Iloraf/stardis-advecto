@@ -117,27 +117,17 @@ solid_get_power
  ******************************************************************************/
 
 res_T
-create_stardis_solid
+create_solver_solid
   (struct stardis* stardis,
-   const struct str* name, /* Can be NULL */
-   const double lambda,
-   const double rho,
-   const double cp,
-   const double delta,
-   const int is_green,
-   const int is_outside,
-   const double tinit,
-   const double imposed_temperature,
-   const double vpower,
-   const unsigned id)
+   const struct solid* solid_props)
 {
   res_T res = RES_OK;
   struct sdis_solid_shader solid_shader = SDIS_SOLID_SHADER_NULL;
   struct sdis_data* data = NULL;
-  struct solid* solid_props;
+  struct solid* props;
   /* Could be less restrictive if green output included positions/dates */
 
-  ASSERT(stardis && lambda > 0 && rho > 0 && cp > 0 && delta > 0);
+  ASSERT(stardis && solid_props);
   solid_shader.calorific_capacity = solid_get_calorific_capacity;
   solid_shader.thermal_conductivity = solid_get_thermal_conductivity;
   solid_shader.volumic_mass = solid_get_volumic_mass;
@@ -149,29 +139,85 @@ create_stardis_solid
   ERR(sdis_data_create(stardis->dev, sizeof(struct solid), ALIGNOF(struct solid),
     NULL, &data));
 
-  solid_props = sdis_data_get(data); /* Fetch the allocated memory space */
-  str_init(stardis->allocator, &solid_props->name);
-  if(name) str_copy(&solid_props->name, name);
-  solid_props->t0 = 0;
-  solid_props->lambda = lambda;
-  solid_props->rho = rho;
-  solid_props->cp = cp;
-  solid_props->delta = delta;
-  solid_props->tinit = tinit;
-  solid_props->imposed_temperature = imposed_temperature;
-  solid_props->vpower = vpower;
-  solid_props->is_green = is_green;
-  solid_props->is_outside = is_outside;
-  solid_props->id = id;
-  if(vpower != 0) solid_shader.volumic_power = solid_get_power;
-  ASSERT(id >= darray_media_ptr_size_get(&stardis->media));
-  ERR(darray_media_ptr_resize(&stardis->media, id + 1));
+  props = sdis_data_get(data); /* Fetch the allocated memory space */
+  init_solid(stardis->allocator, props);
+  cp_solid(props, solid_props);
+  if(solid_props->vpower != 0) solid_shader.volumic_power = solid_get_power;
+  if(solid_props->solid_id >= darray_media_ptr_size_get(&stardis->media)) {
+    ERR(darray_media_ptr_resize(&stardis->media, solid_props->solid_id + 1));
+  }
+  ASSERT(darray_media_ptr_data_get(&stardis->media)[solid_props->solid_id] == NULL);
   ERR(sdis_solid_create(stardis->dev, &solid_shader, data,
-    darray_media_ptr_data_get(&stardis->media) + id));
+    darray_media_ptr_data_get(&stardis->media) + solid_props->solid_id));
 
 end:
   if(data) SDIS(data_ref_put(data));
   return res;
 error:
   goto end;
+}
+
+void
+init_solid(struct mem_allocator* allocator, struct solid* dst)
+{
+  str_init(allocator, &dst->name);
+  dst->lambda = 1;
+  dst->rho = 1;
+  dst->cp = 1;
+  dst->delta = 1;
+  dst->tinit = -1;
+  dst->imposed_temperature = -1;
+  dst->vpower = 0;
+  dst->t0 = 0;
+  dst->is_outside = 0;
+  dst->is_green = 0;
+  dst->desc_id = UINT_MAX;
+  dst->solid_id = UINT_MAX;
+}
+
+void
+release_solid(struct solid* solid)
+{
+  str_release(&solid->name);
+}
+
+res_T
+str_print_solid(struct str* str, const struct solid* s)
+{
+  res_T res = RES_OK;
+  ASSERT(str && s);
+  STR_APPEND_PRINTF(str, "Solid '%s': lambda=%g rho=%g cp=%g delta=%g",
+    str_cget(&s->name), s->lambda, s->rho, s->cp, s->delta);
+  if(s->vpower != 0) {
+    STR_APPEND_PRINTF(str, " VPower=%g", s->vpower);
+  }
+  if(s->tinit >= 0) {
+    STR_APPEND_PRINTF(str, " Tinit=%g", s->tinit);
+  }
+  if(s->imposed_temperature >= 0) {
+    STR_APPEND_PRINTF(str, " Temp=%g", s->imposed_temperature);
+  }
+  STR_APPEND_PRINTF(str, " (it is medium %u)", s->solid_id);
+end:
+  return res;
+error:
+  goto end;
+}
+
+res_T
+cp_solid(struct solid* dst, const struct solid* src)
+{
+  dst->lambda = src->lambda;
+  dst->rho = src->rho;
+  dst->cp = src->cp;
+  dst->delta = src->delta;
+  dst->tinit = src->tinit;
+  dst->imposed_temperature = src->imposed_temperature;
+  dst->vpower = src->vpower;
+  dst->t0 = src->t0;
+  dst->is_outside = src->is_outside;
+  dst->is_green = src->is_green;
+  dst->desc_id = src->desc_id;
+  dst->solid_id = src->solid_id;
+  return str_copy(&dst->name, &src->name);
 }

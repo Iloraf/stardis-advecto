@@ -188,4 +188,14 @@ process_model_line
    struct stardis* stardis,
    struct dummies* dummies);
 
+extern LOCAL_SYM unsigned
+get_dummy_solid_id
+  (struct stardis* stardis,
+   struct dummies* dummies);
+
+extern LOCAL_SYM unsigned
+get_dummy_fluid_id
+  (struct stardis* stardis,
+   struct dummies* dummies);
+
 #endif /*ARGS_H*/

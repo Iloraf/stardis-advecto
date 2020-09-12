@@ -34,7 +34,8 @@ struct intface {
   double imposed_temperature;
   double imposed_flux;
   /* IDs */
-  unsigned front_medium_id, back_medium_id, connect_id;
+  unsigned front_medium_id, back_medium_id;
+  unsigned desc_id; /* The description this interfaces comes from */
 };
 
 /* Declare the hash table that map an interface to its descriptor */

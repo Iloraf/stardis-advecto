@@ -28,27 +28,32 @@ struct stardis;
  ******************************************************************************/
 struct fluid {
   struct str name;
-  double cp; /* Calorific capacity */
   double rho; /* Volumic mass */
-  /* Compute mode */
-  int is_green, is_outside;
-  double t0; /* End time of tinit */
+  double cp; /* Calorific capacity */
   double tinit;
   double imposed_temperature;
-  /* ID */
-  unsigned id;
+  double t0; /* End time of tinit */
+  int is_outside; /* the fluid is used for a boundary */
+  int is_green; /* green computation (nothing to do with fluid itself) */
+  unsigned desc_id; /* id of the boundary; meaningful if is_outside */
+  unsigned fluid_id;
 };
 
-extern res_T
-create_stardis_fluid
+res_T
+create_solver_fluid
   (struct stardis* stardis,
-   const struct str* name,
-   const double rho,
-   const double cp,
-   const int is_green,
-   const int is_outside,
-   const double tinit,
-   const double imposed_temperature,
-   const unsigned out_id);
+   const struct fluid* fluid_props);
+
+LOCAL_SYM void
+init_fluid(struct mem_allocator* allocator, struct fluid* dst);
+
+LOCAL_SYM void
+release_fluid(struct fluid* fluid);
+
+LOCAL_SYM res_T
+str_print_fluid(struct str* str, const struct fluid* s);
+
+LOCAL_SYM res_T
+cp_fluid(struct fluid* dst, const struct fluid* src);
 
 #endif

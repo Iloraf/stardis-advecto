@@ -26,33 +26,35 @@ struct stardis;
  ******************************************************************************/
 struct solid {
   struct str name;
-  double cp; /* Calorific capacity */
   double lambda; /* Conductivity */
   double rho; /* Volumic mass */
+  double cp; /* Calorific capacity */
   double delta; /* Numerical parameter */
   double tinit; /* Initial temperature */
   double imposed_temperature; /* allow to impose a T; -1 if unset */
   double vpower;
-  /* Compute mode */
-  int is_green, is_outside;
   double t0; /* End time of tinit */
-  /* ID */
-  unsigned id;
+  int is_outside; /* the solid is used for a boundary */
+  int is_green; /* green computation (nothing to do with solid itself) */
+  unsigned desc_id; /* id of the boundary; meaningful if is_outside */
+  unsigned solid_id;
 };
 
-extern res_T
-create_stardis_solid
+LOCAL_SYM void
+init_solid(struct mem_allocator* allocator, struct solid* dst);
+
+LOCAL_SYM void
+release_solid(struct solid* solid);
+
+LOCAL_SYM res_T
+str_print_solid(struct str* str, const struct solid* s);
+
+LOCAL_SYM res_T
+cp_solid(struct solid* dst, const struct solid* src);
+
+LOCAL_SYM res_T
+create_solver_solid
   (struct stardis* stardis,
-   const struct str* name,
-   const double lambda,
-   const double rho,
-   const double cp,
-   const double delta,
-   const int is_green,
-   const int is_outside,
-   const double tinit,
-   const double imposed_temperature,
-   const double vpower,
-   const unsigned id);
+   const struct solid* solid_props);
 
 #endif

@@ -721,8 +721,14 @@ dump_green_ascii
       const struct solid* sl;
       if(desc->type != DESC_MAT_SOLID) continue;
       sl = &desc->d.solid;
-      fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\n",
-        i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower);
+      if(sl->imposed_temperature >= 0) {
+        fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\t%g\n",
+          i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower,
+          sl->imposed_temperature);
+      } else {
+        fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\tNONE\n",
+          i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower);
+      }
     }
   }
   if(stardis->counts.fmed_count) {
@@ -733,8 +739,13 @@ dump_green_ascii
       const struct fluid* fl;
       if(desc->type != DESC_MAT_FLUID) continue;
       fl = &desc->d.fluid;
-      fprintf(stream, "%u\t%s\t%g\t%g\n",
-        i, str_cget(&fl->name), fl->rho, fl->cp);
+      if(fl->imposed_temperature >= 0) {
+        fprintf(stream, "%u\t%s\t%g\t%g\t%g\n",
+          i, str_cget(&fl->name), fl->rho, fl->cp, fl->imposed_temperature);
+      } else {
+        fprintf(stream, "%u\t%s\t%g\t%g\tNONE\n",
+          i, str_cget(&fl->name), fl->rho, fl->cp);
+      }
     }
   }
 

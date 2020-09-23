@@ -82,12 +82,8 @@ solid_get_temperature
    struct sdis_data* data)
 {
   const struct solid* solid_props = sdis_data_cget(data);
-  if(solid_props->is_green || vtx->time > solid_props->t0) {
-    /* Always use temp for Green mode, regardless of time */
-    if(solid_props->imposed_temperature >= 0)
-      return solid_props->imposed_temperature;
-    else return -1;
-  }
+  if(vtx->time > solid_props->t0)
+    return solid_props->imposed_temperature;
   /* Time is <= 0: use tinit */
   if(solid_props->tinit >= 0) return solid_props->tinit;
   /* Must have had t_init defined: error! */

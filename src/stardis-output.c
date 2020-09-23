@@ -350,7 +350,27 @@ error:
 struct path_header {
   unsigned id;
   unsigned pcount, fcount;
+  char at_initial;
 };
+
+static FINLINE double
+medium_get_t0
+  (struct sdis_medium* medium)
+{
+  struct sdis_data* data = NULL;
+  enum sdis_medium_type type;
+  ASSERT(medium);
+  type = sdis_medium_get_type(medium);
+  data = sdis_medium_get_data(medium);
+  if(type == SDIS_FLUID) {
+    const struct fluid* fluid_props = sdis_data_cget(data);
+    return fluid_props->t0;
+  } else {
+    ASSERT(type == SDIS_SOLID);
+    const struct solid* solid_props = sdis_data_cget(data);
+    return solid_props->t0;
+  }
+}
 
 static res_T
 dump_sample
@@ -369,6 +389,7 @@ dump_sample
   unsigned* ids = NULL;
   double* weights = NULL;
   size_t sz, i;
+  double t0;
 
   CHK(path && ctx);
 
@@ -390,11 +411,14 @@ dump_sample
     desc_id = d__->desc_id;
     CHK(DESC_IS_T(descs[desc_id].type) || DESC_IS_H(descs[desc_id].type));
     header.id = desc_id;
+    header.at_initial = 0;
     break;
   }
   case SDIS_VERTEX:
     type = sdis_medium_get_type(pt.data.mdmvert.medium);
     data = sdis_medium_get_data(pt.data.mdmvert.medium);
+    t0 = medium_get_t0(pt.data.mdmvert.medium);
+    header.at_initial = (pt.data.mdmvert.vertex.time <= t0);
     if(pt.data.mdmvert.vertex.P[0] == INF) {
       /* Radiative output (ambient temperature)*/
       sz = darray_descriptions_size_get(w_ctx->desc);
@@ -503,7 +527,7 @@ dump_green_bin
   szd = (unsigned)sz;
   descs = darray_descriptions_cdata_get(&stardis->descriptions);
 
-  /* Save names that donot fit inplace */
+  /* Save names that do not fit inplace */
   FOR_EACH(i, 0, szd) {
     const struct description* desc = descs + i;
     const struct str* name = get_description_name(desc);

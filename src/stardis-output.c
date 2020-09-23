@@ -130,10 +130,10 @@ merge_power_terms
   case SDIS_SOLID: {
     struct solid* d__ = sdis_data_get(data);
     double* w;
-    unsigned mid = d__->solid_id;
-    w = htable_weigth_find(&w_ctx->pw, &mid);
+    unsigned id = d__->desc_id;
+    w = htable_weigth_find(&w_ctx->pw, &id);
     if(w) *w += power_term;
-    else ERR(htable_weigth_set(&w_ctx->pw, &mid, &power_term));
+    else ERR(htable_weigth_set(&w_ctx->pw, &id, &power_term));
     break;
   }
   default: FATAL("Unreachable code.\n"); break;

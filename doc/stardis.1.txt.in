@@ -154,8 +154,7 @@ EXCLUSIVE OPTIONS
     By default, use @STARDIS_ARGS_DEFAULT_RENDERING_SPP@ samples per pixel.
 
   **t=**_time_;;
-    Rendering time. By default _time_ is @STARDIS_ARGS_DEFAULT_RENDERING_TIME@
-    seconds.
+    Rendering time. By default _time_ is @STARDIS_ARGS_DEFAULT_RENDERING_TIME@.
 
   **tgt=**_x_**,**_y_**,**_z_;;
     Position targeted by the camera. By default, it is set to

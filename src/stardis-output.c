@@ -739,36 +739,50 @@ dump_green_ascii
   /* List Media */
   if(stardis->counts.smed_count) {
     fprintf(stream, "# Solids\n");
-    fprintf(stream, "# ID Name lambda rho cp power Temp\n");
+    fprintf(stream, "# ID Name lambda rho cp power initial_temp imposed_temp\n");
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct solid* sl;
       if(desc->type != DESC_MAT_SOLID) continue;
       sl = &desc->d.solid;
-      if(sl->imposed_temperature >= 0) {
-        fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\t%g\n",
-          i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower,
-          sl->imposed_temperature);
+      fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g",
+        i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower);
+      if(sl->tinit >= 0) {
+        fprintf(stream, "\t%g", sl->tinit);
       } else {
-        fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\tNONE\n",
-          i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower);
+        fprintf(stream, "\tNONE");
+      }
+      if(sl->imposed_temperature >= 0) {
+        fprintf(stream, "\t%g\n", sl->imposed_temperature);
+      } else {
+        fprintf(stream, "\tNONE\n");
       }
     }
   }
   if(stardis->counts.fmed_count) {
     fprintf(stream, "# Fluids\n");
-    fprintf(stream, "# ID Name rho cp Temp\n");
+    fprintf(stream, "# ID Name rho cp initial_temp imposed_temp\n");
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct fluid* fl;
       if(desc->type != DESC_MAT_FLUID) continue;
       fl = &desc->d.fluid;
       if(fl->imposed_temperature >= 0) {
-        fprintf(stream, "%u\t%s\t%g\t%g\t%g\n",
-          i, str_cget(&fl->name), fl->rho, fl->cp, fl->imposed_temperature);
-      } else {
-        fprintf(stream, "%u\t%s\t%g\t%g\tNONE\n",
+        fprintf(stream, "%u\t%s\t%g\t%g",
           i, str_cget(&fl->name), fl->rho, fl->cp);
+      } else {
+        fprintf(stream, "%u\t%s\t%g\t%g",
+          i, str_cget(&fl->name), fl->rho, fl->cp);
+      }
+      if(fl->tinit >= 0) {
+        fprintf(stream, "\t%g", fl->tinit);
+      } else {
+        fprintf(stream, "\tNONE");
+      }
+      if(fl->imposed_temperature >= 0) {
+        fprintf(stream, "\t%g\n", fl->imposed_temperature);
+      } else {
+        fprintf(stream, "\tNONE\n");
       }
     }
   }

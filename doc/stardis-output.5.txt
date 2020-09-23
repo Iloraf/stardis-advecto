@@ -380,9 +380,9 @@ _______
 
 <sample>            ::= <end-spec> <power-count> <flux-count> <power-terms> <flux-terms>
 
-<solid>             ::= <green-id> <name> <lambda> <rho> <cp> <power> <imposed-temp>
+<solid>             ::= <green-id> <name> <lambda> <rho> <cp> <power> <initial-temp> <imposed-temp>
 
-<fluid>             ::= <green-id> <name> <rho> <cp> <imposed-temp>
+<fluid>             ::= <green-id> <name> <rho> <cp> <initial-temp> <imposed-temp>
 
 <t-bound>           ::= <green-id> <name> <temperature>
 
@@ -402,6 +402,9 @@ _______
 <cp>                ::= REAL # in ]0, INF)
 
 <power>             ::= REAL # in (-INF , INF)
+
+<initial-temp>      ::= REAL # in [0 , INF)
+                      | "NONE" if not imposed
 
 <imposed-temp>      ::= REAL # in [0 , INF)
                       | "NONE" if not imposed

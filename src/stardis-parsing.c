@@ -652,10 +652,29 @@ parse_args
     /*case 'F': see 's' */
 
     case 'g':
+      if(args->mode & MODE_BIN_GREEN) {
+        res = RES_BAD_ARG;
+        logger_print(args->logger, LOG_ERROR,
+          "Options -%c and -%c are exclusive.\n",
+          (char)opt, mode_option(MODE_BIN_GREEN));
+        goto error;
+      }
       args->mode |= MODE_GREEN;
       break;
 
     case 'G':
+      if(args->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+        res = RES_BAD_ARG;
+        if(args->mode & MODE_BIN_GREEN)
+          logger_print(args->logger, LOG_ERROR,
+            "Option -%c cannot be used twice.\n",
+            (char)opt);
+        else
+          logger_print(args->logger, LOG_ERROR,
+            "Options -%c and -%c are exclusive.\n",
+            (char)opt, mode_option(MODE_GREEN));
+        goto error;
+      }
       args->mode |= MODE_BIN_GREEN;
       args->bin_green_filename = optarg;
       break;

@@ -123,55 +123,59 @@ check_delta_and_create_solid
     /* The enclosures where created using description ids */
     ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn,
       desc_id, &ecount));
-    CHK(ecount != 0); /* This solid cannot be unused */
-    /* Can be unused if conflicts; in this case, avoid delta warnings */
-    int external = 0;
-    FOR_EACH(e, 0, ecount) {
-      ERR(senc3d_scene_get_enclosure_by_medium(stardis->senc3d_scn, desc_id,
-        e, &enc));
-      ERR(senc3d_enclosure_get_header(enc, &header));
-      if(header.is_infinite) {
-        /* External solid, volume is negative and no delta walk expected */
-        external = 1;
-      } else {
-        double d = header.volume / (header.area * 6);
-        ASSERT(d >= 0);
-        delta_range[0] = MMIN(delta_range[0], d);
-        delta_range[1] = MMAX(delta_range[1], d);
+    if(ecount == 0) {
+      unsigned ccount;
+      ERR(sg3d_geometry_get_unique_triangles_with_properties_conflict_count(
+        stardis->geometry.sg3d, &ccount));
+      CHK(ccount == 0); /* This solid can only be unused if in conflict*/
+    } else {
+      int external = 0;
+      FOR_EACH(e, 0, ecount) {
+        ERR(senc3d_scene_get_enclosure_by_medium(stardis->senc3d_scn, desc_id,
+          e, &enc));
+        ERR(senc3d_enclosure_get_header(enc, &header));
+        if(header.is_infinite) {
+          /* External solid, volume is negative and no delta walk expected */
+          external = 1;
+        } else {
+          double d = header.volume / (header.area * 6);
+          ASSERT(d >= 0);
+          delta_range[0] = MMIN(delta_range[0], d);
+          delta_range[1] = MMAX(delta_range[1], d);
+        }
+        ERR(senc3d_enclosure_ref_put(enc));
+        enc = NULL;
       }
-      ERR(senc3d_enclosure_ref_put(enc));
-      enc = NULL;
-    }
-    if(ecount > 1 || !external) {
-      ASSERT(0 < delta_range[0] && delta_range[0] <= delta_range[1]);
-      ratio = delta_range[1] / delta_range[0];
-      if(ratio > acceptance_ratio)
-        logger_print(stardis->logger, LOG_WARNING,
-          "Solid %s is used in %u different enclosures that have different "
-          "delta requirements.\n",
-          str_cget(&description->d.solid.name), ecount);
-      /* Delta needs to be substituted with actual value */
-      if(description->d.solid.delta == DELTA_AUTO) {
-        description->d.solid.delta = delta_range[0];
-        logger_print(stardis->logger, LOG_OUTPUT,
-          "Auto delta for solid %s set to %g\n",
-          str_cget(&description->d.solid.name), description->d.solid.delta);
-      } else {
-        int too_small
-          = (delta_range[0] > description->d.solid.delta * acceptance_ratio);
-        int too_big
-          = (delta_range[0] * acceptance_ratio < description->d.solid.delta);
-        /* Check if user delta is OK */
-        if(too_small || too_big) {
+      if(ecount > 1 || !external) {
+        ASSERT(0 < delta_range[0] && delta_range[0] <= delta_range[1]);
+        ratio = delta_range[1] / delta_range[0];
+        if(ratio > acceptance_ratio)
           logger_print(stardis->logger, LOG_WARNING,
-            "User delta for solid %s seems too %s: %g; "
-            "auto delta would have set it to %g.\n",
-            str_cget(&description->d.solid.name), (too_big ? "big" : "small"),
-            description->d.solid.delta, delta_range[0]);
+            "Solid %s is used in %u different enclosures that have different "
+            "delta requirements.\n",
+            str_cget(&description->d.solid.name), ecount);
+        /* Delta needs to be substituted with actual value */
+        if(description->d.solid.delta == DELTA_AUTO) {
+          description->d.solid.delta = delta_range[0];
+          logger_print(stardis->logger, LOG_OUTPUT,
+            "Auto delta for solid %s set to %g\n",
+            str_cget(&description->d.solid.name), description->d.solid.delta);
+        } else {
+          int too_small
+            = (delta_range[0] > description->d.solid.delta * acceptance_ratio);
+          int too_big
+            = (delta_range[0] * acceptance_ratio < description->d.solid.delta);
+          /* Check if user delta is OK */
+          if(too_small || too_big) {
+            logger_print(stardis->logger, LOG_WARNING,
+              "User delta for solid %s seems too %s: %g; "
+              "auto delta would have set it to %g.\n",
+              str_cget(&description->d.solid.name), (too_big ? "big" : "small"),
+              description->d.solid.delta, delta_range[0]);
+          }
         }
       }
     }
-
   }
   ERR(create_solver_solid(stardis, &description->d.solid));
 

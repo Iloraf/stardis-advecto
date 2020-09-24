@@ -27,6 +27,8 @@
 #include <rsys/str.h>
 #include <rsys/text_reader.h>
 #include <rsys/logger.h>
+#include <rsys/double2.h>
+#include <rsys/double3.h>
 
 #include <string.h>
 
@@ -207,10 +209,8 @@ stardis_init
   stardis->allocator = allocator;
   htable_intface_init(stardis->allocator, &htable_interfaces);
   darray_descriptions_init(stardis->allocator, &stardis->descriptions);
-  stardis->probe[0] = args->probe[0];
-  stardis->probe[1] = args->probe[1];
-  stardis->probe[2] = args->probe[2];
-  stardis->probe[3] = args->probe[3];
+  d3_set(stardis->probe, args->pos_and_time);
+  d2_set(stardis->time_range, args->pos_and_time + 3);
   stardis->dev = NULL;
   stardis->sdis_scn = NULL;
   stardis->senc3d_scn = NULL;
@@ -250,7 +250,7 @@ stardis_init
     &stardis->geometry));
 
   if(args->mode & MODE_IR_COMPUTE) {
-    ERR(parse_camera(stardis->logger, args->camera, &stardis->camera));
+    ERR(parse_camera(stardis->logger, args->camera, stardis));
   }
   else if(args->mode & MODE_MEDIUM_COMPUTE) {
     ERR(str_set(&stardis->solve_name, args->medium_name));

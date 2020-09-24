@@ -404,7 +404,7 @@ compute_probe(struct stardis* stardis)
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
-    d2_splat(args.time_range, stardis->probe[3]);
+    d2_set(args.time_range, stardis->time_range);
     args.register_paths = stardis->dump_paths;
     ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -466,7 +466,7 @@ compute_probe_on_interface(struct stardis* stardis)
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
-    d2_splat(args.time_range, stardis->probe[3]);
+    d2_set(args.time_range, stardis->time_range);
     args.register_paths = stardis->dump_paths;
     ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -600,7 +600,7 @@ compute_camera(struct stardis* stardis)
     stardis->camera.up));
 
   args.cam = cam;
-  d2_splat(args.time_range, stardis->camera.time);
+  d2_set(args.time_range, stardis->camera.time_range);
   args.fp_to_meter = stardis->scale_factor;
   args.ambient_radiative_temperature = stardis->ambient_temp;
   args.reference_temperature = stardis->ref_temp;
@@ -681,7 +681,7 @@ compute_medium(struct stardis* stardis)
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
-    d2_splat(args.time_range, stardis->probe[3]);
+    d2_set(args.time_range, stardis->time_range);
     args.register_paths = stardis->dump_paths;
     ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -787,7 +787,7 @@ compute_boundary(struct stardis* stardis)
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
-    d2_splat(args.time_range, stardis->probe[3]);
+    d2_set(args.time_range, stardis->time_range);
     args.register_paths = stardis->dump_paths;
     ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -823,7 +823,7 @@ compute_flux_boundary(struct stardis* stardis)
     = darray_size_t_cdata_get(&stardis->compute_surface.primitives);
   args.nprimitives
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
-  d2_splat(args.time_range, stardis->probe[3]);
+  d2_set(args.time_range, stardis->time_range);
   args.fp_to_meter = stardis->scale_factor;
   args.ambient_radiative_temperature = stardis->ambient_temp;
   args.reference_temperature = stardis->ref_temp;
@@ -873,7 +873,7 @@ compute_map(struct stardis* stardis)
     args.sides = darray_sides_cdata_get(&stardis->compute_surface.sides);
     args.nprimitives
       = darray_size_t_size_get(&stardis->compute_surface.primitives);
-    d2_splat(args.time_range, stardis->probe[3]);
+    d2_set(args.time_range, stardis->time_range);
     args.fp_to_meter = stardis->scale_factor;
     args.ambient_radiative_temperature = stardis->ambient_temp;
     args.reference_temperature = stardis->ref_temp;

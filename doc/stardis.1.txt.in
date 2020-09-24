@@ -39,9 +39,11 @@ relative to the characteristic time of the system. The provided system
 description should comply with the *stardis-input*(5) format.
 
 *stardis* can compute a thermal observable, like temperature or flux, at a
-probe point and date or the mean value of an observable over a given surface
-or volume, and time period. In addition, *stardis* gives access to the
-evaluation of the propagator (a.k.a the *Green function*).
+probe point and date or the mean value of an observable over a given surface,
+volume, or time range. When a time range *t1, t2* is provided, the computed
+value is the mean value over the time range. To compute the value at a given
+time, simply provide a single value *t*. In addition, *stardis* gives access to
+the evaluation of the propagator (a.k.a the *Green function*).
 
 The propagator is of great value for thermicist engineers as it gives some
 crucial information to analyse heat transfers in the system. It helps engineers
@@ -89,43 +91,45 @@ MANDATORY OPTIONS
 
 EXCLUSIVE OPTIONS
 -----------------
-*-p* _x,y,z[,time]_::
-  Compute the temperature at the given probe at a given time. By default
-  compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The probe must be in a
-  medium. The probe coordinates must be in the same system as the geometry.
+*-p* _x,y,z[,time-range]_::
+  Compute the temperature at the given probe at a given time. By default the
+  compute time range is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The probe must
+  be in a medium. The probe coordinates must be in the same system as the
+  geometry.
 
-*-P* _x,y,z[,time]_::
+*-P* _x,y,z[,time-range]_::
   Compute the temperature at the given probe on an interface at a given time.
-  By default compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The probe is
-  supposed to be on an interface and is moved to the closest point of the
-  closest interface before the computation start. The probe coordinates must
-  be in the same system as the geometry.
+  By default the compute time range is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The
+  probe is supposed to be on an interface and is moved to the closest point of
+  the closest interface before the computation start. The probe coordinates
+  must be in the same system as the geometry.
 
-*-m* _medium_name[,time]_::
+*-m* _medium_name[,time-range]_::
   Compute the mean temperature in a given medium at a given time. The medium
-  name must be part of the system description. By default compute time is
-  @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The medium does not need to be connex.
+  name must be part of the system description. By default the compute time
+  range is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The medium does not need to be
+  connex.
 
-*-s* _file[,time]_::
-  Compute the mean temperature on a given 2D region at a given time, the
-  region being defined as the front sides of the triangles in the provided
-  *STL* file. By default compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
+*-s* _file[,time-range]_::
+  Compute the mean temperature on a given 2D region at a given time, the region
+  being defined as the front sides of the triangles in the provided *STL* file.
+  By default the compute time range is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
   These triangles are not added to the geometry, but must be part of it. The
   region does not need to be connex.
 
-*-S* _file[,time]_::
+*-S* _file[,time-range]_::
   Compute the by-triangle mean temperature on a given 2D region at a given
   time, the region being defined as the front sides of the triangles in the
   provided *VTK* file. These triangles are not added to the geometry, but must
-  be part of it. By default compute time is
+  be part of it. By default the compute time range is
   @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The region does not need to be connex.
 
-*-F* _file[,time]_::
+*-F* _file[,time-range]_::
   Compute the mean flux on a given 2D region at a given time, the region
   being defined as the front sides of the triangles in the provided *VTK* file.
   These triangles are not added to the geometry, but must be part of it. Flux
   is accounted positive when going from the front side to the back side, at a
-  single-triangle level. By default compute time is
+  single-triangle level. By default the compute time range is
   @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.The region does not need to be connex.
 
 *-R* [__sub-option__:...]::
@@ -153,8 +157,9 @@ EXCLUSIVE OPTIONS
     Number of samples per pixel.
     By default, use @STARDIS_ARGS_DEFAULT_RENDERING_SPP@ samples per pixel.
 
-  **t=**_time_;;
-    Rendering time. By default _time_ is @STARDIS_ARGS_DEFAULT_RENDERING_TIME@.
+  **t=**_time-range_;;
+    Rendering time range. By default _time-range_ is
+	@STARDIS_ARGS_DEFAULT_RENDERING_TIME@.
 
   **tgt=**_x_**,**_y_**,**_z_;;
     Position targeted by the camera. By default, it is set to
@@ -205,14 +210,14 @@ options -g or -G.
 +
 This option can only be used in conjunction with one these options: -p, -P,
 -m, -s and cannot be used in conjunction with option -D. Any compute time
-provided through one of these options is silently ignored.
+range provided through one of these options is silently ignored.
 
 *-G* _file_name_::
   Compute the Green function at steady state and write it to an binary file.
 +
 This option can only be used in conjunction with one these options: -p, -P,
 -m, -s and cannot be used in conjunction with option -D. Any compute time
-provided through one of these options is silently ignored.
+range provided through one of these options is silently ignored.
 +
 The resulting file can be further used through the *sgreen*(1) command to apply
 different temperature, flux or volumic power values.
@@ -250,16 +255,26 @@ in the file *scene.vtk*. Verbosity level is set to *3*:
     $ stardis -M "scene 5.txt" -F edge.stl -d -V 3 > scene.vtk
 
 Compute the temperature at the probe point *0, 0.5, 0* at steady state. The
-system is read from the 2 files *media.txt* and *bounds.txt* and the number of
-samples is set to *1000000*:
+system is read from the file *model.txt* and the number of samples is set to
+*1000000*:
 
-    $ stardis -M media.txt -M bounds.txt -p 0,0.5,0 -n 1000000
+    $ stardis -M model.txt -p 0,0.5,0 -n 1000000
 
 Compute the mean temperature in the medium *med05* at *t=100* s. The system is
-read from the 2 files *media.txt* and *bounds.txt* and the result is output
-with extended format:
+read from the file *model.txt* and the result is output with extended format:
 
-    $ stardis -M media.txt -M bounds.txt -m med05,100 -e
+    $ stardis -M model.txt -m med05,100 -e
+
+Compute the temperature at the probe point *0, 0, 0* at *t=2500*. The system is
+read from the 2 files *media.txt* and *bounds.txt* and the number of samples is
+set to *1000000*:
+
+    $ stardis -M media.txt -M bounds.txt -p 0,0,0,2500 -n 1000000
+
+Compute the mean temperature at the probe point *1, 2.5, 0* over the *50, 5000*
+time range. The system is read from the file *model.txt*:
+
+    $ stardis -M model.txt -p 1,2.5,0,50,5000
 
 Render the system as described in *scene.txt* with default settings:
 

@@ -1132,40 +1132,64 @@ print_single_MC_result
   switch (stardis->mode & COMPUTE_MODES) {
   case MODE_PROBE_COMPUTE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
-      fprintf(stream, "Temperature at [%g, %g, %g] at t=%g = %g +/- %g\n",
-        SPLIT4(stardis->probe),
-        result.E, /* Expected value */
-        result.SE); /* Standard error */
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Temperature at [%g, %g, %g] at t=%g = %g +/- %g\n",
+          SPLIT3(stardis->probe), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream, "Temperature at [%g, %g, %g] with t in [%g %g] = %g +/- %g\n",
+          SPLIT3(stardis->probe), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
     }
     else fprintf(stream, "%g %g %zu %zu\n",
       result.E, result.SE, nfailures, stardis->samples);
     break;
   case MODE_PROBE_COMPUTE_ON_INTERFACE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
-      fprintf(stream, "Boundary temperature at [%g, %g, %g] at t=%g = %g +/- %g\n",
-        SPLIT4(stardis->probe),
-        result.E, /* Expected value */
-        result.SE); /* Standard error */
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Boundary temperature at [%g, %g, %g] at t=%g = %g +/- %g\n",
+          SPLIT3(stardis->probe), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream, "Boundary temperature at [%g, %g, %g] with t in [%g %g] = %g +/- %g\n",
+          SPLIT3(stardis->probe), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
     }
     else fprintf(stream, "%g %g %zu %zu\n",
       result.E, result.SE, nfailures, stardis->samples);
     break;
   case MODE_MEDIUM_COMPUTE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
-      fprintf(stream, "Temperature in medium '%s' at t=%g = %g +/- %g\n",
-        str_cget(&stardis->solve_name), stardis->probe[3],
-        result.E, /* Expected value */
-        result.SE); /* Standard error */
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Temperature in medium '%s' at t=%g = %g +/- %g\n",
+          str_cget(&stardis->solve_name), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream, "Temperature in medium '%s' with t in [%g %g] = %g +/- %g\n",
+          str_cget(&stardis->solve_name), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
     }
     else fprintf(stream, "%g %g %zu %zu\n",
       result.E, result.SE, nfailures, stardis->samples);
     break;
   case MODE_BOUNDARY_COMPUTE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
-      fprintf(stream, "Temperature at boundary %s at t=%g = %g +/- %g\n",
-        str_cget(&stardis->solve_name), stardis->probe[3],
-        result.E, /* Expected value */
-        result.SE); /* Standard error */
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Temperature at boundary %s at t=%g = %g +/- %g\n",
+          str_cget(&stardis->solve_name), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream, "Temperature at boundary %s with t in [%g %g] = %g +/- %g\n",
+          str_cget(&stardis->solve_name), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
     }
     else fprintf(stream, "%g %g %zu %zu\n",
       result.E, result.SE, nfailures, stardis->samples);
@@ -1176,25 +1200,49 @@ print_single_MC_result
     ASSERT(type == SDIS_ESTIMATOR_FLUX);
 
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
-      fprintf(stream, "Temperature at boundary %s at t=%g = %g +/- %g\n",
-        str_cget(&stardis->solve_name), stardis->probe[3],
-        result.E, /* Expected value */
-        result.SE); /* Standard error */
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Temperature at boundary %s at t=%g = %g +/- %g\n",
+          str_cget(&stardis->solve_name), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream, "Temperature at boundary %s with t in [%g %g] = %g +/- %g\n",
+          str_cget(&stardis->solve_name), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
       ERR(sdis_estimator_get_convective_flux(estimator, &result));
-      fprintf(stream, "Convective flux at boundary %s at t=%g = %g +/- %g\n",
-        str_cget(&stardis->solve_name), stardis->probe[3],
-        result.E, /* Expected value */
-        result.SE); /* Standard error */
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Convective flux at boundary %s at t=%g = %g +/- %g\n",
+          str_cget(&stardis->solve_name), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream, "Convective flux at boundary %s with t in [%g %g] = %g +/- %g\n",
+          str_cget(&stardis->solve_name), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
       ERR(sdis_estimator_get_radiative_flux(estimator, &result));
-      fprintf(stream, "Radiative flux at boundary %s at t=%g = %g +/- %g\n",
-        str_cget(&stardis->solve_name), stardis->probe[3],
-        result.E, /* Expected value */
-        result.SE); /* Standard error */
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Radiative flux at boundary %s at t=%g = %g +/- %g\n",
+          str_cget(&stardis->solve_name), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream, "Radiative flux at boundary %s with t in [%g %g] = %g +/- %g\n",
+          str_cget(&stardis->solve_name), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
       ERR(sdis_estimator_get_total_flux(estimator, &result));
-      fprintf(stream, "Total flux Flux at boundary %s at t=%g = %g +/- %g\n",
-        str_cget(&stardis->solve_name), stardis->probe[3],
-        result.E, /* Expected value */
-        result.SE); /* Standard error */
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Total flux Flux at boundary %s at t=%g = %g +/- %g\n",
+          str_cget(&stardis->solve_name), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream, "Total flux Flux at boundary %s with t in [%g %g] = %g +/- %g\n",
+          str_cget(&stardis->solve_name), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
     } else {
       fprintf(stream, "%g %g ", result.E, result.SE);
       ERR(sdis_estimator_get_convective_flux(estimator, &result));

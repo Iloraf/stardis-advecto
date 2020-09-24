@@ -20,6 +20,7 @@
 #include "stardis-version.h"
 
 #include <rsys/cstr.h>
+#include <rsys/double2.h>
 #include <rsys/double3.h>
 #include <sdis_version.h>
 #include <rsys/logger.h>
@@ -343,7 +344,7 @@ init_args
   /* Set default values */
   args->samples = STARDIS_DEFAULT_SAMPLES_COUNT;
   args->nthreads = SDIS_NTHREADS_DEFAULT;
-  args->probe[3] = STARDIS_DEFAULT_COMPUTE_TIME;
+  d2(args->pos_and_time+3, STARDIS_DEFAULT_COMPUTE_TIME);
   args->ambient_temp = STARDIS_DEFAULT_AMBIENT_TEMP;
   args->ref_temp = STARDIS_DEFAULT_REFERENCE_TEMP;
   args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;
@@ -438,37 +439,37 @@ short_help
     name);
   print_version(stream);
 
-  fprintf(stream, "\nMandatory arguments\n");
+  fprintf(stream, "\nMandatory options\n");
   fprintf(stream, "-------------------\n");
 
   fprintf(stream, "\n  -M <FILE>\n");
   fprintf(stream, "     Read a text file that contains (partial) description of the model.\n");
 
-  fprintf(stream, "\nExclusive arguments\n");
+  fprintf(stream, "\nExclusive options\n");
   fprintf(stream, "-------------------\n");
 
-  fprintf(stream, "\n  -F STL_FILE[,TIME]\n");
+  fprintf(stream, "\n  -F STL_FILE[,TIME-RANGE]\n");
   fprintf(stream, "     Compute the mean flux on a given 2D region at a given time.\n");
 
-  fprintf(stream, "\n  -m MEDIUM_NAME[,TIME]\n");
+  fprintf(stream, "\n  -m MEDIUM_NAME[,TIME-RANGE]\n");
   fprintf(stream, "     Compute the mean temperature in a given medium at a given time.\n");
 
-  fprintf(stream, "\n  -p X,Y,Z[,TIME]\n");
+  fprintf(stream, "\n  -p X,Y,Z[,TIME-RANGE]\n");
   fprintf(stream, "     Compute the temperature at the given probe.\n");
 
-  fprintf(stream, "\n  -P X,Y,Z[,TIME]\n");
+  fprintf(stream, "\n  -P X,Y,Z[,TIME-RANGE]\n");
   fprintf(stream, "     Compute the temperature at the given probe on an interface.\n");
 
   fprintf(stream, "\n  -R [RENDERING_OPTIONS]\n");
   fprintf(stream, "     Compute an infra-red image of the model.\n");
 
-  fprintf(stream, "\n  -s STL_FILE[,TIME]\n");
+  fprintf(stream, "\n  -s STL_FILE[,TIME-RANGE]\n");
   fprintf(stream, "     Compute the mean temperature on a given 2D region.\n");
 
-  fprintf(stream, "\n  -S STL_FILE[,TIME]\n");
+  fprintf(stream, "\n  -S STL_FILE[,TIME-RANGE]\n");
   fprintf(stream, "     Compute the by-triangle mean temperature on a given 2D region.\n");
 
-  fprintf(stream, "\nOptionnal arguments\n");
+  fprintf(stream, "\nOther options\n");
   fprintf(stream, "-------------------\n");
 
   fprintf(stream, "\n  -a AMBIENT_TEMP\n");
@@ -510,6 +511,39 @@ short_help
   fprintf(stream, "\n  -V LEVEL\n");
   fprintf(stream, "     Set the verbosity level.\n");
 }
+
+/* Get a time range from a coma-separated list of doubles
+ * The first Rank values are mandatory, followed by an optional time range
+ * that can be a single time */
+#define GET_OPTIONAL_TIME_RANGE(Src, Rank, Dst, Logger, OptionString, Option) \
+  res = cstr_to_list_double((Src), ',', (Dst), &len, (Rank)+2); \
+  if(res != RES_OK \
+     || (len < (Rank)) \
+     || (len == (Rank)+1 && (Dst)[(Rank)] < 0) \
+     || (len == (Rank)+2  && ((Dst)[0] < 0 || (Dst)[(Rank)] > (Dst)[(Rank)+1])) \
+     || len > (Rank)+2) \
+  { \
+    if(res == RES_OK) res = RES_BAD_ARG; \
+      logger_print((Logger), LOG_ERROR, \
+      "Invalid argument for option "OptionString": %s\n", \
+      (Option), (Src)); \
+    goto error; \
+  } else { \
+    if(len == (Rank)+1) (Dst)[(Rank)+1] = (Dst)[(Rank)];\
+  }
+
+ /* Get a string followed by an optional time range */
+#define GET_STR_AND_OPTIONAL_TIME_RANGE(Str, Time) \
+  ptr = strchr(optarg, ','); /* First ',' */ \
+  if(ptr) { /* Time range provided */ \
+    GET_OPTIONAL_TIME_RANGE(ptr+1, 0, (Time), args->logger, "-%c", opt); \
+    *ptr = '\0'; \
+  } \
+  (Str) = optarg;
+
+/* Get a position followed by an optional time range */
+#define GET_POS_AND_OPTIONAL_TIME_RANGE(Dst) \
+  GET_OPTIONAL_TIME_RANGE(optarg, 3, (Dst), args->logger, "-%c", opt);
 
 res_T
 parse_args
@@ -648,23 +682,7 @@ parse_args
         goto error;
       }
       args->mode |= MODE_MEDIUM_COMPUTE;
-      ptr = strrchr(optarg, ',');
-      if(ptr) {
-        if(ptr != strchr(optarg, ','))
-          res = RES_BAD_ARG; /* Single ',' allowed */
-        else {
-          res = cstr_to_double(ptr + 1, args->probe + 3);
-          if(res == RES_OK && args->probe[3] < 0) res = RES_BAD_ARG;
-        }
-        *ptr = '\0';
-      }
-      if(res != RES_OK) {
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
-      args->medium_name = optarg;
+      GET_STR_AND_OPTIONAL_TIME_RANGE(args->medium_name, args->pos_and_time + 3);
       break;
     }
 
@@ -702,18 +720,7 @@ parse_args
         goto error;
       }
       args->mode |= MODE_PROBE_COMPUTE;
-      res = cstr_to_list_double(optarg, ',', args->probe, &len, 4);
-      if(res != RES_OK
-        || len < 3
-        || (len == 4 && args->probe[3] < 0)
-        || len > 4)
-      {
-        if(res == RES_OK) res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
+      GET_POS_AND_OPTIONAL_TIME_RANGE(args->pos_and_time);
       break;
 
     case 'P':
@@ -725,18 +732,7 @@ parse_args
         goto error;
       }
       args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
-      res = cstr_to_list_double(optarg, ',', args->probe, &len, 4);
-      if(res != RES_OK
-        || len < 3
-        || (len == 4 && args->probe[3] < 0)
-        || len > 4)
-      {
-        if(res == RES_OK) res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
+      GET_POS_AND_OPTIONAL_TIME_RANGE(args->pos_and_time);
       break;
 
     case 'r':
@@ -786,24 +782,7 @@ parse_args
         args->mode |= MODE_FLUX_BOUNDARY_COMPUTE;
         break;
       }
-      ptr = strrchr(optarg, ',');
-      if(ptr) {
-        if(ptr != strchr(optarg, ','))
-          res = RES_BAD_ARG; /* Single ',' allowed */
-        else {
-          res = cstr_to_double(ptr + 1, args->probe + 3);
-          if(res == RES_OK && args->probe[3] < 0)
-            res = RES_BAD_ARG;
-        }
-        *ptr = '\0';
-      }
-      args->solve_filename = optarg;
-      if(res != RES_OK) {
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
+      GET_STR_AND_OPTIONAL_TIME_RANGE(args->solve_filename, args->pos_and_time + 3);
       break;
     }
 
@@ -944,25 +923,36 @@ res_T
 parse_camera
   (struct logger* logger,
    char* cam_param,
-   struct camera* cam)
+   struct stardis* stardis)
 {
   char** line = NULL;
   char** opt = NULL;
+  struct camera* cam;
   res_T res = RES_OK;
 
-  ASSERT(cam_param && cam);
-
+  ASSERT(cam_param && stardis);
+  cam = &stardis->camera;
   line = split_line(cam_param, ':');
 
   if(line) {
+    struct str keep;
     int i = 0;
+    str_init(stardis->allocator, &keep);
     for(i = 0; *(line + i); i++) {
       size_t len = 0;
+      str_set(&keep, line[i]);
       opt = split_line(line[i], '=');
-      ASSERT(opt[0] && opt[1] && !opt[2]);
+      if(!opt[0] || ! opt[1]  || opt[2]) {
+        if(res == RES_OK) res = RES_BAD_ARG;
+        logger_print((logger), LOG_ERROR,
+          "Invalid option syntax: %s\n", str_cget(&keep));
+        goto error;
+      }
+      str_set(&keep, opt[0]);
       _strupr(opt[0]);
       if(strcmp(opt[0], "T") == 0) {
-        ERR(cstr_to_double(opt[1], &cam->time));
+        GET_OPTIONAL_TIME_RANGE(opt[1], 0, cam->time_range, logger, "%s",
+          str_cget(&keep));
       }
       else if(strcmp(opt[0], "FOV") == 0) {
         ERR(cstr_to_double(opt[1], &cam->fov));
@@ -994,6 +984,7 @@ parse_camera
         goto error;
       }
     }
+    str_release(&keep);
   }
 
 end:
@@ -1014,6 +1005,10 @@ error:
   logger_print(logger, LOG_ERROR, "Use the -h option to get help.\n");
   goto end;
 }
+
+#undef GET_STR_AND_OPTIONAL_TIME_RANGE
+#undef GET_POS_AND_OPTIONAL_TIME_RANGE
+#undef GET_OPTIONAL_TIME_RANGE
 
 static struct description*
 find_description_by_name

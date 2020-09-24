@@ -615,10 +615,6 @@ parse_args
       args->mode |= MODE_DUMP_VTK;
       break;
 
-    case 'e':
-      args->mode |= MODE_EXTENDED_RESULTS;
-      break;
-
     case 'D': {
       char* ptr = strrchr(optarg, ',');
       if(!ptr || ptr != strchr(optarg, ','))
@@ -648,6 +644,10 @@ parse_args
       args->mode |= MODE_DUMP_PATHS;
       break;
     }
+
+    case 'e':
+      args->mode |= MODE_EXTENDED_RESULTS;
+      break;
 
     /*case 'F': see 's' */
 
@@ -893,7 +893,7 @@ parse_args
   }
 
   if(args->mode & MODE_EXTENDED_RESULTS) {
-    if(!(args->mode & COMPUTE_MODES)) {
+    if(!(args->mode & EXT_COMPATIBLE_MODES)) {
       res = RES_BAD_ARG;
       print_multiple_modes(buf, sizeof(buf), EXT_COMPATIBLE_MODES, 0);
       logger_print(args->logger, LOG_ERROR,

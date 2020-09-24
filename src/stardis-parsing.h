@@ -68,7 +68,8 @@ enum stardis_mode {
   SURFACE_COMPUTE_MODES
     = MODE_BOUNDARY_COMPUTE | MODE_FLUX_BOUNDARY_COMPUTE | MODE_MAP_COMPUTE,
 
-  EXT_COMPATIBLE_MODES = GREEN_COMPATIBLE_MODES | MODE_MEDIUM_COMPUTE,
+  EXT_COMPATIBLE_MODES
+    = GREEN_COMPATIBLE_MODES | MODE_MEDIUM_COMPUTE | MODE_FLUX_BOUNDARY_COMPUTE,
 
   REGION_COMPUTE_MODES = SURFACE_COMPUTE_MODES | MODE_MEDIUM_COMPUTE,
 
@@ -104,7 +105,7 @@ struct args {
   char* chunks_prefix;
   size_t samples;
   unsigned nthreads;
-  double probe[4];
+  double pos_and_time[5];
   enum stardis_mode mode;
   double ambient_temp, ref_temp;
   char* camera;
@@ -179,7 +180,7 @@ extern res_T
 parse_camera
   (struct logger* logger, 
    char* cam_param,
-   struct camera* cam);
+   struct stardis* stardis);
 
 extern LOCAL_SYM res_T
 process_model_line

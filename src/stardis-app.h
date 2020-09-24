@@ -26,6 +26,7 @@
 
 #include <rsys/rsys.h>
 #include <rsys/float3.h>
+#include <rsys/double2.h>
 #include <rsys/double3.h>
 #include <rsys/dynamic_array_size_t.h>
 #include <rsys/dynamic_array.h>
@@ -615,7 +616,7 @@ struct camera {
   double tgt[3];
   double up[3];
   double fov;
-  double time;
+  double time_range[2];
   unsigned spp;
   unsigned img_width, img_height;
   int auto_look_at;
@@ -630,7 +631,7 @@ init_camera(struct camera* cam) {
   cam->spp = STARDIS_DEFAULT_RENDERING_SPP;
   cam->img_width = STARDIS_DEFAULT_RENDERING_IMG_WIDTH;
   cam->img_height = STARDIS_DEFAULT_RENDERING_IMG_HEIGHT;
-  cam->time = STARDIS_DEFAULT_RENDERING_TIME;
+  d2(cam->time_range, STARDIS_DEFAULT_RENDERING_TIME);
   cam->auto_look_at = 1;
 }
 
@@ -704,7 +705,8 @@ struct stardis {
   struct senc3d_scene* senc3d_scn;
   struct counts counts;
 
-  double probe[4]; /* x,y,z,t of probe when mode is PROBE_COMPUTE */
+  double probe[3]; /* x,y,z of probe when mode is PROBE_COMPUTE */
+  double time_range[2]; /* compute time */
   struct camera camera; /* camera when mode is IR_COMPUTE */
   struct str solve_name; /* medium name when mode is MEDIUM_COMPUTE,
                             boundary file name when [FLUX_]BOUNDARY_COMPUTE

@@ -565,8 +565,12 @@ dump_green_bin
   if(name_pool_sz)
     FW(name_pool, name_pool_sz);
 
+  /* Write radiative temperatures */
   FW(&stardis->ambient_temp, 1);
   FW(&stardis->ref_temp, 1);
+
+  /* Write time range */
+  FW(&stardis->time_range, 2);
 
   w_ctx.alloc = stardis->allocator;
   w_ctx.desc = &stardis->descriptions;
@@ -729,6 +733,9 @@ dump_green_ascii
 
   /* Output counts */
   fprintf(stream, "---BEGIN GREEN---\n");
+  fprintf(stream, "# time range\n");
+  fprintf(stream, "%g %g\n",
+    SPLIT2(stardis->time_range));
   fprintf(stream,
     "# #solids #fluids #t_boundaries #h_boundaries #f_boundaries #ok #failures\n");
   fprintf(stream, "%u %u %u %u %u %u %u\n",

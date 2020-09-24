@@ -677,7 +677,7 @@ parse_args
       if(args->mode & EXCLUSIVE_MODES) {
         res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
-          "Modes -%c and -%c are exclusive.\n",
+          "Options -%c and -%c are exclusive.\n",
           (char)opt, mode_option(args->mode));
         goto error;
       }
@@ -715,7 +715,7 @@ parse_args
       if(args->mode & EXCLUSIVE_MODES) {
         res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
-          "Modes -%c and -%c are exclusive.\n",
+          "Options -%c and -%c are exclusive.\n",
           (char)opt, mode_option(args->mode));
         goto error;
       }
@@ -727,7 +727,7 @@ parse_args
       if(args->mode & EXCLUSIVE_MODES) {
         res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
-          "Modes -%c and -%c are exclusive.\n",
+          "Options -%c and -%c are exclusive.\n",
           (char)opt, mode_option(args->mode));
         goto error;
       }
@@ -752,7 +752,7 @@ parse_args
       if(args->mode & EXCLUSIVE_MODES) {
         res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
-          "Modes -%c and -%c are exclusive.\n",
+          "Options -%c and -%c are exclusive.\n",
           (char)opt, mode_option(args->mode));
         goto error;
       }
@@ -767,7 +767,7 @@ parse_args
       if(args->mode & EXCLUSIVE_MODES) {
         res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
-          "Modes -%c and -%c are exclusive.\n",
+          "Options -%c and -%c are exclusive.\n",
           (char)opt, mode_option(args->mode));
         goto error;
       }
@@ -858,8 +858,8 @@ parse_args
   {
     print_multiple_modes(buf, sizeof(buf), GREEN_COMPATIBLE_MODES, 0);
     logger_print(args->logger, LOG_ERROR,
-      "Option -g can only be used in conjunction with: %s\n",
-      buf);
+      "Option -%c can only be used in conjunction with: %s\n",
+      mode_option(args->mode & (MODE_BIN_GREEN | MODE_GREEN)), buf);
     res = RES_BAD_ARG;
     goto error;
   }

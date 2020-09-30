@@ -1277,6 +1277,17 @@ print_single_MC_result
           str_cget(&stardis->solve_name), SPLIT2(stardis->time_range),
           result.E, /* Expected value */
           result.SE); /* Standard error */
+      ERR(sdis_estimator_get_imposed_flux(estimator, &result));
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Imposed flux at boundary %s at t=%g = %g +/- %g\n",
+          str_cget(&stardis->solve_name), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream, "Imposed flux at boundary %s with t in [%g %g] = %g +/- %g\n",
+          str_cget(&stardis->solve_name), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
       ERR(sdis_estimator_get_total_flux(estimator, &result));
       if(stardis->time_range[0] == stardis->time_range[1])
         fprintf(stream, "Total flux Flux at boundary %s at t=%g = %g +/- %g\n",
@@ -1293,6 +1304,8 @@ print_single_MC_result
       ERR(sdis_estimator_get_convective_flux(estimator, &result));
       fprintf(stream, "%g %g ", result.E, result.SE);
       ERR(sdis_estimator_get_radiative_flux(estimator, &result));
+      fprintf(stream, "%g %g ", result.E, result.SE);
+      ERR(sdis_estimator_get_imposed_flux(estimator, &result));
       fprintf(stream, "%g %g ", result.E, result.SE);
       ERR(sdis_estimator_get_total_flux(estimator, &result));
       fprintf(stream, "%g %g ", result.E, result.SE);

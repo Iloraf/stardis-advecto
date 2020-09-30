@@ -87,11 +87,11 @@ when neither verbatim nor count, is a comment and is not part of the output.
 [verse]
 _______
 
-<output>           ::= <single-MC-result>
-                     | <binary-green>
-                     | <ascii-green>
-                     | <geometry-dump>
-                     | <infrared-image>
+<output> ::= <single-MC-result>
+           | <binary-green>
+           | <ascii-green>
+           | <geometry-dump>
+           | <infrared-image>
 _______
 
 == SINGLE MONTE CARLO
@@ -101,42 +101,70 @@ temperature or flux, this result is output first to _standard output_, possibly
 followed by some of the heat paths involved in the computation if option *-D*
 was used too.
 
+Two different formats are possible: a compact, numbers only format (the default)
+or an extended format that mixes numbers and their descriptions (if option *-e*
+is used).
+
 [verse]
 _______
-<single-MC-result>   ::= <probe-temp>
-                       | <medium-temp>
-                       | <mean-temp>
-                       | <mean-flux>
+<single-MC-result>     ::= <single-MC-result>
+                         | <ext-single-MC-result>
+
+<single-MC-result>     ::= <probe-temp>
+                         | <medium-temp>
+                         | <mean-temp>
+                         | <mean-flux>
+
+<ext-single-MC-result> ::= <ext-probe-temp>
+                         | <ext-medium-temp>
+                         | <ext-mean-temp>
+                         | <ext-mean-flux>
 
 -------------------------------------
 
-<probe-temp>         ::= "Temperature at" <probe-position> <time> <MC-estimate>
-                         <failures-report>
+<probe-temp>          ::= <MC-estimate> <failures-report>
 
-<mean-temp>          ::= "Temperature at boundary" <file-name> <time> <MC-estimate>
-                         <failures-report>
+<mean-temp>           ::= <MC-estimate> <failures-report>
 
-<mean-flux>          ::= "Temperature at boundary" <file-name> <time> <MC-estimate>
-                         "Convective flux at boundary " <file-name> <time> \
-                         <MC-estimate>
-                         "Radiative flux at boundary" <file-name> <time> <MC-estimate>
-                         "Total flux at boundary" <file-name> <time> <MC-estimate>
-                         <failures-report>
+<mean-flux>           ::= <MC-estimate> <MC-estimate> <MC-estimate> <MC-estimate> \
+                          <MC-estimate> <failures-report>
+                          # MC estimates order is: temperature, convective flux,
+                          # radiative flux, imposed flux, total flux
 
-<medium-temp>        ::= "Temperature in medium" <medium-name> <time> <MC-estimate>
-                         <failures-report>
+<medium-temp>         ::= <MC-estimate> <failures-report>
 
-<probe-position>     ::= "[" <x-value> "," <y-value> "," <z-value> "]"
+<MC-estimate>         ::= <expected-value> <standard-deviation>
 
-<time>               ::= "at t=" <time-value> "="
+<failures-report>     ::= <error-count> <success-count>
 
-<MC-estimate>        ::= <expected-value> "+/-" <standard-deviation>
+<ext-probe-temp>      ::= "Temperature at" <probe-position> <time> <MC-estimate>
+                          <failures-report>
 
-<failures-report>    ::= "#failures:" <error-count> "/" <success-count>
+<ext-mean-temp>       ::= "Temperature at boundary" <file-name> <time> <MC-estimate>
+                          <failures-report>
 
-<file-name>          ::= STRING # as provided in input data
+<ext-mean-flux>       ::= "Temperature at boundary" <file-name> <time> <MC-estimate>
+                          "Convective flux at boundary " <file-name> <time> \
+                          <MC-estimate>
+                          "Radiative flux at boundary" <file-name> <time> <MC-estimate>
+                          "Imposed flux at boundary" <file-name> <time> <MC-estimate>
+                          "Total flux at boundary" <file-name> <time> <MC-estimate>
+                          <failures-report>
 
-<medium-name>        ::= STRING # as provided in input data
+<ext-medium-temp>     ::= "Temperature in medium" <medium-name> <time> <MC-estimate>
+                          <failures-report>
+
+<ext-probe-position>  ::= "[" <x-value> "," <y-value> "," <z-value> "]"
+
+<ext-time>            ::= "at t=" <time-value> "="
+
+<ext-MC-estimate>     ::= <expected-value> "+/-" <standard-deviation>
+
+<ext-failures-report> ::= "#failures:" <error-count> "/" <success-count>
+
+<ext-file-name>       ::= STRING # as provided in input data
+
+<ext-medium-name>     ::= STRING # as provided in input data
 
 -------------------------------------
 

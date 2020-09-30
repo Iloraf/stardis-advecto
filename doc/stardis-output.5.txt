@@ -122,20 +122,20 @@ _______
 
 -------------------------------------
 
-<probe-temp>         ::= <MC-estimate> <failures-report>
+<probe-temp>          ::= <MC-estimate> <failures-report>
 
-<mean-temp>          ::= <MC-estimate> <failures-report>
+<mean-temp>           ::= <MC-estimate> <failures-report>
 
-<mean-flux>          ::= <MC-estimate> <MC-estimate> <MC-estimate> <MC-estimate>\
-                         <failures-report>
-                         # MC estimates order is: temperature, convective flux,
-                         # radiative flux, total flux
+<mean-flux>           ::= <MC-estimate> <MC-estimate> <MC-estimate> <MC-estimate> \
+                          <MC-estimate> <failures-report>
+                          # MC estimates order is: temperature, convective flux,
+                          # radiative flux, imposed flux, total flux
 
-<medium-temp>        ::= <MC-estimate> <failures-report>
+<medium-temp>         ::= <MC-estimate> <failures-report>
 
-<MC-estimate>        ::= <expected-value> <standard-deviation>
+<MC-estimate>         ::= <expected-value> <standard-deviation>
 
-<failures-report>    ::= <error-count> <success-count>
+<failures-report>     ::= <error-count> <success-count>
 
 <ext-probe-temp>      ::= "Temperature at" <probe-position> <time> <MC-estimate>
                           <failures-report>
@@ -147,6 +147,7 @@ _______
                           "Convective flux at boundary " <file-name> <time> \
                           <MC-estimate>
                           "Radiative flux at boundary" <file-name> <time> <MC-estimate>
+                          "Imposed flux at boundary" <file-name> <time> <MC-estimate>
                           "Total flux at boundary" <file-name> <time> <MC-estimate>
                           <failures-report>
 

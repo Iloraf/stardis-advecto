@@ -130,7 +130,10 @@ EXCLUSIVE OPTIONS
   These triangles are not added to the geometry, but must be part of it. Flux
   is accounted positive when going from the front side to the back side, at a
   single-triangle level. By default the compute time range is
-  @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.The region does not need to be connex.
+  @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The region does not need to be connex,
+  but it can currently only include geometry appearing in description lines
+  starting with H_BOUNDARY_FOR_SOLID, H_BOUNDARY_FOR_FLUID,
+  F_BOUNDARY_FOR_SOLID or SOLID_FLUID_CONNECTION (see *stardis-input*(5)).
 
 *-R* [__sub-option__:...]::
   Render an infrared image of the system through a pinhole camera and write it
@@ -159,7 +162,7 @@ EXCLUSIVE OPTIONS
 
   **t=**_time-range_;;
     Rendering time range. By default _time-range_ is
-	@STARDIS_ARGS_DEFAULT_RENDERING_TIME@.
+    @STARDIS_ARGS_DEFAULT_RENDERING_TIME@.
 
   **tgt=**_x_**,**_y_**,**_z_;;
     Position targeted by the camera. By default, it is set to

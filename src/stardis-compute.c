@@ -399,6 +399,17 @@ compute_probe(struct stardis* stardis)
       }
       ERR(dump_green_bin(green, stardis, stream));
       fclose(stream); stream = NULL;
+      if(str_cget(&stardis->end_paths_filename)
+        && strlen(str_cget(&stardis->end_paths_filename)))
+      {
+        stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+        if(!stream) {
+          res = RES_IO_ERR;
+          goto error;
+        }
+        ERR(dump_paths_end(green, stardis, stream));
+        fclose(stream); stream = NULL;
+      }
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));
@@ -461,6 +472,17 @@ compute_probe_on_interface(struct stardis* stardis)
       }
       ERR(dump_green_bin(green, stardis, stream));
       fclose(stream); stream = NULL;
+      if(str_cget(&stardis->end_paths_filename)
+        && strlen(str_cget(&stardis->end_paths_filename)))
+      {
+        stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+        if(!stream) {
+          res = RES_IO_ERR;
+          goto error;
+        }
+        ERR(dump_paths_end(green, stardis, stream));
+        fclose(stream); stream = NULL;
+      }
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));
@@ -676,6 +698,17 @@ compute_medium(struct stardis* stardis)
       }
       ERR(dump_green_bin(green, stardis, stream));
       fclose(stream); stream = NULL;
+      if(str_cget(&stardis->end_paths_filename)
+        && strlen(str_cget(&stardis->end_paths_filename)))
+      {
+        stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+        if(!stream) {
+          res = RES_IO_ERR;
+          goto error;
+        }
+        ERR(dump_paths_end(green, stardis, stream));
+        fclose(stream); stream = NULL;
+      }
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));
@@ -782,6 +815,17 @@ compute_boundary(struct stardis* stardis)
       }
       ERR(dump_green_bin(green, stardis, stream));
       fclose(stream); stream = NULL;
+      if(str_cget(&stardis->end_paths_filename)
+        && strlen(str_cget(&stardis->end_paths_filename)))
+      {
+        stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+        if(!stream) {
+          res = RES_IO_ERR;
+          goto error;
+        }
+        ERR(dump_paths_end(green, stardis, stream));
+        fclose(stream); stream = NULL;
+      }
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));

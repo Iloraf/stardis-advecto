@@ -65,6 +65,12 @@ dump_green_bin
    FILE* stream);
 
 extern res_T
+dump_paths_end
+  (struct sdis_green_function* green,
+   const struct stardis* stardis,
+   FILE* stream);
+
+extern res_T
 dump_enclosure_related_stuff_at_the_end_of_vtk
   (struct stardis* stardis,
    FILE* stream);

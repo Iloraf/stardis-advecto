@@ -32,9 +32,9 @@ The type of the data that are generated depends on the options used when
 (*-p*, *-P*, *-m*, *-s* or *-F*), *stardis*(1) outputs a single Monte-Carlo
 result. On the opposite, *stardis*(1) ouputs compound results when invoked with
 option *-S* or *-R*. Additionally, options *-g* and *-G* make *stardis*(1)
-compute and output a Green function. Most if not all complex data output are in
-VTK [1] format that can be displayed and manipulated by the open-source
-software Paraview [2].
+compute and output a Green function and possibly information on heat paths'
+ends. Most of the complex data output is in VTK [1] format that can be
+displayed and manipulated by the open-source software Paraview [2].
 
 Finaly, some special options (*-v*, *-h* or *-d*) that does not involve any
 computation produce output including information on the *stardis*(1) software
@@ -61,7 +61,7 @@ correspondance:
 *-F*: produces <mean-flux>
 
 *-p*, *-P*, *-m* or *-s* with *-g* or *-G*: produce <ascii-green> or
-<binary-green> respectively.
+<binary-green> and possibly <heat-paths-ends> respectively.
 
 *-D*: produces <heat-path> files in addition to the simulation output
 
@@ -89,6 +89,7 @@ _______
 
 <output> ::= <single-MC-result>
            | <binary-green>
+           | <heat-paths-ends>
            | <ascii-green>
            | <geometry-dump>
            | <infrared-image>
@@ -108,7 +109,7 @@ is used).
 [verse]
 _______
 <single-MC-result>     ::= <single-MC-result>
-                        | <ext-single-MC-result>
+                         | <ext-single-MC-result>
 
 <single-MC-result>     ::= <probe-temp>
                          | <medium-temp>
@@ -190,7 +191,7 @@ _______
 
 The Green function is generated, either in binary or ascii format, when a
 green-compatible *stardis*(1) simulation option is used in conjuction with
-option *-G* for a binary outpur, or option *-g* for an ascii output. For
+option *-G* for a binary output, or option *-g* for an ascii output. For
 every successful heat path sampled carrying out the simulation, the solver
 records all the elements of the path history relevant to link the various
 imposed temperature, fluxe and volumic power values to the simulation result.
@@ -202,7 +203,8 @@ ambient temperature.
 
 The output in green mode is made of tables containing the different media and
 boundaries and their imposed temperature, flux and volumic power values,
-followed by the paths' history.
+followed by the heat paths' history. Also, option *-G* make it possible to
+output heat paths' end information on an ascii, csv formated file.
 
 The Monte-Carlo estimate and standard deviation for a given set of settings can
 be computed as the mean and standard deviation of the samples of the *Green
@@ -481,8 +483,44 @@ _______
 
 <flux-factor>       ::= REAL # in ]0, INF)
                              # the temperature gain is flux-factor * Flux(green-id)
+_______
 
+== HEAT PATHS' ENDS
 
+When computing the Green function in binary mode, stardis can output partial
+information ot the sampled heat paths. Opposed to what the *-D* option outputs,
+that is the complete history of selected heat paths, here the information
+output is restricted to paths' ends to allow the inclusion of all the sampled
+heat paths, allowing statistical analysis.
+
+Note that in wath follows, the meaning of external quotes is as usual: what is
+inside is verbatim, including quotes.
+
+[verse]
+_______
+<heat-paths-ends>    ::= ""End", "End ID", "X", "Y", "Z", "Elapsed time""
+                         <heat-path-end-list>
+
+<heat-path-end-list> ::= <end-name> ", " <endid> ", "  <x> ", "  <y> ", " \
+                         <z> ", "  <elapsed-time>
+                         <heat-path-end-list> # #samples heat path ends
+
+-------------------------------------
+
+<end-name>           ::= STRING # the name of the boundary at the end of the
+                                # heat path, or AMBIANT for radiative ending
+
+<end-id>             ::= INTEGER # in [0 #boundaries]
+                                 # order is the order in the description file,
+                                 # AMBIANT's id being #boundaries
+
+<x>                  ::= REAL
+
+<y>                  ::= REAL
+
+<z>                  ::= REAL
+
+<elapsed-time>       ::= REAL # in [0, INF)
 _______
 
 == GEOMETRY DUMP
@@ -718,7 +756,6 @@ _______
                         | "3" # invalid enclosure: more than 1 medium
                         | "5" # invalid enclosure: some triangles with no defined medium
                         | "7" # invalid enclosure: more than 1 "medium", including undefined
-
 _______
 
 == INFRARED IMAGE

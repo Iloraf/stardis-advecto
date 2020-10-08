@@ -215,8 +215,10 @@ This option can only be used in conjunction with one these options: -p, -P,
 -m, -s and cannot be used in conjunction with option -D. Any compute time
 range provided through one of these options is silently ignored.
 
-*-G* _file_name_::
+*-G* _file_name_[,__file_name__]::
   Compute the Green function at steady state and write it to an binary file.
+  If a second file name is provided, information on heat paths' ends is also
+  written in this second file in ascii csv format.
 +
 This option can only be used in conjunction with one these options: -p, -P,
 -m, -s and cannot be used in conjunction with option -D. Any compute time
@@ -290,6 +292,13 @@ named error_path_00000000.vtk, error_path_00000001.vtk, ...
 
     $ stardis -M scene.txt -R t=10000:spp=2:img=800x600 -D error,error_path_
 
+Compute the Green fonction that computes the temperature at the probe point
+*0, 0, 0* at steady state. The system is read from the file *model.txt* and
+the Green function is written to the *probe.green file* and the heat paths'
+ends are written to the *probe_ends.csv* file:
+
+    $ stardis -M model.txt -p 0,0,0 -G probe.green,probe_ends.csv
+	
 COPYRIGHT
 ---------
 Copyright &copy; 2018-2020 |Meso|Star>. License GPLv3+: GNU GPL

@@ -49,6 +49,11 @@ struct w_ctx {
   FILE* stream;
 };
 
+struct e_ctx {
+  const struct darray_descriptions* desc;
+  FILE* stream;
+};
+
 /*******************************************************************************
  * Local Type; for documentation purpose
  * These values are used in dumps
@@ -373,6 +378,77 @@ medium_get_t0
 }
 
 static res_T
+dump_sample_end
+  (struct sdis_green_path* path,
+   void* ctx)
+{
+  res_T res = RES_OK;
+  struct sdis_point pt = SDIS_POINT_NULL;
+  struct sdis_data* data = NULL;
+  enum sdis_medium_type type;
+  struct e_ctx* e_ctx = ctx;
+  const struct description* descs;
+  FILE* stream;
+  double elapsed;
+  double* pos;
+  unsigned id;
+
+  CHK(path && ctx);
+
+  stream = e_ctx->stream;
+  ERR(sdis_green_path_get_limit_point(path, &pt));
+  ERR(sdis_green_path_get_elapsed_time(path, &elapsed));
+
+  descs = darray_descriptions_cdata_get(e_ctx->desc);
+  switch (pt.type) {
+  case SDIS_FRAGMENT: {
+    struct intface* d__;
+    data = sdis_interface_get_data(pt.data.itfrag.intface);
+    pos = pt.data.itfrag.fragment.P;
+    d__ = sdis_data_get(data);
+    id = d__->desc_id;
+    CHK(DESC_IS_T(descs[id].type) || DESC_IS_H(descs[id].type));
+    break;
+  }
+  case SDIS_VERTEX:
+    type = sdis_medium_get_type(pt.data.mdmvert.medium);
+    data = sdis_medium_get_data(pt.data.mdmvert.medium);
+    pos = pt.data.mdmvert.vertex.P;
+    if(pt.data.mdmvert.vertex.P[0] == INF) {
+      /* Radiative output (ambient temperature) */
+      size_t sz = darray_descriptions_size_get(e_ctx->desc);
+      ASSERT(sz <= UINT_MAX);
+      id = (unsigned)sz; /* Ambient ID */
+    }
+    else if(type == SDIS_FLUID) {
+      struct fluid* d__ = sdis_data_get(data);
+      id = d__->desc_id;
+    } else {
+      struct solid* d__ = sdis_data_get(data);
+      ASSERT(type == SDIS_SOLID);
+      ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
+      id = d__->desc_id;
+    }
+    break;
+  default: FATAL("Unreachable code.\n"); break;
+  }
+
+  /* End, End ID, X, Y, Z, Elapsed time */
+  if(pt.data.mdmvert.vertex.P[0] == INF) {
+    fprintf(stream, "AMBIANT, %u, 0, 0, 0, %g\n",
+      id, elapsed);
+  } else {
+    fprintf(stream, "%s, %u, %g, %g, %g, %g\n",
+      str_cget(get_description_name(descs + id)), id, SPLIT3(pos), elapsed);
+  }
+
+end:
+  return res;
+error:
+  goto end;
+}
+
+static res_T
 dump_sample
   (struct sdis_green_path* path,
    void* ctx)
@@ -397,7 +473,8 @@ dump_sample
   ERR(sdis_green_path_get_limit_point(path, &pt));
 
   /* For each path, dump:
-   * # end_id #power_terms #flux_terms power_id_1  ... power_id_n flux_id_1 ... flux_id_n
+   * # end_id #power_terms #flux_terms
+   *    power_id_1  ... power_id_n flux_id_1 ... flux_id_n
    *    power_factor_1  ... power_factor_n flux_factor_1 ... flux_factor_n
    */
 
@@ -420,7 +497,7 @@ dump_sample
     t0 = medium_get_t0(pt.data.mdmvert.medium);
     header.at_initial = (pt.data.mdmvert.vertex.time <= t0);
     if(pt.data.mdmvert.vertex.P[0] == INF) {
-      /* Radiative output (ambient temperature)*/
+      /* Radiative output (ambient temperature) */
       sz = darray_descriptions_size_get(w_ctx->desc);
       ASSERT(sz <= UINT_MAX);
       header.id = (unsigned)sz; /* Ambient ID */
@@ -490,7 +567,6 @@ dump_sample
 
   FW(ids, sz);
   FW(weights, sz);
-
 
 end:
   MEM_RM(w_ctx->alloc, ids);
@@ -586,6 +662,29 @@ end:
   MEM_RM(stardis->allocator, name_pool);
   if(table_initialized) htable_weigth_release(&w_ctx.pw);
   if(table_initialized) htable_weigth_release(&w_ctx.flux);
+  return res;
+error:
+  goto end;
+}
+
+res_T
+dump_paths_end
+  (struct sdis_green_function* green,
+   const struct stardis* stardis,
+   FILE* stream)
+{
+  res_T res = RES_OK;
+  struct e_ctx e_ctx = { 0 };
+
+  ASSERT(green && stardis && stream);
+
+  e_ctx.desc = &stardis->descriptions;
+  e_ctx.stream = stream;
+
+  fprintf(stream, "\"End\", \"End ID\", \"X\", \"Y\", \"Z\", \"Elapsed time\"\n");
+  ERR(sdis_green_function_for_each_path(green, dump_sample_end, &e_ctx));
+
+end:
   return res;
 error:
   goto end;

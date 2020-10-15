@@ -224,6 +224,7 @@ stardis_init
   str_init(stardis->allocator, &stardis->solve_name);
   str_init(stardis->allocator, &stardis->paths_filename);
   str_init(stardis->allocator, &stardis->bin_green_filename);
+  str_init(stardis->allocator, &stardis->end_paths_filename);
   str_init(stardis->allocator, &stardis->chunks_prefix);
   darray_size_t_init(stardis->allocator, &stardis->compute_surface.primitives);
   darray_sides_init(stardis->allocator, &stardis->compute_surface.sides);
@@ -352,6 +353,9 @@ stardis_init
     if(args->bin_green_filename) {
       ERR(str_set(&stardis->bin_green_filename, args->bin_green_filename));
     }
+    if(args->end_paths_filename) {
+      ERR(str_set(&stardis->end_paths_filename, args->end_paths_filename));
+    }
   }
 
   /* If computation is on a volume, check medium is known */
@@ -405,6 +409,7 @@ stardis_release
   str_release(&stardis->solve_name);
   str_release(&stardis->paths_filename);
   str_release(&stardis->bin_green_filename);
+  str_release(&stardis->end_paths_filename);
   str_release(&stardis->chunks_prefix);
   darray_descriptions_release(&stardis->descriptions);
   release_geometry(&stardis->geometry);

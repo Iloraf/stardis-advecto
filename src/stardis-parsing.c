@@ -490,8 +490,8 @@ short_help
   fprintf(stream, "\n  -g\n");
   fprintf(stream, "     Change the computation to produce the green function.\n");
 
-  fprintf(stream, "\n  -G BIN_FILE_NAME\n");
-  fprintf(stream, "     Change the computation to produce the green function.\n");
+  fprintf(stream, "\n  -G BIN_FILE_NAME[,CSV_FILE_NAME]\n");
+  fprintf(stream, "     Change the computation to produce the green function and possibly end of paths information.\n");
 
   fprintf(stream, "\n  -h\n");
   fprintf(stream, "     Print this help and exit.\n");
@@ -662,7 +662,10 @@ parse_args
       args->mode |= MODE_GREEN;
       break;
 
-    case 'G':
+    case 'G': {
+      char* ptr = strrchr(optarg, ',');
+      if(ptr && ptr != strchr(optarg, ','))
+        res = RES_BAD_ARG; /* Expecting 1 or 0 ',' */
       if(args->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
         res = RES_BAD_ARG;
         if(args->mode & MODE_BIN_GREEN)
@@ -676,8 +679,13 @@ parse_args
         goto error;
       }
       args->mode |= MODE_BIN_GREEN;
+      if(ptr) {
+        args->end_paths_filename = ptr + 1;
+        *ptr = '\0';
+      }
       args->bin_green_filename = optarg;
       break;
+    }
 
     case 'h':
       if(args->mode & USE_STDOUT_MODES) {

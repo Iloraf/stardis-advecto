@@ -101,6 +101,7 @@ struct args {
   char* medium_name;
   char* solve_filename;
   char* bin_green_filename;
+  char* end_paths_filename;
   char* paths_filename;
   char* chunks_prefix;
   size_t samples;

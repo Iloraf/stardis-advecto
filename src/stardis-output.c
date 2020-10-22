@@ -355,7 +355,27 @@ error:
 struct path_header {
   unsigned id;
   unsigned pcount, fcount;
+  char at_initial;
 };
+
+static FINLINE double
+medium_get_t0
+  (struct sdis_medium* medium)
+{
+  struct sdis_data* data = NULL;
+  enum sdis_medium_type type;
+  ASSERT(medium);
+  type = sdis_medium_get_type(medium);
+  data = sdis_medium_get_data(medium);
+  if(type == SDIS_FLUID) {
+    const struct fluid* fluid_props = sdis_data_cget(data);
+    return fluid_props->t0;
+  } else {
+    ASSERT(type == SDIS_SOLID);
+    const struct solid* solid_props = sdis_data_cget(data);
+    return solid_props->t0;
+  }
+}
 
 static res_T
 dump_sample_end
@@ -445,6 +465,7 @@ dump_sample
   unsigned* ids = NULL;
   double* weights = NULL;
   size_t sz, i;
+  double t0;
 
   CHK(path && ctx);
 
@@ -467,11 +488,14 @@ dump_sample
     desc_id = d__->desc_id;
     CHK(DESC_IS_T(descs[desc_id].type) || DESC_IS_H(descs[desc_id].type));
     header.id = desc_id;
+    header.at_initial = 0;
     break;
   }
   case SDIS_VERTEX:
     type = sdis_medium_get_type(pt.data.mdmvert.medium);
     data = sdis_medium_get_data(pt.data.mdmvert.medium);
+    t0 = medium_get_t0(pt.data.mdmvert.medium);
+    header.at_initial = (pt.data.mdmvert.vertex.time <= t0);
     if(pt.data.mdmvert.vertex.P[0] == INF) {
       /* Radiative output (ambient temperature) */
       sz = darray_descriptions_size_get(w_ctx->desc);
@@ -579,7 +603,7 @@ dump_green_bin
   szd = (unsigned)sz;
   descs = darray_descriptions_cdata_get(&stardis->descriptions);
 
-  /* Save names that donot fit inplace */
+  /* Save names that do not fit inplace */
   FOR_EACH(i, 0, szd) {
     const struct description* desc = descs + i;
     const struct str* name = get_description_name(desc);
@@ -617,8 +641,12 @@ dump_green_bin
   if(name_pool_sz)
     FW(name_pool, name_pool_sz);
 
+  /* Write radiative temperatures */
   FW(&stardis->ambient_temp, 1);
   FW(&stardis->ref_temp, 1);
+
+  /* Write time range */
+  FW(&stardis->time_range, 2);
 
   w_ctx.alloc = stardis->allocator;
   w_ctx.desc = &stardis->descriptions;
@@ -804,6 +832,9 @@ dump_green_ascii
 
   /* Output counts */
   fprintf(stream, "---BEGIN GREEN---\n");
+  fprintf(stream, "# time range\n");
+  fprintf(stream, "%g %g\n",
+    SPLIT2(stardis->time_range));
   fprintf(stream,
     "# #solids #fluids #t_boundaries #h_boundaries #f_boundaries #ok #failures\n");
   fprintf(stream, "%u %u %u %u %u %u %u\n",
@@ -814,36 +845,50 @@ dump_green_ascii
   /* List Media */
   if(stardis->counts.smed_count) {
     fprintf(stream, "# Solids\n");
-    fprintf(stream, "# ID Name lambda rho cp power Temp\n");
+    fprintf(stream, "# ID Name lambda rho cp power initial_temp imposed_temp\n");
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct solid* sl;
       if(desc->type != DESC_MAT_SOLID) continue;
       sl = &desc->d.solid;
-      if(sl->imposed_temperature >= 0) {
-        fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\t%g\n",
-          i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower,
-          sl->imposed_temperature);
+      fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g",
+        i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower);
+      if(sl->tinit >= 0) {
+        fprintf(stream, "\t%g", sl->tinit);
       } else {
-        fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\tNONE\n",
-          i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower);
+        fprintf(stream, "\tNONE");
+      }
+      if(sl->imposed_temperature >= 0) {
+        fprintf(stream, "\t%g\n", sl->imposed_temperature);
+      } else {
+        fprintf(stream, "\tNONE\n");
       }
     }
   }
   if(stardis->counts.fmed_count) {
     fprintf(stream, "# Fluids\n");
-    fprintf(stream, "# ID Name rho cp Temp\n");
+    fprintf(stream, "# ID Name rho cp initial_temp imposed_temp\n");
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct fluid* fl;
       if(desc->type != DESC_MAT_FLUID) continue;
       fl = &desc->d.fluid;
       if(fl->imposed_temperature >= 0) {
-        fprintf(stream, "%u\t%s\t%g\t%g\t%g\n",
-          i, str_cget(&fl->name), fl->rho, fl->cp, fl->imposed_temperature);
-      } else {
-        fprintf(stream, "%u\t%s\t%g\t%g\tNONE\n",
+        fprintf(stream, "%u\t%s\t%g\t%g",
           i, str_cget(&fl->name), fl->rho, fl->cp);
+      } else {
+        fprintf(stream, "%u\t%s\t%g\t%g",
+          i, str_cget(&fl->name), fl->rho, fl->cp);
+      }
+      if(fl->tinit >= 0) {
+        fprintf(stream, "\t%g", fl->tinit);
+      } else {
+        fprintf(stream, "\tNONE");
+      }
+      if(fl->imposed_temperature >= 0) {
+        fprintf(stream, "\t%g\n", fl->imposed_temperature);
+      } else {
+        fprintf(stream, "\tNONE\n");
       }
     }
   }

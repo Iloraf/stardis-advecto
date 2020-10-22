@@ -51,10 +51,8 @@ fluid_get_temperature
    struct sdis_data* data)
 {
   const struct fluid* fluid_props = sdis_data_cget(data);
-  if(fluid_props->is_green || vtx->time > fluid_props->t0) {
-    /* Always use temp for Green mode, regardless of time */
+  if(vtx->time > fluid_props->t0)
     return fluid_props->imposed_temperature;
-  }
   /* Time is <= 0: use tinit */
   if(fluid_props->tinit >= 0) return fluid_props->tinit;
   /* Must have had tinit defined: error! */

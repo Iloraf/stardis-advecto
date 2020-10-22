@@ -208,21 +208,19 @@ options -g or -G.
   or -s without options -g or -G).
 
 *-g*::
-  Compute the Green function at steady state and write in ASCII to _standard
-  output_.
+  Compute the Green function at the specified time and write it in ASCII to
+  _standard output_.
 +
 This option can only be used in conjunction with one these options: -p, -P,
--m, -s and cannot be used in conjunction with option -D. Any compute time
-range provided through one of these options is silently ignored.
+-m, -s and cannot be used in conjunction with option -D.
 
 *-G* _file_name_[,__file_name__]::
-  Compute the Green function at steady state and write it to an binary file.
-  If a second file name is provided, information on heat paths' ends is also
-  written in this second file in ascii csv format.
+  Compute the Green function at the specified time and write it to a binary
+  file. If a second file name is provided, information on heat paths' ends
+  is also written in this second file in ascii csv format.
 +
 This option can only be used in conjunction with one these options: -p, -P,
--m, -s and cannot be used in conjunction with option -D. Any compute time
-range provided through one of these options is silently ignored.
+-m, -s and cannot be used in conjunction with option -D.
 +
 The resulting file can be further used through the *sgreen*(1) command to apply
 different temperature, flux or volumic power values.

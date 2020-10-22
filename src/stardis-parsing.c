@@ -512,13 +512,16 @@ short_help
   fprintf(stream, "     Set the verbosity level.\n");
 }
 
+/* Workaround for a gcc warning when GET_OPTIONAL_TIME_RANGE used with Rank=0 */
+FINLINE int is_less(size_t a, size_t b) { return a < b; }
+
 /* Get a time range from a coma-separated list of doubles
  * The first Rank values are mandatory, followed by an optional time range
  * that can be a single time */
 #define GET_OPTIONAL_TIME_RANGE(Src, Rank, Dst, Logger, OptionString, Option) \
   res = cstr_to_list_double((Src), ',', (Dst), &len, (Rank)+2); \
   if(res != RES_OK \
-     || (len < (Rank)) \
+     || is_less(len, (Rank)) \
      || (len == (Rank)+1 && (Dst)[(Rank)] < 0) \
      || (len == (Rank)+2  && ((Dst)[0] < 0 || (Dst)[(Rank)] > (Dst)[(Rank)+1])) \
      || len > (Rank)+2) \

@@ -238,6 +238,7 @@ _______
                    <concatenated-names> # char[names-pool-size]
                    ambient-temperature # double
                    reference-temperature # double
+                   time-range # double[2]
                    <samples>
 
 <descriptions> ::= description # struct description
@@ -268,16 +269,19 @@ _______
 
  struct mat_fluid {
    struct str name;
-   unsigned fluid_id;
    double rho;
    double cp;
    double tinit;
    double imposed_temperature;
+   double t0;
+   int is_outside;
+   int is_green;
+   unsigned desc_id;
+   unsigned fluid_id;
  };
 
  struct mat_solid {
    struct str name;
-   unsigned solid_id;
    double lambda;
    double rho;
    double cp;
@@ -285,24 +289,29 @@ _______
    double tinit;
    double imposed_temperature;
    double vpower;
+   double t0;
+   int is_outside;
+   int is_green;
+   unsigned desc_id;
+   unsigned solid_id;
  };
 
  struct t_boundary {
    struct str name;
-   unsigned mat_id;
    double emissivity;
    double specular_fraction;
    double hc;
    double imposed_temperature;
+   unsigned mat_id;
  };
 
  struct h_boundary {
    struct str name;
-   unsigned mat_id;
    double emissivity;
    double specular_fraction;
    double hc;
    double imposed_temperature;
+   unsigned mat_id;
  };
 
  struct solid_fluid_connect {
@@ -310,6 +319,7 @@ _______
    double emissivity;
    double specular_fraction;
    double hc;
+   unsigned connection_id;
  };
 
  enum description_type {
@@ -327,8 +337,8 @@ _______
 
  struct f_boundary {
    struct str name;
-   unsigned mat_id;
    double imposed_flux;
+   unsigned mat_id;
  };
 
  struct description {
@@ -346,6 +356,7 @@ _______
  struct path_header {
    unsigned id;
    unsigned pcount, fcount;
+   char at_initial;
  };
 
 === ASCII GREEN
@@ -355,6 +366,8 @@ Thereafter is the format of ascii Green outputs.
 [verse]
 _______
 <ascii-green>       ::= "---BEGIN GREEN---"
+                        "# time range"
+                        <time-range>
                         "# #solids #fluids #t_boundaries #h_boundaries #f_boundaries \
                         #ok #failures"
                         #solids #fluids #t_boundaries #h_boundaries #f_boundaries \
@@ -386,6 +399,8 @@ _______
                         <samples>
                         "---END GREEN---"
 
+<time-range>        ::= <REAL> <REAL> # in [0, INF) x [first REAL, INF)
+
 <solids>            ::= <solid>
                         <solids> # #solids solid descriptions
 
@@ -410,9 +425,9 @@ _______
 
 <sample>            ::= <end-spec> <power-count> <flux-count> <power-terms> <flux-terms>
 
-<solid>             ::= <green-id> <name> <lambda> <rho> <cp> <power> <imposed-temp>
+<solid>             ::= <green-id> <name> <lambda> <rho> <cp> <power> <initial-temp> <imposed-temp>
 
-<fluid>             ::= <green-id> <name> <rho> <cp> <imposed-temp>
+<fluid>             ::= <green-id> <name> <rho> <cp> <initial-temp> <imposed-temp>
 
 <t-bound>           ::= <green-id> <name> <temperature>
 
@@ -432,6 +447,9 @@ _______
 <cp>                ::= REAL # in ]0, INF)
 
 <power>             ::= REAL # in (-INF , INF)
+
+<initial-temp>      ::= REAL # in [0 , INF)
+                      | "NONE" if not imposed
 
 <imposed-temp>      ::= REAL # in [0 , INF)
                       | "NONE" if not imposed

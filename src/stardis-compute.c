@@ -383,12 +383,12 @@ compute_probe(struct stardis* stardis)
 
   args.nrealisations = stardis->samples;
   d3_set(args.position, stardis->probe);
+  d2_splat(args.time_range, stardis->probe[3]);
   args.fp_to_meter = stardis->scale_factor;
   args.ambient_radiative_temperature = stardis->ambient_temp;
   args.reference_temperature = stardis->ref_temp;
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
-    d2_splat(args.time_range, INF);
     ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
     if(stardis->mode & MODE_BIN_GREEN) {
       ASSERT(!str_is_empty(&stardis->bin_green_filename));
@@ -415,7 +415,6 @@ compute_probe(struct stardis* stardis)
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
-    d2_set(args.time_range, stardis->time_range);
     args.register_paths = stardis->dump_paths;
     ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -455,12 +454,12 @@ compute_probe_on_interface(struct stardis* stardis)
   args.iprim = iprim;
   d3_set(args.uv, uv);
   args.side = SDIS_FRONT;
+  d2_splat(args.time_range, stardis->probe[3]);
   args.fp_to_meter = stardis->scale_factor;
   args.ambient_radiative_temperature = stardis->ambient_temp;
   args.reference_temperature = stardis->ref_temp;
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
-    d2_splat(args.time_range, INF);
     ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
       &green));
     if(stardis->mode & MODE_BIN_GREEN) {
@@ -488,7 +487,6 @@ compute_probe_on_interface(struct stardis* stardis)
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
-    d2_set(args.time_range, stardis->time_range);
     args.register_paths = stardis->dump_paths;
     ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -682,12 +680,12 @@ compute_medium(struct stardis* stardis)
 
   args.nrealisations = stardis->samples;
   args.medium = medium;
+  d2_splat(args.time_range, stardis->probe[3]);
   args.fp_to_meter = stardis->scale_factor;
   args.ambient_radiative_temperature = stardis->ambient_temp;
   args.reference_temperature = stardis->ref_temp;
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
-    d2_splat(args.time_range, INF);
     ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
     if(stardis->mode & MODE_BIN_GREEN) {
       ASSERT(!str_is_empty(&stardis->bin_green_filename));
@@ -714,7 +712,6 @@ compute_medium(struct stardis* stardis)
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
-    d2_set(args.time_range, stardis->time_range);
     args.register_paths = stardis->dump_paths;
     ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -799,12 +796,12 @@ compute_boundary(struct stardis* stardis)
   args.sides = darray_sides_cdata_get(&stardis->compute_surface.sides);
   args.nprimitives
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
+  d2_splat(args.time_range, stardis->probe[3]);
   args.fp_to_meter = stardis->scale_factor;
   args.ambient_radiative_temperature = stardis->ambient_temp;
   args.reference_temperature = stardis->ref_temp;
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
-    d2_splat(args.time_range, INF);
     ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
     if(stardis->mode & MODE_BIN_GREEN) {
       ASSERT(!str_is_empty(&stardis->bin_green_filename));
@@ -831,7 +828,6 @@ compute_boundary(struct stardis* stardis)
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
-    d2_set(args.time_range, stardis->time_range);
     args.register_paths = stardis->dump_paths;
     ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
     ERR(print_single_MC_result(estimator, stardis, stdout));

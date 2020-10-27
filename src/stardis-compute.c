@@ -383,7 +383,7 @@ compute_probe(struct stardis* stardis)
 
   args.nrealisations = stardis->samples;
   d3_set(args.position, stardis->probe);
-  d2_splat(args.time_range, stardis->probe[3]);
+  d2_set(args.time_range, stardis->time_range);
   args.fp_to_meter = stardis->scale_factor;
   args.ambient_radiative_temperature = stardis->ambient_temp;
   args.reference_temperature = stardis->ref_temp;
@@ -454,7 +454,7 @@ compute_probe_on_interface(struct stardis* stardis)
   args.iprim = iprim;
   d3_set(args.uv, uv);
   args.side = SDIS_FRONT;
-  d2_splat(args.time_range, stardis->probe[3]);
+  d2_set(args.time_range, stardis->time_range);
   args.fp_to_meter = stardis->scale_factor;
   args.ambient_radiative_temperature = stardis->ambient_temp;
   args.reference_temperature = stardis->ref_temp;
@@ -680,7 +680,7 @@ compute_medium(struct stardis* stardis)
 
   args.nrealisations = stardis->samples;
   args.medium = medium;
-  d2_splat(args.time_range, stardis->probe[3]);
+  d2_set(args.time_range, stardis->time_range);
   args.fp_to_meter = stardis->scale_factor;
   args.ambient_radiative_temperature = stardis->ambient_temp;
   args.reference_temperature = stardis->ref_temp;
@@ -796,7 +796,7 @@ compute_boundary(struct stardis* stardis)
   args.sides = darray_sides_cdata_get(&stardis->compute_surface.sides);
   args.nprimitives
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
-  d2_splat(args.time_range, stardis->probe[3]);
+  d2_set(args.time_range, stardis->time_range);
   args.fp_to_meter = stardis->scale_factor;
   args.ambient_radiative_temperature = stardis->ambient_temp;
   args.reference_temperature = stardis->ref_temp;

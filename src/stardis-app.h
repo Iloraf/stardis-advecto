@@ -277,7 +277,7 @@ str_print_t_boundary
 {
   res_T res = RES_OK;
   ASSERT(str && b && DESC_IS_T(type));
-  STR_APPEND_PRINTF(str, "T boundary for %s' %s': T=%g ",
+  STR_APPEND_PRINTF(str, "T boundary for %s '%s': T=%g ",
     (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
     str_cget(&b->name), b->imposed_temperature);
 

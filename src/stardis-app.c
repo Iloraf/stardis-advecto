@@ -151,14 +151,14 @@ check_delta_and_create_solid
         ratio = delta_range[1] / delta_range[0];
         if(ratio > acceptance_ratio)
           logger_print(stardis->logger, LOG_WARNING,
-            "Solid %s is used in %u different enclosures that have different "
+            "Solid '%s' is used in %u different enclosures that have different "
             "delta requirements.\n",
             str_cget(&description->d.solid.name), ecount);
         /* Delta needs to be substituted with actual value */
         if(description->d.solid.delta == DELTA_AUTO) {
           description->d.solid.delta = delta_range[0];
           logger_print(stardis->logger, LOG_OUTPUT,
-            "Auto delta for solid %s set to %g\n",
+            "Auto delta for solid '%s' set to %g\n",
             str_cget(&description->d.solid.name), description->d.solid.delta);
         } else {
           int too_small
@@ -168,7 +168,7 @@ check_delta_and_create_solid
           /* Check if user delta is OK */
           if(too_small || too_big) {
             logger_print(stardis->logger, LOG_WARNING,
-              "User delta for solid %s seems too %s: %g; "
+              "User delta for solid '%s' seems too %s: %g; "
               "auto delta would have set it to %g.\n",
               str_cget(&description->d.solid.name), (too_big ? "big" : "small"),
               description->d.solid.delta, delta_range[0]);

@@ -1541,6 +1541,15 @@ process_solid
   }
   ERR(read_imposed_temperature(stardis, &desc->d.solid.imposed_temperature,
     tok_ctx));
+  if(desc->d.solid.imposed_temperature >= 0
+    && desc->d.solid.imposed_temperature != desc->d.solid.tinit)
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Imposed temperature, if defined, must match initial temperature "
+      "(initial: %g; imposed: %g)\n",
+      desc->d.solid.tinit, desc->d.solid.imposed_temperature); res = RES_BAD_ARG;
+    goto end;
+  }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "volumic power");
   res = cstr_to_double(tk, &desc->d.solid.vpower);
   if(res != RES_OK) {
@@ -1629,6 +1638,15 @@ process_fluid
 
   ERR(read_imposed_temperature(stardis, &desc->d.fluid.imposed_temperature,
     tok_ctx));
+  if(desc->d.fluid.imposed_temperature >= 0
+    && desc->d.fluid.imposed_temperature != desc->d.fluid.tinit)
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Imposed temperature, if defined, must match initial temperature "
+      "(initial: %g; imposed: %g)\n",
+      desc->d.fluid.tinit, desc->d.fluid.imposed_temperature); res = RES_BAD_ARG;
+    goto end;
+  }
 
   ERR(create_solver_fluid(stardis, &desc->d.fluid));
 

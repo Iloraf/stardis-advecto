@@ -55,6 +55,14 @@ the same applies to *stardis(1)* outputs as described in *stardis-output(5)*.
 However, the geometry provided to *stardis*(1) can be described in any unit,
 multiple of meters or not, as long as  the scaling factor is provided.
 
+TINIT VS TIMPOSED
+-----------------
+Media's descriptions, either solids or fluids, include two possible
+temperatures: initial and imposed. If imposed temperature is set (that is not
+"UNKNOWN"), initial temperature must be defined at the same value. As a
+consequence, one cannot define a medium with an imposed temperature that
+changes at t=0.
+
 GRAMMAR
 -------
 In what follows, some lines end in *\*. This is used as a convenience to

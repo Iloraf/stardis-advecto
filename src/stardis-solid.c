@@ -82,20 +82,22 @@ solid_get_temperature
    struct sdis_data* data)
 {
   const struct solid* solid_props = sdis_data_cget(data);
-  if(vtx->time > solid_props->t0)
+  if(solid_props->imposed_temperature >= 0)
+    /* If there is an imposed temp, it is imposed regardless of time */
     return solid_props->imposed_temperature;
-  /* Time is <= 0: use tinit */
-  if(solid_props->tinit >= 0) return solid_props->tinit;
-  /* Must have had t_init defined: error! */
-  if(str_is_empty(&solid_props->name)) {
-    FATAL("solid_get_temperature: getting undefined Tinit\n");
-  } else {
-    fprintf(stderr,
-      "solid_get_temperature: getting undefined Tinit (solid '%s')\n",
-      str_cget(&solid_props->name));
-    ASSERT(0);
-    abort();
+  if(vtx->time <= solid_props->t0) {
+    /* If time is <= t0: use tinit */
+    if(solid_props->tinit < 0) {
+      if(str_is_empty(&solid_props->name)) {
+        FATAL("solid_get_temperature: getting undefined Tinit\n");
+      } else {
+        VFATAL("solid_get_temperature: getting undefined Tinit (solid '%s')\n",
+          ARG1(str_cget(&solid_props->name)));
+      }
+    }
+    return solid_props->tinit;
   }
+  return -1; /* Unknown temperature */
 }
 
 static double

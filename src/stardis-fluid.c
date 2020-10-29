@@ -51,20 +51,22 @@ fluid_get_temperature
    struct sdis_data* data)
 {
   const struct fluid* fluid_props = sdis_data_cget(data);
-  if(vtx->time > fluid_props->t0)
+  if(fluid_props->imposed_temperature >= 0)
+    /* If there is an imposed temp, it is imposed regardless of time */
     return fluid_props->imposed_temperature;
-  /* Time is <= 0: use tinit */
-  if(fluid_props->tinit >= 0) return fluid_props->tinit;
-  /* Must have had tinit defined: error! */
-  if(str_is_empty(&fluid_props->name)) {
-    FATAL("fluid_get_temperature: getting undefined Tinit\n");
-  } else {
-    fprintf(stderr,
-      "fluid_get_temperature: getting undefined Tinit (fluid '%s')\n",
-      str_cget(&fluid_props->name));
-    ASSERT(0);
-    abort();
+  if(vtx->time <= fluid_props->t0) {
+    /* If time is <= t0: use tinit */
+    if(fluid_props->tinit < 0) {
+      if(str_is_empty(&fluid_props->name)) {
+        FATAL("fluid_get_temperature: getting undefined Tinit\n");
+      } else {
+        VFATAL("fluid_get_temperature: getting undefined Tinit (fluid '%s')\n",
+          ARG1(str_cget(&fluid_props->name)));
+      }
+    }
+    return fluid_props->tinit;
   }
+  return -1; /* Unknown temperature */
 }
 
 /*******************************************************************************

@@ -384,9 +384,6 @@ compute_probe(struct stardis* stardis)
   args.nrealisations = stardis->samples;
   d3_set(args.position, stardis->probe);
   d2_set(args.time_range, stardis->time_range);
-  args.fp_to_meter = stardis->scale_factor;
-  args.ambient_radiative_temperature = stardis->ambient_temp;
-  args.reference_temperature = stardis->ref_temp;
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
@@ -455,9 +452,6 @@ compute_probe_on_interface(struct stardis* stardis)
   d3_set(args.uv, uv);
   args.side = SDIS_FRONT;
   d2_set(args.time_range, stardis->time_range);
-  args.fp_to_meter = stardis->scale_factor;
-  args.ambient_radiative_temperature = stardis->ambient_temp;
-  args.reference_temperature = stardis->ref_temp;
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
@@ -621,9 +615,6 @@ compute_camera(struct stardis* stardis)
 
   args.cam = cam;
   d2_set(args.time_range, stardis->camera.time_range);
-  args.fp_to_meter = stardis->scale_factor;
-  args.ambient_radiative_temperature = stardis->ambient_temp;
-  args.reference_temperature = stardis->ref_temp;
   args.image_resolution[0] = width;
   args.image_resolution[1] = height;
   args.spp = (size_t)stardis->camera.spp;
@@ -681,9 +672,6 @@ compute_medium(struct stardis* stardis)
   args.nrealisations = stardis->samples;
   args.medium = medium;
   d2_set(args.time_range, stardis->time_range);
-  args.fp_to_meter = stardis->scale_factor;
-  args.ambient_radiative_temperature = stardis->ambient_temp;
-  args.reference_temperature = stardis->ref_temp;
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
@@ -797,9 +785,6 @@ compute_boundary(struct stardis* stardis)
   args.nprimitives
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
   d2_set(args.time_range, stardis->time_range);
-  args.fp_to_meter = stardis->scale_factor;
-  args.ambient_radiative_temperature = stardis->ambient_temp;
-  args.reference_temperature = stardis->ref_temp;
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
@@ -864,9 +849,6 @@ compute_flux_boundary(struct stardis* stardis)
   args.nprimitives
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
   d2_set(args.time_range, stardis->time_range);
-  args.fp_to_meter = stardis->scale_factor;
-  args.ambient_radiative_temperature = stardis->ambient_temp;
-  args.reference_temperature = stardis->ref_temp;
 
   ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
   ERR(print_single_MC_result(estimator, stardis, stdout));
@@ -914,9 +896,6 @@ compute_map(struct stardis* stardis)
     args.nprimitives
       = darray_size_t_size_get(&stardis->compute_surface.primitives);
     d2_set(args.time_range, stardis->time_range);
-    args.fp_to_meter = stardis->scale_factor;
-    args.ambient_radiative_temperature = stardis->ambient_temp;
-    args.reference_temperature = stardis->ref_temp;
     args.register_paths = stardis->dump_paths;
 
     ERR(sdis_solve_boundary(stardis->sdis_scn, &args,

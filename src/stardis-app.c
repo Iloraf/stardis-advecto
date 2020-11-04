@@ -378,6 +378,7 @@ stardis_init
       sg3d_sdisXd_geometry_get_indices,
       sg3d_sdisXd_geometry_get_interface,
       vcount, sg3d_sdisXd_geometry_get_position,
+      stardis->scale_factor, stardis->ambient_temp, stardis->ref_temp,
       &create_context, &stardis->sdis_scn);
     if(res != RES_OK) {
       logger_print(stardis->logger, LOG_ERROR,

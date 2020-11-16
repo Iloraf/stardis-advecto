@@ -369,17 +369,22 @@ stardis_init
   }
 
   if(is_for_compute) {
+    struct sdis_scene_create_args scn_args = SDIS_SCENE_CREATE_ARGS_DEFAULT;
     ASSERT(darray_interface_ptrs_size_get(&stardis->geometry.interf_bytrg)
       == tcount);
     /* Can release enclosures as they are no longer needed if compute */
     SENC3D(scene_ref_put(stardis->senc3d_scn));
     stardis->senc3d_scn = NULL;
-    res = sdis_scene_create(stardis->dev, tcount,
-      sg3d_sdisXd_geometry_get_indices,
-      sg3d_sdisXd_geometry_get_interface,
-      vcount, sg3d_sdisXd_geometry_get_position,
-      stardis->scale_factor, stardis->ambient_temp, stardis->ref_temp,
-      &create_context, &stardis->sdis_scn);
+    scn_args.get_indices = sg3d_sdisXd_geometry_get_indices;
+    scn_args.get_interface = sg3d_sdisXd_geometry_get_interface;
+    scn_args.get_position = sg3d_sdisXd_geometry_get_position;
+    scn_args.nprimitives = tcount;
+    scn_args.nvertices = vcount;
+    scn_args.fp_to_meter = stardis->scale_factor;
+    scn_args.trad = stardis->ambient_temp;
+    scn_args.tref = stardis->ref_temp;
+    scn_args.context = &create_context;
+    res = sdis_scene_create(stardis->dev, &scn_args, &stardis->sdis_scn);
     if(res != RES_OK) {
       logger_print(stardis->logger, LOG_ERROR,
         "Cannot create the stardis solver scene.\n");
@@ -595,7 +600,7 @@ validate_properties
     /* Undef interface between solids is OK */
     CHK(solid_count == 2);
   }
-  
+
 end:
   return res;
 }

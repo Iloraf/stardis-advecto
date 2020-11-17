@@ -143,7 +143,7 @@ if(_html)
   endforeach()
   add_custom_target(man-html ALL DEPENDS ${MAN_FILES})
 
-  install(FILES ${MAN1_FILES} DESTINATION share/man/man1)
-  install(FILES ${MAN5_FILES} DESTINATION share/man/man5)
+  install(FILES ${MAN1_FILES} DESTINATION share/doc/stardis/html)
+  install(FILES ${MAN5_FILES} DESTINATION share/doc/stardis/html)
 endif()
 

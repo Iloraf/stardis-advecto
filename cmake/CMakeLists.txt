@@ -19,7 +19,7 @@ project(stardis C)
 set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 
 if(CMAKE_HOST_UNIX)
-  set(STARDIS_DOC "TROFF & HTML" CACHE STRING
+  set(STARDIS_DOC "TROFF" CACHE STRING
     "Type of documentation to generate and install.")
 else()
   set(STARDIS_DOC "HTML" CACHE STRING

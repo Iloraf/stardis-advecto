@@ -779,9 +779,42 @@ _______
 == INFRARED IMAGE
 
 When invoked with option *-R*, *stardis*(1) generates an infrared image of
-the system and write it to _standard output_ in VTK [1] file format. The image
-is on an XY plane with coordinates in the [0 pixel_count[ range. By convention,
-the origine (0,0) pixel is at the top-left corner of the image.
+the system and write it to _standard output_. Depending on the *fmt*
+sub-option, this file can be either in VTK [1] format on in *htrdr-image*(5)
+format.
+
+=== HTRDR-IMAGE INFRARED IMAGE
+If the output image is in htrdr-image format, it comply with the *lw* section
+of the format, with only the temperature fields being informed. The resulting
+format is as follows:
+
+[verse]
+_______
+<htrdr-image>    ::= <definition>
+                     <pixel>
+                   [ <pixel> ... ]
+
+<definition>     ::= <width> <height>
+<width>          ::= INTEGER
+<height>         ::= INTEGER
+
+<pixel>          ::= <temperature> 0 0 0 0 <time>
+
+<temperature>    ::= <estimate>
+<time>           ::= <estimate>
+
+<estimate>       ::= <expected-value> <standard-error>
+<expected-value> ::= REAL
+<standard-error> ::= REAL
+_______
+
+These files can be post-processed using the *htpp*(1) tool, that is part of
+the high-tune project.
+
+=== VTK INFRARED IMAGE
+If the output image is in VTK format, it is on an XY plane with coordinates in
+the [0 pixel_count[ range. By convention, the origine (0,0) pixel is at the
+top-left corner of the image.
 
 The result not only includes the computed temperature image, but also includes
 a per-pixel computation time image as well as a per-pixel path error count

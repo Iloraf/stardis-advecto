@@ -137,10 +137,14 @@ EXCLUSIVE OPTIONS
 
 *-R* [__sub-option__:...]::
   Render an infrared image of the system through a pinhole camera and write it
-  to _standard output_ in VTK format. One can use all-default sub-options by
+  to _standard output_. One can use all-default sub-options by
   simply providing the colon character (*:*) alone as an argument. Please note
   that the camera position must be outside the geometry or in a fluid.
   Available sub-options are:
+
+  **fmt=**_image_file_format_;;
+    Format of the image file in output. Can be *VTK* or *HT*. Default
+    _image_file_format_ is @STARDIS_ARGS_DEFAULT_RENDERING_OUTPUT_FILE_FMT@.
 
   **fov=**_angle_;;
     Horizontal field of view of the camera in [30, 120] degrees. By default
@@ -177,8 +181,8 @@ EXCLUSIVE OPTIONS
 OTHER OPTIONS
 -------------
 *-a* _ambient_::
-  Set the ambient radiative temperature for the whole system. By default
-  *ambient* is @STARDIS_ARGS_DEFAULT_AMBIENT_TEMP@.
+  Set the ambient radiative temperature for the whole system, in Kelvin. By
+  default *ambient* is @STARDIS_ARGS_DEFAULT_AMBIENT_TEMP@.
 
 *-d*::
   Write the geometry to _standard output_ in VTK format along with various
@@ -234,7 +238,8 @@ different temperature, flux or volumic power values.
 
 *-r* _reference_::
   Set the reference temperature used for the linearization of the radiative
-  transfer. By default *reference* is @STARDIS_ARGS_DEFAULT_REFERENCE_TEMP@.
+  transfer, in Kelvin. By default *reference*
+  is @STARDIS_ARGS_DEFAULT_REFERENCE_TEMP@.
 
 *-t* _threads-count_::
   Hint on the number of threads to use. By default use as many threads as CPU
@@ -283,12 +288,15 @@ Render the system as described in *scene.txt* with default settings:
 
     $ stardis -M scene.txt -R :
 
-Render the system as described in *scene.txt* at *t=10000*, *spp=2*,
-*img=800x600* and all other settings set to their default values. It the
+Render the system as described in *scn.txt* at *t=100*, *spp=2*,
+*img=800x600*, with output format *fmt=ht* and all other settings set to their
+default values. The output is redirected to the *img.ht* file. If the
 computation encounters erroneous heat paths, they will be dumped to VTK files
-named error_path_00000000.vtk, error_path_00000001.vtk, ...
+named err_path_00000000.vtk, err_path_00000001.vtk, etc. The image file is then
+post-processed using *htpp*(1) with default settings to obtain a png file.
 
-    $ stardis -M scene.txt -R t=10000:spp=2:img=800x600 -D error,error_path_
+    $ stardis -M scn.txt -R t=100:spp=2:img=800x600:fmt=ht -D error,err_path_ > img.ht
+    $ htpp -o img.pgn -v -m default img.ht
 
 Compute the Green fonction that computes the temperature at the probe point
 *0, 0, 0* at steady state. The system is read from the file *model.txt* and
@@ -296,7 +304,7 @@ the Green function is written to the *probe.green file* and the heat paths'
 ends are written to the *probe_ends.csv* file:
 
     $ stardis -M model.txt -p 0,0,0 -G probe.green,probe_ends.csv
-	
+
 COPYRIGHT
 ---------
 Copyright &copy; 2018-2020 |Meso|Star>. License GPLv3+: GNU GPL
@@ -308,4 +316,5 @@ SEE ALSO
 --------
 *stardis-input*(5),
 *stardis-output*(5),
-*sgreen*(1)
+*sgreen*(1),
+*htpp*(1)

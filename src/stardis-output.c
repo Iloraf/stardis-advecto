@@ -256,7 +256,7 @@ error:
 }
 
 res_T
-dump_image
+dump_vtk_image
   (const struct sdis_estimator_buffer* buf,
    FILE* stream)
 {
@@ -339,6 +339,38 @@ dump_image
     }
   }
   mem_rm(temps);
+
+end:
+  return res;
+error:
+  goto end;
+}
+
+res_T
+dump_ht_image
+  (const struct sdis_estimator_buffer* buf,
+   FILE* stream)
+{
+  res_T res = RES_OK;
+  size_t definition[2];
+  size_t ix, iy;
+
+  ASSERT(buf && stream);
+  ERR(sdis_estimator_buffer_get_definition(buf, definition));
+
+  fprintf(stream, "%zu %zu\n", definition[0], definition[1]);
+  FOR_EACH(iy, 0, definition[1]) {
+    FOR_EACH(ix, 0, definition[0]) {
+      const struct sdis_estimator* estimator;
+      struct sdis_mc T;
+      struct sdis_mc time;
+      ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
+      ERR(sdis_estimator_get_realisation_time(estimator, &time));
+      ERR(sdis_estimator_get_temperature(estimator, &T));
+      fprintf(stream, "%f %f 0 0 0 0 %f %f\n",
+        T.E, T.SE, time.E, time.SE);
+    }
+  };
 
 end:
   return res;

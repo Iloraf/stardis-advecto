@@ -48,7 +48,12 @@ print_sample
    void* ctx);
 
 extern res_T
-dump_image
+dump_vtk_image
+  (const struct sdis_estimator_buffer* buf,
+   FILE* stream);
+
+extern res_T
+dump_ht_image
   (const struct sdis_estimator_buffer* buf,
    FILE* stream);
 

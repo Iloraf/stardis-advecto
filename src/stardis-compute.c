@@ -624,7 +624,11 @@ compute_camera(struct stardis* stardis)
   ERR(sdis_solve_camera(stardis->sdis_scn, &args, &buf));
 
   /* Write the image */
-  ERR(dump_image(buf, stdout));
+  ASSERT(stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK
+  || stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_HT);
+  if(stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK)
+    ERR(dump_vtk_image(buf, stdout));
+  else ERR(dump_ht_image(buf, stdout));
 
   /* Dump paths recorded according to user settings */
   dump_ctx.stardis = stardis;

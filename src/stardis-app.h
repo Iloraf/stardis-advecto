@@ -611,10 +611,16 @@ description_get_medium_id
   }
 }
 
+enum stardis_output_fmt {
+  STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK,
+  STARDIS_RENDERING_OUTPUT_FILE_FMT_HT
+};
+
 struct camera {
   double pos[3];
   double tgt[3];
   double up[3];
+  enum stardis_output_fmt fmt;
   double fov;
   double time_range[2];
   unsigned spp;
@@ -627,6 +633,7 @@ init_camera(struct camera* cam) {
   d3(cam->pos, STARDIS_DEFAULT_RENDERING_POS);
   d3(cam->tgt, STARDIS_DEFAULT_RENDERING_TGT);
   d3(cam->up, STARDIS_DEFAULT_RENDERING_UP);
+  cam->fmt = STARDIS_DEFAULT_RENDERING_OUTPUT_FILE_FMT;
   cam->fov = STARDIS_DEFAULT_RENDERING_FOV;
   cam->spp = STARDIS_DEFAULT_RENDERING_SPP;
   cam->img_width = STARDIS_DEFAULT_RENDERING_IMG_WIDTH;

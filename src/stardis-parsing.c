@@ -984,6 +984,20 @@ parse_camera
         GET_OPTIONAL_TIME_RANGE(opt[1], 0, cam->time_range, logger, "%s",
           str_cget(&keep));
       }
+      else if(strcmp(opt[0], "FMT") == 0) {
+        _strupr(opt[1]);
+        if(strcmp(opt[1], "VTK") == 0)
+          cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK;
+        else if(strcmp(opt[1], "HT") == 0)
+          cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_HT;
+        else {
+          logger_print(logger, LOG_ERROR,
+            "Unexpected value for rendering option %s: %s.\n",
+            opt[0], opt[1]);
+          res = RES_BAD_ARG;
+          goto error;
+        }
+      }
       else if(strcmp(opt[0], "FOV") == 0) {
         ERR(cstr_to_double(opt[1], &cam->fov));
       }

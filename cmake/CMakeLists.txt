@@ -69,7 +69,7 @@ configure_file(${SDIS_SOURCE_DIR}/stardis-version.h.in
 # Check dependencies
 ###############################################################################
 find_package(RCMake 0.4 REQUIRED)
-find_package(RSys 0.9.1 REQUIRED)
+find_package(RSys 0.11 REQUIRED)
 find_package(StarGeom3D 0.1 REQUIRED)
 find_package(Star3D 0.7.1 REQUIRED)
 find_package(StarEnc3D 0.4.2 REQUIRED)
@@ -148,14 +148,12 @@ add_executable(stardis
 
 if(CMAKE_COMPILER_IS_GNUCC)
   set(MATH_LIB m)
-  set_target_properties(stardis PROPERTIES
-    COMPILE_FLAGS "-std=c99"
-    VERSION ${SDIS_VERSION})
 elseif(MSVC)
   set(GETOPT_LIB MuslGetopt)
-  set_target_properties(stardis PROPERTIES
-    VERSION ${SDIS_VERSION})
 endif()
+
+set_target_properties(stardis
+  PROPERTIES VERSION ${SDIS_VERSION})
 
 target_link_libraries(stardis
   Stardis Star3D StarGeom3D StarEnc3D StarSTL RSys ${GETOPT_LIB} ${MATH_LIB})

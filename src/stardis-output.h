@@ -33,7 +33,7 @@ struct vertex;
 struct darray_estimators;
 
 struct dump_path_context {
-  size_t rank;
+  unsigned long rank;
   struct stardis* stardis;
 };
 

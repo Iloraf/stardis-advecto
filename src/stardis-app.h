@@ -45,15 +45,24 @@ struct sdis_medium;
 /* Utility macros */
 #define ERR(Expr) if((res = (Expr)) != RES_OK) goto error; else (void)0
 
-#define STR_APPEND_PRINTF(accum, fmt, ...) \
+#define STR_APPEND_PRINTF(Accum, Fmt, Args) \
 { \
   struct str tmp; \
-  str_init((accum)->allocator, &tmp); \
-  res = str_printf(&tmp, (fmt), ##__VA_ARGS__);\
-  if(res == RES_OK) res = str_append((accum), str_cget(&tmp)); \
+  str_init((Accum)->allocator, &tmp); \
+  res = str_printf(&tmp, Fmt COMMA_##Args LIST_##Args); \
+  if(res == RES_OK) res = str_append((Accum), str_cget(&tmp)); \
   str_release(&tmp); \
   if(res != RES_OK) goto error; \
 } (void)0
+
+
+#define VFATAL(Fmt, Args)                                                      \
+  {                                                                            \
+    fprintf(stderr, Fmt COMMA_##Args LIST_##Args);                             \
+    ASSERT(0);                                                                 \
+    abort();                                                                   \
+  } (void)0
+
 
 #define DELTA_AUTO INF /* Placeholder until actual value is substituted */
 #define UNKNOWN_MEDIUM_TEMPERATURE -1 /* Unknown for stadis solver is -1 */
@@ -224,8 +233,8 @@ str_print_h_boundary
   STR_APPEND_PRINTF(str,
     "H boundary for %s '%s': emissivity=%g specular_fraction=%g hc=%g T=%g "
     "(using medium %u as external medium)",
-    (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"), str_cget(&b->name),
-    b->emissivity, b->specular_fraction, b->hc, b->imposed_temperature, b->mat_id);
+    ARG7( (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"), str_cget(&b->name),
+      b->emissivity, b->specular_fraction, b->hc, b->imposed_temperature, b->mat_id ) );
 end:
   return res;
 error:
@@ -278,14 +287,15 @@ str_print_t_boundary
   res_T res = RES_OK;
   ASSERT(str && b && DESC_IS_T(type));
   STR_APPEND_PRINTF(str, "T boundary for %s '%s': T=%g ",
-    (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
-    str_cget(&b->name), b->imposed_temperature);
+   ARG3( (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
+    str_cget(&b->name), b->imposed_temperature ) );
 
   if(type == DESC_BOUND_T_FOR_FLUID) {
     STR_APPEND_PRINTF(str, "emissivity=%g, specular_fraction=%g hc=%g ",
-      b->emissivity, b->specular_fraction, b->hc);
+      ARG3( b->emissivity, b->specular_fraction, b->hc ) );
   }
-  STR_APPEND_PRINTF(str, "(using medium %u as external medium)", b->mat_id);
+  STR_APPEND_PRINTF(str, "(using medium %u as external medium)",
+    ARG1( b->mat_id ) );
 end:
   return res;
 error:
@@ -332,7 +342,7 @@ str_print_f_boundary
   ASSERT(str && b);
   STR_APPEND_PRINTF(str,
     "F boundary for SOLID '%s': flux=%g (using medium %u as external medium)",
-    str_cget(&b->name), b->imposed_flux, b->mat_id);
+    ARG3( str_cget(&b->name), b->imposed_flux, b->mat_id ) );
 end:
   return res;
 error:
@@ -378,9 +388,9 @@ str_print_sf_connect
 {
   res_T res = RES_OK;
   ASSERT(str && c);
-  STR_APPEND_PRINTF(str, "Solid-Fluid connection '%s':", str_cget(&c->name));
+  STR_APPEND_PRINTF(str, "Solid-Fluid connection '%s':", ARG1( str_cget(&c->name) ) );
   STR_APPEND_PRINTF(str, " emissivity=%g, specular_fraction=%g hc=%g",
-      c->emissivity, c->specular_fraction, c->hc);
+      ARG3( c->emissivity, c->specular_fraction, c->hc ) );
 end:
   return res;
 error:

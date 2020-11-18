@@ -91,7 +91,7 @@ enum dump_path_type {
   DUMP_NONE = 0,
   DUMP_SUCCESS = BIT(0),
   DUMP_ERROR = BIT(1),
-  DUMP_ALL = DUMP_SUCCESS | DUMP_ERROR,
+  DUMP_ALL = DUMP_SUCCESS | DUMP_ERROR
 };
 
 struct args {

@@ -134,14 +134,14 @@ str_print_fluid(struct str* str, const struct fluid* f)
   res_T res = RES_OK;
   ASSERT(str && f);
   STR_APPEND_PRINTF(str, "Fluid '%s': rho=%g cp=%g",
-    str_cget(&f->name), f->rho, f->cp);
+    ARG3( str_cget(&f->name), f->rho, f->cp ) );
   if(f->tinit >= 0) {
-    STR_APPEND_PRINTF(str, " Tinit=%g", f->tinit);
+    STR_APPEND_PRINTF(str, " Tinit=%g", ARG1( f->tinit ) );
   }
   if(f->imposed_temperature >= 0) {
-    STR_APPEND_PRINTF(str, " Temp=%g", f->imposed_temperature);
+    STR_APPEND_PRINTF(str, " Temp=%g", ARG1( f->imposed_temperature ) );
   }
-  STR_APPEND_PRINTF(str, " (it is medium %u)", f->fluid_id);
+  STR_APPEND_PRINTF(str, " (it is medium %u)", ARG1( f->fluid_id ) );
 end:
   return res;
 error:

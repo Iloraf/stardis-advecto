@@ -110,8 +110,8 @@ exit:
       char dump[4096] = { '\0' };
       MEM_DUMP(&allocator, dump, sizeof(dump));
       fprintf(stderr, "%s\n", dump);
-      fprintf(stderr, "\nMemory leaks: %zu Bytes\n",
-        MEM_ALLOCATED_SIZE(&allocator));
+      fprintf(stderr, "\nMemory leaks: %lu Bytes\n",
+        (unsigned long)MEM_ALLOCATED_SIZE(&allocator));
     }
     mem_shutdown_proxy_allocator(&allocator);
   }

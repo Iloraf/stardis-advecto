@@ -13,6 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#define _POSIX_C_SOURCE 200112L /* snprintf */
 #include "stardis-output.h"
 #include "stardis-compute.h"
 #include "stardis-fluid.h"
@@ -163,7 +164,8 @@ dump_path
   FILE* stream = NULL;
   char* name = NULL;
   enum sdis_heat_path_flag status = SDIS_HEAT_PATH_NONE;
-  size_t i, vcount, name_sz;
+  size_t vcount_, name_sz;
+  unsigned long i, vcount;
 
   ASSERT(path && dump_ctx
     && dump_ctx->stardis
@@ -177,7 +179,7 @@ dump_path
     res = RES_MEM_ERR;
     goto error;
   }
-  snprintf(name, name_sz, "%s%08zu%s.vtk",
+  snprintf(name, name_sz, "%s%08lu%s.vtk",
     str_cget(&dump_ctx->stardis->paths_filename), dump_ctx->rank++,
     (status == SDIS_HEAT_PATH_FAILURE ? "_err" : ""));
 
@@ -192,17 +194,19 @@ dump_path
   fprintf(stream, "ASCII\n");
   fprintf(stream, "DATASET POLYDATA\n");
   /* Write path positions */
-  sdis_heat_path_get_vertices_count(path, &vcount);
-  fprintf(stream, "POINTS %zu double\n", vcount);
+  sdis_heat_path_get_vertices_count(path, &vcount_);
+  ASSERT(vcount_ < ULONG_MAX);
+  vcount = (unsigned long)vcount_;
+  fprintf(stream, "POINTS %lu double\n", vcount);
   FOR_EACH(i, 0, vcount) {
     struct sdis_heat_vertex vtx;
     ERR(sdis_heat_path_get_vertex(path, i, &vtx));
     fprintf(stream, "%g %g %g\n", SPLIT3(vtx.P));
   }
   /* Write the segment of the path */
-  fprintf(stream, "LINES %d %zu\n", 1, 1 + vcount);
-  fprintf(stream, "%zu", vcount);
-  FOR_EACH(i, 0, vcount) fprintf(stream, " %zu", i);
+  fprintf(stream, "LINES %d %lu\n", 1, 1 + vcount);
+  fprintf(stream, "%lu", vcount);
+  FOR_EACH(i, 0, vcount) fprintf(stream, " %lu", i);
   fprintf(stream, "\n");
 
   /* Write path type */
@@ -215,7 +219,7 @@ dump_path
   default: FATAL("Unreachable code.\n"); break;
   }
 
-  fprintf(stream, "POINT_DATA %zu\n", vcount);
+  fprintf(stream, "POINT_DATA %lu\n", vcount);
   /* Write the type of the random walk vertices */
   fprintf(stream, "SCALARS Vertex_Type unsigned_char 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
@@ -261,12 +265,16 @@ dump_vtk_image
    FILE* stream)
 {
   res_T res = RES_OK;
-  size_t definition[2];
+  size_t def[2];
+  unsigned long definition[2];
   double* temps = NULL;
   size_t ix, iy;
 
   ASSERT(buf && stream);
-  ERR(sdis_estimator_buffer_get_definition(buf, definition));
+  ERR(sdis_estimator_buffer_get_definition(buf, def));
+  ASSERT(def[0] != 0 && def[1] != 0 && def[0] * def[1] <= ULONG_MAX);
+  definition[0] = (unsigned long)def[0];
+  definition[1] = (unsigned long)def[1];
 
   temps = mem_alloc(definition[0] * definition[1] * sizeof(double));
   if(temps == NULL) {
@@ -279,10 +287,10 @@ dump_vtk_image
   fprintf(stream, "Infrared Image\n");
   fprintf(stream, "ASCII\n");
   fprintf(stream, "DATASET STRUCTURED_POINTS\n");
-  fprintf(stream, "DIMENSIONS %zu %zu 1\n", definition[0], definition[1]);
+  fprintf(stream, "DIMENSIONS %lu %lu 1\n", definition[0], definition[1]);
   fprintf(stream, "ORIGIN 0 0 0\n");
   fprintf(stream, "SPACING 1 1 1\n");
-  fprintf(stream, "POINT_DATA %zu\n", definition[0] * definition[1]);
+  fprintf(stream, "POINT_DATA %lu\n", definition[0] * definition[1]);
   fprintf(stream, "SCALARS temperature_estimate float 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(iy, 0, definition[1]) {
@@ -335,7 +343,8 @@ dump_vtk_image
       size_t nfails;
       ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
       ERR(sdis_estimator_get_failure_count(estimator, &nfails));
-      fprintf(stream, "%zu\n", nfails);
+      ASSERT(nfails <= ULONG_MAX);
+      fprintf(stream, "%lu\n", (unsigned long)nfails);
     }
   }
   mem_rm(temps);
@@ -352,13 +361,17 @@ dump_ht_image
    FILE* stream)
 {
   res_T res = RES_OK;
-  size_t definition[2];
+  size_t def[2];
+  unsigned long definition[2];
   size_t ix, iy;
 
   ASSERT(buf && stream);
-  ERR(sdis_estimator_buffer_get_definition(buf, definition));
+  ERR(sdis_estimator_buffer_get_definition(buf, def));
+  ASSERT(def[0] <= ULONG_MAX && def[1] <= ULONG_MAX);
+  definition[0] = (unsigned long)def[0];
+  definition[1] = (unsigned long)def[1];
 
-  fprintf(stream, "%zu %zu\n", definition[0], definition[1]);
+  fprintf(stream, "%lu %lu\n", definition[0], definition[1]);
   FOR_EACH(iy, 0, definition[1]) {
     FOR_EACH(ix, 0, definition[0]) {
       const struct sdis_estimator* estimator;
@@ -403,8 +416,8 @@ medium_get_t0
     const struct fluid* fluid_props = sdis_data_cget(data);
     return fluid_props->t0;
   } else {
-    ASSERT(type == SDIS_SOLID);
     const struct solid* solid_props = sdis_data_cget(data);
+    ASSERT(type == SDIS_SOLID);
     return solid_props->t0;
   }
 }
@@ -808,7 +821,9 @@ print_sample
   ERR(sdis_green_path_for_each_flux_term(path, merge_flux_terms, w_ctx));
   fcount = htable_weigth_size_get(&w_ctx->flux);
 
-  fprintf(w_ctx->stream, "\t%zu\t%zu", pcount, fcount);
+  ASSERT(pcount <= ULONG_MAX && fcount <= ULONG_MAX);
+  fprintf(w_ctx->stream, "\t%lu\t%lu",
+    (unsigned long)pcount, (unsigned long)fcount);
 
   htable_weigth_begin(&w_ctx->pw, &it);
   htable_weigth_end(&w_ctx->pw, &end);
@@ -1290,16 +1305,20 @@ print_single_MC_result
 {
   res_T res = RES_OK;
   struct sdis_mc result;
-  size_t nfailures;
+  size_t nfailures_;
+  unsigned long nfailures, nsamples;
 
   ASSERT(estimator && stardis && stream);
 
   /* Fetch the estimation data */
   ERR(sdis_estimator_get_temperature(estimator, &result));
-  ERR(sdis_estimator_get_failure_count(estimator, &nfailures));
-  if(nfailures == stardis->samples) {
+  ERR(sdis_estimator_get_failure_count(estimator, &nfailures_));
+  ASSERT(nfailures_ <= ULONG_MAX && stardis->samples <= ULONG_MAX);
+  nfailures = (unsigned long)nfailures_;
+  nsamples = (unsigned long)stardis->samples;
+  if(nfailures == nsamples) {
     logger_print(stardis->logger, LOG_ERROR,
-      "All the %zu samples failed. No result to display.\n", nfailures);
+      "All the %lu samples failed. No result to display.\n", nsamples);
     res = RES_BAD_OP;
     goto error;
   }
@@ -1319,8 +1338,8 @@ print_single_MC_result
           result.E, /* Expected value */
           result.SE); /* Standard error */
     }
-    else fprintf(stream, "%g %g %zu %zu\n",
-      result.E, result.SE, nfailures, stardis->samples);
+    else fprintf(stream, "%g %g %lu %lu\n",
+      result.E, result.SE, nfailures, nsamples);
     break;
   case MODE_PROBE_COMPUTE_ON_INTERFACE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
@@ -1335,8 +1354,8 @@ print_single_MC_result
           result.E, /* Expected value */
           result.SE); /* Standard error */
     }
-    else fprintf(stream, "%g %g %zu %zu\n",
-      result.E, result.SE, nfailures, stardis->samples);
+    else fprintf(stream, "%g %g %lu %lu\n",
+      result.E, result.SE, nfailures, nsamples);
     break;
   case MODE_MEDIUM_COMPUTE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
@@ -1351,8 +1370,8 @@ print_single_MC_result
           result.E, /* Expected value */
           result.SE); /* Standard error */
     }
-    else fprintf(stream, "%g %g %zu %zu\n",
-      result.E, result.SE, nfailures, stardis->samples);
+    else fprintf(stream, "%g %g %lu %lu\n",
+      result.E, result.SE, nfailures, nsamples);
     break;
   case MODE_BOUNDARY_COMPUTE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
@@ -1367,8 +1386,8 @@ print_single_MC_result
           result.E, /* Expected value */
           result.SE); /* Standard error */
     }
-    else fprintf(stream, "%g %g %zu %zu\n",
-      result.E, result.SE, nfailures, stardis->samples);
+    else fprintf(stream, "%g %g %lu %lu\n",
+      result.E, result.SE, nfailures, nsamples);
     break;
   case MODE_FLUX_BOUNDARY_COMPUTE: {
     enum sdis_estimator_type type;
@@ -1440,17 +1459,17 @@ print_single_MC_result
       fprintf(stream, "%g %g ", result.E, result.SE);
       ERR(sdis_estimator_get_total_flux(estimator, &result));
       fprintf(stream, "%g %g ", result.E, result.SE);
-      fprintf(stream, "%zu %zu\n", nfailures, stardis->samples);
+      fprintf(stream, "%lu %lu\n", nfailures, nsamples);
     }
     break;
   }
   default: FATAL("Invalid mode.");
   }
   if(stardis->mode & MODE_EXTENDED_RESULTS)
-    fprintf(stream, "#failures: %zu/%zu\n", nfailures, stardis->samples);
+    fprintf(stream, "#failures: %lu/%lu\n", nfailures, nsamples);
   if(nfailures)
     logger_print(stardis->logger, LOG_ERROR,
-      "#failures: %zu/%zu\n", nfailures, stardis->samples);
+      "#failures: %lu/%lu\n", nfailures, nsamples);
 
 end:
   return res;

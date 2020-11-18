@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _GNU_SOURCE 1
+#define _POSIX_C_SOURCE 200809L /* strdup */
 #include "stardis-parsing.h"
 #include "stardis-app.h"
 #include "stardis-default.h"
@@ -279,10 +279,12 @@ read_sides_and_files
       size_t c, n;
       const unsigned* ids = darray_uint_cdata_get(&degenerated);
       c = darray_uint_size_get(&degenerated);
+      ASSERT(c <= ULONG_MAX);
       logger_print(stardis->logger, LOG_WARNING,
-        "File '%s' included %zu degenerated triangles (removed)\n", tk, c);
+        "File '%s' included %lu degenerated triangles (removed)\n",
+        tk, (unsigned long)c);
       ERR(str_printf(&str, "Degenerated triangles IDs: %u", ids[0]));
-      FOR_EACH(n, 1, c) { STR_APPEND_PRINTF(&str, ", %u", ids[n]); }
+      FOR_EACH(n, 1, c) { STR_APPEND_PRINTF(&str, ", %u", ARG1( ids[n] ) ); }
       logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
       darray_uint_clear(&degenerated);
     }

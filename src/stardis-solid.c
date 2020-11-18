@@ -185,17 +185,17 @@ str_print_solid(struct str* str, const struct solid* s)
   res_T res = RES_OK;
   ASSERT(str && s);
   STR_APPEND_PRINTF(str, "Solid '%s': lambda=%g rho=%g cp=%g delta=%g",
-    str_cget(&s->name), s->lambda, s->rho, s->cp, s->delta);
+    ARG5( str_cget(&s->name), s->lambda, s->rho, s->cp, s->delta ) );
   if(s->vpower != 0) {
-    STR_APPEND_PRINTF(str, " VPower=%g", s->vpower);
+    STR_APPEND_PRINTF(str, " VPower=%g", ARG1( s->vpower ) );
   }
   if(s->tinit >= 0) {
-    STR_APPEND_PRINTF(str, " Tinit=%g", s->tinit);
+    STR_APPEND_PRINTF(str, " Tinit=%g", ARG1( s->tinit ) );
   }
   if(s->imposed_temperature >= 0) {
-    STR_APPEND_PRINTF(str, " Temp=%g", s->imposed_temperature);
+    STR_APPEND_PRINTF(str, " Temp=%g", ARG1( s->imposed_temperature ) );
   }
-  STR_APPEND_PRINTF(str, " (it is medium %u)", s->solid_id);
+  STR_APPEND_PRINTF(str, " (it is medium %u)", ARG1( s->solid_id ) );
 end:
   return res;
 error:

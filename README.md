@@ -16,6 +16,7 @@ Stardis relies on the [CMake](http://www.cmake.org) and the
 [RCMake](https://gitlab.com/vaplv/rcmake/) package to build.
 It also depends on the
 [RSys](https://gitlab.com/vaplv/rsys/),
+[star-3d](https://gitlab.com/meso-star/star-3d/),
 [star-enclosures-3d](https://gitlab.com/meso-star/star-enclosures-3d/),
 [star-geometry-3d](https://gitlab.com/meso-star/star-geometry-3d/),
 [star-stl](https://gitlab.com/meso-star/star-stl) and
@@ -34,11 +35,19 @@ variable the install directories of its dependencies.
 
 ### v0.5
 
+- Ensure C89 compliance.
+- New output format for infra-red rendering.
+- Use new stardis-solver 0.11.
+- Replace fixed dates by time-ranges as time arguments
+  for computations.
+- Allow unsteady Green's function computations.
+- Model files now include scale parameter.
+
 ### v0.4
 
 - Improve C99 compliance.
 - Build on Windows systems.
-- Upgrade stardis-solver to v0.5.
+- Use new stardis-solver 0.5.
 - Transition to cmake to manage builds.
 
 ### v0.3.2

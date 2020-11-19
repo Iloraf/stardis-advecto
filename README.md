@@ -1,58 +1,81 @@
-#stardis-app : Prototype d'application Stardis
+# stardis
 
-stardis-app est un prototype d'applicatif mettant en oeuvre la bibliothèque
-stardis-solver (https://gitlab.com/meso-star/stardis-solver) avec comme objectif
-de faire la jonction entre un outil de CAO telle que Salome et le solver.
+## Overview
 
-Pour compiler il suffit de taper `make` après avoir préalablement renseigner
-dans le makefile la variable SDIS_SDK qui est le chemin du SDK de Stardis. Voir
-les notes de version en ci-dessous pour avoir la bonne version du SDK.
+Stardis is a software dedicated to the resolution of coupled
+convective-conductive-radiative thermal problems in 3D environments.
+It is based on [stardis-solver](https://gitlab.com/meso-star/stardis-solver)
+and exposes some of the main features of the solver in an easy to use way.
+Using stardis is a practical way of carrying out thermal studies on CAD
+models which can be exported from Salomé or other similar software.
 
 
-# Note de versions
+## How to build
 
-## v0.4
+Stardis relies on the [CMake](http://www.cmake.org) and the
+[RCMake](https://gitlab.com/vaplv/rcmake/) package to build.
+It also depends on the
+[RSys](https://gitlab.com/vaplv/rsys/),
+[star-3d](https://gitlab.com/meso-star/star-3d/),
+[star-enclosures-3d](https://gitlab.com/meso-star/star-enclosures-3d/),
+[star-geometry-3d](https://gitlab.com/meso-star/star-geometry-3d/),
+[star-stl](https://gitlab.com/meso-star/star-stl) and
+[stardis-solver](https://gitlab.com/meso-star/stardis-solver) libraries
+as well as on the [OpenMP](http://www.openmp.org) 2.0 specification to
+parallelize its computations.
 
-- Conformité C99.
-- Build Windows.
-- Passage à stardis-solver 0.5 ; l'intégration temporelle n'est toutefois pas
-  encore accessible.
-- Passage à cmake
 
-## v0.3.2
+First ensure that CMake and a C99 compiler that implements the OpenMP 2.0
+specification are installed on your system. Then install the RCMake package as
+well as all the aforementioned prerequisites. Finally generate the project from
+the `cmake/CMakeLists.txt` file by appending to the `CMAKE_PREFIX_PATH`
+variable the install directories of its dependencies.
 
-- Ajout de la fonctionnalité solve_probe_boundary. La fonction solve est
-  automatiquement selectionnée en fonction de la distance à la primitive la plus
-  proche. Si la distance est inférieure à 2.1 delta, la fonction
-  solve_probe_boundary sera utilisée.
-- Ajout des conditions limites en flux.
+## Note de versions
 
-## v0.3.1
+### v0.5
 
-Ajout du tranfert radiatif. Ce qui ajoute deux nouveaux parametrès par medium : 
+- Ensure C89 compliance.
+- New output format for infra-red rendering.
+- Use new stardis-solver 0.11.
+- Replace fixed dates by time-ranges as time arguments
+  for computations.
+- Allow unsteady Green's function computations.
+- Model files now include scale parameter.
+
+### v0.4
+
+- Improve C99 compliance.
+- Build on Windows systems.
+- Use new stardis-solver 0.5.
+- Transition to cmake to manage builds.
+
+### v0.3.2
+
+- Add the solve_probe_boundary feature. The solve_probe_boundary VS
+  solve_probe selection is automated according the probe-geometry distance.
+  solve_probe_boundary is called for probe points closer than 2.1 delta
+  from geometry.
+- Add flux boundary conditions.
+
+### v0.3.1
+
+Add radiative transfer computations. To achieve this, media gain 2 new parameters: 
 
 - emissivity;
 - specular_fraction.
 
-## v0.3
+### v0.3
 
-Passage à la version 0.3.0 du  SDK de stardis-solver. La version modifié du SDK
-est disponible sur le NAS
-(meso-star/repo/Stardis-0.1.0-GNU-Linux64_modified.tar.gz). Trois fonctionnalités
-ont été ajoutés :
-
- - la puissance volumique;
- - la possibilité de renseigner l'argument fp_to_meter de la fonction solve de
-   stardis-solver;
- - une option pour dumper la géométrie après analyse au format VTK avec des tags
-   medium front/back et id des conditions limites.
+- Upgrade stardis-solver to v0.3.
+- Add volumic power sources on solids;
+- Allow to use the fp_to_meter parameter of the stardis-solver solve function;
+- Add a dump geometry feature. It outputs the geometry as it is sent to
+  stardis-solver in VTK format, together with the front and back media and
+  boundary conditions information.
 
 
-## v0.1
+### v0.1
 
-Evalue une température sonde uniquement, pour un système purement conductif.Les
-conditions aux limites peuvent être de type dirichlet ou de type échange. Cette
-version repose sur le SDK de Stardis modifié 0.1.0 disponible sur la NAS
-(meso-star/repo/Stardis-0.1.0-GNU-Linux64_modified.tar.gz). La modification
-consiste en l'ajout de la bibliothèqe sstl et tinyexpr
-(https://github.com/codeplea/tinyexpr (https://github.com/codeplea/tinyexpr)
+- Allow probe computations on conductive-only thermal systems.
+- Allow Dirichlet and h.dT boundary conditions.

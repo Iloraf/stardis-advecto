@@ -1,0 +1,110 @@
+/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>. */
+
+#ifndef SDIS_OUTPUT_H
+#define SDIS_OUTPUT_H
+
+#include <rsys/rsys.h>
+#include <stdio.h>
+
+struct sdis_green_path;
+struct sdis_heat_path;
+struct sdis_estimator_buffer;
+struct sdis_green_function;
+struct counts;
+struct description;
+struct mem_allocator;
+struct sdis_estimator;
+struct stardis;
+struct geometry;
+struct vertex;
+struct darray_estimators;
+
+struct dump_path_context {
+  unsigned long rank;
+  struct stardis* stardis;
+};
+
+extern res_T
+dump_path
+  (const struct sdis_heat_path* path,
+   void* context);
+
+extern res_T
+print_sample
+  (struct sdis_green_path* path,
+   void* ctx);
+
+extern res_T
+dump_vtk_image
+  (const struct sdis_estimator_buffer* buf,
+   FILE* stream);
+
+extern res_T
+dump_ht_image
+  (const struct sdis_estimator_buffer* buf,
+   FILE* stream);
+
+extern res_T
+dump_green_ascii
+  (struct sdis_green_function* green,
+   const struct stardis* stardis,
+   FILE* stream);
+
+extern res_T
+dump_green_bin
+  (struct sdis_green_function* green,
+   const struct stardis* stardis,
+   FILE* stream);
+
+extern res_T
+dump_paths_end
+  (struct sdis_green_function* green,
+   const struct stardis* stardis,
+   FILE* stream);
+
+extern res_T
+dump_enclosure_related_stuff_at_the_end_of_vtk
+  (struct stardis* stardis,
+   FILE* stream);
+
+extern res_T
+print_single_MC_result
+  (struct sdis_estimator* estimator,
+   struct stardis* stardis,
+   FILE* stream);
+
+extern void
+dump_map
+  (const struct stardis* stardis,
+   const struct darray_estimators* estimators,
+   FILE* stream);
+
+extern res_T
+dump_boundaries_at_the_end_of_vtk
+  (const struct stardis* stardis,
+   FILE* stream);
+
+extern res_T
+dump_compute_region_at_the_end_of_vtk
+  (struct stardis* stardis,
+   FILE* stream);
+
+extern res_T
+dump_model_as_c_chunks
+  (struct stardis* stardis,
+   FILE* stream);
+
+#endif

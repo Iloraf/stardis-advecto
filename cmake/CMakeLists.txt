@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2018 |Meso|Star>
+# Copyright (C) 2018-2020 |Meso|Star>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,29 +14,80 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 cmake_minimum_required(VERSION 3.0)
-project(stardis-app C)
+project(stardis C)
 
 set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 
-################################################################################
-# Check dependencies
-################################################################################
-find_package(RCMake 0.4 REQUIRED)
-find_package(RSys 0.8.1 REQUIRED)
-find_package(StarEnc 0.3.1 REQUIRED)
-find_package(Stardis 0.7.1 REQUIRED)
-find_package(StarSTL 0.3 REQUIRED)
+if(CMAKE_HOST_UNIX)
+  set(STARDIS_DOC "TROFF" CACHE STRING
+    "Type of documentation to generate and install.")
+else()
+  set(STARDIS_DOC "HTML" CACHE STRING
+    "Type of documentation to generate and install.")
+endif()
 
-set(TINYEXPR_SOURCE_DIR  "${PROJECT_SOURCE_DIR}/../tinyexpr" CACHE PATH "Directory for TinyExpr source files")
+set_property(CACHE STARDIS_DOC PROPERTY STRINGS
+  "HTML"
+  "TROFF"
+  "TROFF & HTML"
+  "NONE")
+  
+###############################################################################
+# Generate files
+###############################################################################
+set(STARDIS_ARGS_DEFAULT_AMBIENT_TEMP "300")
+set(STARDIS_ARGS_DEFAULT_COMPUTE_TIME "INF, INF")
+set(STARDIS_ARGS_DEFAULT_RENDERING_FOV "70") # degrees
+set(STARDIS_ARGS_DEFAULT_RENDERING_IMG_HEIGHT "480")
+set(STARDIS_ARGS_DEFAULT_RENDERING_IMG_WIDTH "640")
+set(STARDIS_ARGS_DEFAULT_RENDERING_OUTPUT_FILE_FMT "HT") # VTK or HT
+set(STARDIS_ARGS_DEFAULT_RENDERING_POS "1, 1, 1")
+set(STARDIS_ARGS_DEFAULT_RENDERING_SPP "4")
+set(STARDIS_ARGS_DEFAULT_RENDERING_TGT "0, 0, 0")
+set(STARDIS_ARGS_DEFAULT_RENDERING_TIME "INF, INF")
+set(STARDIS_ARGS_DEFAULT_RENDERING_UP "0, 0, 1")
+set(STARDIS_ARGS_DEFAULT_REFERENCE_TEMP "300")
+set(STARDIS_ARGS_DEFAULT_SAMPLES_COUNT "10000")
+set(STARDIS_ARGS_DEFAULT_SCALE_FACTOR "1")
+set(STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL "1")
+
+configure_file(${SDIS_SOURCE_DIR}/../doc/stardis.1.txt.in
+  ${CMAKE_CURRENT_BINARY_DIR}/doc/stardis.1.txt @ONLY)
+
+set(SDIS_VERSION_MAJOR 0)
+set(SDIS_VERSION_MINOR 5)
+set(SDIS_VERSION_PATCH 0)
+set(SDIS_VERSION ${SDIS_VERSION_MAJOR}.${SDIS_VERSION_MINOR}.${SDIS_VERSION_PATCH})
+
+configure_file(${SDIS_SOURCE_DIR}/stardis-default.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-default.h @ONLY)
+  
+configure_file(${SDIS_SOURCE_DIR}/stardis-version.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-version.h @ONLY)
+
+###############################################################################
+# Check dependencies
+###############################################################################
+find_package(RCMake 0.4 REQUIRED)
+find_package(RSys 0.11 REQUIRED)
+find_package(StarGeom3D 0.1 REQUIRED)
+find_package(Star3D 0.7.1 REQUIRED)
+find_package(StarEnc3D 0.4.2 REQUIRED)
+find_package(Stardis 0.11 REQUIRED)
+find_package(StarSTL 0.3 REQUIRED)
+if(MSVC)
+  find_package(MuslGetopt REQUIRED)
+endif()
 
 include_directories(
   ${RSys_INCLUDE_DIR}
-  ${StarEnc_INCLUDE_DIR}
+  ${Star3D_INCLUDE_DIR}
+  ${StarGeom3D_INCLUDE_DIR}
+  ${StarEnc3D_INCLUDE_DIR}
   ${Stardis_INCLUDE_DIR}
   ${StarSTL_INCLUDE_DIR}
-  ${TINYEXPR_SOURCE_DIR})
+  ${CMAKE_CURRENT_BINARY_DIR})
 if(MSVC)
-  find_package(MuslGetopt REQUIRED)
   include_directories(${MuslGetopt_INCLUDE_DIR})
 endif()
 
@@ -44,24 +95,45 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${RCMAKE_SOURCE_DIR})
 include(rcmake)
 include(rcmake_runtime)
 
-rcmake_append_runtime_dirs(_runtime_dirs RSys Stardis StarEnc StarSTL)
+if(CMAKE_COMPILER_IS_GNUCC)
+  rcmake_append_runtime_dirs(_runtime_dirs
+    RSys Stardis Star3D StarGeom3D StarEnc3D StarSTL)
+endif()
+if(MSVC)
+  rcmake_append_runtime_dirs(_runtime_dirs
+    RSys MuslGetopt Stardis Star3D StarGeom3D StarEnc3D StarSTL)
+endif()
 
-################################################################################
+###############################################################################
+# Build subprojects
+###############################################################################
+if(NOT STARDIS_DOC STREQUAL "NONE")
+  add_subdirectory(doc)
+endif()
+
+###############################################################################
 # Configure and define targets
-################################################################################
-set(VERSION_MAJOR 0)
-set(VERSION_MINOR 4)
-set(VERSION_PATCH 0)
-set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
-
+###############################################################################
 set(SDIS_FILES_SRC
   stardis-app.c
   stardis-compute.c
-  main.c)
+  stardis-fluid.c
+  stardis-intface.c
+  stardis-main.c
+  stardis-output.c
+  stardis-parsing.c
+  stardis-solid.c)
 
 set(SDIS_FILES_INC
   stardis-app.h
-  args.h)
+  stardis-compute.h
+  stardis-default.h.in
+  stardis-fluid.h
+  stardis-intface.h
+  stardis-output.h
+  stardis-parsing.h
+  stardis-solid.h
+  stardis-version.h.in)
 
 set(SDIS_FILES_DOC COPYING README.md)
 
@@ -70,46 +142,30 @@ rcmake_prepend_path(SDIS_FILES_SRC ${SDIS_SOURCE_DIR})
 rcmake_prepend_path(SDIS_FILES_INC ${SDIS_SOURCE_DIR})
 rcmake_prepend_path(SDIS_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
-# Default is right to left pow and log is natural log
-# Build tinyExpr without closure support and with function_1 to function_3 support only
-# (these ones cannot be disabled as predefined functions require them).
-set(TE_DEFAULTS
-  "-DTE_POW_FROM_RIGHT -DTE_NAT_LOG -DTE_WITHOUT_CLOSURES -DTE_WITHOUT_FUNCTION_0 -DTE_MAX_FUNCTION_ARITY=3")
-
-ADD_LIBRARY(tinyexpr STATIC
-  ${TINYEXPR_SOURCE_DIR}/tinyexpr.c ${TINYEXPR_SOURCE_DIR}/tinyexpr.h)
-
-if(CMAKE_COMPILER_IS_GNUCC)
-  set_target_properties(tinyexpr PROPERTIES
-    COMPILE_FLAGS "-std=c99 ${TE_DEFAULTS}")
-elseif(MSVC)
-  set_target_properties(tinyexpr PROPERTIES
-    COMPILE_FLAGS ${TE_DEFAULTS})
-endif()
-
-add_executable(sdis-app
+add_executable(stardis
   ${SDIS_FILES_SRC}
   ${SDIS_FILES_INC})
-  
+
 if(CMAKE_COMPILER_IS_GNUCC)
-  set_target_properties(sdis-app PROPERTIES
-    COMPILE_FLAGS "-std=c99 ${TE_DEFAULTS}"
-    VERSION ${VERSION})
-  target_link_libraries(sdis-app Stardis StarEnc StarSTL RSys tinyexpr m)
+  set(MATH_LIB m)
 elseif(MSVC)
-  set_target_properties(sdis-app PROPERTIES
-    COMPILE_FLAGS "${TE_DEFAULTS}"
-    VERSION ${VERSION})
-  target_link_libraries(sdis-app Stardis StarEnc StarSTL RSys tinyexpr MuslGetopt)
+  set(GETOPT_LIB MuslGetopt)
 endif()
 
-rcmake_copy_runtime_libraries(sdis-app)
+set_target_properties(stardis
+  PROPERTIES VERSION ${SDIS_VERSION})
 
-################################################################################
+target_link_libraries(stardis
+  Stardis Star3D StarGeom3D StarEnc3D StarSTL RSys ${GETOPT_LIB} ${MATH_LIB})
+
+###############################################################################
 # Define output & install directories
-################################################################################
-install(TARGETS sdis-app
+###############################################################################
+install(TARGETS stardis
   ARCHIVE DESTINATION bin
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
-install(FILES ${SDIS_FILES_DOC} DESTINATION share/doc/stardis-app)
+
+install(FILES ${SDIS_FILES_DOC} DESTINATION share/doc/stardis)
+
+rcmake_copy_runtime_libraries(stardis)

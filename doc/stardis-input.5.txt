@@ -1,0 +1,207 @@
+// Copyright (C) 2018-2020 |Meso|Star>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+:toc:
+
+stardis-input(5)
+=================
+
+NAME
+----
+stardis-input - thermal system description for stardis(1)
+
+DESCRIPTION
+-----------
+*stardis-input* is the format used by the *stardis*(1) program to describe a
+thermal system. It relies on a line-based ad-hoc syntax.
+
+A thermal system is composed of lines of text, each one describing either a
+medium (solid or fluid) frontier, a boundary (limit condition or connection
+between two media), or the scale of the geometry. In the medium or boundary
+cases, description lines include a list of file names that constitute the
+limit or boundary. The current version of *stardis* only accepts triangle
+mesh geometry files in *STL* format. If a scale is  specified, it defines the
+scaling factor to apply to the geometry to have it expressed in meters (e.g.
+1e-3 if the geometry is in mm).
+
+A medium limit or a boundary description can be split accross files and a
+single file or description line can describe more than one frontier (more than
+one connex region). The main semantic constraint on descriptions is that any
+enclosure must be defined by a single description line, to ensure that any
+part in the system is made from a single medium.
+
+Finally, description lines can be submitted to the *stardis*(1) program in
+any order and can be split accross more than one file, through multiple use
+of option *-M*.
+
+UNITS
+-----
+Any physical quantity involved in descriptions is expected in the
+International System of Units (second, metre, kilogram, kelvin, watt, joule);
+the same applies to *stardis(1)* outputs as described in *stardis-output(5)*.
+
+However, the geometry provided to *stardis*(1) can be described in any unit,
+multiple of meters or not, as long as  the scaling factor is provided.
+
+TINIT VS TIMPOSED
+-----------------
+Media's descriptions, either solids or fluids, include two possible
+temperatures: initial and imposed. If imposed temperature is set (that is not
+"UNKNOWN"), initial temperature must be defined at the same value. As a
+consequence, one cannot define a medium with an imposed temperature that
+changes at t=0.
+
+GRAMMAR
+-------
+In what follows, some lines end in *\*. This is used as a convenience to
+continue a description next line. However, this trick cannot be used in
+actual description files and actual description lines must be kept single-line.
+Also, text appearing between quote marks has to be used verbatim in the input,
+except the quote characters. Finally, text introduced by the *#* character in
+descriptions, when not verbatim, is a comment and is not part of the
+description.
+
+[verse]
+_______
+<thermal-system>      ::= <description-lines>
+                        [ <scaling-factor> ]
+
+<description-lines>   ::= <description-line>
+                        [ <description-lines> ]
+
+<description-line>    ::= [ <medium-frontier> ] [ <comment> ]
+                        | [ <medium-boundary> ] [ <comment> ]
+                        | [ <media-connection> ] [ <comment> ]
+
+<scaling-factor>      ::= "SCALE" <scaling_factor> [ <comment> ]
+
+-------------------------------------
+
+<medium-frontier>     ::= <solid-frontier>
+                        | <fluid-frontier>
+
+<medium-boundary>     ::= <t-bound-for-solid>
+                        | <t-bound-for-fluid>
+                        | <h-bound-for-solid>
+                        | <h-bound-for-fluid>
+                        | <f-bound-for-solid>
+
+<media-connection>    ::= <solid-fluid-connect>
+
+<comment>             ::= "#" Any text introduced by the # character
+
+<scaling_factor>      ::= REAL # scaling factor to apply to the geometry ; in ]0 INF)
+
+<solid-frontier>      ::= "SOLID" <medium-name> <lambda> <rho> <cp> <delta> \
+                          <initial-temp> <imposed-temperature> <volumic-power> \
+                          <triangle-sides>
+
+<fluid-frontier>      ::= "FLUID" <medium-name> <rho> <cp> <initial-temp> \
+                          <imposed-temperature> <triangle-sides>
+
+<t-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> <triangles>
+
+<t-bound-for-fluid>   ::= "T_BOUNDARY_FOR_FLUID" <bound-name> <temperature> \
+                          <emissivity> <specular-fraction> <hc> <triangles>
+
+<h-bound-for-solid>   ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <emissivity> \
+                          <specular-fraction> <hc> <outside-temperature> <triangles>
+
+<h-bound-for-fluid>   ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <emissivity> \
+                          <specular-fraction> <hc> <outside-temperature> <triangles>
+
+<f-bound-for-solid>   ::= "F_BOUNDARY_FOR_SOLID" <bound-name> <flux> <triangles>
+
+<solid-fluid-connect> ::= "SOLID_FLUID_CONNECTION" <bound-name> <emissivity> \
+                          <specular-fraction> <hc> <triangles>
+
+-------------------------------------
+
+<medium-name>         ::= STRING # no space allowed
+
+<lambda>              ::= REAL # conductivity in W/(m.K); in ]0, INF)
+
+<rho>                 ::= REAL # volumic mass,in kg/m3; in ]0, INF)
+
+<cp>                  ::= REAL # capacity, in J/(kg.K) or kg.m2/(s2.K); in ]0, INF)
+
+<delta>               ::= "AUTO" # delta is automatically set to V/6A (V and A being
+                                 # respectively the solid volume and its boundary area)
+                        | REAL # delta*scaling_factor in m; in [0, INF)
+
+<initial-temp>        ::= REAL # in K; in [0, INF)
+
+<imposed-temperature> ::= "UNKNOWN" # temperature has to be solved
+                        | REAL # in K; in [0, INF)
+
+<outside-temperature> ::= REAL # in K; in [0, INF)
+
+<volumic-power>       ::= REAL # in W/m3; in (-INF , INF)
+
+<triangle-sides>      ::= <side-specifier> <file-name> [ <triangle-sides> ]
+
+<bound-name>          ::= STRING # no space allowed
+
+<emissivity>          ::= REAL # in [0, 1]
+
+<specular-fraction>   ::= REAL # in [0, 1]
+
+<hc>                  ::= REAL # in W/(m2.K); in [0, INF)
+
+<flux>                ::= REAL # in W/m2; in (-INF , INF)
+
+<triangles>           ::= <file-name> [ <triangles> ]
+
+-------------------------------------
+
+<side-specifier>      ::= "FRONT" | "BACK" | "BOTH"
+
+<file-name>           ::= STRING # no space allowed
+
+______________
+
+TRIANGLE SIDES
+--------------
+Side descriptions in side specifiers rely on the following convention: we
+first consider the direct triangle's normal (right-hand rule), then we define
+the BACK side of a triangle to be the side this normal comes out from. That
+means that a closed set of triangles with normals pointing outside should be
+used with the FRONT side specifier to describe inside medium.
+
+NAMES
+-----
+Names, either file names, medium names or boundary names, are a sequence of
+one or ore ASCII characters, including numbers and special characters like
+*.* *_* *-* as one may consider using in standard file names, *without any
+spacing* either escaped or not. Names are case-sensitive anf two different
+description lines, either in the same description file or from different
+description files, cannot use the same name.
+
+EXAMPLES
+--------
+Define a solid named Cube with a h boundary. The cube geometry is read from
+the file cube.stl and the solid medium properties are lambda=0.1, rho=25, cp=2.
+The numerical parameter delta, that is used for solid conductive walks, is
+0.05. The initial temperature of the cube is 0°K and its volumic power is 0.
+The boundary properties are emisivity=0, specular-fraction=0, h=10 and
+external-temperature = 100°K.
+.......
+SOLID Cube 0.1 25 2 0.05 0 0 FRONT cube.stl
+H_BOUNDARY_FOR_SOLID HdT 0 0 10 100 cube.stl
+.......
+
+SEE ALSO
+--------
+*stardis*(1)

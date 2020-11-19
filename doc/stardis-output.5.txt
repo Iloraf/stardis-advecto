@@ -1,0 +1,941 @@
+// Copyright (C) 2018-2020 |Meso|Star>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+:toc:
+
+= stardis-output(5)
+
+== NAME
+
+stardis-output - output format of stardis(1) results
+
+== DESCRIPTION
+
+*stardis-output* describes the output format of the *stardis*(1) program.
+Any *stardis*(1) result is written to _standard output_, even though some
+additional information can be written in files.
+
+The type of the data that are generated depends on the options used when
+*stardis*(1) is invoked. When invoked with one of the basic computation options
+(*-p*, *-P*, *-m*, *-s* or *-F*), *stardis*(1) outputs a single Monte-Carlo
+result. On the opposite, *stardis*(1) ouputs compound results when invoked with
+option *-S* or *-R*. Additionally, options *-g* and *-G* make *stardis*(1)
+compute and output a Green function and possibly information on heat paths'
+ends. Most of the complex data output is in VTK [1] format that can be
+displayed and manipulated by the open-source software Paraview [2].
+
+Finaly, some special options (*-v*, *-h* or *-d*) that does not involve any
+computation produce output including information on the *stardis*(1) software
+(their ouputs will not be described thereafter) or the provided thermal system.
+
+== UNITS
+
+As with the values in *stardis-input*(5), any physical quantity in output is in
+the International System of Units (second, metre, kilogram, kelvin) except the
+coordinates that are in same system as the geometry.
+
+== OPTIONS
+
+Every top-level item of the output listed below is produced by one or more
+specific options of the *stardis*(1) program. The following list gives the
+correspondance:
+
+*-p* or *-P*: produce <probe-temp>
+
+*-m*: produces <medium-temp>
+
+*-s*: produces <mean-temp>
+
+*-F*: produces <mean-flux>
+
+*-p*, *-P*, *-m* or *-s* with *-g* or *-G*: produce <ascii-green> or
+<binary-green> and possibly <heat-paths-ends> respectively.
+
+*-D*: produces <heat-path> files in addition to the simulation output
+
+*-R*: produces <infrared-image>
+
+*-d*: produces <geometry-dump>
+
+== GRAMMAR
+
+In what follows, some lines end in *\*. This is used as a convenience to
+continue a description next line. However, this trick is not part of the
+actual output, that continues on a single line. On the other hand, multiple
+lines not using the *\* convenience in multi-lines descriptions are truly
+different lines of output. Also, text appearing between quote marks is a
+verbatim part of the output, except the quote characters, *#something*
+denotes a count (the number of something), and the math symbols '*\+*'
+and '***', when not verbatim, are used with the usual meaning (like in
+#something+1). Finally, text introduced by the *#* character in a description,
+when neither verbatim nor count, is a comment and is not part of the output.
+
+== OUTPUT
+
+[verse]
+_______
+
+<output> ::= <single-MC-result>
+           | <binary-green>
+           | <heat-paths-ends>
+           | <ascii-green>
+           | <geometry-dump>
+           | <infrared-image>
+_______
+
+== SINGLE MONTE CARLO
+
+When *stardis*(1) is used to produce a single Monte-Carlo result, either
+temperature or flux, this result is output first to _standard output_, possibly
+followed by some of the heat paths involved in the computation if option *-D*
+was used too.
+
+Two different formats are possible: a compact, numbers only format (the default)
+or an extended format that mixes numbers and their descriptions (if option *-e*
+is used).
+
+[verse]
+_______
+<single-MC-result>     ::= <single-MC-result>
+                         | <ext-single-MC-result>
+
+<single-MC-result>     ::= <probe-temp>
+                         | <medium-temp>
+                         | <mean-temp>
+                         | <mean-flux>
+
+<ext-single-MC-result> ::= <ext-probe-temp>
+                         | <ext-medium-temp>
+                         | <ext-mean-temp>
+                         | <ext-mean-flux>
+
+-------------------------------------
+
+<probe-temp>          ::= <MC-estimate> <failures-report>
+
+<mean-temp>           ::= <MC-estimate> <failures-report>
+
+<mean-flux>           ::= <MC-estimate> <MC-estimate> <MC-estimate> <MC-estimate> \
+                          <MC-estimate> <failures-report>
+                          # MC estimates order is: temperature, convective flux,
+                          # radiative flux, imposed flux, total flux
+
+<medium-temp>         ::= <MC-estimate> <failures-report>
+
+<MC-estimate>         ::= <expected-value> <standard-deviation>
+
+<failures-report>     ::= <error-count> <success-count>
+
+<ext-probe-temp>      ::= "Temperature at" <probe-position> <time> <MC-estimate>
+                          <failures-report>
+
+<ext-mean-temp>       ::= "Temperature at boundary" <file-name> <time> <MC-estimate>
+                          <failures-report>
+
+<ext-mean-flux>       ::= "Temperature at boundary" <file-name> <time> <MC-estimate>
+                          "Convective flux at boundary " <file-name> <time> \
+                          <MC-estimate>
+                          "Radiative flux at boundary" <file-name> <time> <MC-estimate>
+                          "Imposed flux at boundary" <file-name> <time> <MC-estimate>
+                          "Total flux at boundary" <file-name> <time> <MC-estimate>
+                          <failures-report>
+
+<ext-medium-temp>     ::= "Temperature in medium" <medium-name> <time> <MC-estimate>
+                          <failures-report>
+
+<ext-probe-position>  ::= "[" <x-value> "," <y-value> "," <z-value> "]"
+
+<ext-time>            ::= "at t=" <time-value> "="
+
+<ext-MC-estimate>     ::= <expected-value> "+/-" <standard-deviation>
+
+<ext-failures-report> ::= "#failures:" <error-count> "/" <success-count>
+
+<ext-file-name>       ::= STRING # as provided in input data
+
+<ext-medium-name>     ::= STRING # as provided in input data
+
+-------------------------------------
+
+<x-value>            ::= REAL
+
+<y-value>            ::= REAL
+
+<z-value>            ::= REAL
+
+<time-value>         ::= REAL # in [0, INF)
+
+<error-count>        ::= INTEGER # in [0, #samples]
+
+<success-count>      ::= INTEGER # in [0, #samples]
+
+<expected-value>     ::= REAL # depending on value semantics, range can be restricted
+
+<standard-deviation> ::= REAL # in [0, INF)
+
+_______
+
+== GREEN
+
+The Green function is generated, either in binary or ascii format, when a
+green-compatible *stardis*(1) simulation option is used in conjuction with
+option *-G* for a binary output, or option *-g* for an ascii output. For
+every successful heat path sampled carrying out the simulation, the solver
+records all the elements of the path history relevant to link the various
+imposed temperature, fluxe and volumic power values to the simulation result.
+Note that to be able to explore different values of volumic power when
+applying the Green function, it must have been generated with these values
+being non-zero. On the other hand, any temperature or flux value in boundary
+descriptions can be modified when applying the Green function, as well as the
+ambient temperature.
+
+The output in green mode is made of tables containing the different media and
+boundaries and their imposed temperature, flux and volumic power values,
+followed by the heat paths' history. Also, option *-G* make it possible to
+output heat paths' end information on an ascii, csv formated file.
+
+The Monte-Carlo estimate and standard deviation for a given set of settings can
+be computed as the mean and standard deviation of the samples of the *Green
+function* computed using these settings. Each sample can be computed as
+follows:
+
+* Get the temperature of the ending boundary, medium or ambient;
+* Add the temperature gain of each power term;
+* Add the temperature gain of each flux term.
+
+=== BINARY GREEN
+
+Thereafter is the format of binary Green outputs. This output is produced by
+fwrite calls and does not take care of endianness. Comments include the C type
+of the written data.
+
+[verse]
+_______
+<binary-green> ::= "BINGREEN" # char[8]
+                   #descriptions # unsigned
+                   #solids # unsigned
+                   #fluids # unsigned
+                   #t-boundaries # unsigned
+                   #h-boundaries # unsigned
+                   #flux-boundaries # unsigned
+                   #solid-fluid-connections # unsigned
+                   names-pool-size # size of concatenated description names: unsigned
+                   #ok-samples # size_t
+                   #failed-samples # size_t
+                   <descriptions>
+                   <concatenated-names> # char[names-pool-size]
+                   ambient-temperature # double
+                   reference-temperature # double
+                   time-range # double[2]
+                   <samples>
+
+<descriptions> ::= description # struct description
+                   <descriptions> # #descriptions descriptions
+
+<samples>      ::= <sample>
+                   <samples> # #ok-samples samples
+
+---------------------
+
+<sample>       ::= <sample-header> # struct path_header
+                   <ids> # unsigned[header.pcount + header.fcount]
+                   <weights> # double[header.pcount + header.fcount]
+_______
+
+[literal]
+ /* The content of stuct str name members in descriptions is meaningless.
+  * The name of the ith description is the ith nul-terminated string in
+  * <concatenated-names>.
+  * As a convenience, one could use char* baz to store a pointer to the
+  * description's name into <concatenated-names>. */
+ struct str {
+   void* foo;
+   size_t bar;
+   char* baz;
+   char qux[16];
+ };
+
+ struct mat_fluid {
+   struct str name;
+   double rho;
+   double cp;
+   double tinit;
+   double imposed_temperature;
+   double t0;
+   int is_outside;
+   int is_green;
+   unsigned desc_id;
+   unsigned fluid_id;
+ };
+
+ struct mat_solid {
+   struct str name;
+   double lambda;
+   double rho;
+   double cp;
+   double delta;
+   double tinit;
+   double imposed_temperature;
+   double vpower;
+   double t0;
+   int is_outside;
+   int is_green;
+   unsigned desc_id;
+   unsigned solid_id;
+ };
+
+ struct t_boundary {
+   struct str name;
+   double emissivity;
+   double specular_fraction;
+   double hc;
+   double imposed_temperature;
+   unsigned mat_id;
+ };
+
+ struct h_boundary {
+   struct str name;
+   double emissivity;
+   double specular_fraction;
+   double hc;
+   double imposed_temperature;
+   unsigned mat_id;
+ };
+
+ struct solid_fluid_connect {
+   struct str name;
+   double emissivity;
+   double specular_fraction;
+   double hc;
+   unsigned connection_id;
+ };
+
+ enum description_type {
+   DESC_MAT_SOLID,
+   DESC_MAT_FLUID,
+   DESC_BOUND_H_FOR_FLUID,
+   DESC_BOUND_H_FOR_SOLID,
+   DESC_BOUND_T_FOR_FLUID,
+   DESC_BOUND_T_FOR_SOLID,
+   DESC_BOUND_F_FOR_SOLID,
+   DESC_SOLID_FLUID_CONNECT,
+   DESCRIPTION_TYPE_COUNT__,
+   DESC_OUTSIDE
+ };
+
+ struct f_boundary {
+   struct str name;
+   double imposed_flux;
+   unsigned mat_id;
+ };
+
+ struct description {
+   enum description_type type;
+   union {
+     struct mat_fluid fluid;
+     struct mat_solid solid;
+     struct t_boundary t_boundary;
+     struct f_boundary f_boundary;
+     struct h_boundary h_boundary;
+     struct solid_fluid_connect sf_connect;
+   } d;
+ };
+
+ struct path_header {
+   unsigned id;
+   unsigned pcount, fcount;
+   char at_initial;
+ };
+
+=== ASCII GREEN
+
+Thereafter is the format of ascii Green outputs.
+
+[verse]
+_______
+<ascii-green>       ::= "---BEGIN GREEN---"
+                        "# time range"
+                        <time-range>
+                        "# #solids #fluids #t_boundaries #h_boundaries #f_boundaries \
+                        #ok #failures"
+                        #solids #fluids #t_boundaries #h_boundaries #f_boundaries \
+                        #ok #failures
+                        "# Solids"
+                        "# ID Name lambda rho cp power"
+                        <solids>
+                        "# Fluids"
+                        "# ID Name rho cp"
+                        <fluids>
+                        "# T Boundaries"
+                        "# ID Name temperature"
+                        <t-bounds>
+                        "# H Boundaries"
+                        "# ID Name emissivity specular_fraction hc T_env"
+                        <h-bounds>
+                        "# F Boundaries"
+                        "# ID Name flux"
+                        <f-bounds>
+                        "# Radiative Temperatures"
+                        "# ID Rad_Temp Lin_Temp"
+                        <rad-temps>
+                        "# Samples"
+                        "# end #power_terms #flux_terms power_term_1 ... power_term_n \
+                        flux_term_1 ... flux_term_n"
+                        "# end = end_type end_id; end_type = T | H | X | R | F | S"
+                        "# power_term_i = power_id_i factor_i"
+                        "# flux_term_i = flux_id_i factor_i"
+                        <samples>
+                        "---END GREEN---"
+
+<time-range>        ::= <REAL> <REAL> # in [0, INF) x [first REAL, INF)
+
+<solids>            ::= <solid>
+                        <solids> # #solids solid descriptions
+
+<fluids>            ::= <fluid>
+                        <fluids> # #fluids fluid descriptions
+
+<t-bounds>          ::= <t-bound>
+                        <t-bounds> # #t-bounds t-bound descriptions
+
+<h-bounds>          ::= <h-bound>
+                        <h-bounds> # #h-bounds h-bound descriptions
+
+<f-bounds>          ::= <f-bound>
+                        <f-bounds> # #f-bounds f-bound descriptions
+
+<rad-temps>         ::= <green-id> <rad-temp> <lin-temp>
+
+<samples>           ::= <sample>
+                        <samples> # #samples sample descriptions
+
+-------------------------------------
+
+<sample>            ::= <end-spec> <power-count> <flux-count> <power-terms> <flux-terms>
+
+<solid>             ::= <green-id> <name> <lambda> <rho> <cp> <power> <initial-temp> <imposed-temp>
+
+<fluid>             ::= <green-id> <name> <rho> <cp> <initial-temp> <imposed-temp>
+
+<t-bound>           ::= <green-id> <name> <temperature>
+
+<h-bound>           ::= <green-id> <name> <emissivity> <specular_fraction> <hc> \
+                        <temperature>
+
+<f-bound>           ::= <green-id> <name> <flux>
+
+<rad-temps>         ::= <green-id> <ambient-temp> <lin-temp>
+
+<name>              ::= STRING # no space allowed
+
+<lambda>            ::= REAL # in ]0, INF)
+
+<rho>               ::= REAL # in ]0, INF)
+
+<cp>                ::= REAL # in ]0, INF)
+
+<power>             ::= REAL # in (-INF , INF)
+
+<initial-temp>      ::= REAL # in [0 , INF)
+                      | "NONE" if not imposed
+
+<imposed-temp>      ::= REAL # in [0 , INF)
+                      | "NONE" if not imposed
+
+<temperature>       ::= REAL # in [0, INF)
+
+<emissivity>        ::= REAL # in [0, 1]
+
+<specular-fraction> ::= REAL # in [0, 1]
+
+<hc>                ::= REAL # in [0, INF)
+
+<flux>              ::= REAL # in (-INF, INF)
+
+<ambient-temp>      ::= REAL # in [0, INF)
+
+<lin-temp>          ::= REAL # in [0, INF)
+
+<green-id>          ::= INTEGER # in [0 #green-sources[
+
+-------------------------------------
+
+<end-spec>          ::= <end-type> <green-id>
+<end-type>          ::= "T" # sample ends at an t-bound
+                      | "H" # sample ends at an h-bound
+                            # a sample cannot end at an f-bound
+                      | "A" # sample ends with ambient temperature
+                      | "F" # sample ends in a fluid with known temperature
+                      | "S" # sample ends in a solid with known temperature
+
+<power-count>       ::= INTEGER # in [0 INF)
+
+<flux-count>        ::= INTEGER # in [0 INF)
+
+<power-terms>       ::= <power-term>
+                        <power-terms> # <power-count> power terms
+
+<flux-terms>        ::= <flux-term>
+                        <flux-terms> # <flux-count> flux terms
+
+-------------------------------------
+
+<power-term>        ::= <green-id> <power-factor>
+
+<flux-term>         ::= <green-id> <flux-factor>
+
+<power-factor>      ::= REAL # in ]0, INF)
+                             # the temperature gain is power-factor * Power(green-id)
+
+<flux-factor>       ::= REAL # in ]0, INF)
+                             # the temperature gain is flux-factor * Flux(green-id)
+_______
+
+== HEAT PATHS' ENDS
+
+When computing the Green function in binary mode, stardis can output partial
+information ot the sampled heat paths. Opposed to what the *-D* option outputs,
+that is the complete history of selected heat paths, here the information
+output is restricted to paths' ends to allow the inclusion of all the sampled
+heat paths, allowing statistical analysis.
+
+Note that in wath follows, the meaning of external quotes is as usual: what is
+inside is verbatim, including quotes.
+
+[verse]
+_______
+<heat-paths-ends>    ::= ""End", "End ID", "X", "Y", "Z", "Elapsed time""
+                         <heat-path-end-list>
+
+<heat-path-end-list> ::= <end-name> ", " <endid> ", "  <x> ", "  <y> ", " \
+                         <z> ", "  <elapsed-time>
+                         <heat-path-end-list> # #samples heat path ends
+
+-------------------------------------
+
+<end-name>           ::= STRING # the name of the boundary at the end of the
+                                # heat path, or AMBIANT for radiative ending
+
+<end-id>             ::= INTEGER # in [0 #boundaries]
+                                 # order is the order in the description file,
+                                 # AMBIANT's id being #boundaries
+
+<x>                  ::= REAL
+
+<y>                  ::= REAL
+
+<z>                  ::= REAL
+
+<elapsed-time>       ::= REAL # in [0, INF)
+_______
+
+== GEOMETRY DUMP
+
+A *geometry-file* is generated when *stardis*(1) is invoked with option *-d*.
+In this mode, *stardis*(1) outputs the system geometry, as submitted in
+*stardis-input*(5) description, to _standard output_ in VTK [1] format.
+The output geometry is not the concatenation of the various geometry files
+used in *stardis-input*(5) description. It is the result of a deduplication
+process that removes duplicate and degenerated triangles from the submited
+geometry.
+
+Additionaly, as permitted by the VTK [1] format, the output geometry is
+decorated with many different properties provided to help users understand
+the description processing, including possible errors.
+
+If errors are detected, some optional error-related data fields are included
+in the geometry file. Some errors report a by-triangle error status, other
+errors report a by-enclosure error status.
+
+Also, holes in the geometry, if any, are reported in geometry dumps. A hole is
+defined by its frontier that is a collection of triangles surrounding the hole.
+Such triangles are detected as having their 2 sides in the same enclosure, but
+with a different medium on each side.
+
+Media information is provided in two different flavours. First the medium on
+front and back sides of triangles can be found through the Front_medium and
+Back_medium fields. These fields use the special value 4294967295 (INT_MAX) for
+sides with no defined medium, as one can expect on boundary triangles. On the
+other hand, medium information provided by the Enclosures_internal_media
+field displays the id of the medium created to hold boundary information for
+boundary triangles. In either case, media numbering information can be found
+in log messages if option -V 3 is used in conjunction with the -d dump option.
+
+[verse]
+_______
+<geometry-file>       ::= "# vtk DataFile Version 2.0"
+                          "Dump of star-geometry-3d geometry"
+                          "ASCII"
+                          "DATASET POLYDATA"
+                          <vertices>
+                          <triangles>
+                          "CELL_DATA" #triangles
+                          <front-media>
+                          <back-media>
+                          <interfaces>
+                          <unique-ids>
+                          <user-ids>
+                        [ <merge-conflicts> ] # if some merge conflict occured
+                        [ <property-conflicts> ] # if some property conflict occured
+                          <file-ids>
+                          <boundaries>
+                        [ <compute-region> ] # if defined
+                          <encl-or-overlaps>
+
+<vertices>            ::= "POINTS" #vertices "double"
+                          <vertex-list>
+
+<triangles>           ::= "POLYGONS" #triangles #triangles*4
+                          <triangle-list>
+
+<front-media>         ::= "SCALARS Front_medium unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <front-medium-ids>
+
+<back-media>          ::= "SCALARS Back_medium unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <back-medium-ids>
+
+<interfaces>          ::= "SCALARS Interface unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <interface-ids>
+
+<unique-ids>          ::= "SCALARS Unique_ID unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <trg-unique-ids>
+
+<user-ids>            ::= "SCALARS User_ID unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                         <trg-user-ids>
+
+<merge-conflicts>     ::= "SCALARS Merge_conflict int 1"
+                          "LOOKUP_TABLE default"
+                          <trg-merge-conflicts>
+
+<property-conflicts>  ::= "SCALARS Property_conflict int 1"
+                          "LOOKUP_TABLE default"
+                          <trg-prop-conflicts>
+
+<file-ids>            ::= "SCALARS Created_at_sg3d_geometry_add unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <file-ranks>
+
+<boundaries>          ::= "SCALARS Boundaries unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <boundary-ids>
+
+<compute-region>      ::= "SCALARS Compute_region unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <region-membership>
+
+<encl-or-overlaps>    ::= <encl-information> # if enclosure extraction was possible
+                        | <overlaps> # if overlapping triangles where detected
+
+-----------------
+
+<vertex-list>         ::= "3" <vertice_id> <vertice_id> <vertice_id>
+                          <vertex-list> # #vertices vertices
+
+<triangle-list>       ::= <real3>
+                          <triangle-list> # #triangles triangles
+
+<front-medium-ids>    ::= <medium-id> | <undef-medium>
+                          <front-medium-ids> # #triangles ids
+
+<back-medium-ids>     ::= <medium-id> | <undef-medium>
+                          <back-medium-ids> # #triangles ids
+
+<interface-ids>       ::= INTEGER # in [0 #interface[
+                          <interface-ids> # #triangles ids
+
+<trg-unique-ids>      ::= INTEGER # in [0 #triangles[
+                          <trg-unique-ids> # #triangles ids
+
+<trg-user-ids>        ::= INTEGER # in [0 #submitted triangles[
+                          <trg-user-ids> # #triangles ids
+
+<trg-merge-conflicts> ::= "0" # triangle without any merge conflict
+                        | "1" # triangle with a merge conflict
+                          <trg-merge-conflicts> # #triangles statuses
+
+<trg-prop-conflicts>  ::= "0" # triangle with no property conflict
+                        | "1" # H_BOUNDARY_FOR_FLUID between 2 defined media
+                        | "2" # H_BOUNDARY_FOR_FLUID between 2 undefined media
+                        | "3" # H_BOUNDARY_FOR_FLUID enclosing a solid
+                        | "4" # H_BOUNDARY_FOR_SOLID between 2 defined media
+                        | "5" # H_BOUNDARY_FOR_SOLID between 2 undefined media
+                        | "6" # H_BOUNDARY_FOR_SOLID enclosing a fluid
+                        | "7" # T_BOUNDARY_FOR_FLUID between 2 defined media
+                        | "8" # T_BOUNDARY_FOR_FLUID between 2 undefined media
+                        | "9" # T_BOUNDARY_FOR_FLUID enclosing a solid
+                        | "10" # T_BOUNDARY_FOR_SOLID between 2 defined media
+                        | "11" # T_BOUNDARY_FOR_SOLID between 2 undefined media
+                        | "12" # T_BOUNDARY_FOR_SOLID enclosing a fluid
+                        | "13" # F_BOUNDARY_FOR_FLUID between 2 defined media
+                        | "14" # F_BOUNDARY_FOR_FLUID between 2 undefined media
+                        | "15" # F_BOUNDARY_FOR_SOLID enclosing a fluid
+                        | "16" # SOLID_FLUID_CONNECTION between 2 solids
+                        | "17" # SOLID_FLUID_CONNECTION between 2 fluids
+                        | "18" # SOLID_FLUID_CONNECTION used as boundary
+                        | "19" # SOLID_FLUID_CONNECTION between 2 undefined media
+                        | "20" # no connexion between 2 fluids
+                        | "21" # no connexion between a solid and a fluid
+                        | "22" # no boundary around a fluid
+                        | "23" # no boundary around a solid
+                        | "24" # invalid part of a compute surface
+                          <trg-prop-conflicts> # #triangles statuses
+
+<real3>               ::= REAL REAL REAL
+
+<vertice-id>          ::= INTEGER # in [0 #vertices[
+
+<file-ranks>          ::= INTEGER # in [0 #submitted files[
+                         <file-ranks> # #triangles ranks
+
+<boundary-ids>        ::= INTEGER # in [0 #submitted descriptions[
+                         <boundary-ids> # #triangles ids
+
+<region-membership>   ::= <reg-not-member> # triangle not part of the compute region
+                        | <reg-member> # triangle is part of the compute region
+                          <region-membership> # #triangles membership status
+
+<encl-information>    ::= [ <holes> ] # if there are holes
+                          <enclosures>
+
+<overlaps>            ::= "SCALARS Overlapping_triangles unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <overlapping-status>
+
+<holes>               ::= "SCALARS Hole_frontiers unsigned_int 1"
+                          "LOOKUP_TABLE default"
+                          <hole-memberships>
+
+<enclosures>          ::= "FIELD FieldData 2"
+                          "Enclosures" #enclosures #triangles "unsigned_char"
+                          <encl-memberships>
+                          "Enclosures_internal_media" #enclosures #triangles "unsigned_int"
+                          <encl-media>
+
+-----------------
+
+<hole-memberships>    ::= "0" # triangle not surrounding a hole
+                        | "1" # triangle surrounding a hole
+                          <hole-memberships> # #triangles hole memberships
+
+<encl-memberships>    ::= <enclosure-status 0> ... <enclosure-status #enclosures-1>
+                          <encl-memberships> # #triangles enclosure memberships
+
+<encl-media>          ::= <enclosure 0 medium> ... <enclosure #enclosures-1 medium>
+                          <encl-media> # #triangles enclosure media
+
+<medium-id>           ::= INTEGER # in [0, #medium[
+
+<undef-medium>        ::= "4294967295"
+
+<reg-not-member>      ::= "0"
+
+<reg-member>          ::= "1" # the FRONT side is member of the region
+                        | "2" # the BACK side is member of the region
+                        | "3" # both sides are member of the region
+                        | "4294967295" # the triangle is an invalid part of the region
+
+<overlapping-status>  ::= "0" # triangle not overlapping another triangle
+                        | "1" # triangle overlapping another triangle
+                          <overlapping-status> # #triangles overlapping status
+
+<enclosure-status i>  ::= <encl-not-member> # the triangle is not part of the ith enclosure
+                        | <encl-member> # the triangle is part of the ith enclosure
+
+<enclosure i medium>  ::= <medium-id> # the triangle is part of the ith enclosure and
+                                      # has this medium in the involved side(s)
+                        | "4294967293" # the triangle is part of the ith enclosure and
+                                       # has no defined medium in the involved side(s)
+                        | "4294967294" # the 2 sides of the triangle are part of the ith
+                                       # enclosure, but have 2 different media
+                        | "4294967295" # the triangle is not part of the ith enclosure
+
+-----------------
+
+<encl-not-member>     ::= "0"
+
+<encl-member>         ::= "1" # valid enclosure
+                        | "3" # invalid enclosure: more than 1 medium
+                        | "5" # invalid enclosure: some triangles with no defined medium
+                        | "7" # invalid enclosure: more than 1 "medium", including undefined
+_______
+
+== INFRARED IMAGE
+
+When invoked with option *-R*, *stardis*(1) generates an infrared image of
+the system and write it to _standard output_. Depending on the *fmt*
+sub-option, this file can be either in VTK [1] format on in *htrdr-image*(5)
+format.
+
+=== HTRDR-IMAGE INFRARED IMAGE
+If the output image is in htrdr-image format, it comply with the *lw* section
+of the format, with only the temperature fields being informed. The resulting
+format is as follows:
+
+[verse]
+_______
+<htrdr-image>    ::= <definition>
+                     <pixel>
+                   [ <pixel> ... ]
+
+<definition>     ::= <width> <height>
+<width>          ::= INTEGER
+<height>         ::= INTEGER
+
+<pixel>          ::= <temperature> 0 0 0 0 <time>
+
+<temperature>    ::= <estimate>
+<time>           ::= <estimate>
+
+<estimate>       ::= <expected-value> <standard-error>
+<expected-value> ::= REAL
+<standard-error> ::= REAL
+_______
+
+These files can be post-processed using the *htpp*(1) tool, that is part of
+the high-tune project.
+
+=== VTK INFRARED IMAGE
+If the output image is in VTK format, it is on an XY plane with coordinates in
+the [0 pixel_count[ range. By convention, the origine (0,0) pixel is at the
+top-left corner of the image.
+
+The result not only includes the computed temperature image, but also includes
+a per-pixel computation time image as well as a per-pixel path error count
+image and per-pixel standard deviation images for both temperature and
+computation time.
+
+[verse]
+_______
+<infrared-image>     ::= "# vtk DataFile Version 2.0"
+                         "Infrared Image"
+                         "ASCII"
+                         "DATASET STRUCTURED_POINTS"
+                         "DIMENSIONS" <image-width> <image-height> "1"
+                         "ORIGIN 0 0 0"
+                         "SPACING 1 1 1"
+                         "POINT_DATA" <image-width>*<image-height>
+                         "SCALARS temperature_estimate float 1"
+                         "LOOKUP_TABLE default"
+                         <temperatures>
+                         "SCALARS temperature_std_dev float 1"
+                         "LOOKUP_TABLE default"
+                         <temp_std_devs>
+                         "SCALARS computation_time float 1"
+                         "LOOKUP_TABLE default"
+                         <computation_times>
+                         "SCALARS computation_time_std_dev float 1"
+                         "LOOKUP_TABLE default"
+                         <com_time_std_devs>
+                         "SCALARS failures_count unsigned_long_long 1"
+                         "LOOKUP_TABLE default"
+                         <failures_counts>
+
+<temperatures>       ::= REAL # in [0, INF)
+                         <temperatures> # <image-width>*<image-height> temperatures
+
+<temp_std_devs>      ::= REAL # in [0, INF)
+                         <temperature_std_devs> # <image-width>*<image-height> std_devs
+
+<computation_times>  ::= REAL # in [0, INF)
+                         <computation_times> # <image-width>*<image-height> times
+
+<comp_time_std_devs> ::= REAL # in [0, INF)
+                         <comp_time_std_devs> # <image-width>*<image-height> std_devs
+
+<failures_counts>    ::= INTEGER # in [0, SAMPLES_COUNT]
+                         <failures_counts> # <image-width>*<image-height> failures_counts
+_______
+
+== DUMP HEAT PATHS
+
+When the *stardis*(1) option *-D* is used in conjunction with an option that
+computes a result, some of the heat paths (successful paths, erroneous paths,
+or both) sampled during the simulation are written to files. Each path is
+written in VTK [1] format, one VTK file per path. The path description can
+include vertices' time if it makes sense, that is if the computation time is
+not INF.
+
+[verse]
+_______
+
+<heat-path>       ::= "# vtk DataFile Version 2.0"
+                      "Heat path"
+                      "ASCII"
+                      "DATASET POLYDATA"
+                      "POINTS" #vertices "double"
+                      <path-vertices>
+                      "LINES 1" #vertices+1
+                      <heat-path>
+                      "POINT_DATA" #vertices
+                      "SCALARS Vertex_Type unsigned_char 1"
+                      "LOOKUP_TABLE default"
+                      <vertices-types>
+                      "CELL_DATA 1"
+                      "SCALAR Path_type unsigned_char 1"
+                      "LOOKUP_TABLE default"
+                      <path-type>
+                      "SCALARS Weight double 1"
+                      "LOOKUP_TABLE default"
+                      <weigths>
+                    [ <vertices-time> ] # if not steady
+
+<path-vertices>   ::= <real3>
+                      <path-vertices> # #vertices vertices
+
+<heat-path>       ::= #vertices "0" "1" ... #vertices-1
+
+<vertices-types>  ::= <vertice-type>
+                      <vertices-types> # #vertices types
+
+<weigths>         ::= REAL
+                      <weigths> # #vertices weigths
+
+<vertices-time>   ::= "SCALARS Time double 1"
+                      "LOOKUP_TABLE default"
+                      <durations>
+
+-----------------
+
+<real3>           ::= REAL REAL REAL
+
+<durations>       ::= REAL # in [0, INF)
+                      <durations> # #vertices durations
+
+<vertice-type>    ::= "0" # CONDUCTION
+                    | "1" # CONVECTION
+                    | "2" # RADIATIVE
+
+<path-type>       ::= "0" # SUCCESS
+                    | "1" # FAILURE
+
+_______
+
+== NOTES
+
+1. VTK file format -
+  <http://www.vtk.org/wp-content/uploads/2015/04/file-formats.pdf>
+
+2. Paraview softawre -
+  <https://www.paraview.org/>
+
+== SEE ALSO
+
+*stardis*(1),
+*stardis-input*(5)

@@ -1,1032 +1,608 @@
-/* Copyright (C) 2018 |Meso|Star> (contact@meso-star.com) */
+/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#define _GNU_SOURCE 1
-#include <string.h>
-#include <ctype.h>
 #include "stardis-app.h"
+#include "stardis-output.h"
+#include "stardis-compute.h"
+#include "stardis-intface.h"
+#include "stardis-fluid.h"
+#include "stardis-solid.h"
 
+#include <star/senc3d.h>
+#include <star/sg3d_sencXd_helper.h>
+#include <star/sg3d_sdisXd_helper.h>
 
-#include <rsys/hash_table.h>
-#define HTABLE_NAME descriptions
-#define HTABLE_KEY struct description
-#define HTABLE_DATA unsigned
-#define HTABLE_KEY_FUNCTOR_EQ eq_description
-#define HTABLE_KEY_FUNCTOR_HASH hash_description
-#include <rsys/hash_table.h>
+#include <rsys/str.h>
+#include <rsys/text_reader.h>
+#include <rsys/logger.h>
+#include <rsys/double2.h>
+#include <rsys/double3.h>
+
+#include <string.h>
+
+static const struct dummies DUMMIES_NULL = DUMMIES_NULL__;
+
+static const struct counts COUNTS_NULL = COUNTS_NULL__;
 
 /*******************************************************************************
- *
+ * Local Functions
  ******************************************************************************/
-static INLINE char*
-read_line(char** pb, FILE* stream)
-{
-  const int chunk_sz = 32;
-  char* buf = *pb;
-  size_t idx;
-
-  if(!buf) buf = sa_add(buf, 128);
-
-  do {
-    /* Read stream until EOL, EOF or up to sa_size(b) */
-    if(!fgets(buf, (int)sa_size(buf) + 1, stream)) return NULL;
-
-    /* Ensure that he whole line is read */
-    while(!strrchr(buf, '\n') && !feof(stream)) {
-      /* Add some room to buffer */
-      char* more = sa_add(buf, (size_t)chunk_sz);
-      /* Continue reading chunk_sz more characters until EOL or EOF */
-      fgets(more, chunk_sz + 1, stream);
-    }
-    /* Search idx of first occurence of comment char or EOL */
-    idx = strcspn(buf, "#\n\r");
-    /* Remove meaningless text */
-    buf[idx] = '\0';
-    /* Find first text */
-    idx = strspn(buf, " \t");
-  } while(buf[idx] == '\0'); /* Skip empty lines */
-  *pb = buf;
-  return buf;
-}
-
-static char** split_line(char* a_str, const char a_delim)
-{
-  char** result    = 0;
-  size_t count     = 0;
-  char* tmp        = a_str;
-  char* last_comma = 0;
-  char delim[2];
-  delim[0] = a_delim;
-  delim[1] = 0;
-
-  /* Count how many elements will be extracted. */
-  while (*tmp)
-  {
-    if (a_delim == *tmp)
-    {
-      count++;
-      last_comma = tmp;
-    }
-    tmp++;
-  }
-
-  /* Add space for trailing token. */
-  count += last_comma < (a_str + strlen(a_str) - 1);
-
-  /* Add space for terminating null string so caller
-     knows where the list of returned strings ends. */
-  count++;
-
-  result = malloc(sizeof(char*) * count);
-
-  if (result)
-  {
-    size_t idx  = 0;
-    char* token = strtok(a_str, delim);
-
-    while (token)
-    {
-      ASSERT(idx < count);
-#ifdef COMPILER_CL
-      *(result + idx++) = _strdup(token);
-#else
-      *(result + idx++) = strdup(token);
-#endif
-      token = strtok(0, delim);
-    }
-    ASSERT(idx == count - 1);
-    *(result + idx) = 0;
-  }
-
-  return result;
-}
-
-#ifdef COMPILER_GCC
-static char*
-_strupr(char* s)
-{
-  char* ptr;
-  for (ptr = s; *ptr; ++ptr) {
-    int tmp = toupper(*ptr);
-    ASSERT(tmp == (char)tmp);
-    *ptr = (char)tmp;
-  }
-  return s;
-}
-#endif
-
-
-/* Read medium line; should be one of:
- * SOLID medium_name STL_filename lambda rho cp delta "Tinit(x,y,z)" [ "volumic_power(x,y,z,t)" ]
- * FLUID medium_name STL_filename rho cp "Tinit(x,y,z)"
-*/
 static res_T
-parse_medium_line(char* line, char** stl_filename, struct description* desc)
+read_model
+  (const struct darray_str* model_files,
+   struct stardis* stardis,
+   struct dummies* dummies)
 {
-  char* tk = NULL;
   res_T res = RES_OK;
+  const struct str* files = NULL;
+  size_t i;
+  FILE* f = NULL;
+  struct txtrdr* txtrdr = NULL;
 
-#define CHK_TOK(x, Name) if ((tk = (x)) == NULL) {\
-   fprintf(stderr, "Invalid data (missing token " Name ")\n");\
-   res = RES_BAD_ARG;\
-   goto exit;\
-  } (void)0
-  CHK_TOK(_strupr(strtok(line, " ")), "medium type");
-  if (strcmp(tk, "SOLID") == 0) {
-    desc->type = DESC_MAT_SOLID;
-    desc->d.solid = NULL_SOLID;
-
-    CHK_TOK(strtok(NULL, " "), "medium name");
-    if (strlen(tk) >= sizeof(desc->d.solid.name)) {
-      fprintf(stderr, "Medium name is too long: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
+  ASSERT(model_files && stardis && dummies);
+  files = darray_str_cdata_get(model_files);
+  FOR_EACH(i, 0, darray_str_size_get(model_files)) {
+    const char* name = str_cget(files + i);
+    f = fopen(name, "r");
+    if(!f) {
+      logger_print(stardis->logger, LOG_ERROR,
+        "Cannot open model file '%s'\n",
+        name);
+      res = RES_IO_ERR;
+      goto error;
     }
-    strncpy(desc->d.solid.name, tk, sizeof(desc->d.solid.name));
-
-    CHK_TOK(strtok(NULL, " "), "file name");
-    *stl_filename = malloc(strlen(tk) + 1);
-    strcpy(*stl_filename, tk);
-
-    CHK_TOK(strtok(NULL, " "), "lambda");
-    res = cstr_to_double(tk, &desc->d.solid.lambda);
-    if (res != RES_OK || desc->d.solid.lambda <= 0) {
-      fprintf(stderr, "Invalid lambda: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
+    txtrdr_stream(stardis->allocator, f, name, '#', &txtrdr);
+    for(;;) {
+      char* line;
+      ERR(txtrdr_read_line(txtrdr));
+      line = txtrdr_get_line(txtrdr);
+      if(!line) break;
+      ERR(process_model_line(name, line, stardis, dummies));
     }
-    CHK_TOK(strtok(NULL, " "), "rho");
-    res = cstr_to_double(tk, &desc->d.solid.rho);
-    if (res != RES_OK || desc->d.solid.rho <= 0) {
-      fprintf(stderr, "Invalid rho: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    CHK_TOK(strtok(NULL, " "), "cp");
-    res = cstr_to_double(tk, &desc->d.solid.cp);
-    if (res != RES_OK || desc->d.solid.cp <= 0) {
-      fprintf(stderr, "Invalid cp: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    CHK_TOK(strtok(NULL, " "), "delta");
-    res = cstr_to_double(tk, &desc->d.solid.delta);
-    if (res != RES_OK || desc->d.solid.delta <= 0) {
-      fprintf(stderr, "Invalid delta: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    /* Depending of the number of spaces before '"' strtok should
-     * be called once or twice */
-    CHK_TOK(strtok(NULL, "\""), "Tinit");
-    if (*(tk + strspn(tk, " \t")) == '\0') {
-      CHK_TOK(strtok(NULL, "\""), "Tinit");
-    }
-    desc->d.solid.Tinit = malloc(strlen(tk) + 1);
-    strcpy(desc->d.solid.Tinit, tk);
-    /* Closing " fot Tinit; can return NULL if line ends just after "Tinit" */
-    tk = strtok(NULL, "\"");
-
-    /* Volumic Power is optional */
-    if (tk && *(tk + strspn(tk, " \t")) == '\0') {
-      /* Depending of the number of spaces before '"' strtok should
-       * be called once or twice */
-      tk = strtok(NULL, "\"");
-    }
-    if (tk) {
-      desc->d.solid.power = malloc(strlen(tk) + 1);
-      strcpy(desc->d.solid.power, tk);
-      /* Can be changed aftwerwards if compiled to constant 0  */
-      desc->d.solid.has_power = 1;
-    }
+    txtrdr_ref_put(txtrdr);
+    txtrdr = NULL;
+    fclose(f);
+    f = NULL;
   }
-  else if (strcmp(tk, "FLUID") == 0) {
-    desc->type = DESC_MAT_FLUID;
-    desc->d.fluid = NULL_FLUID;
+  if(stardis->scale_factor <= 0)
+    stardis->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Scaling factor is %g\n", stardis->scale_factor);
 
-    CHK_TOK(strtok(NULL, " "), "medium name");
-    if (strlen(tk) >= sizeof(desc->d.fluid.name)) {
-      fprintf(stderr, "Medium name is too long: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    strncpy(desc->d.fluid.name, tk, sizeof(desc->d.fluid.name));
-
-    CHK_TOK(strtok(NULL, " "), "file name");
-    *stl_filename = malloc(strlen(tk) + 1);
-    strcpy(*stl_filename, tk);
-
-    CHK_TOK(strtok(NULL, " "), "rho");
-    res = cstr_to_double(tk, &desc->d.fluid.rho);
-    if (res != RES_OK || desc->d.fluid.rho <= 0) {
-      fprintf(stderr, "Invalid rho: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    CHK_TOK(strtok(NULL, " "), "cp");
-    res = cstr_to_double(tk, &desc->d.fluid.cp);
-    if (res != RES_OK || desc->d.fluid.cp <= 0) {
-      fprintf(stderr, "Invalid cp: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    /* Depending of the number of spaces before '"' strtok should
-     * be called once or twice */
-    CHK_TOK(strtok(NULL, "\""), "Tinit");
-    if (*(tk + strspn(tk, " \t")) == '\0') {
-      CHK_TOK(strtok(NULL, "\""), "Tinit");
-    }
-    desc->d.fluid.Tinit = malloc(strlen(tk) + 1);
-    strcpy(desc->d.fluid.Tinit, tk);
-  }
-  else {
-    res = RES_BAD_ARG;
-    fprintf(stderr, "Invalid medium type: %s\n", tk);
-  }
-
-#undef CHK_TOK
+  ASSERT(!f && !txtrdr);
 exit:
   return res;
+error:
+  if(f) fclose(f);
+  if(txtrdr) txtrdr_ref_put(txtrdr);
+  goto exit;
 }
 
-/* Read boundary line; should be one of:
-#   H_BOUNDARY_FOR_SOLID Boundary_name STL_filename emissivity specular_fraction hc hc_max "T_env(x,y,z,t)"
-# | H_BOUNDARY_FOR_FLUID Boundary_name STL_filename emissivity specular_fraction hc hc_max "T_env(x,y,z,t)"
-# | T_BOUNDARY_FOR_SOLID Boundary_name STL_filename "T_value(x,y,z,t)"
-# | T_BOUNDARY_FOR_FLUID Boundary_name STL_filename "T_value(x,y,z,t)" hc hc_max
-# | F_BOUNDARY_FOR_SOLID Boundary_name STL_filename "F_value(x,y,z,t)"
-# ; no F_BOUNDARY_FOR_FLUID
-# | SOLID_FLUID_CONNECTION Connection_name STL_filename emissivity specular_fraction hc hc_max
- */
-static res_T
-parse_boundary_line(char* line, char** stl_filename, struct description* desc)
+static struct sdis_interface*
+geometry_get_interface
+  (const size_t itri, void* ctx)
 {
-  char* tk = NULL;
-  int h_solid = 0, h_fluid = 0;
-  int t_solid = 0, t_fluid = 0;
-  int f_solid = 0;
-  int sf_connect = 0;
-  res_T res = RES_OK;
+  struct darray_interface_ptrs* app_interface_data = ctx;
+  ASSERT(app_interface_data
+    && itri < darray_interface_ptrs_size_get(app_interface_data));
+  return darray_interface_ptrs_cdata_get(app_interface_data)[itri];
+}
 
-#define CHK_TOK(x, Name) if ((tk = (x)) == NULL) {\
-   fprintf(stderr, "Invalid data (missing token " Name ")\n");\
-   res = RES_BAD_ARG;\
-   goto exit;\
-  } (void)0
-  CHK_TOK(strtok(line, " "), "boundary type");
-  h_solid = (0 == strcmp(tk, "H_BOUNDARY_FOR_SOLID"));
-  if (!h_solid) {
-    h_fluid = (0 == strcmp(tk, "H_BOUNDARY_FOR_FLUID"));
-    if (!h_fluid) {
-      t_solid = (0 == strcmp(tk, "T_BOUNDARY_FOR_SOLID"));
-      if (!t_solid) {
-        t_fluid = (0 == strcmp(tk, "T_BOUNDARY_FOR_FLUID"));
-        if (!t_fluid) {
-          f_solid = (0 == strcmp(tk, "F_BOUNDARY_FOR_SOLID"));
-          if (!f_solid) {
-            sf_connect = (0 == strcmp(tk, "SOLID_FLUID_CONNECTION"));
+static res_T
+check_delta_and_create_solid
+  (struct stardis* stardis,
+   struct description* description)
+{
+  res_T res = RES_OK;
+  struct senc3d_enclosure* enc = NULL;
+  double ratio, delta_range[2] = { DBL_MAX, -DBL_MAX };
+  const double acceptance_ratio = 3;
+  struct senc3d_enclosure_header header;
+
+  ASSERT(stardis && description && description->type == DESC_MAT_SOLID);
+
+  /* Create solid to have ID informed */
+  /* Check if delta can fit possible multiple enclosures */
+  if(stardis->senc3d_scn) {
+    /* Due to previous errors, senc3d_scn can be unavailable */
+    unsigned e, ecount = 0;
+    const unsigned desc_id = description->d.solid.desc_id;
+
+    /* The enclosures where created using description ids */
+    ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn,
+      desc_id, &ecount));
+    if(ecount == 0) {
+      unsigned ccount;
+      ERR(sg3d_geometry_get_unique_triangles_with_properties_conflict_count(
+        stardis->geometry.sg3d, &ccount));
+      CHK(ccount == 0); /* This solid can only be unused if in conflict*/
+    } else {
+      int external = 0;
+      FOR_EACH(e, 0, ecount) {
+        ERR(senc3d_scene_get_enclosure_by_medium(stardis->senc3d_scn, desc_id,
+          e, &enc));
+        ERR(senc3d_enclosure_get_header(enc, &header));
+        if(header.is_infinite) {
+          /* External solid, volume is negative and no delta walk expected */
+          external = 1;
+        } else {
+          double d = header.volume / (header.area * 6);
+          ASSERT(d >= 0);
+          delta_range[0] = MMIN(delta_range[0], d);
+          delta_range[1] = MMAX(delta_range[1], d);
+        }
+        ERR(senc3d_enclosure_ref_put(enc));
+        enc = NULL;
+      }
+      if(ecount > 1 || !external) {
+        ASSERT(0 < delta_range[0] && delta_range[0] <= delta_range[1]);
+        ratio = delta_range[1] / delta_range[0];
+        if(ratio > acceptance_ratio)
+          logger_print(stardis->logger, LOG_WARNING,
+            "Solid '%s' is used in %u different enclosures that have different "
+            "delta requirements.\n",
+            str_cget(&description->d.solid.name), ecount);
+        /* Delta needs to be substituted with actual value */
+        if(description->d.solid.delta == DELTA_AUTO) {
+          description->d.solid.delta = delta_range[0];
+          logger_print(stardis->logger, LOG_OUTPUT,
+            "Auto delta for solid '%s' set to %g\n",
+            str_cget(&description->d.solid.name), description->d.solid.delta);
+        } else {
+          int too_small
+            = (delta_range[0] > description->d.solid.delta * acceptance_ratio);
+          int too_big
+            = (delta_range[0] * acceptance_ratio < description->d.solid.delta);
+          /* Check if user delta is OK */
+          if(too_small || too_big) {
+            logger_print(stardis->logger, LOG_WARNING,
+              "User delta for solid '%s' seems too %s: %g; "
+              "auto delta would have set it to %g.\n",
+              str_cget(&description->d.solid.name), (too_big ? "big" : "small"),
+              description->d.solid.delta, delta_range[0]);
           }
         }
       }
     }
   }
-
-  if (h_solid || h_fluid) {
-    desc->type = h_solid ? DESC_BOUND_H_FOR_SOLID : DESC_BOUND_H_FOR_FLUID;
-    desc->d.h_boundary = NULL_HBOUND;
-
-    CHK_TOK(strtok(NULL, " "), "boundary name");
-    if (strlen(tk) >= sizeof(desc->d.h_boundary.name)) {
-      fprintf(stderr, "Boundary name is too long: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    strncpy(desc->d.h_boundary.name, tk, sizeof(desc->d.h_boundary.name));
-
-    /* The description is parsed the same way for both types */
-    CHK_TOK(strtok(NULL, " "), "file name");
-    *stl_filename = malloc(strlen(tk) + 1);
-    strcpy(*stl_filename, tk);
-
-    CHK_TOK(strtok(NULL, " "), "emissivity");
-    res = cstr_to_double(tk, &desc->d.h_boundary.emissivity);
-    if (res != RES_OK ||
-      desc->d.h_boundary.emissivity < 0 || desc->d.h_boundary.emissivity > 1) {
-      fprintf(stderr, "Invalid emissivity: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    desc->d.h_boundary.has_emissivity = (desc->d.h_boundary.emissivity > 0);
-    CHK_TOK(strtok(NULL, " "), "specular fraction");
-    res = cstr_to_double(tk, &desc->d.h_boundary.specular_fraction);
-    if (res != RES_OK
-      || desc->d.h_boundary.specular_fraction < 0.0
-      || desc->d.h_boundary.specular_fraction > 1.0) {
-      fprintf(stderr, "Invalid specular_fraction: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    CHK_TOK(strtok(NULL, " "), "hc");
-    res = cstr_to_double(tk, &desc->d.h_boundary.hc);
-    if (res != RES_OK || desc->d.h_boundary.hc < 0) {
-      fprintf(stderr, "Invalid hc value: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    desc->d.h_boundary.has_hc = (desc->d.h_boundary.hc > 0);
-    CHK_TOK(strtok(NULL, " "), "hc max");
-    res = cstr_to_double(tk, &desc->d.h_boundary.hc_max);
-    if (res != RES_OK
-      || desc->d.h_boundary.hc_max < desc->d.h_boundary.hc
-      || desc->d.h_boundary.hc_max < 0) {
-      fprintf(stderr, "Invalid hc_max value: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    /* Depending of the number of spaces before '"' strtok should
-     * be called once or twice */
-    CHK_TOK(strtok(NULL, "\""), "temperature");
-    if (*(tk + strspn(tk, " \t")) == '\0') {
-      CHK_TOK(strtok(NULL, "\""), "temperature");
-    }
-    desc->d.h_boundary.T = malloc(strlen(tk) + 1);
-    strcpy(desc->d.h_boundary.T, tk);
-  }
-  else if (t_solid || t_fluid) {
-    desc->type = t_solid ? DESC_BOUND_T_FOR_SOLID : DESC_BOUND_T_FOR_FLUID;
-    desc->d.t_boundary = NULL_TBOUND;
-
-    CHK_TOK(strtok(NULL, " "), "boundary name");
-    if (strlen(tk) >= sizeof(desc->d.t_boundary.name)) {
-      fprintf(stderr, "Boundary name is too long: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    strncpy(desc->d.t_boundary.name, tk, sizeof(desc->d.t_boundary.name));
-
-    /* This part of the description is parsed the same way for both types */
-    CHK_TOK(strtok(NULL, " "), "file name");
-    *stl_filename = malloc(strlen(tk) + 1);
-    strcpy(*stl_filename, tk);
-
-    /* Depending of the number of spaces before '"' strtok should
-     * be called once or twice */
-    CHK_TOK(strtok(NULL, "\""), "temperature");
-    if (*(tk + strspn(tk, " \t")) == '\0') {
-      CHK_TOK(strtok(NULL, "\""), "temperature");
-    }
-    desc->d.t_boundary.T = malloc(strlen(tk) + 1);
-    strcpy(desc->d.t_boundary.T, tk);
-
-    /* Parse hc + hc_max only if fluid */
-    if (t_fluid) {
-      CHK_TOK(strtok(NULL, " "), "hc");
-      res = cstr_to_double(tk, &desc->d.t_boundary.hc);
-      if (res != RES_OK || desc->d.t_boundary.hc < 0) {
-        fprintf(stderr, "Invalid hc value: %s\n", tk);
-        res = RES_BAD_ARG;
-        goto exit;
-      }
-      desc->d.t_boundary.has_hc = (desc->d.t_boundary.hc > 0);
-      CHK_TOK(strtok(NULL, " "), "hc max");
-      res = cstr_to_double(tk, &desc->d.t_boundary.hc_max);
-      if (res != RES_OK
-        || desc->d.t_boundary.hc_max < desc->d.t_boundary.hc
-        || desc->d.t_boundary.hc_max < 0) {
-        fprintf(stderr, "Invalid hc_max value: %s\n", tk);
-        res = RES_BAD_ARG;
-        goto exit;
-      }
-    }
-    else desc->d.t_boundary.has_hc = 0;
-  }
-  else if (f_solid) {
-    desc->type = DESC_BOUND_F_FOR_SOLID;
-    desc->d.f_boundary = NULL_FBOUND;
-
-    CHK_TOK(strtok(NULL, " "), "boundary name");
-    if (strlen(tk) >= sizeof(desc->d.f_boundary.name)) {
-      fprintf(stderr, "Boundary name is too long: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    strncpy(desc->d.f_boundary.name, tk, sizeof(desc->d.f_boundary.name));
-
-    CHK_TOK(strtok(NULL, " "), "file name");
-    *stl_filename = malloc(strlen(tk) + 1);
-    strcpy(*stl_filename, tk);
-
-    /* Depending of the number of spaces before '"' strtok should
-     * be called once or twice */
-    CHK_TOK(strtok(NULL, "\""), "flux");
-    if (*(tk + strspn(tk, " \t")) == '\0') {
-      CHK_TOK(strtok(NULL, "\""), "flux");
-    }
-    desc->d.f_boundary.flux = malloc(strlen(tk) + 1);
-    strcpy(desc->d.f_boundary.flux, tk);
-  }
-  else if (sf_connect) {
-    desc->type = DESC_SOLID_FLUID_CONNECT;
-    desc->d.sf_connect = NULL_SFCONNECT;
-
-    CHK_TOK(strtok(NULL, " "), "boundary name");
-    if (strlen(tk) >= sizeof(desc->d.sf_connect.name)) {
-      fprintf(stderr, "Boundary name is too long: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    strncpy(desc->d.sf_connect.name, tk, sizeof(desc->d.sf_connect.name));
-
-    CHK_TOK(strtok(NULL, " "), "file name");
-    *stl_filename = malloc(strlen(tk) + 1);
-    strcpy(*stl_filename, tk);
-
-    CHK_TOK(strtok(NULL, " "), "emissivity");
-    res = cstr_to_double(tk, &desc->d.sf_connect.emissivity);
-    if (res != RES_OK ||
-      desc->d.sf_connect.emissivity < 0 || desc->d.sf_connect.emissivity > 1) {
-      fprintf(stderr, "Invalid emissivity: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    desc->d.sf_connect.has_emissivity = (desc->d.sf_connect.emissivity > 0);
-    CHK_TOK(strtok(NULL, " "), "specular fraction");
-    res = cstr_to_double(tk, &desc->d.sf_connect.specular_fraction);
-    if (res != RES_OK
-      || desc->d.sf_connect.specular_fraction < 0.0
-      || desc->d.sf_connect.specular_fraction > 1.0) {
-      fprintf(stderr, "Invalid specular_fraction: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    CHK_TOK(strtok(NULL, " "), "hc");
-    res = cstr_to_double(tk, &desc->d.sf_connect.hc);
-    if (res != RES_OK || desc->d.sf_connect.hc < 0) {
-      fprintf(stderr, "Invalid hc value: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-    desc->d.sf_connect.has_hc = (desc->d.sf_connect.hc > 0);
-    CHK_TOK(strtok(NULL, " "), "hc max");
-    res = cstr_to_double(tk, &desc->d.h_boundary.hc_max);
-    if (res != RES_OK
-      || desc->d.h_boundary.hc_max < desc->d.h_boundary.hc
-      || desc->d.h_boundary.hc_max < 0) {
-      fprintf(stderr, "Invalid hc_max value: %s\n", tk);
-      res = RES_BAD_ARG;
-      goto exit;
-    }
-  } else {
-  fprintf(stderr, "Invalid boundary type: %s", tk);
-    res = RES_BAD_ARG;
-    goto exit;
-  }
-
-#undef CHK_TOK
-exit:
-  return res;
-}
-
-static res_T
-read_vertices
-  (struct sstl_desc* desc,
-  struct htable_vertex* vertex2id,
-  unsigned** id2id,
-  struct geometry* geometry)
-{
-  res_T res = RES_OK;
-  unsigned vtx_index = 0;
-
-  for (vtx_index = 0; vtx_index < desc->vertices_count; ++vtx_index){
-    struct vertex vtx = NULL_VERTEX;
-    unsigned *found_id = NULL;
-
-    vtx.xyz[0] = desc->vertices[3*vtx_index + 0];
-    vtx.xyz[1] = desc->vertices[3*vtx_index + 1];
-    vtx.xyz[2] = desc->vertices[3*vtx_index + 2];
-    found_id = htable_vertex_find(vertex2id, &vtx);
-
-    if (found_id){
-      sa_push(*id2id, *found_id);
-    } else {
-      size_t sz = htable_vertex_size_get(vertex2id);
-      unsigned size;
-      ASSERT(sz < UINT_MAX);
-      size = (unsigned)sz;
-      res = htable_vertex_set(vertex2id, &vtx, &size);
-      if (res != RES_OK) return res;
-      sa_push(geometry->vertex, vtx);
-      sa_push(*id2id, size);
-    }
-  }
-
-  return res;
-}
-
-static int
-indices_to_key(struct unsigned3* key, const struct unsigned3* indices)
-{
-  int i, reversed = 0;
-  FOR_EACH(i, 0, 3) key->data[i] = indices->data[i];
-  if (key->data[0] > key->data[1]) {
-    reversed = !reversed;
-    SWAP(unsigned, key->data[0], key->data[1]);
-  }
-  if (key->data[1] > key->data[2]) {
-    reversed = !reversed;
-    SWAP(unsigned, key->data[1], key->data[2]);
-  }
-  if (key->data[0] > key->data[1]) {
-    reversed = !reversed;
-    SWAP(unsigned, key->data[0], key->data[1]);
-  }
-  return reversed;
-}
-
-static res_T
-read_triangles
-  (struct sstl_desc* stl_desc,
-   struct htable_triangle* triangle2id,
-   const char* stl_filename,
-   const unsigned* id2id,
-   const enum content_type file_type,
-   const unsigned desc_id,
-   struct geometry* geometry,
-   struct solve_boundary* boundary)
-{
-  res_T res = RES_OK;
-  unsigned* packed_indices = NULL;
-  float* packed_normals = NULL;
-  unsigned tri_index = 0, drop_cpt = 0;
-  for (tri_index = 0; tri_index < stl_desc->triangles_count; ++tri_index) {
-    struct triangle tri = NULL_TRIANGLE;
-    const unsigned *found_id = NULL;
-    unsigned i, id;
-    struct unsigned3 key;
-    int reversed;
-    int drop = 0;
-    enum sdis_side current_side = SDIS_FRONT;
-    unsigned* side_desc_ptr = NULL;
-    float coord[3][3];
-
-    FOR_EACH(i, 0, 3)
-      tri.indices.data[i] = id2id[stl_desc->indices[3*tri_index + i]];
-    reversed = indices_to_key(&key, &tri.indices);
-
-    FOR_EACH(i, 0, 3) {
-      unsigned j;
-      f3_set(coord[i], geometry->vertex[key.data[i]].xyz);
-      FOR_EACH(j, 0, i) {
-        if (f3_eq(coord[i], coord[j])) {
-          drop = 1;
-          drop_cpt++;
-        }
-      }
-    }
-    if (drop) continue;
-    FOR_EACH(i, 0, 3) {
-      sa_push(packed_indices, stl_desc->indices[3 * tri_index + i]);
-      sa_push(packed_normals, stl_desc->normals[3 * tri_index + i]);
-    }
-
-    /* Find triangle if already known, or insert it in known list */
-    found_id = htable_triangle_find(triangle2id, &key);
-    if (found_id) {
-      struct triangle* original_tri;
-      int original_reversed;
-      id = *found_id;
-      original_tri = geometry->triangle + id;
-      original_reversed = indices_to_key(&key, &original_tri->indices);
-      current_side = (reversed == original_reversed) ? SDIS_FRONT : SDIS_BACK;
-      ASSERT(id < sa_size(geometry->triangle));
-    } else {
-      size_t sz;
-      if (file_type == CONTENT_BOUNDARY) {
-        /* Cannot create new geometry! */
-        fprintf(stderr,
-          "Triangle %u from file %s cannot compute temperature on this surface\n"
-          "Not part of the model\n",
-          tri_index, stl_filename);
-        return RES_BAD_ARG;
-      }
-      sz = htable_triangle_size_get(triangle2id);
-      ASSERT(sz == sa_size(geometry->triangle));
-      ASSERT(sz < UINT_MAX);
-      id = (unsigned)sz;
-      /* Store tri as described by stl_desc regardless of key order */
-      res = htable_triangle_set(triangle2id, &key, &id);
-      if (res != RES_OK) goto error;
-      sa_push(geometry->triangle, tri);
-    }
-
-    switch (file_type) {
-    case CONTENT_CONNECTION:
-      side_desc_ptr = &geometry->triangle[id].connection_description;
-      break;
-    case CONTENT_GEOMETRY:
-      /* Is the triangle in triangle list reversed wrt stl_desc? */
-      side_desc_ptr = (current_side == SDIS_FRONT) ?
-        &geometry->triangle[id].front_description
-        : &geometry->triangle[id].back_description;
-      break;
-    case CONTENT_BOUNDARY:
-      sa_push(boundary->primitives, id);
-      sa_push(boundary->sides, current_side);
-      continue; /* Next triangle */
-      break;
-    default: FATAL("Invalid type.\n");
-    }
-    if (*side_desc_ptr != UINT_MAX && *side_desc_ptr != desc_id) {
-      /* Already described with a different description! */
-      fprintf(stderr, "Triangle %u %s from file %s with 2 different descriptions\n",
-        tri_index,
-        (file_type == CONTENT_CONNECTION
-          ? "connection" : (current_side == SDIS_FRONT ? "front" : "back")),
-        stl_filename);
-      print_trg_as_obj(stderr, (const struct vertex*)stl_desc->vertices, stl_desc->indices + (3 * tri_index));
-      return RES_BAD_ARG;
-    }
-    /* Everithing is OK: store description */
-    *side_desc_ptr = desc_id;
-  }
-  ASSERT(drop_cpt == 0 || packed_indices != NULL);
-  if (drop_cpt) {
-    fprintf(stderr, "File '%s' includes %u degenerate triangles (dropped)\n",
-      stl_filename, drop_cpt);
-    /* Keep only valid triangles */
-    ASSERT(sa_size(packed_indices) % 3 == 0);
-    ASSERT(sa_size(packed_indices) == sa_size(packed_normals));
-    ASSERT(sa_size(packed_indices) + 3 * drop_cpt == sa_size(stl_desc->indices));
-    /* Don't sa_release stl_desc->indices or stl_desc->normals as they have
-     * their own release mechanism */
-    stl_desc->indices = packed_indices;
-    stl_desc->normals = packed_normals;
-    stl_desc->triangles_count = sa_size(stl_desc->indices) / 3;
-  }
-  else {
-    sa_release(packed_indices);
-    sa_release(packed_normals);
-    packed_indices = NULL;
-    packed_normals = NULL;
-  }
+  ERR(create_solver_solid(stardis, &description->d.solid));
 
 end:
-  sa_release(packed_indices);
-  sa_release(packed_normals);
-
-  return res;
-  error:
-    goto end;
-}
-
-res_T
-read_stl
-  (const unsigned desc_id,
-   const enum content_type file_type,
-   const char* stl_filename,
-   struct htable_vertex* vertex2id,
-   struct htable_triangle* triangle2id,
-   struct stardis* stardis)
-{
-  res_T res = RES_OK;
-  struct sstl* sstl = NULL;
-  struct sstl_desc stl_desc;
-  unsigned* id2id = NULL;
-
-  if (!stl_filename) return RES_BAD_ARG;
-
-  SSTL(create(NULL, &stardis->allocator, 0, &sstl));
-
-  res = sstl_load(sstl, stl_filename);
-  if (res != RES_OK) {
-    fprintf(stderr, "Cannot read STL file: %s\n", stl_filename);
-    goto error;
-  }
-  SSTL(get_desc(sstl, &stl_desc));
-
-  res = read_vertices(&stl_desc, vertex2id, &id2id, &stardis->geometry);
-  if (res != RES_OK) goto error;
-  res = read_triangles(&stl_desc, triangle2id, stl_filename, id2id, file_type,
-    desc_id, &stardis->geometry, &stardis->boundary);
-  if (res != RES_OK) goto error;
-  
-end:
-  sa_release(id2id);
-  SSTL(ref_put(sstl));
+  if(enc) SENC3D(enclosure_ref_put(enc));
   return res;
 error:
   goto end;
 }
 
 /*******************************************************************************
- *
- ******************************************************************************/
-
-static res_T
-geometry_analyse
-  (const char* medium_filename,
-   const char* bc_filename,
-   const char* bound_filename, /* Can be NULL */
-   struct stardis* stardis)
-{
-  res_T res = RES_OK;
-  FILE* input = NULL;
-  char* line = NULL;
-  unsigned sz = (unsigned)sa_size(stardis->descriptions);
-  struct htable_vertex vertex2id;
-  struct htable_triangle triangle2id;
-  struct htable_descriptions descriptions;
-  int tables_initialised = 0;
-  unsigned desc_id;
-  unsigned *p_desc;
-  ASSERT(sz == sa_size(stardis->descriptions));
-
-  stardis->geometry = NULL_GEOMETRY;
-
-  /* parse medium files */
-  input = fopen(medium_filename,"r");
-  if (!input){
-    fprintf(stderr,"Cannot open %s\n", medium_filename);
-    res = RES_IO_ERR;
-    goto error;
-  }
-
-  htable_vertex_init(&stardis->allocator, &vertex2id);
-  htable_triangle_init(&stardis->allocator, &triangle2id);
-  htable_descriptions_init(&stardis->allocator, &descriptions);
-  tables_initialised = 1;
-  /* loop on media */
-  while (read_line(&line, input)){
-    char* stl_filename = NULL;
-    struct description desc;
-    
-    init_description(&desc);
-    res = parse_medium_line(line, &stl_filename, &desc);
-    if (res != RES_OK) goto error;
-
-    /* Deduplicate media: find if the same description already exists
-     * (including name) */
-    p_desc = htable_descriptions_find(&descriptions, &desc);
-    if (!p_desc) {
-      sa_push(stardis->descriptions, desc);
-      desc_id = sz++;
-      ASSERT(sz == sa_size(stardis->descriptions));
-      /* Register new medium description */
-      res = htable_descriptions_set(&descriptions, &desc, &desc_id);
-      if (res != RES_OK) goto error;
-    } else {
-      fprintf(stderr, "Duplicate media description found: deduplicated.\n");
-      desc_id = *p_desc;
-    }
-
-    res = read_stl(sz-1, CONTENT_GEOMETRY, stl_filename, &vertex2id,
-      &triangle2id, stardis);
-    if (stl_filename) free(stl_filename);
-    if (res != RES_OK) goto error;
-  }
-  fclose(input);
-  input = NULL;
-
-  /* parse boundary files */
-  input = fopen(bc_filename,"r");
-  if (!input){
-    fprintf(stderr,"Cannot open %s\n", bc_filename);
-    res = RES_IO_ERR;
-    goto error;
-  }
-
-  /* loop on boundaries */
-  while (read_line(&line, input)){
-    char* stl_filename = NULL;
-    struct description desc;
-
-    init_description(&desc);
-    res = parse_boundary_line(line, &stl_filename, &desc);
-    if (res != RES_OK) goto error;
-    
-    /* Deduplicate media: find if the same description already exists
-     * (including name) */
-    p_desc = htable_descriptions_find(&descriptions, &desc);
-    if (!p_desc) {
-      sa_push(stardis->descriptions, desc);
-      desc_id = sz++;
-      ASSERT(sz == sa_size(stardis->descriptions));
-      /* Register new boundary description */
-      res = htable_descriptions_set(&descriptions, &desc, &desc_id);
-      if (res != RES_OK) goto error;
-    } else {
-      fprintf(stderr, "Duplicate boundary description found: deduplicated.\n");
-      desc_id = *p_desc;
-    }
-    
-    res = read_stl(desc_id, CONTENT_CONNECTION, stl_filename, &vertex2id,
-      &triangle2id, stardis);
-    if (stl_filename) free(stl_filename);
-    if (res != RES_OK) goto error;
-  }
-  fclose(input);
-  input = NULL;
-
-  /* Process vtk file describing boundary compute */
-  if (bound_filename) {
-    res = read_stl(0, CONTENT_BOUNDARY, bound_filename, &vertex2id,
-      &triangle2id, stardis);
-    if (res != RES_OK) goto error;
-  }
-
-exit:
-  if(input) fclose(input);
-  if (tables_initialised) {
-    htable_descriptions_release(&descriptions);
-    htable_vertex_release(&vertex2id);
-    htable_triangle_release(&triangle2id);
-  }
-  sa_release(line);
-  return res;
-error:
-  goto exit;
-}
-
-static res_T
-parse_camera
-  (char* cam_param, struct camera* cam)
-{
-  char** line = NULL;
-  char** opt = NULL;
-  res_T res = RES_OK;
-
-  line = split_line(cam_param,':');
-  
-  if (line)
-  {
-    int i = 0;
-    for (i = 0; *(line + i); i++)
-    {
-      size_t len = 0;
-      opt = split_line(line[i],'=');
-      if (strcmp(opt[0], "t") == 0) {
-        res = cstr_to_double(opt[1], &cam->u.time);
-        if (res != RES_OK) goto error;
-      } else if (strcmp(opt[0],"fov")==0){
-        res = cstr_to_double(opt[1], &cam->fov);
-        if (res != RES_OK) goto error;
-      } else if (strcmp(opt[0],"up")==0) {
-        res = cstr_to_list_double(opt[1], ',', cam->up, &len, 3);
-        if (res != RES_OK || len != 3) goto error;
-      } else if (strcmp(opt[0],"tgt")==0) {
-        res = cstr_to_list_double(opt[1], ',', cam->tgt, &len, 3);
-        if (res != RES_OK || len != 3) goto error;
-      } else if (strcmp(opt[0],"pos")==0) {
-        res = cstr_to_list_double(opt[1], ',', cam->pos, &len, 3);
-        if (res != RES_OK || len != 3) goto error;
-      } else if (strcmp(opt[0],"img")==0) {
-        res = cstr_to_list_uint(opt[1], 'x', cam->img, &len, 2);
-        if (res != RES_OK || len != 2) goto error;
-      } else if (strcmp(opt[0],"spp")==0) {
-        res = cstr_to_uint(opt[1], &cam->spp);
-        if (res != RES_OK) goto error;
-      } 
-    }
-  }
-
-exit:
-  FREE_AARRAY(line)
-  FREE_AARRAY(opt)
- 
-  return res;
-error:
-  goto exit;
-}
-
-/*******************************************************************************
- *
+ * Public Functions
  ******************************************************************************/
 
 res_T
 stardis_init
   (const struct args* args,
+   struct logger* logger,
+   struct mem_allocator* allocator,
    struct stardis* stardis)
 {
-  res_T res = RES_OK;
+  res_T tmp_res, res = RES_OK;
+  struct sg3d_sdisXd_scene_create_context create_context;
+  struct dummies dummies = DUMMIES_NULL;
+  struct htable_intface htable_interfaces;
+  struct str str;
+  unsigned i, vcount, tcount, ocount, count;
+  int is_for_compute;
 
-  res = mem_init_proxy_allocator(&stardis->allocator,
-    &mem_default_allocator);
-  if (res != RES_OK) goto error;
+  ASSERT(args && logger && allocator && stardis);
 
-  res = geometry_analyse(args->medium_filename,
-      args->bc_filename, args->solve_boundary_filename, stardis);
-  if (res != RES_OK) goto error;
-
-  stardis->N = args->N;
+  str_init(allocator, &str);
+  /* Init everithing that cannot fail */
+  stardis->logger = logger;
+  stardis->allocator = allocator;
+  htable_intface_init(stardis->allocator, &htable_interfaces);
+  darray_descriptions_init(stardis->allocator, &stardis->descriptions);
+  d3_set(stardis->probe, args->pos_and_time);
+  d2_set(stardis->time_range, args->pos_and_time + 3);
+  stardis->dev = NULL;
+  stardis->sdis_scn = NULL;
+  stardis->senc3d_scn = NULL;
+  stardis->mode = args->mode;
+  stardis->counts = COUNTS_NULL;
+  init_camera(&stardis->camera);
+  str_init(stardis->allocator, &stardis->solve_name);
+  str_init(stardis->allocator, &stardis->paths_filename);
+  str_init(stardis->allocator, &stardis->bin_green_filename);
+  str_init(stardis->allocator, &stardis->end_paths_filename);
+  str_init(stardis->allocator, &stardis->chunks_prefix);
+  darray_size_t_init(stardis->allocator, &stardis->compute_surface.primitives);
+  darray_sides_init(stardis->allocator, &stardis->compute_surface.sides);
+  darray_uint_init(stardis->allocator, &stardis->compute_surface.err_triangles);
+  stardis->samples = args->samples;
   stardis->nthreads = args->nthreads;
-  stardis->probe[0] = args->u.probe[0];
-  stardis->probe[1] = args->u.probe[1];
-  stardis->probe[2] = args->u.probe[2];
-  stardis->probe[3] = args->u.probe[3];
-  stardis->scale_factor = args->scale_factor;
-  stardis->radiative_temp[0] = args->radiative_temp[0];
-  stardis->radiative_temp[1] = args->radiative_temp[1];
+  stardis->scale_factor = -1; /* invalid value */
+  stardis->ambient_temp = args->ambient_temp;
+  stardis->ref_temp = args->ref_temp;
   stardis->dump_paths = SDIS_HEAT_PATH_NONE;
-  if (args->dump_paths & DUMP_ERROR)
-    stardis->dump_paths |= SDIS_HEAT_PATH_FAILED;
-  if (args->dump_paths & DUMP_SUCCESS)
-    stardis->dump_paths |= SDIS_HEAT_PATH_SUCCEED;
+  if(args->dump_paths & DUMP_ERROR)
+    stardis->dump_paths |= SDIS_HEAT_PATH_FAILURE;
+  if(args->dump_paths & DUMP_SUCCESS)
+    stardis->dump_paths |= SDIS_HEAT_PATH_SUCCESS;
+  stardis->next_medium_id = 0;
+  stardis->undefined_medium_behind_boundary_id = SENC3D_UNSPECIFIED_MEDIUM;
+  stardis->verbose = args->verbose;
+  darray_media_ptr_init(stardis->allocator, &stardis->media);
 
- if (args->mode & IR_COMPUTE){
-    res = parse_camera(args->camera, &stardis->camera);
-    if (res != RES_OK) goto error;
- }
- else if (args->mode & MEDIUM_COMPUTE) {
-   strcpy(stardis->solve_name, args->medium_name);
- }
- else if (args->mode & BOUNDARY_COMPUTE) {
-   strcpy(stardis->solve_name, args->solve_boundary_filename);
- }
+  /* If a dump is expected, we won't process any computation */
+  is_for_compute =
+    (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_VTK);
+
+  ERR(sdis_device_create(stardis->logger, stardis->allocator, stardis->nthreads,
+    args->verbose, &stardis->dev));
+
+  ERR(init_geometry(stardis->logger, stardis->allocator, stardis->verbose,
+    &stardis->geometry));
+
+  if(args->mode & MODE_IR_COMPUTE) {
+    ERR(parse_camera(stardis->logger, args->camera, stardis));
+  }
+  else if(args->mode & MODE_MEDIUM_COMPUTE) {
+    ERR(str_set(&stardis->solve_name, args->medium_name));
+  }
+  else if(args->mode & SURFACE_COMPUTE_MODES) {
+    ERR(str_set(&stardis->solve_name, args->solve_filename));
+  }
+  else if(args->mode & MODE_DUMP_C_CHUNKS) {
+    ERR(str_set(&stardis->chunks_prefix, args->chunks_prefix));
+  }
+  ERR(read_model(&args->model_files, stardis, &dummies));
+
+  create_context.geometry = stardis->geometry.sg3d;
+  create_context.app_interface_getter = geometry_get_interface;
+  create_context.app_interface_data = &stardis->geometry.interf_bytrg;
+  ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));
+  ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tcount));
+
+  ERR(sg3d_geometry_validate_properties(stardis->geometry.sg3d,
+     validate_properties, stardis));
+  ERR(sg3d_geometry_get_unique_triangles_with_properties_conflict_count(
+    stardis->geometry.sg3d, &count));
+  if(count) {
+    logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
+      "Property conflicts found in the model (%u triangles).\n", count);
+    if(is_for_compute) {
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+
+  /* If computation is on a compute surface, read it */
+  if(args->mode & SURFACE_COMPUTE_MODES) {
+    unsigned save_count = count;
+    ASSERT(!str_is_empty(&stardis->solve_name));
+    ERR(read_compute_surface(stardis));
+    /* Check compute surface  */
+    ERR(sg3d_geometry_validate_properties(stardis->geometry.sg3d,
+      validate_properties, stardis));
+    ERR(sg3d_geometry_get_unique_triangles_with_properties_conflict_count(
+      stardis->geometry.sg3d, &count));
+    ASSERT(count >= save_count);
+    if(save_count != count) {
+      logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
+        "Invalid compute region defined by file '%s'.\n",
+        str_cget(&stardis->solve_name));
+      logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
+        "The file contains %u triangles not in the model.\n", count - save_count);
+      if(is_for_compute) {
+        res = RES_BAD_ARG;
+        goto error;
+      }
+    }
+  }
+
+  /* Create enclosures */
+  tmp_res = init_enclosures(stardis);
+  if(tmp_res != RES_OK && is_for_compute) {
+    res = tmp_res;
+    goto error;
+  }
+  ERR(senc3d_scene_get_overlapping_triangles_count(stardis->senc3d_scn, &ocount));
+  if(ocount) {
+    logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
+      "Scene contains %u overlapping triangles.\n",
+      ocount);
+    if(is_for_compute) {
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+
+  /* Create solids and log model information */
+  for(i = 0; i < darray_descriptions_size_get(&stardis->descriptions); i++) {
+    struct description* desc =
+      darray_descriptions_data_get(&stardis->descriptions) + i;
+    if(desc->type == DESC_MAT_SOLID) {
+      tmp_res = check_delta_and_create_solid(stardis, desc);
+      if(tmp_res != RES_OK && is_for_compute) {
+        res = tmp_res;
+        goto error;
+      }
+    }
+    ERR(str_print_description(&str, i, desc));
+    logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
+  }
+
+  if(is_for_compute) {
+    for(i = 0; i < tcount; ++i) {
+      ERR(create_intface(stardis, i, &htable_interfaces));
+    }
+    if(args->paths_filename) {
+      ERR(str_set(&stardis->paths_filename, args->paths_filename));
+    }
+    if(args->bin_green_filename) {
+      ERR(str_set(&stardis->bin_green_filename, args->bin_green_filename));
+    }
+    if(args->end_paths_filename) {
+      ERR(str_set(&stardis->end_paths_filename, args->end_paths_filename));
+    }
+  }
+
+  /* If computation is on a volume, check medium is known */
+  if(args->mode & MODE_MEDIUM_COMPUTE) {
+    if(!find_medium_by_name(stardis, &stardis->solve_name, NULL)) {
+      logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
+        "Cannot find medium '%s'\n", str_cget(&stardis->solve_name));
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+
+  if(is_for_compute) {
+    struct sdis_scene_create_args scn_args = SDIS_SCENE_CREATE_ARGS_DEFAULT;
+    ASSERT(darray_interface_ptrs_size_get(&stardis->geometry.interf_bytrg)
+      == tcount);
+    /* Can release enclosures as they are no longer needed if compute */
+    SENC3D(scene_ref_put(stardis->senc3d_scn));
+    stardis->senc3d_scn = NULL;
+    scn_args.get_indices = sg3d_sdisXd_geometry_get_indices;
+    scn_args.get_interface = sg3d_sdisXd_geometry_get_interface;
+    scn_args.get_position = sg3d_sdisXd_geometry_get_position;
+    scn_args.nprimitives = tcount;
+    scn_args.nvertices = vcount;
+    scn_args.fp_to_meter = stardis->scale_factor;
+    scn_args.trad = stardis->ambient_temp;
+    scn_args.tref = stardis->ref_temp;
+    scn_args.context = &create_context;
+    res = sdis_scene_create(stardis->dev, &scn_args, &stardis->sdis_scn);
+    if(res != RES_OK) {
+      logger_print(stardis->logger, LOG_ERROR,
+        "Cannot create the stardis solver scene.\n");
+      goto error;
+    }
+  }
 
 exit:
+  str_release(&str);
+  htable_intface_release(&htable_interfaces);
   return res;
 error:
+  stardis_release(stardis);
   goto exit;
 }
 
 void
-stardis_release(struct stardis* stardis)
+stardis_release
+  (struct stardis* stardis)
 {
-  size_t i = 0;
+  size_t i;
 
-  for (i=0; i<sa_size(stardis->descriptions); ++i) {
-    struct description* desc = &stardis->descriptions[i];
-    switch (desc->type) {
-    case DESC_MAT_SOLID:
-      free(desc->d.solid.power);
-      free(desc->d.solid.Tinit);
-      free(desc->d.solid.Temp);
-      break;
-    case DESC_MAT_FLUID:
-      free(desc->d.fluid.Tinit);
-      free(desc->d.fluid.Temp);
-      break;
-    case DESC_BOUND_H_FOR_SOLID:
-    case DESC_BOUND_H_FOR_FLUID:
-      free(desc->d.h_boundary.T);
-      break;
-    case DESC_BOUND_T_FOR_SOLID:
-    case DESC_BOUND_T_FOR_FLUID:
-      free(desc->d.t_boundary.T);
-      te_free(desc->d.t_boundary.te_temperature);
-      break;
-    case DESC_BOUND_F_FOR_SOLID:
-      free(desc->d.f_boundary.flux);
-      te_free(desc->d.f_boundary.te_flux);
-      break;
-    default: FATAL("Invalid type.\n");
-    }
-  }
-  sa_release(stardis->descriptions);
+  ASSERT(stardis);
+
+  if(stardis->dev) SDIS(device_ref_put(stardis->dev));
+  if(stardis->sdis_scn) SDIS(scene_ref_put(stardis->sdis_scn));
+  if(stardis->senc3d_scn) SENC3D(scene_ref_put(stardis->senc3d_scn));
+  str_release(&stardis->solve_name);
+  str_release(&stardis->paths_filename);
+  str_release(&stardis->bin_green_filename);
+  str_release(&stardis->end_paths_filename);
+  str_release(&stardis->chunks_prefix);
+  darray_descriptions_release(&stardis->descriptions);
   release_geometry(&stardis->geometry);
-  sa_release(stardis->boundary.primitives);
-  sa_release(stardis->boundary.sides);
+  darray_size_t_release(&stardis->compute_surface.primitives);
+  darray_sides_release(&stardis->compute_surface.sides);
+  darray_uint_release(&stardis->compute_surface.err_triangles);
+  FOR_EACH(i, 0, darray_media_ptr_size_get(&stardis->media)) {
+    if(darray_media_ptr_data_get(&stardis->media)[i])
+      SDIS(medium_ref_put(darray_media_ptr_data_get(&stardis->media)[i]));
+  }
+  darray_media_ptr_release(&stardis->media);
 }
 
-/* TODO: rewrite dump! */
 res_T
-dump_vtk
-  (FILE* output,
-   const struct geometry* geometry)
+init_enclosures
+  (struct stardis* stardis)
 {
   res_T res = RES_OK;
-  unsigned i;
-  struct vertex* vtx = geometry->vertex;
-  struct triangle* tri = geometry->triangle;
-  
-  if (!output){
-    fprintf(stderr, "Invalid output file to dump vtk.\n");
-    res = RES_BAD_ARG;
-    goto error;
-  }
+  unsigned tsz, vsz;
+  struct senc3d_device* senc_dev = NULL;
 
-  fprintf(output,"# vtk DataFile Version 2.0\nvtk output\nASCII\nDATASET POLYDATA\n");
-  fprintf(output,"POINTS %i float\n\n", (int)sa_size(vtx));
-  for (i=0; i<sa_size(vtx); ++i){
-    fprintf(output,"%f %f %f\n",SPLIT3(vtx[i].xyz));
-  }
-  fprintf(output,"\nPOLYGONS %i %i\n", (int)sa_size(tri), (int)(4*sa_size(tri)));
-  for (i=0; i<sa_size(tri); ++i){
-    fprintf(output,"3 %i %i %i\n",SPLIT3(tri[i].indices.data));
-  }
-  fprintf(output,"\nCELL_DATA %i \n", (int)sa_size(tri));
-  fprintf(output,"SCALARS front_description float 1\n");
-  fprintf(output,"LOOKUP_TABLE default\n");
-  for (i=0; i<sa_size(tri); ++i) {
-    fprintf(output,"%i\n",tri[i].front_description);
-  }
-  fprintf(output,"SCALARS back_description float 1\n");
-  fprintf(output,"LOOKUP_TABLE default\n");
-  for (i=0; i<sa_size(tri); ++i) {
-    fprintf(output,"%i\n",tri[i].back_description);
-  }
-
+  ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
+  ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vsz));
+  ERR(senc3d_device_create(stardis->logger, stardis->allocator,
+    stardis->nthreads, stardis->verbose, &senc_dev));
+  stardis->undefined_medium_behind_boundary_id
+    = allocate_stardis_medium_id(stardis);
+  ERR(senc3d_scene_create(senc_dev,
+    SENC3D_CONVENTION_NORMAL_BACK | SENC3D_CONVENTION_NORMAL_OUTSIDE,
+    tsz, sg3d_sencXd_geometry_get_indices, sg3d_sencXd_geometry_get_media,
+    vsz, sg3d_sencXd_geometry_get_position, stardis->geometry.sg3d,
+    &stardis->senc3d_scn));
 exit:
+  if(senc_dev) senc3d_device_ref_put(senc_dev);
   return res;
 error:
   goto exit;
 }
+
+#define COUNT_SIDE(Rank) {\
+  if(properties[(Rank)] == SG3D_UNSPECIFIED_PROPERTY) undef_count++;\
+  else {\
+    ASSERT(properties[(Rank)] < darray_descriptions_size_get(&stardis->descriptions));\
+    ASSERT(descs[properties[(Rank)]].type == DESC_MAT_SOLID\
+      || descs[properties[(Rank)]].type == DESC_MAT_FLUID);\
+    if(descs[properties[(Rank)]].type == DESC_MAT_SOLID) solid_count++;\
+    else fluid_count++;\
+  }\
+}
+
+res_T
+validate_properties
+  (const unsigned itri,
+   const unsigned properties[SG3D_PROP_TYPES_COUNT__],
+   void* context,
+   int* properties_conflict_status)
+{
+  res_T res = RES_OK;
+  struct stardis* stardis = context;
+  unsigned undef_count, solid_count, fluid_count, intface_count;
+  const struct description* descs;
+  const struct description* intface = NULL;
+
+  (void)itri;
+  ASSERT(stardis && properties_conflict_status);
+  descs = darray_descriptions_cdata_get(&stardis->descriptions);
+  *properties_conflict_status = NO_PROPERTY_CONFLICT;
+  undef_count = solid_count = fluid_count = intface_count = 0;
+
+  COUNT_SIDE(SG3D_FRONT);
+  COUNT_SIDE(SG3D_BACK);
+  if(properties[SG3D_INTFACE] == SG3D_UNSPECIFIED_PROPERTY)
+    undef_count++;
+  else intface_count++;
+
+  ASSERT(solid_count <= 2 && fluid_count <= 2 && intface_count <= 1);
+  ASSERT(undef_count + solid_count + fluid_count + intface_count == 3);
+  if(intface_count) {
+    ASSERT(properties[SG3D_INTFACE]
+      < darray_descriptions_size_get(&stardis->descriptions));
+    intface = descs + properties[SG3D_INTFACE];
+    switch (intface->type) {
+    case DESC_BOUND_H_FOR_FLUID:
+      if(!(solid_count == 0 && fluid_count == 1)) {
+        if(solid_count + fluid_count == 2)
+          *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_DEFS;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_UNDEFS;
+        else if(solid_count == 1)
+          *properties_conflict_status = BOUND_H_FOR_FLUID_ENCLOSING_SOLID;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_BOUND_H_FOR_SOLID:
+      if(!(solid_count == 1 && fluid_count == 0)) {
+        if(solid_count + fluid_count == 2)
+          *properties_conflict_status = BOUND_H_FOR_SOLID_BETWEEN_2_DEFS;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = BOUND_H_FOR_SOLID_BETWEEN_2_UNDEFS;
+        else if(fluid_count == 1)
+          *properties_conflict_status = BOUND_H_FOR_SOLID_ENCLOSING_FLUID;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_BOUND_T_FOR_FLUID:
+      if(!(solid_count == 0 && fluid_count == 1)) {
+        if(solid_count + fluid_count == 2)
+          *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_DEFS;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS;
+        else if(solid_count == 1)
+          *properties_conflict_status = BOUND_T_FOR_FLUID_ENCLOSING_SOLID;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_BOUND_T_FOR_SOLID:
+      if(!(solid_count == 1 && fluid_count == 0)) {
+        if(solid_count + fluid_count == 2)
+          *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_DEFS;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_UNDEFS;
+        else if(fluid_count == 1)
+          *properties_conflict_status = BOUND_T_FOR_SOLID_ENCLOSING_FLUID;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_BOUND_F_FOR_SOLID:
+      if(!(solid_count == 1 && fluid_count == 0)) {
+        if(solid_count + fluid_count == 2)
+          *properties_conflict_status = BOUND_F_FOR_SOLID_BETWEEN_2_DEFS;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = BOUND_F_FOR_SOLID_BETWEEN_2_UNDEFS;
+        else if(fluid_count == 1)
+          *properties_conflict_status = BOUND_F_FOR_SOLID_ENCLOSING_FLUID;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_SOLID_FLUID_CONNECT:
+      if(solid_count != 1 || fluid_count != 1) {
+        if(solid_count == 2)
+          *properties_conflict_status = SFCONNECT_BETWEEN_2_SOLIDS;
+        else if(fluid_count == 2)
+          *properties_conflict_status = SFCONNECT_BETWEEN_2_FLUIDS;
+        else if(solid_count + fluid_count == 1)
+          *properties_conflict_status = SFCONNECT_USED_AS_BOUNDARY;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = SFCONNECT_BETWEEN_2_UNDEFS;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    default:
+      FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
+    }
+  } else {
+    /* No interface defined */
+    ASSERT(intface_count == 0 && undef_count >= 1);
+    if(undef_count == 3) {
+      *properties_conflict_status = TRG_WITH_NO_PROPERTY;
+      goto end;
+    }
+    if(fluid_count == 2) {
+      *properties_conflict_status = NO_CONNECTION_BETWEEN_2_FLUIDS;
+      goto end;
+    }
+    if(undef_count == 2) {
+      ASSERT(fluid_count + solid_count == 1);
+      if(fluid_count)
+        *properties_conflict_status = NO_BOUND_BETWEEN_FLUID_AND_UNDEF;
+      else *properties_conflict_status = NO_BOUND_BETWEEN_SOLID_AND_UNDEF;
+      goto end;
+    }
+    if(undef_count == 1 && solid_count == 1 && fluid_count == 1) {
+      *properties_conflict_status = NO_CONNECTION_BETWEEN_SOLID_AND_FLUID;
+      goto end;
+    }
+    /* Undef interface between solids is OK */
+    CHK(solid_count == 2);
+  }
+
+end:
+  return res;
+}
+
+#undef COUNT_SIDE

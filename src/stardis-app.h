@@ -1,24 +1,100 @@
-/* Copyright (C) 2018 |Meso|Star> (contact@meso-star.com)*/
+/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #ifndef STARDIS_APP_H
 #define STARDIS_APP_H
 
+#include "stardis-parsing.h"
+#include "stardis-default.h"
+#include "stardis-solid.h"
+#include "stardis-fluid.h"
+
 #include <star/sstl.h>
+#include <star/sg3d.h>
+
 #include <rsys/rsys.h>
 #include <rsys/float3.h>
-#include <rsys/stretchy_array.h>
-#include <rsys/hash_table.h>
-#include <sdis.h>
-#include <tinyexpr.h>
-#include "args.h"
+#include <rsys/double2.h>
+#include <rsys/double3.h>
+#include <rsys/dynamic_array_size_t.h>
+#include <rsys/dynamic_array.h>
+#include <rsys/str.h>
 
-#define FREE_AARRAY(ARRAY) if (ARRAY) {\
-  int i = 0; \
-  for (i=0; *(ARRAY+i);i++){\
-    free(ARRAY[i]);\
-  }\
-  free(ARRAY);\
-}
+#include <sdis.h>
+
+#include <limits.h>
+#include <stdarg.h>
+
+/* Forward declarations */
+struct logger;
+struct mem_allocator;
+struct sdis_medium;
+
+/* Utility macros */
+#define ERR(Expr) if((res = (Expr)) != RES_OK) goto error; else (void)0
+
+#define STR_APPEND_PRINTF(Accum, Fmt, Args) \
+{ \
+  struct str tmp; \
+  str_init((Accum)->allocator, &tmp); \
+  res = str_printf(&tmp, Fmt COMMA_##Args LIST_##Args); \
+  if(res == RES_OK) res = str_append((Accum), str_cget(&tmp)); \
+  str_release(&tmp); \
+  if(res != RES_OK) goto error; \
+} (void)0
+
+
+#define VFATAL(Fmt, Args)                                                      \
+  {                                                                            \
+    fprintf(stderr, Fmt COMMA_##Args LIST_##Args);                             \
+    ASSERT(0);                                                                 \
+    abort();                                                                   \
+  } (void)0
+
+
+#define DELTA_AUTO INF /* Placeholder until actual value is substituted */
+#define UNKNOWN_MEDIUM_TEMPERATURE -1 /* Unknown for stadis solver is -1 */
+
+enum properties_conflict_t {
+  NO_PROPERTY_CONFLICT,
+  BOUND_H_FOR_FLUID_BETWEEN_2_DEFS,
+  BOUND_H_FOR_FLUID_BETWEEN_2_UNDEFS,
+  BOUND_H_FOR_FLUID_ENCLOSING_SOLID,
+  BOUND_H_FOR_SOLID_BETWEEN_2_DEFS,
+  BOUND_H_FOR_SOLID_BETWEEN_2_UNDEFS,
+  BOUND_H_FOR_SOLID_ENCLOSING_FLUID,
+  BOUND_T_FOR_FLUID_BETWEEN_2_DEFS,
+  BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS,
+  BOUND_T_FOR_FLUID_ENCLOSING_SOLID,
+  BOUND_T_FOR_SOLID_BETWEEN_2_DEFS,
+  BOUND_T_FOR_SOLID_BETWEEN_2_UNDEFS,
+  BOUND_T_FOR_SOLID_ENCLOSING_FLUID,
+  BOUND_F_FOR_SOLID_BETWEEN_2_DEFS,
+  BOUND_F_FOR_SOLID_BETWEEN_2_UNDEFS,
+  BOUND_F_FOR_SOLID_ENCLOSING_FLUID,
+  SFCONNECT_BETWEEN_2_SOLIDS,
+  SFCONNECT_BETWEEN_2_FLUIDS,
+  SFCONNECT_USED_AS_BOUNDARY,
+  SFCONNECT_BETWEEN_2_UNDEFS,
+  NO_CONNECTION_BETWEEN_2_FLUIDS,
+  NO_CONNECTION_BETWEEN_SOLID_AND_FLUID,
+  NO_BOUND_BETWEEN_FLUID_AND_UNDEF,
+  NO_BOUND_BETWEEN_SOLID_AND_UNDEF,
+  TRG_WITH_NO_PROPERTY,
+  PROPERTIES_CONFLICT_COUNT__
+};
 
 /* Different types of descriptions */
 enum description_type {
@@ -34,841 +110,316 @@ enum description_type {
   DESC_OUTSIDE
 };
 
-struct vertex{
-  float xyz[3];
+#define DESC_IS_H(D) \
+  ((D) == DESC_BOUND_H_FOR_SOLID || (D) == DESC_BOUND_H_FOR_FLUID)
+#define DESC_IS_T(D) \
+  ((D) == DESC_BOUND_T_FOR_SOLID || (D) == DESC_BOUND_T_FOR_FLUID)
+#define DESC_IS_F(D) \
+  ((D) == DESC_BOUND_F_FOR_SOLID)
+#define DESC_IS_MEDIUM(D) \
+  ((D) == DESC_MAT_SOLID || (D) == DESC_MAT_FLUID)
+#define DESC_IS_BOUNDARY(D) \
+ (DESC_IS_H(D) || DESC_IS_T(D) || DESC_IS_F(D))
+
+#define DARRAY_NAME interface_ptrs
+#define DARRAY_DATA struct sdis_interface*
+#include <rsys/dynamic_array.h>
+
+struct dummies {
+  struct sdis_medium* dummy_fluid;
+  unsigned dummy_fluid_id;
+  struct sdis_medium* dummy_solid;
+  unsigned dummy_solid_id;
 };
-#define NULL_VERTEX__ {{0.0 ,0.0 ,0.0}}
-static const struct vertex NULL_VERTEX = NULL_VERTEX__;
+#define DUMMIES_NULL__ {\
+  NULL, UINT_MAX, NULL, UINT_MAX\
+}
 
-static INLINE char
-eq_vertex(const struct vertex* a, const struct vertex* b)
+static FINLINE void
+init_media_ptr
+  (struct mem_allocator* alloc,
+   struct sdis_medium** data)
 {
-  return (char)f3_eq(a->xyz, b->xyz);
+  ASSERT(data); (void)alloc;
+  *data = NULL;
 }
 
-/* Declare the hash table that map a vertex to its index */
-#define HTABLE_NAME vertex
-#define HTABLE_DATA unsigned
-#define HTABLE_KEY struct vertex
-#define HTABLE_KEY_FUNCTOR_EQ eq_vertex
-#include <rsys/hash_table.h>
-
-struct unsigned3 { unsigned data[3]; };
-struct triangle {
-  struct unsigned3 indices;
-  unsigned front_description;
-  unsigned back_description;
-  unsigned connection_description;
-};
-#define NULL_TRIANGLE__ {{{0, 0, 0}}, UINT_MAX, UINT_MAX, UINT_MAX }
-static const struct triangle NULL_TRIANGLE = NULL_TRIANGLE__;
-
-static INLINE void
-print_trg_as_obj
-  (FILE* stream,
-   const struct vertex* vertices,
-   const unsigned* indices)
-{
-  ASSERT(stream && vertices && indices);
-  fprintf(stream, "v %.8f %.8f %.8f\nv %.8f %.8f %.8f\nv %.8f %.8f %.8f\nf 1 2 3\n",
-    SPLIT3(vertices[indices[0]].xyz),
-    SPLIT3(vertices[indices[1]].xyz),
-    SPLIT3(vertices[indices[2]].xyz));
-}
-
-static INLINE char
-eq_indices(const struct unsigned3* a, const struct unsigned3* b)
-{  
-  return a->data[0] == b->data[0]
-    && a->data[1] == b->data[1]
-    && a->data[2] == b->data[2];
-}
-
-static INLINE res_T
-cp_indices(struct unsigned3* dst, const struct unsigned3* src)
-{
-  int i;
-  FOR_EACH(i, 0, 3) dst->data[i] = src->data[i];
-  return RES_OK;
-}
-
-/* Declare the hash table that maps a triangle id to its index */
-#define HTABLE_NAME triangle 
-#define HTABLE_DATA unsigned
-#define HTABLE_KEY struct unsigned3
-#define HTABLE_KEY_FUNCTOR_EQ eq_indices
-#define HTABLE_KEY_FUNCTOR_COPY cp_indices
-#include <rsys/hash_table.h>
+#define DARRAY_NAME media_ptr
+#define DARRAY_DATA struct sdis_medium*
+#define DARRAY_FUNCTOR_INIT init_media_ptr
+#include <rsys/dynamic_array.h>
 
 struct geometry {
-  struct vertex* vertex;
-  struct triangle* triangle;
-  struct sdis_interface** interf_bytrg;
-  struct sdis_interface** interfaces;
+  struct sg3d_geometry* sg3d;
+  struct darray_interface_ptrs interf_bytrg;
+  struct darray_interface_ptrs interfaces;
 };
-#define NULL_GEOMETRY__ {NULL, NULL, NULL, NULL }
-static const struct geometry NULL_GEOMETRY = NULL_GEOMETRY__;
 
 static INLINE void
 release_geometry(struct geometry* geom)
 {
   size_t i;
-  for (i = 0; i < sa_size(geom->interfaces); ++i)
-    SDIS(interface_ref_put(geom->interfaces[i]));
-  sa_release(geom->vertex); geom->vertex = NULL;
-  sa_release(geom->triangle); geom->triangle = NULL;
-  sa_release(geom->interfaces); geom->interfaces = NULL;
-  sa_release(geom->interf_bytrg); geom->interf_bytrg = NULL;
+  struct sdis_interface
+    ** intf = darray_interface_ptrs_data_get(&geom->interfaces);
+  if(geom->sg3d) SG3D(geometry_ref_put(geom->sg3d));
+  for(i = 0; i < darray_interface_ptrs_size_get(&geom->interfaces); ++i)
+    SDIS(interface_ref_put(intf[i]));
+  darray_interface_ptrs_release(&geom->interfaces);
+  darray_interface_ptrs_release(&geom->interf_bytrg);
 }
 
-struct mat_fluid {
-  char name[32];
-  unsigned fluid_id;
-  double rho;
-  double cp;
-  char* Tinit;
-  char* Temp;
-};
-#define NULL_FLUID__ { "", UINT_MAX, 0, 0, NULL, NULL }
-static const struct mat_fluid NULL_FLUID = NULL_FLUID__;
-
-static void
-print_fluid(FILE* stream, const struct mat_fluid* f)
+static INLINE res_T
+init_geometry
+  (struct logger* logger,
+   struct mem_allocator* allocator,
+   const int verbose,
+   struct geometry* geom)
 {
-  ASSERT(stream && f);
-  fprintf(stream, "Fluid '%s': cp=%g rho=%g",
-    f->name, f->cp, f->rho);
-  if (f->Tinit) fprintf(stream, " Tinit='%s'", f->Tinit);
-  if (f->Temp) fprintf(stream, " Temp='%s'", f->Temp);
-  fprintf(stream, "\n");
+  res_T res = RES_OK;
+  struct sg3d_device* sg3d_dev = NULL;
+
+  ASSERT(allocator && geom);
+  
+  geom->sg3d = NULL;
+  darray_interface_ptrs_init(allocator, &geom->interfaces);
+  darray_interface_ptrs_init(allocator, &geom->interf_bytrg);
+  ERR(sg3d_device_create(logger, allocator, verbose, &sg3d_dev));
+  ERR(sg3d_geometry_create(sg3d_dev, &geom->sg3d));
+
+exit:
+  if(sg3d_dev) SG3D(device_ref_put(sg3d_dev));
+  return res;
+error:
+  release_geometry(geom);
+  goto exit;
 }
 
-static char
-eq_fluid(const struct mat_fluid* a, const struct mat_fluid* b)
-{
-  if (strcmp(a->name, b->name)
-    || a->fluid_id != b->fluid_id
-    || a->rho != b->rho
-    || a->cp != b->cp
-    || strcmp(a->Tinit, b->Tinit)
-    || strcmp(a->Temp, b->Temp))
-    return 0;
-  return 1;
-}
-
-static size_t
-hash_fluid(const struct mat_fluid* key)
-{
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->fluid_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->fluid_id)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->rho)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->rho)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->cp)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->cp)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  hash = hash ^ (uint32_t)((unsigned char)(key->Tinit == 0));
-  hash = hash * FNV32_PRIME;
-  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit) * sizeof(*key->Tinit) : 0) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Tinit)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  hash = hash ^ (uint32_t)((unsigned char)(key->Temp == 0));
-  hash = hash * FNV32_PRIME;
-  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Temp)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
-  /* 64-bits Fowler/Noll/Vo hash function */
-  const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
-  uint64_t hash = OFFSET64_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->fluid_id)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->fluid_id)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->rho)) {
-    hash = hash ^ (uint64_t) ((unsigned char)((const char*)&key->rho)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->cp)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->cp)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  hash = hash ^ (uint64_t)((unsigned char)(key->Tinit == 0));
-  hash = hash * FNV64_PRIME;
-  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit)*sizeof(*key->Tinit) : 0) {
-    hash = hash ^ (uint64_t)((unsigned char) ((const char*)key->Tinit)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  hash = hash ^ (uint64_t)((unsigned char)(key->Temp == 0));
-  hash = hash * FNV64_PRIME;
-  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)key->Temp)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  return hash;
-#else
-#error "Unexpected architecture"
-#endif
-}
-
-struct mat_solid {
-  char name[32];
-  unsigned solid_id;
-  double lambda;
-  double rho;
-  double cp;
-  double delta;
-  char* Tinit;
-  char* Temp;
-  char* power;
-  int has_power;
-};
-#define NULL_SOLID__ { "", UINT_MAX, 0, 0, 0, 0, NULL, NULL, NULL, 0}
-static const struct mat_solid NULL_SOLID = NULL_SOLID__;
-
-static void
-print_solid(FILE* stream, const struct mat_solid* s)
-{
-  ASSERT(stream && s);
-  fprintf(stream,
-    "Solid '%s': lambda=%g cp=%g rho=%g delta=%g Power='%s'",
-    s->name, s->lambda, s->cp, s->rho, s->delta,
-    (s->has_power ? s->power : "0"));
-  if (s->Tinit) fprintf(stream, " Tinit='%s'", s->Tinit);
-  if (s->Temp) fprintf(stream, " Temp='%s'", s->Temp);
-  fprintf(stream, "\n");
-}
-
-static char
-eq_solid(const struct mat_solid* a, const struct mat_solid* b)
-{
-  if (strcmp(a->name, b->name)
-    || a->solid_id != b->solid_id
-    || a->lambda != b->lambda
-    || a->rho != b->rho
-    || a->cp != b->cp
-    || a->delta != b->delta
-    || strcmp(a->Tinit, b->Tinit)
-    || strcmp(a->Temp, b->Temp)
-    || a->has_power != b->has_power)
-    return 0;
-  if (a->has_power && a->power != b->power) return 0;
-  return 1;
-}
-
-static size_t
-hash_solid(const struct mat_solid* key)
-{
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->solid_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->solid_id)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->lambda)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->lambda)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->rho)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->rho)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->cp)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->cp)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->delta)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->delta)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  hash = hash ^ (uint32_t)((unsigned char)(key->Tinit == 0));
-  hash = hash * FNV32_PRIME;
-  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit) * sizeof(*key->Tinit) : 0) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Tinit)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  hash = hash ^ (uint32_t)((unsigned char)(key->Temp == 0));
-  hash = hash * FNV32_PRIME;
-  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->Temp)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_power)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_power)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  if (!key->has_power) return hash;
-  FOR_EACH(i, 0, strlen(key->Tinit) * sizeof(*key->power)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) key->power)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
-  /* 64-bits Fowler/Noll/Vo hash function */
-  const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
-  uint64_t hash = OFFSET64_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->solid_id)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->solid_id)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->lambda)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->lambda)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->rho)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->rho)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->cp)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->cp)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->delta)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->delta)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  hash = hash ^ (uint64_t)((unsigned char)(key->Tinit == 0));
-  hash = hash * FNV64_PRIME;
-  FOR_EACH(i, 0, key->Tinit ? strlen(key->Tinit) * sizeof(*key->Tinit) : 0) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)key->Tinit)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  hash = hash ^ (uint64_t)((unsigned char)(key->Temp == 0));
-  hash = hash * FNV64_PRIME;
-  FOR_EACH(i, 0, key->Temp ? strlen(key->Temp) * sizeof(*key->Temp) : 0) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)key->Temp)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_power)) {
-    hash = hash ^ (uint64_t) ((unsigned char) ((const char*) &key->has_power)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  if (!key->has_power) return hash;
-  FOR_EACH(i, 0, strlen(key->power) * sizeof(*key->power)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)key->power)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  return hash;
-#else
-#error "Unexpected architecture"
-#endif
-}
+/******************************************************************************/
 
 struct h_boundary {
-  char name[32];
-  unsigned mat_id;
+  struct str name;
   double emissivity;
   double specular_fraction;
   double hc;
-  double hc_max;
-  char* T;
-  int has_emissivity, has_hc;
+  double imposed_temperature;
+  unsigned mat_id;
 };
-#define NULL_HBOUND__ { "", UINT_MAX, 0, 0, 0, 0, NULL, 0, 0}
-static const struct h_boundary NULL_HBOUND = NULL_HBOUND__;
 
-static void
-print_h_boundary
-  (FILE* stream,
+static FINLINE void
+init_h(struct mem_allocator* allocator, struct h_boundary* dst)
+{
+  str_init(allocator, &dst->name);
+  dst->emissivity = 0;
+  dst->specular_fraction = 0;
+  dst->hc = 0;
+  dst->imposed_temperature = -1;
+  dst->mat_id = UINT_MAX;
+}
+
+static FINLINE void
+release_h_boundary(struct h_boundary* bound)
+{
+  str_release(&bound->name);
+}
+
+static res_T
+str_print_h_boundary
+  (struct str* str,
    const struct h_boundary* b,
    const enum description_type type)
 {
-  ASSERT(stream && b
-    && (type == DESC_BOUND_H_FOR_SOLID || type == DESC_BOUND_H_FOR_FLUID));
-  fprintf(stream,
-    "H boundary %s for %s: emissivity=%g specular_fraction=%g hc=%g hc_max=%g T='%s'\n",
-    b->name,
-    (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"),
-    (b->has_emissivity ? b->emissivity : 0),
-    (b->has_emissivity ? b->specular_fraction : 0),
-    (b->has_hc ? b->hc : 0),
-    (b->has_hc ? b->hc_max : 0),
-    (b->T ? b->T : "0"));
+  res_T res = RES_OK;
+  ASSERT(str && b && DESC_IS_H(type));
+  STR_APPEND_PRINTF(str,
+    "H boundary for %s '%s': emissivity=%g specular_fraction=%g hc=%g T=%g "
+    "(using medium %u as external medium)",
+    ARG7( (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"), str_cget(&b->name),
+      b->emissivity, b->specular_fraction, b->hc, b->imposed_temperature, b->mat_id ) );
+end:
+  return res;
+error:
+  goto end;
 }
 
-static char
-eq_h_boundary
-  (const struct h_boundary* a,
-   const struct h_boundary* b)
+static FINLINE res_T
+cp_h_boundary(struct h_boundary* dst, const struct h_boundary* src)
 {
-  if (a->mat_id != b->mat_id
-    || strcmp(a->name, b->name)
-    || a->specular_fraction != b->specular_fraction
-    || strcmp(a->T, b->T)
-    || a->has_emissivity != b->has_emissivity
-    || a->has_hc != b->has_hc)
-    return 0;
-  if (a->has_emissivity && a->emissivity != b->emissivity) return 0;
-  if (a->has_hc && (a->hc != b->hc || a->hc_max != b->hc_max)) return 0;
-  return 1;
-}
-
-static size_t
-hash_h_boundary(const struct h_boundary* key)
-{
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->mat_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->emissivity)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->specular_fraction)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->specular_fraction)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, strlen(key->T) * sizeof(*key->T)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->T)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_emissivity)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->has_hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  if (!key->has_hc) return hash;
-  FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->hc_max)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
-  /* 64-bits Fowler/Noll/Vo hash function */
-  const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
-  uint64_t hash = OFFSET64_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->mat_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->emissivity)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->specular_fraction)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->specular_fraction)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, strlen(key->T) * sizeof(*key->T)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->T)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_emissivity)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->has_hc)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  if (!key->has_hc) return hash;
-  FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->hc)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->hc_max)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  return hash;
-#else
-#error "Unexpected architecture"
-#endif
+  dst->specular_fraction = src->specular_fraction;
+  dst->imposed_temperature = src->imposed_temperature;
+  dst->emissivity = src->emissivity;
+  dst->hc = src->hc;
+  dst->mat_id = src->mat_id;
+  return str_copy(&dst->name, &src->name);
 }
 
 struct t_boundary {
-  char name[32];
-  unsigned mat_id;
-  char* T;
-  struct te_expr* te_temperature;
-  double hc;
-  double hc_max;
-  int has_hc;
-};
-#define NULL_TBOUND__ { "", UINT_MAX, NULL, NULL, 0, 0, 0}
-static const struct t_boundary NULL_TBOUND = NULL_TBOUND__;
-
-static void
-print_t_boundary
-  (FILE* stream,
-   const struct t_boundary* b,
-   const enum description_type type)
-{
-  ASSERT(stream && b
-    && (type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID));
-  fprintf(stream,
-    "T boundary %s  for %s: hc=%g hc_max=%g T='%s'\n",
-    b->name,
-    (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
-    (b->has_hc ? b->hc : 0),
-    (b->has_hc ? b->hc_max : 0),
-    (b->T ? b->T : "0"));
-}
-
-static char
-eq_t_boundary
-  (const struct t_boundary* a,
-   const struct t_boundary* b,
-   const enum description_type type)
-{
-  ASSERT(type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID);
-  /* These fields are meaningful  by both types */
-  if (strcmp(a->name, b->name))
-    return 0;
-  if (a->mat_id != b->mat_id || strcmp(a->T, b->T))
-    return 0;
-  if (type != DESC_BOUND_T_FOR_FLUID)
-    return 1;
-  /* These ones are only relevant for fluids */
-  if (a->has_hc != b->has_hc)
-    return 0;
-  if (a->has_hc && (a->hc != b->hc || a->hc_max != b->hc_max))
-    return 0;
-  return 1;
-}
-
-static size_t
-hash_t_boundary
-  (const struct t_boundary* key,
-   const enum description_type type)
-{
-  (void)type;
-  ASSERT(type == DESC_BOUND_T_FOR_SOLID || type == DESC_BOUND_T_FOR_FLUID);
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->mat_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->has_hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, strlen(key->T) * sizeof(*key->T)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) key->T)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  if (!key->has_hc) return hash;
-  FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc_max)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
-  /* 64-bits Fowler/Noll/Vo hash function */
-  const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
-  uint64_t hash = OFFSET64_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->mat_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) &key->has_hc)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, strlen(key->T) * sizeof(*key->T)) {
-    hash = hash ^ (uint32_t) ((unsigned char) ((const char*) key->T)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  if (!key->has_hc) return hash;
-  FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc_max)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  return hash;
-#else
-#error "Unexpected architecture"
-#endif
-}
-
-struct f_boundary {
-  char name[32];
-  unsigned mat_id;
-  char* flux;
-  struct te_expr* te_flux;
-};
-#define NULL_FBOUND__ { "", UINT_MAX, NULL, NULL}
-static const struct f_boundary NULL_FBOUND = NULL_FBOUND__;
-
-static void
-print_f_boundary
-  (FILE* stream,
-   const struct f_boundary* b,
-   const enum description_type type)
-{
-  ASSERT(stream && b && type == DESC_BOUND_F_FOR_SOLID); (void)type;
-  fprintf(stream,
-    "F boundary %s for SOLID: flux='%s'\n",
-    b->name,
-    (b->flux ? b->flux : "0"));
-}
-
-static char
-eq_f_boundary(const struct f_boundary* a, const struct f_boundary* b)
-{
-  return (a->mat_id == b->mat_id
-    && 0 == strcmp(a->name, b->name)
-    && 0 == strcmp(a->flux, b->flux));
-}
-
-static size_t
-hash_f_boundary(const struct f_boundary* key)
-{
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->mat_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, strlen(key->flux) * sizeof(*key->flux)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->flux)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
-  /* 64-bits Fowler/Noll/Vo hash function */
-  const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
-  uint64_t hash = OFFSET64_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->mat_id)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->mat_id)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, strlen(key->flux) * sizeof(*key->flux)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)key->flux)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  return hash;
-#else
-#error "Unexpected architecture"
-#endif
-}
-
-struct solid_fluid_connect {
-  char name[32];
+  struct str name;
   double emissivity;
   double specular_fraction;
   double hc;
-  double hc_max;
-  int has_emissivity, has_hc;
+  double imposed_temperature;
+  unsigned mat_id;
 };
-#define NULL_SFCONNECT__ { "", 0, 0, 0, 0, 0, 0}
-static const struct solid_fluid_connect NULL_SFCONNECT = NULL_SFCONNECT__;
 
-static char
-eq_sf_connect(const struct solid_fluid_connect* a, const struct solid_fluid_connect* b)
+static FINLINE void
+init_t(struct mem_allocator* allocator, struct t_boundary* dst)
 {
-  return (char)(!strcmp(a->name, b->name)
-    && a->emissivity == b->emissivity
-    && a->specular_fraction == b->specular_fraction
-    && a->hc == b->hc
-    && a->hc_max == b->hc_max
-    && a->has_emissivity == b->has_emissivity
-    && a->has_hc == b->has_hc);
+  str_init(allocator, &dst->name);
+  dst->emissivity = 0;
+  dst->specular_fraction = 0;
+  dst->hc = 0;
+  dst->imposed_temperature = -1;
+  dst->mat_id = UINT_MAX;
 }
 
-static size_t
-hash_sf_connect(const struct solid_fluid_connect* key)
+static FINLINE void
+release_t_boundary(struct t_boundary* bound)
 {
-#ifdef ARCH_32BITS
-  /* 32-bits Fowler/Noll/Vo hash function */
-  const uint32_t FNV32_PRIME =
-    (uint32_t) (((uint32_t) 1 << 24) + ((uint32_t) 1 << 8) + 0x93);
-  const uint32_t OFFSET32_BASIS = 2166136261u;
-  uint32_t hash = OFFSET32_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV32_PRIME;
+  str_release(&bound->name);
+}
+
+static res_T
+str_print_t_boundary
+  (struct str* str,
+   const struct t_boundary* b,
+   const enum description_type type)
+{
+  res_T res = RES_OK;
+  ASSERT(str && b && DESC_IS_T(type));
+  STR_APPEND_PRINTF(str, "T boundary for %s '%s': T=%g ",
+   ARG3( (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
+    str_cget(&b->name), b->imposed_temperature ) );
+
+  if(type == DESC_BOUND_T_FOR_FLUID) {
+    STR_APPEND_PRINTF(str, "emissivity=%g, specular_fraction=%g hc=%g ",
+      ARG3( b->emissivity, b->specular_fraction, b->hc ) );
   }
-  FOR_EACH(i, 0, sizeof(key->emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->emissivity)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->specular_fraction)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->specular_fraction)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc_max)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_emissivity)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_hc)[i]);
-    hash = hash * FNV32_PRIME;
-  }
-  return hash;
-#elif defined(ARCH_64BITS)
-  /* 64-bits Fowler/Noll/Vo hash function */
-  const uint64_t FNV64_PRIME =
-    (uint64_t) (((uint64_t) 1 << 40) + ((uint64_t) 1 << 8) + 0xB3);
-  const uint64_t OFFSET64_BASIS = (uint64_t) 14695981039346656037u;
-  uint64_t hash = OFFSET64_BASIS;
-  size_t i;
-  ASSERT(key);
-  FOR_EACH(i, 0, sizeof(key->name)) {
-    hash = hash ^ (uint64_t)((unsigned char)((const char*)&key->name)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->emissivity)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->specular_fraction)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->specular_fraction)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->hc_max)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->hc_max)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_emissivity)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_emissivity)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  FOR_EACH(i, 0, sizeof(key->has_hc)) {
-    hash = hash ^ (uint32_t)((unsigned char)((const char*)&key->has_hc)[i]);
-    hash = hash * FNV64_PRIME;
-  }
-  return hash;
-#else
-#error "Unexpected architecture"
-#endif
+  STR_APPEND_PRINTF(str, "(using medium %u as external medium)",
+    ARG1( b->mat_id ) );
+end:
+  return res;
+error:
+  goto end;
+}
+
+static FINLINE res_T
+cp_t_boundary(struct t_boundary* dst, const struct t_boundary* src)
+{
+  dst->emissivity = src->emissivity;
+  dst->specular_fraction = src->specular_fraction;
+  dst->hc = src->hc;
+  dst->imposed_temperature = src->imposed_temperature;
+  dst->mat_id = src->mat_id;
+  return str_copy(&dst->name, &src->name);
+}
+
+struct f_boundary {
+  struct str name;
+  double imposed_flux;
+  unsigned mat_id;
+};
+
+static FINLINE void
+init_f(struct mem_allocator* allocator, struct f_boundary* dst)
+{
+  str_init(allocator, &dst->name);
+  dst->mat_id = UINT_MAX;
+  dst->imposed_flux = -1;
+}
+
+static FINLINE void
+release_f_boundary(struct f_boundary* bound)
+{
+  str_release(&bound->name);
+}
+
+static res_T
+str_print_f_boundary
+  (struct str* str,
+   const struct f_boundary* b)
+{
+  res_T res = RES_OK;
+  ASSERT(str && b);
+  STR_APPEND_PRINTF(str,
+    "F boundary for SOLID '%s': flux=%g (using medium %u as external medium)",
+    ARG3( str_cget(&b->name), b->imposed_flux, b->mat_id ) );
+end:
+  return res;
+error:
+  goto end;
+}
+
+static FINLINE res_T
+cp_f_boundary(struct f_boundary* dst, const struct f_boundary* src)
+{
+  dst->imposed_flux = src->imposed_flux;
+  dst->mat_id = src->mat_id;
+  return str_copy(&dst->name, &src->name);
+}
+
+struct solid_fluid_connect {
+  struct str name;
+  double emissivity;
+  double specular_fraction;
+  double hc;
+  unsigned connection_id;
+};
+
+static FINLINE void
+release_sf_connect(struct solid_fluid_connect* connect)
+{
+  str_release(&connect->name);
+}
+
+static FINLINE void
+init_sf(struct mem_allocator* allocator, struct solid_fluid_connect* dst)
+{
+  str_init(allocator, &dst->name);
+  dst->emissivity = 0;
+  dst->specular_fraction = 0;
+  dst->hc = 0;
+  dst->connection_id = UINT_MAX;
+}
+
+static res_T
+str_print_sf_connect
+  (struct str* str,
+   const struct solid_fluid_connect* c)
+{
+  res_T res = RES_OK;
+  ASSERT(str && c);
+  STR_APPEND_PRINTF(str, "Solid-Fluid connection '%s':", ARG1( str_cget(&c->name) ) );
+  STR_APPEND_PRINTF(str, " emissivity=%g, specular_fraction=%g hc=%g",
+      ARG3( c->emissivity, c->specular_fraction, c->hc ) );
+end:
+  return res;
+error:
+  goto end;
+}
+
+static FINLINE res_T
+cp_sf_connect
+  (struct solid_fluid_connect* dst, const struct solid_fluid_connect* src)
+{
+  dst->connection_id = src->connection_id;
+  dst->specular_fraction = src->specular_fraction;
+  dst->emissivity = src->emissivity;
+  dst->hc = src->hc;
+  return str_copy(&dst->name, &src->name);
+}
+
+static FINLINE res_T
+cp_release_sf_connect
+  (struct solid_fluid_connect* dst, struct solid_fluid_connect* src)
+{
+  return cp_sf_connect(dst, src);
 }
 
 struct description {
   enum description_type type;
-  union d {
-    struct mat_fluid fluid;
-    struct mat_solid solid;
+  union {
+    struct fluid fluid;
+    struct solid solid;
     struct t_boundary t_boundary;
     struct f_boundary f_boundary;
     struct h_boundary h_boundary;
@@ -876,163 +427,355 @@ struct description {
   } d;
 };
 
-FINLINE void
-init_description(struct description* desc) {
+static FINLINE res_T
+init_description(struct mem_allocator* alloc, struct description* desc)
+{
   ASSERT(desc);
+  (void)alloc;
   desc->type = DESCRIPTION_TYPE_COUNT__;
+  return RES_OK;
 }
 
-static INLINE void
-print_description
-  (FILE* stream,
-   struct description* desc)
+static FINLINE void
+release_description(struct description* desc)
 {
-  ASSERT(stream && desc);
   switch (desc->type) {
   case DESC_MAT_SOLID:
-    print_solid(stream, &desc->d.solid);
+    release_solid(&desc->d.solid);
     break;
   case DESC_MAT_FLUID:
-    print_fluid(stream, &desc->d.fluid);
-    break;
-  case DESC_BOUND_T_FOR_SOLID:
-  case DESC_BOUND_T_FOR_FLUID:
-    print_t_boundary(stream, &desc->d.t_boundary, desc->type);
+    release_fluid(&desc->d.fluid);
     break;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
-    print_h_boundary(stream, &desc->d.h_boundary, desc->type);
+    release_h_boundary(&desc->d.h_boundary);
+    break;
+  case DESC_BOUND_T_FOR_SOLID:
+  case DESC_BOUND_T_FOR_FLUID:
+    release_t_boundary(&desc->d.t_boundary);
     break;
   case DESC_BOUND_F_FOR_SOLID:
-    print_f_boundary(stream, &desc->d.f_boundary, desc->type);
+    release_f_boundary(&desc->d.f_boundary);
     break;
-  default: FATAL("Invalid type.\n");
+  case DESC_SOLID_FLUID_CONNECT:
+    release_sf_connect(&desc->d.sf_connect);
+    break;
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
 }
 
-static INLINE char
-eq_description(const struct description* a, const struct description* b)
+static INLINE res_T
+str_print_description
+  (struct str* str,
+   const unsigned rank,
+   const struct description* desc)
 {
-  if (a->type != b->type) return 0;
-  switch (a->type) {
+  res_T res = RES_OK;
+  ASSERT(str && desc);
+  str_clear(str);
+  ERR(str_printf(str, "Description %u: ", rank));
+  switch (desc->type) {
   case DESC_MAT_SOLID:
-    return eq_solid(&a->d.solid, &b->d.solid);
+    ERR(str_print_solid(str, &desc->d.solid));
+    break;
   case DESC_MAT_FLUID:
-    return eq_fluid(&a->d.fluid, &b->d.fluid);
-  case DESC_BOUND_H_FOR_SOLID:
-  case DESC_BOUND_H_FOR_FLUID:
-    return eq_h_boundary(&a->d.h_boundary, &b->d.h_boundary);
+    ERR(str_print_fluid(str, &desc->d.fluid));
+    break;
   case DESC_BOUND_T_FOR_SOLID:
   case DESC_BOUND_T_FOR_FLUID:
-    return eq_t_boundary(&a->d.t_boundary, &b->d.t_boundary, a->type);
+    ERR(str_print_t_boundary(str, &desc->d.t_boundary, desc->type));
+    break;
+  case DESC_BOUND_H_FOR_SOLID:
+  case DESC_BOUND_H_FOR_FLUID:
+    ERR(str_print_h_boundary(str, &desc->d.h_boundary, desc->type));
+    break;
   case DESC_BOUND_F_FOR_SOLID:
-    return eq_f_boundary(&a->d.f_boundary, &b->d.f_boundary);
+    ERR(str_print_f_boundary(str, &desc->d.f_boundary));
+    break;
   case DESC_SOLID_FLUID_CONNECT:
-    return eq_sf_connect(&a->d.sf_connect, &b->d.sf_connect);
-  default: FATAL("Invalid type.\n");
+    ERR(str_print_sf_connect(str, &desc->d.sf_connect));
+    break;
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
+  }
+end:
+  return res;
+error:
+  goto end;
+}
+
+static INLINE const struct str*
+get_description_name
+  (const struct description* desc)
+{
+  ASSERT(desc);
+  switch (desc->type) {
+  case DESC_MAT_SOLID:
+    return &desc->d.solid.name;
+  case DESC_MAT_FLUID:
+    return &desc->d.fluid.name;
+  case DESC_BOUND_T_FOR_SOLID:
+  case DESC_BOUND_T_FOR_FLUID:
+    return &desc->d.t_boundary.name;
+  case DESC_BOUND_H_FOR_SOLID:
+  case DESC_BOUND_H_FOR_FLUID:
+    return &desc->d.h_boundary.name;
+  case DESC_BOUND_F_FOR_SOLID:
+    return &desc->d.f_boundary.name;
+  case DESC_SOLID_FLUID_CONNECT:
+    return &desc->d.sf_connect.name;
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
 }
 
-static INLINE size_t
-hash_description(const struct description* key)
+static FINLINE res_T
+cp_description
+  (struct description* dst,
+   const struct description* src)
 {
-  switch (key->type) {
+  res_T res = RES_OK;
+  ASSERT(src && dst);
+  switch (src->type) {
   case DESC_MAT_SOLID:
-    return hash_solid(&key->d.solid);
+    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
+      dst->type = src->type;
+      init_solid(src->d.solid.name.allocator, &dst->d.solid);
+    }
+    ERR(cp_solid(&dst->d.solid, &src->d.solid));
+    break;
   case DESC_MAT_FLUID:
-    return hash_fluid(&key->d.fluid);
+    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
+      dst->type = src->type;
+      init_fluid(src->d.fluid.name.allocator, &dst->d.fluid);
+    }
+    ERR(cp_fluid(&dst->d.fluid, &src->d.fluid));
+    break;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
-    return hash_h_boundary(&key->d.h_boundary);
+    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
+      dst->type = src->type;
+      init_h(src->d.h_boundary.name.allocator, &dst->d.h_boundary);
+    }
+    ERR(cp_h_boundary(&dst->d.h_boundary, &src->d.h_boundary));
+    break;
   case DESC_BOUND_T_FOR_SOLID:
   case DESC_BOUND_T_FOR_FLUID:
-    return hash_t_boundary(&key->d.t_boundary, key->type);
+    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
+      dst->type = src->type;
+      init_t(src->d.t_boundary.name.allocator, &dst->d.t_boundary);
+    }
+    ERR(cp_t_boundary(&dst->d.t_boundary, &src->d.t_boundary));
+    break;
   case DESC_BOUND_F_FOR_SOLID:
-    return hash_f_boundary(&key->d.f_boundary);
+    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
+      dst->type = src->type;
+      init_f(src->d.f_boundary.name.allocator, &dst->d.f_boundary);
+    }
+    ERR(cp_f_boundary(&dst->d.f_boundary, &src->d.f_boundary));
+    break;
   case DESC_SOLID_FLUID_CONNECT:
-    return hash_sf_connect(&key->d.sf_connect);
-  default: FATAL("Invalid type.\n");
+    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
+      dst->type = src->type;
+      init_sf(src->d.sf_connect.name.allocator, &dst->d.sf_connect);
+    }
+    ERR(cp_sf_connect(&dst->d.sf_connect, &src->d.sf_connect));
+    break;
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
+  }
+end:
+  return res;
+error:
+  goto end;
+}
+
+static FINLINE void
+description_get_medium_id
+  (const struct description* desc,
+   unsigned* id)
+{
+  ASSERT(desc && id);
+  switch (desc->type) {
+  case DESC_MAT_SOLID:
+    *id = desc->d.solid.solid_id;
+    return;
+  case DESC_MAT_FLUID:
+    *id = desc->d.fluid.fluid_id;
+    return;
+  case DESC_BOUND_H_FOR_SOLID:
+  case DESC_BOUND_H_FOR_FLUID:
+    *id = desc->d.h_boundary.mat_id;
+    return;
+  case DESC_BOUND_T_FOR_SOLID:
+  case DESC_BOUND_T_FOR_FLUID:
+    *id = desc->d.t_boundary.mat_id;
+    return;
+  case DESC_BOUND_F_FOR_SOLID:
+    *id = desc->d.f_boundary.mat_id;
+    return;
+  case DESC_SOLID_FLUID_CONNECT: /* No medium linked to SF */
+  default:
+    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
 }
+
+enum stardis_output_fmt {
+  STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK,
+  STARDIS_RENDERING_OUTPUT_FILE_FMT_HT
+};
 
 struct camera {
   double pos[3];
   double tgt[3];
   double up[3];
+  enum stardis_output_fmt fmt;
   double fov;
+  double time_range[2];
   unsigned spp;
-  unsigned img[2];
-  union { /* Trick to allow static initialization with INF */
-    uint64_t t;
-    double time;
-  } u;
+  unsigned img_width, img_height;
+  int auto_look_at;
 };
-#define NULL_CAMERA__ {\
-  {1,1,1},{0,0,0},{0,0,1},30,4,{640,480},\
-  { 0x7FF0000000000000 } /* time=INF */\
-} 
-static const struct camera NULL_CAMERA = NULL_CAMERA__;
 
-struct solve_boundary {
-  size_t* primitives;
-  enum sdis_side* sides;
+static INLINE void
+init_camera(struct camera* cam) {
+  d3(cam->pos, STARDIS_DEFAULT_RENDERING_POS);
+  d3(cam->tgt, STARDIS_DEFAULT_RENDERING_TGT);
+  d3(cam->up, STARDIS_DEFAULT_RENDERING_UP);
+  cam->fmt = STARDIS_DEFAULT_RENDERING_OUTPUT_FILE_FMT;
+  cam->fov = STARDIS_DEFAULT_RENDERING_FOV;
+  cam->spp = STARDIS_DEFAULT_RENDERING_SPP;
+  cam->img_width = STARDIS_DEFAULT_RENDERING_IMG_WIDTH;
+  cam->img_height = STARDIS_DEFAULT_RENDERING_IMG_HEIGHT;
+  d2(cam->time_range, STARDIS_DEFAULT_RENDERING_TIME);
+  cam->auto_look_at = 1;
+}
+
+static INLINE void
+log_err_fn(const char* msg, void* ctx)
+{
+  ASSERT(msg);
+  (void)ctx;
+#ifdef OS_WINDOWS
+  fprintf(stderr, "error: %s", msg);
+#else
+  fprintf(stderr, "\x1b[31merror:\x1b[0m %s", msg);
+#endif
+}
+
+static INLINE void
+log_warn_fn(const char* msg, void* ctx)
+{
+  ASSERT(msg);
+  (void)ctx;
+#ifdef OS_WINDOWS
+  fprintf(stderr, "warning: %s", msg);
+#else
+  fprintf(stderr, "\x1b[33mwarning:\x1b[0m %s", msg);
+#endif
+}
+
+static INLINE void
+log_prt_fn(const char* msg, void* ctx)
+{
+  ASSERT(msg);
+  (void)ctx;
+#ifdef OS_WINDOWS
+  fprintf(stderr, "message: %s", msg);
+#else
+  fprintf(stderr, "\x1b[32moutput:\x1b[0m %s", msg);
+#endif
+}
+
+struct counts {
+  unsigned smed_count, fmed_count, tbound_count, hbound_count,
+    fbound_count, sfconnect_count;
+};
+#define COUNTS_NULL__ {\
+  0, 0, 0, 0, 0, 0\
+ }
+
+/* Type to store the primitives of a compute region */
+#define DARRAY_NAME sides
+#define DARRAY_DATA enum sdis_side
+#include <rsys/dynamic_array.h>
+
+#define DARRAY_NAME descriptions
+#define DARRAY_DATA struct description
+#define DARRAY_FUNCTOR_INIT init_description
+#define DARRAY_FUNCTOR_COPY cp_description
+#define DARRAY_FUNCTOR_RELEASE release_description
+#include <rsys/dynamic_array.h>
+
+struct compute_surface {
+  struct darray_size_t primitives;
+  struct darray_sides sides;
+  struct darray_uint err_triangles;
 };
 
 struct stardis {
   struct geometry geometry;
-  struct description* descriptions;  /*array of materials and boundaries */
+  struct sdis_scene* sdis_scn; /* The solver scene */
+  struct darray_descriptions descriptions;  /* Materials and boundaries */
+  struct darray_media_ptr media;
+  struct senc3d_scene* senc3d_scn;
+  struct counts counts;
 
-  double probe[4]; /* x,y,z,t of probe when mode is PROBE_COMPUTE */
+  double probe[3]; /* x,y,z of probe when mode is PROBE_COMPUTE */
+  double time_range[2]; /* compute time */
   struct camera camera; /* camera when mode is IR_COMPUTE */
-  char solve_name[64]; /* medium name when mode is MEDIUM_COMPUTE,
-                       boundary file name when BOUNDARY_COMPUTE*/
-  struct solve_boundary boundary; /* Boundary to solve when mode
-                                  is BOUNDARY_COMPUTE */
-
-  size_t N; /*number of MC realizations*/
+  struct str solve_name; /* medium name when mode is MEDIUM_COMPUTE,
+                            boundary file name when [FLUX_]BOUNDARY_COMPUTE
+                            map file name when MAP_COMPUTE */
+  struct compute_surface compute_surface; /* 2D compute region when mode is
+                                             [FLUX_]BOUNDARY_COMPUTE
+                                             or MAP_COMPUTE */
+  struct str paths_filename;
+  struct str bin_green_filename;
+  struct str end_paths_filename;
+  struct str chunks_prefix;
+  int mode;
+  size_t samples;
   unsigned nthreads;
   double scale_factor;
-  double radiative_temp[2];
-  struct mem_allocator allocator;
-  int allocator_initialized;
-  enum sdis_heat_path_flag dump_paths;
-};
-#define NULL_ALLOCATOR__ {NULL}
-#define NULL_STARDIS__ {\
-  NULL_GEOMETRY__, NULL,\
-  {0,0,0,0}, NULL_CAMERA__, "", {NULL,NULL},\
-  0, 0, 0, {300,300}, NULL_ALLOCATOR__, 0, SDIS_HEAT_PATH_NONE}
-static const struct stardis NULL_STARDIS = NULL_STARDIS__;
-
-enum content_type {
-  CONTENT_GEOMETRY,
-  CONTENT_CONNECTION,
-  CONTENT_BOUNDARY,
-  CONTENT_TYPES_COUNT
+  double ambient_temp, ref_temp;
+  struct mem_allocator* allocator;
+  struct logger* logger;
+  struct sdis_device* dev;
+  unsigned next_medium_id;
+  unsigned undefined_medium_behind_boundary_id;
+  int dump_paths;
+  int verbose;
 };
 
+static INLINE unsigned
+allocate_stardis_medium_id(struct stardis* stardis)
+{
+  ASSERT(stardis);
+  return stardis->next_medium_id++;
+}
 
-extern res_T 
+extern LOCAL_SYM res_T
 stardis_init
   (const struct args* args,
+   struct logger* logger,
+   struct mem_allocator* allocator,
    struct stardis* stardis);
 
-extern res_T
-stardis_compute(struct stardis* stardis, enum stardis_mode mode);
+extern LOCAL_SYM void
+stardis_release
+  (struct stardis* stardis);
 
-extern void
-stardis_release(struct stardis* stardis);
+extern LOCAL_SYM res_T
+init_enclosures
+  (struct stardis* stardis);
 
-extern res_T
-dump_vtk(FILE* output, const struct geometry* geometry);
-
-extern res_T
-read_stl
-  (const unsigned desc_id,
-   const enum content_type file_type,
-   const char* stl_filename,
-   struct htable_vertex* vertex2id,
-   struct htable_triangle* triangle2id,
-   struct stardis* stardis);
+extern LOCAL_SYM res_T
+validate_properties
+  (const unsigned itri,
+   const unsigned properties[SG3D_PROP_TYPES_COUNT__],
+   void* context,
+   int* properties_conflict_status);
 
 #endif /*STARDIS-APP_H*/

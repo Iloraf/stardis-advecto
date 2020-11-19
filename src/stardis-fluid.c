@@ -1,0 +1,164 @@
+/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>. */
+
+#include "stardis-fluid.h"
+#include "stardis-compute.h"
+#include "stardis-app.h"
+
+#include <sdis.h>
+
+#include <limits.h>
+
+/*******************************************************************************
+ * Local Functions
+ ******************************************************************************/
+
+static double
+fluid_get_calorific_capacity
+  (const struct sdis_rwalk_vertex* vtx,
+   struct sdis_data* data)
+{
+  const struct fluid* fluid_props = sdis_data_cget(data);
+  (void)vtx;
+  return fluid_props->cp;
+}
+
+static double
+fluid_get_volumic_mass
+  (const struct sdis_rwalk_vertex* vtx,
+   struct sdis_data* data)
+{
+  const struct fluid* fluid_props = sdis_data_cget(data);
+  (void)vtx;
+  return fluid_props->rho;
+}
+
+static double
+fluid_get_temperature
+  (const struct sdis_rwalk_vertex* vtx,
+   struct sdis_data* data)
+{
+  const struct fluid* fluid_props = sdis_data_cget(data);
+  if(fluid_props->imposed_temperature >= 0)
+    /* If there is an imposed temp, it is imposed regardless of time */
+    return fluid_props->imposed_temperature;
+  if(vtx->time <= fluid_props->t0) {
+    /* If time is <= t0: use tinit */
+    if(fluid_props->tinit < 0) {
+      if(str_is_empty(&fluid_props->name)) {
+        FATAL("fluid_get_temperature: getting undefined Tinit\n");
+      } else {
+        VFATAL("fluid_get_temperature: getting undefined Tinit (fluid '%s')\n",
+          ARG1(str_cget(&fluid_props->name)));
+      }
+    }
+    return fluid_props->tinit;
+  }
+  return -1; /* Unknown temperature */
+}
+
+/*******************************************************************************
+ * Public Functions
+ ******************************************************************************/
+
+res_T
+create_solver_fluid
+  (struct stardis* stardis,
+   const struct fluid* fluid_props)
+{
+  res_T res = RES_OK;
+  struct sdis_fluid_shader fluid_shader = SDIS_FLUID_SHADER_NULL;
+  struct sdis_data* data = NULL;
+  struct fluid* props;
+
+  ASSERT(stardis && fluid_props);
+  fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
+  fluid_shader.volumic_mass = fluid_get_volumic_mass;
+  fluid_shader.temperature = fluid_get_temperature;
+  ERR(sdis_data_create(stardis->dev, sizeof(struct fluid), ALIGNOF(struct fluid),
+    NULL, &data));
+
+  props = sdis_data_get(data); /* Fetch the allocated memory space */
+  init_fluid(stardis->allocator, props);
+  cp_fluid(props, fluid_props);
+  if(fluid_props->fluid_id >= darray_media_ptr_size_get(&stardis->media)) {
+    ERR(darray_media_ptr_resize(&stardis->media, fluid_props->fluid_id + 1));
+  }
+  ASSERT(darray_media_ptr_data_get(&stardis->media)[fluid_props->fluid_id] == NULL);
+  ERR(sdis_fluid_create(stardis->dev, &fluid_shader, data,
+    darray_media_ptr_data_get(&stardis->media) + fluid_props->fluid_id));
+
+end:
+  if(data) SDIS(data_ref_put(data));
+  return res;
+error:
+  goto end;
+}
+
+void
+init_fluid(struct mem_allocator* allocator, struct fluid* dst)
+{
+  str_init(allocator, &dst->name);
+  dst->rho = 1;
+  dst->cp = 1;
+  dst->tinit = -1;
+  dst->imposed_temperature = -1;
+  dst->t0 = 0;
+  dst->is_outside = 0;
+  dst->is_green = 0;
+  dst->desc_id = UINT_MAX;
+  dst->fluid_id = UINT_MAX;
+}
+
+void
+release_fluid(struct fluid* fluid)
+{
+  str_release(&fluid->name);
+}
+
+res_T
+str_print_fluid(struct str* str, const struct fluid* f)
+{
+  res_T res = RES_OK;
+  ASSERT(str && f);
+  STR_APPEND_PRINTF(str, "Fluid '%s': rho=%g cp=%g",
+    ARG3( str_cget(&f->name), f->rho, f->cp ) );
+  if(f->tinit >= 0) {
+    STR_APPEND_PRINTF(str, " Tinit=%g", ARG1( f->tinit ) );
+  }
+  if(f->imposed_temperature >= 0) {
+    STR_APPEND_PRINTF(str, " Temp=%g", ARG1( f->imposed_temperature ) );
+  }
+  STR_APPEND_PRINTF(str, " (it is medium %u)", ARG1( f->fluid_id ) );
+end:
+  return res;
+error:
+  goto end;
+}
+
+res_T
+cp_fluid(struct fluid* dst, const struct fluid* src)
+{
+  dst->rho = src->rho;
+  dst->cp = src->cp;
+  dst->tinit = src->tinit;
+  dst->imposed_temperature = src->imposed_temperature;
+  dst->t0 = src->t0;
+  dst->is_outside = src->is_outside;
+  dst->is_green = src->is_green;
+  dst->desc_id = src->desc_id;
+  dst->fluid_id = src->fluid_id;
+  return str_copy(&dst->name, &src->name);
+}

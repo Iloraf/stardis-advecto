@@ -31,7 +31,7 @@ well as all the aforementioned prerequisites. Finally generate the project from
 the `cmake/CMakeLists.txt` file by appending to the `CMAKE_PREFIX_PATH`
 variable the install directories of its dependencies.
 
-## Note de versions
+## Release Notes
 
 ### v0.5
 

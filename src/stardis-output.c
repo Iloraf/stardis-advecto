@@ -637,7 +637,8 @@ dump_green_bin
   unsigned name_pool_sz = 0;
   char* name_pool = NULL;
   char* pool_ptr;
-  char green_string[] = "BINGREEN";
+  const char green_string[] = "GREEN_BIN_FILE:";
+  const unsigned file_fmt_version = 1;
 
   ASSERT(green && stardis && stream);
 
@@ -669,8 +670,9 @@ dump_green_bin
     pool_ptr += len + 1;
   }
   ASSERT(pool_ptr == name_pool + name_pool_sz);
-  /* Write Green string */
+  /* Write Green string and file format version */
   FW(green_string, sizeof(green_string));
+  FW(&file_fmt_version, 1);
 
   /* Write counts */
   FW(&szd, 1);

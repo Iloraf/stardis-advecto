@@ -295,7 +295,8 @@ computation encounters erroneous heat paths, they will be dumped to VTK files
 named err_path_00000000.vtk, err_path_00000001.vtk, etc. The image file is then
 post-processed using *htpp*(1) with default settings to obtain a png file.
 
-    $ stardis -M scn.txt -R t=100:spp=2:img=800x600:fmt=ht -D error,err_path_ > img.ht
+    $ stardis -M scn.txt -R t=100:spp=2:img=800x600:fmt=ht \
+      -D error,err_path_ > img.ht
     $ htpp -o img.pgn -v -m default img.ht
 
 Compute the Green fonction that computes the temperature at the probe point

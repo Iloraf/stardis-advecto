@@ -25,15 +25,21 @@ as well as on the [OpenMP](http://www.openmp.org) 2.0 specification to
 parallelize its computations.
 
 
-First ensure that CMake and a C99 compiler that implements the OpenMP 2.0
+First ensure that CMake and a C89 compiler that implements the OpenMP 2.0
 specification are installed on your system. Then install the RCMake package as
 well as all the aforementioned prerequisites. Finally generate the project from
 the `cmake/CMakeLists.txt` file by appending to the `CMAKE_PREFIX_PATH`
 variable the install directories of its dependencies.
 
-## Note de versions
+## Release notes
 
-### v0.5
+### Version 0.5.1
+
+- Fix a memleak
+- Add a file format version in binary Green files.
+- Man improvement.
+
+### Version 0.5
 
 - Ensure C89 compliance.
 - New output format for infra-red rendering.
@@ -43,14 +49,14 @@ variable the install directories of its dependencies.
 - Allow unsteady Green's function computations.
 - Model files now include scale parameter.
 
-### v0.4
+### Version 0.4
 
 - Improve C99 compliance.
 - Build on Windows systems.
 - Use new stardis-solver 0.5.
 - Transition to cmake to manage builds.
 
-### v0.3.2
+### Version 0.3.2
 
 - Add the solve_probe_boundary feature. The solve_probe_boundary VS
   solve_probe selection is automated according the probe-geometry distance.
@@ -58,14 +64,14 @@ variable the install directories of its dependencies.
   from geometry.
 - Add flux boundary conditions.
 
-### v0.3.1
+### Version 0.3.1
 
 Add radiative transfer computations. To achieve this, media gain 2 new parameters: 
 
 - emissivity;
 - specular_fraction.
 
-### v0.3
+### Version 0.3
 
 - Upgrade stardis-solver to v0.3.
 - Add volumic power sources on solids;
@@ -75,7 +81,7 @@ Add radiative transfer computations. To achieve this, media gain 2 new parameter
   boundary conditions information.
 
 
-### v0.1
+### Version 0.1
 
 - Allow probe computations on conductive-only thermal systems.
 - Allow Dirichlet and h.dT boundary conditions.

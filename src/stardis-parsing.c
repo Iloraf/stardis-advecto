@@ -960,19 +960,19 @@ parse_camera
   char** line = NULL;
   char** opt = NULL;
   struct camera* cam;
+  struct str keep;
   res_T res = RES_OK;
 
   ASSERT(cam_param && stardis);
   cam = &stardis->camera;
   line = split_line(cam_param, ':');
+  str_init(stardis->allocator, &keep);
 
   if(line) {
-    struct str keep;
     int i = 0;
-    str_init(stardis->allocator, &keep);
     for(i = 0; *(line + i); i++) {
       size_t len = 0;
-      str_set(&keep, line[i]);
+      ERR(str_set(&keep, line[i]));
       opt = split_line(line[i], '=');
       if(!opt[0] || ! opt[1]  || opt[2]) {
         if(res == RES_OK) res = RES_BAD_ARG;
@@ -980,7 +980,7 @@ parse_camera
           "Invalid option syntax: %s\n", str_cget(&keep));
         goto error;
       }
-      str_set(&keep, opt[0]);
+      ERR(str_set(&keep, opt[0]));
       _strupr(opt[0]);
       if(strcmp(opt[0], "T") == 0) {
         GET_OPTIONAL_TIME_RANGE(opt[1], 0, cam->time_range, logger, "%s",
@@ -1030,7 +1030,6 @@ parse_camera
         goto error;
       }
     }
-    str_release(&keep);
   }
 
 end:
@@ -1045,6 +1044,7 @@ end:
   FREE_AARRAY(opt)
 #undef FREE_AARRAY
 
+  str_release(&keep);
   return res;
 error:
   logger_print(logger, LOG_ERROR, "Error parsing camera options.\n");

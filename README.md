@@ -25,9 +25,9 @@ as well as on the [OpenMP](http://www.openmp.org) 2.0 specification to
 parallelize its computations.
 
 
-First ensure that CMake and a C89 compiler that implements the OpenMP 2.0
-specification are installed on your system. Then install the RCMake package as
-well as all the aforementioned prerequisites. Finally generate the project from
+First ensure that CMake and a C compiler are installed on your system.
+Then install the RCMake package as well as all the aforementioned
+prerequisites. Finally generate the project from
 the `cmake/CMakeLists.txt` file by appending to the `CMAKE_PREFIX_PATH`
 variable the install directories of its dependencies.
 

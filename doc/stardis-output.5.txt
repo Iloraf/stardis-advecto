@@ -813,9 +813,9 @@ sub-option, this file can be either in VTK [1] format on in *htrdr-image*(5)
 format.
 
 === HTRDR-IMAGE INFRARED IMAGE
-If the output image is in htrdr-image format, it comply with the *lw* section
-of the format, with only the temperature fields being informed. The resulting
-format is as follows:
+If the output image is in *htrdr-image*(5) format, it comply with the *lw*
+section of the format, with only the temperature fields being informed. The
+resulting format is as follows:
 
 [verse]
 _______
@@ -972,4 +972,5 @@ _______
 == SEE ALSO
 
 *stardis*(1),
-*stardis-input*(5)
+*stardis-input*(5),
+*htrdr-image*(5)

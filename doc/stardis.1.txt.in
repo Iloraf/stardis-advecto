@@ -120,13 +120,13 @@ EXCLUSIVE OPTIONS
 *-S* _file[,time-range]_::
   Compute the by-triangle mean temperature on a given 2D region at a given
   time, the region being defined as the front sides of the triangles in the
-  provided *VTK* file. These triangles are not added to the geometry, but must
+  provided *STL* file. These triangles are not added to the geometry, but must
   be part of it. By default the compute time range is
   @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The region does not need to be connex.
 
 *-F* _file[,time-range]_::
   Compute the mean flux on a given 2D region at a given time, the region
-  being defined as the front sides of the triangles in the provided *VTK* file.
+  being defined as the front sides of the triangles in the provided *STL* file.
   These triangles are not added to the geometry, but must be part of it. Flux
   is accounted positive when going from the front side to the back side, at a
   single-triangle level. By default the compute time range is

@@ -229,6 +229,7 @@ stardis_init
   darray_size_t_init(stardis->allocator, &stardis->compute_surface.primitives);
   darray_sides_init(stardis->allocator, &stardis->compute_surface.sides);
   darray_uint_init(stardis->allocator, &stardis->compute_surface.err_triangles);
+  stardis->compute_surface.area = 0;
   stardis->samples = args->samples;
   stardis->nthreads = args->nthreads;
   stardis->scale_factor = -1; /* invalid value */
@@ -309,6 +310,8 @@ stardis_init
         goto error;
       }
     }
+    logger_print(stardis->logger, LOG_OUTPUT, "Compute surface area is %g m2\n",
+      stardis->compute_surface.area);
   }
 
   /* Create enclosures */

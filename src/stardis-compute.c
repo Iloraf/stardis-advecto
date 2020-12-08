@@ -972,6 +972,8 @@ read_compute_surface
   struct add_geom_ctx add_geom_ctx;
   struct sg3d_geometry_add_callbacks callbacks = SG3D_ADD_CALLBACKS_NULL__;
   const char* file;
+  size_t i;
+  double _2area = 0;
 
   ASSERT(stardis);
 
@@ -1005,6 +1007,26 @@ read_compute_surface
       "Cannot add file content: '%s'\n", file);
     goto error;
   }
+
+  /* Compute area of the compute surface */
+  FOR_EACH(i, 0, add_geom_ctx.stl_desc.triangles_count) {
+    const unsigned* trg = add_geom_ctx.stl_desc.indices + (i * 3);
+    const float* v0f = add_geom_ctx.stl_desc.vertices + (trg[0] * 3);
+    const float* v1f = add_geom_ctx.stl_desc.vertices + (trg[1] * 3);
+    const float* v2f = add_geom_ctx.stl_desc.vertices + (trg[2] * 3);
+    double v0[3], v1[3], v2[3], edge0[3], edge1[3], normal[3], norm;
+
+    /* Compute component area and volume */
+    d3_sub(edge0, d3_set_f3(v1, v1f), d3_set_f3(v0, v0f));
+    d3_sub(edge1, d3_set_f3(v2, v2f), d3_set_f3(v0, v0f));
+    d3_cross(normal, edge0, edge1);
+    norm = d3_normalize(normal, normal);
+    ASSERT(norm);
+    _2area += norm;
+  }
+
+  stardis->compute_surface.area = _2area * 0.5
+    * stardis->scale_factor * stardis->scale_factor;
 
 end:
   if(sstl) SSTL(ref_put(sstl));

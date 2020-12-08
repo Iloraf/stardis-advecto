@@ -712,6 +712,7 @@ struct compute_surface {
   struct darray_size_t primitives;
   struct darray_sides sides;
   struct darray_uint err_triangles;
+  double area; /* in m2, regardless of scale factor */
 };
 
 struct stardis {

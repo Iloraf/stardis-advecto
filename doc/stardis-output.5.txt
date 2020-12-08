@@ -139,34 +139,36 @@ _______
 <failures-report>     ::= <error-count> <success-count>
 
 <ext-probe-temp>      ::= "Temperature at" <ext-probe-position> <ext-time> \
-                          <ext-MC-estimate>
+                          <ext-temp-estimate>
                           <ext-failures-report>
 
 <ext-mean-temp>       ::= "Temperature at boundary" <file-name> <ext-time> \
-                          <ext-MC-estimate>
+                          <ext-temp-estimate>
                           <ext-failures-report>
 
 <ext-mean-flux>       ::= "Temperature at boundary" <file-name> <ext-time> \
-                          <ext-MC-estimate>
+                          <ext-temp-estimate>
                           "Convective flux at boundary " <file-name> \
-                          <ext-time> <ext-MC-estimate>
+                          <ext-time> <ext-flux-estimate>
                           "Radiative flux at boundary" <file-name> <ext-time> \
-                          <ext-MC-estimate>
+                          <ext-flux-estimate>
                           "Imposed flux at boundary" <file-name> <ext-time> \
-                          <ext-MC-estimate>
+                          <ext-flux-estimate>
                           "Total flux at boundary" <file-name> <ext-time> \
-                          <ext-MC-estimate>
+                          <ext-flux-estimate>
                           <ext-failures-report>
 
 <ext-medium-temp>     ::= "Temperature in medium" <medium-name> <ext-time> \
-                          <ext-MC-estimate>
+                          <ext-temp-estimate>
                           <ext-failures-report>
 
 <ext-probe-position>  ::= "[" <x-value> "," <y-value> "," <z-value> "]"
 
 <ext-time>            ::= "at t=" <time-value> "="
 
-<ext-MC-estimate>     ::= <expected-value> "+/-" <standard-deviation>
+<ext-temp-estimate>   ::= <expected-value> "K +/-" <standard-deviation>
+
+<ext-flux-estimate>   ::= <expected-value> "W +/-" <standard-deviation>
 
 <ext-failures-report> ::= "#failures:" <error-count> "/" <success-count>
 

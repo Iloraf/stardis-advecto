@@ -428,61 +428,66 @@ dump_sample_end
    void* ctx)
 {
   res_T res = RES_OK;
-  struct sdis_point pt = SDIS_POINT_NULL;
-  struct sdis_data* data = NULL;
-  enum sdis_medium_type type;
   struct e_ctx* e_ctx = ctx;
-  const struct description* descs;
+  enum sdis_green_path_end_type end_type;
   FILE* stream;
   double elapsed;
-  double* pos;
-  unsigned id;
 
   CHK(path && ctx);
 
   stream = e_ctx->stream;
-  ERR(sdis_green_path_get_limit_point(path, &pt));
   ERR(sdis_green_path_get_elapsed_time(path, &elapsed));
-
-  descs = darray_descriptions_cdata_get(e_ctx->desc);
-  switch (pt.type) {
-  case SDIS_FRAGMENT: {
-    struct intface* d__;
-    data = sdis_interface_get_data(pt.data.itfrag.intface);
-    pos = pt.data.itfrag.fragment.P;
-    d__ = sdis_data_get(data);
-    id = d__->desc_id;
-    CHK(DESC_IS_T(descs[id].type) || DESC_IS_H(descs[id].type));
-    break;
-  }
-  case SDIS_VERTEX:
-    type = sdis_medium_get_type(pt.data.mdmvert.medium);
-    data = sdis_medium_get_data(pt.data.mdmvert.medium);
-    pos = pt.data.mdmvert.vertex.P;
-    if(pt.data.mdmvert.vertex.P[0] == INF) {
-      /* Radiative output (ambient temperature) */
-      size_t sz = darray_descriptions_size_get(e_ctx->desc);
-      ASSERT(sz <= UINT_MAX);
-      id = (unsigned)sz; /* Ambient ID */
-    }
-    else if(type == SDIS_FLUID) {
-      struct fluid* d__ = sdis_data_get(data);
-      id = d__->desc_id;
-    } else {
-      struct solid* d__ = sdis_data_get(data);
-      ASSERT(type == SDIS_SOLID);
-      ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
-      id = d__->desc_id;
-    }
-    break;
-  default: FATAL("Unreachable code.\n"); break;
-  }
-
-  /* End, End ID, X, Y, Z, Elapsed time */
-  if(pt.data.mdmvert.vertex.P[0] == INF) {
+  ERR(sdis_green_path_get_end_type(path, &end_type));
+  if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
+    size_t ambient_id = darray_descriptions_size_get(e_ctx->desc);
+    ASSERT(ambient_id <= UINT_MAX);
+    /* End, End ID, X, Y, Z, Elapsed time */
     fprintf(stream, "AMBIANT, %u, 0, 0, 0, %g\n",
-      id, elapsed);
+      (unsigned)ambient_id, elapsed);
   } else {
+    struct sdis_point pt = SDIS_POINT_NULL;
+    struct sdis_data* data = NULL;
+    enum sdis_medium_type type;
+    const struct description* descs;
+    double* pos;
+    unsigned id;
+
+    ERR(sdis_green_path_get_limit_point(path, &pt));
+
+    descs = darray_descriptions_cdata_get(e_ctx->desc);
+    switch(pt.type) {
+      case SDIS_FRAGMENT: {
+        struct intface* d__;
+        data = sdis_interface_get_data(pt.data.itfrag.intface);
+        pos = pt.data.itfrag.fragment.P;
+        d__ = sdis_data_get(data);
+        id = d__->desc_id;
+        CHK(DESC_IS_T(descs[id].type) || DESC_IS_H(descs[id].type));
+        break;
+      }
+      case SDIS_VERTEX:
+        type = sdis_medium_get_type(pt.data.mdmvert.medium);
+        data = sdis_medium_get_data(pt.data.mdmvert.medium);
+        pos = pt.data.mdmvert.vertex.P;
+        if(pt.data.mdmvert.vertex.P[0] == INF) {
+          /* Radiative output (ambient temperature) */
+          size_t sz = darray_descriptions_size_get(e_ctx->desc);
+          ASSERT(sz <= UINT_MAX);
+          id = (unsigned)sz; /* Ambient ID */
+        }
+        else if(type == SDIS_FLUID) {
+          struct fluid* d__ = sdis_data_get(data);
+          id = d__->desc_id;
+        } else {
+          struct solid* d__ = sdis_data_get(data);
+          ASSERT(type == SDIS_SOLID);
+          ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
+          id = d__->desc_id;
+        }
+        break;
+      default: FATAL("Unreachable code.\n"); break;
+    }
+    /* End, End ID, X, Y, Z, Elapsed time */
     fprintf(stream, "%s, %u, %g, %g, %g, %g\n",
       str_cget(get_description_name(descs + id)), id, SPLIT3(pos), elapsed);
   }
@@ -499,65 +504,75 @@ dump_sample
    void* ctx)
 {
   res_T res = RES_OK;
-  struct sdis_point pt = SDIS_POINT_NULL;
-  struct sdis_data* data = NULL;
-  enum sdis_medium_type type;
   struct htable_weigth_iterator it, end;
   struct path_header header;
   struct w_ctx* w_ctx = ctx;
-  const struct description* descs;
+  enum sdis_green_path_end_type end_type;
   FILE* stream;
   unsigned* ids = NULL;
   double* weights = NULL;
   size_t sz, i;
-  double t0;
 
   CHK(path && ctx);
 
   stream = w_ctx->stream;
-  ERR(sdis_green_path_get_limit_point(path, &pt));
-
-  /* For each path, dump:
-   * # end_id #power_terms #flux_terms
-   *    power_id_1  ... power_id_n flux_id_1 ... flux_id_n
-   *    power_factor_1  ... power_factor_n flux_factor_1 ... flux_factor_n
-   */
-
-  descs = darray_descriptions_cdata_get(w_ctx->desc);
-  switch (pt.type) {
-  case SDIS_FRAGMENT: {
-    struct intface* d__;
-    unsigned desc_id;
-    data = sdis_interface_get_data(pt.data.itfrag.intface);
-    d__ = sdis_data_get(data);
-    desc_id = d__->desc_id;
-    CHK(DESC_IS_T(descs[desc_id].type) || DESC_IS_H(descs[desc_id].type));
-    header.id = desc_id;
+  ERR(sdis_green_path_get_end_type(path, &end_type));
+  if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
+    size_t ambient_id = darray_descriptions_size_get(w_ctx->desc);
+    ASSERT(ambient_id <= UINT_MAX);
     header.at_initial = 0;
-    break;
-  }
-  case SDIS_VERTEX:
-    type = sdis_medium_get_type(pt.data.mdmvert.medium);
-    data = sdis_medium_get_data(pt.data.mdmvert.medium);
-    t0 = medium_get_t0(pt.data.mdmvert.medium);
-    header.at_initial = (pt.data.mdmvert.vertex.time <= t0);
-    if(pt.data.mdmvert.vertex.P[0] == INF) {
-      /* Radiative output (ambient temperature) */
-      sz = darray_descriptions_size_get(w_ctx->desc);
-      ASSERT(sz <= UINT_MAX);
-      header.id = (unsigned)sz; /* Ambient ID */
+    header.id = (unsigned)ambient_id;
+  } else {
+    struct sdis_point pt = SDIS_POINT_NULL;
+    struct sdis_data* data = NULL;
+    enum sdis_medium_type type;
+    const struct description* descs;
+    double t0;
+
+    ERR(sdis_green_path_get_limit_point(path, &pt));
+
+    /* For each path, dump:
+     * # end_id #power_terms #flux_terms
+     *    power_id_1  ... power_id_n flux_id_1 ... flux_id_n
+     *    power_factor_1  ... power_factor_n flux_factor_1 ... flux_factor_n
+     */
+
+    descs = darray_descriptions_cdata_get(w_ctx->desc);
+    switch(pt.type) {
+      case SDIS_FRAGMENT: {
+        struct intface* d__;
+        unsigned desc_id;
+        data = sdis_interface_get_data(pt.data.itfrag.intface);
+        d__ = sdis_data_get(data);
+        desc_id = d__->desc_id;
+        CHK(DESC_IS_T(descs[desc_id].type) || DESC_IS_H(descs[desc_id].type));
+        header.id = desc_id;
+        header.at_initial = 0;
+        break;
+      }
+      case SDIS_VERTEX:
+        type = sdis_medium_get_type(pt.data.mdmvert.medium);
+        data = sdis_medium_get_data(pt.data.mdmvert.medium);
+        t0 = medium_get_t0(pt.data.mdmvert.medium);
+        header.at_initial = (pt.data.mdmvert.vertex.time <= t0);
+        if(pt.data.mdmvert.vertex.P[0] == INF) {
+          /* Radiative output (ambient temperature) */
+          sz = darray_descriptions_size_get(w_ctx->desc);
+          ASSERT(sz <= UINT_MAX);
+          header.id = (unsigned)sz; /* Ambient ID */
+        }
+        else if(type == SDIS_FLUID) {
+          struct fluid* d__ = sdis_data_get(data);
+          header.id = d__->desc_id;
+        } else {
+          struct solid* d__ = sdis_data_get(data);
+          ASSERT(type == SDIS_SOLID);
+          ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
+          header.id = d__->desc_id;
+        }
+        break;
+      default: FATAL("Unreachable code.\n"); break;
     }
-    else if(type == SDIS_FLUID) {
-      struct fluid* d__ = sdis_data_get(data);
-      header.id = d__->desc_id;
-    } else {
-      struct solid* d__ = sdis_data_get(data);
-      ASSERT(type == SDIS_SOLID);
-      ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
-      header.id = d__->desc_id;
-    }
-    break;
-  default: FATAL("Unreachable code.\n"); break;
   }
 
   /* Merge power and flux terms */

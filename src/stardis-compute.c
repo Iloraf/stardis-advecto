@@ -82,7 +82,7 @@ hit_filter
 {
   struct filter_ctx* filter_ctx = ray_data;
   float s, dir[3];
-  enum senc3d_side hit_side;
+  enum sg3d_property_type prop;
   struct s3d_attrib interf_pos;
   const struct description* descriptions;
   unsigned descr[SG3D_PROP_TYPES_COUNT__];
@@ -143,11 +143,11 @@ hit_filter
     filter_ctx->probe_on_boundary = 0;
   }
 
-  /* Determine which side was hit
+  /* Determine which side was hit and the property to look at.
    * Warning: following Embree 2 convention for geometrical normals,
    * the Star3D hit normals are left-handed */
-  hit_side = (s > 0) ? SG3D_BACK : SG3D_FRONT;
-  if(descr[hit_side] == SG3D_UNSPECIFIED_PROPERTY) {
+  prop = (s > 0) ? SG3D_BACK : SG3D_FRONT;
+  if(descr[prop] == SG3D_UNSPECIFIED_PROPERTY) {
     filter_ctx->prim = hit->prim.prim_id;
     filter_ctx->desc = NULL;
     f3_set(filter_ctx->pos, interf_pos.value);
@@ -156,7 +156,7 @@ hit_filter
     filter_ctx->probe_on_boundary = 0;
   } else {
     filter_ctx->prim = hit->prim.prim_id;
-    filter_ctx->desc = descriptions + descr[hit_side];
+    filter_ctx->desc = descriptions + descr[prop];
     f3_set(filter_ctx->pos, interf_pos.value);
     filter_ctx->dist = hit->distance;
     filter_ctx->outside = 0;

@@ -60,9 +60,7 @@ to radiative transfer physics (Delatorre [1]) combined with conduction's
 statistical formulation (Kac [2] and Muller [3]). Thanks to recent advances in
 computer graphics technology which has already been a game changer in the
 cinema industry (FX and animated movies), this theoretical framework can now
-be practically used on the most geometrically complex systems. While this
-capability is part of the StarEngine Star3D library, it is internally powered
-by Intel® Rendering Framework: Embree.
+be practically used on the most geometrically complex systems.
 
 Everytime the linear assumption is relevant, this theoretical framework allows
 to encompass all the heat transfer mecanisms (conductive-convective-radiative)

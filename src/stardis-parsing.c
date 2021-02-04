@@ -1059,6 +1059,30 @@ error:
 #undef GET_POS_AND_OPTIONAL_TIME_RANGE
 #undef GET_OPTIONAL_TIME_RANGE
 
+static res_T
+description_set_name
+  (struct stardis* stardis,
+   struct str* name,
+   const char* tk)
+{
+  res_T res = RES_OK;
+  double foo;
+  ASSERT(name && tk);
+
+  if(RES_OK == cstr_to_double(tk, &foo)) {
+    /* A number is not a sensible choice for a name! */
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  ERR(str_set(name, tk));
+
+end:
+  return res;
+error:
+  logger_print(stardis->logger, LOG_ERROR, "Invalid name: %s\n", tk);
+  goto end;
+}
+
 static struct description*
 find_description_by_name
   (struct stardis* stardis,
@@ -1105,7 +1129,7 @@ process_h
   desc->type = type;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "h boundary name");
-  ERR(str_set(&desc->d.h_boundary.name, tk));
+  ERR(description_set_name(stardis, &desc->d.h_boundary.name, tk));
   if(find_description_by_name(stardis, &desc->d.h_boundary.name, NULL)
     != desc)
   {
@@ -1212,7 +1236,7 @@ process_t
     ? get_dummy_solid_id(stardis, dummies) : get_dummy_fluid_id(stardis, dummies);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature boundary name");
-  ERR(str_set(&desc->d.t_boundary.name, tk));
+  ERR(description_set_name(stardis, &desc->d.t_boundary.name, tk));
   if(find_description_by_name(stardis, &desc->d.t_boundary.name, NULL)
     != desc)
   {
@@ -1298,7 +1322,7 @@ process_flx
   desc->d.f_boundary.mat_id = get_dummy_fluid_id(stardis, dummies);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "flux boundary name");
-  ERR(str_set(&desc->d.f_boundary.name, tk));
+  ERR(description_set_name(stardis, &desc->d.f_boundary.name, tk));
   if(find_description_by_name(stardis, &desc->d.f_boundary.name, NULL)
     != desc)
   {
@@ -1354,7 +1378,7 @@ process_sfc
   desc->d.sf_connect.connection_id = allocate_stardis_medium_id(stardis);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid fluid connection name");
-  ERR(str_set(&desc->d.sf_connect.name, tk));
+  ERR(description_set_name(stardis, &desc->d.sf_connect.name, tk));
   if(find_description_by_name(stardis, &desc->d.sf_connect.name, NULL)
     != desc)
   {
@@ -1511,7 +1535,7 @@ process_solid
   desc->d.solid.desc_id = (unsigned)sz;
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid name");
-  ERR(str_set(&desc->d.solid.name, tk));
+  ERR(description_set_name(stardis, &desc->d.solid.name, tk));
   if(find_description_by_name(stardis, &desc->d.solid.name, NULL)
     != desc)
   {
@@ -1617,7 +1641,7 @@ process_fluid
   desc->d.fluid.desc_id = (unsigned)sz;
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "fluid name");
-  ERR(str_set(&desc->d.fluid.name, tk));
+  ERR(description_set_name(stardis, &desc->d.fluid.name, tk));
   if(find_description_by_name(stardis, &desc->d.fluid.name, NULL)
     != desc)
   {

@@ -29,6 +29,7 @@
 #include <rsys/double2.h>
 #include <rsys/logger.h>
 #include <rsys/image.h>
+#include <rsys/clock_time.h>
 
 /*******************************************************************************
  * Local Functions
@@ -366,7 +367,7 @@ error:
 }
 
 static res_T
-compute_probe(struct stardis* stardis)
+compute_probe(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   double uv[2] = { 0,0 };
@@ -376,8 +377,9 @@ compute_probe(struct stardis* stardis)
   struct dump_path_context dump_ctx;
   struct sdis_solve_probe_args args = SDIS_SOLVE_PROBE_ARGS_DEFAULT;
   FILE* stream = NULL;
+  struct time compute_start, compute_end;
 
-  ASSERT(stardis && (stardis->mode & MODE_PROBE_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE));
 
   ERR(check_probe_conform_to_type(stardis, 0, stardis->probe, &iprim, uv));
 
@@ -386,8 +388,11 @@ compute_probe(struct stardis* stardis)
   d2_set(args.time_range, stardis->time_range);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+    time_current(&compute_start);
     ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
+    time_current(&compute_end);
     if(stardis->mode & MODE_BIN_GREEN) {
+      struct time output_end;
       ASSERT(!str_is_empty(&stardis->bin_green_filename));
       stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
       if(!stream) {
@@ -407,15 +412,23 @@ compute_probe(struct stardis* stardis)
         ERR(dump_paths_end(green, stardis, stream));
         fclose(stream); stream = NULL;
       }
+      time_current(&output_end);
+      ERR(print_computation_time(NULL, stardis,
+        start, &compute_start, &compute_end, &output_end));
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    time_current(&compute_start);
     ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
+    time_current(&compute_end);
+    ERR(print_computation_time(estimator, stardis,
+      start, &compute_start, &compute_end, NULL));
     ERR(print_single_MC_result(estimator, stardis, stdout));
-    /* Dump paths recorded according to user settings */
+    
+    /* Dump recorded paths according to user settings */
     dump_ctx.stardis = stardis;
     dump_ctx.rank = 0;
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
@@ -431,7 +444,7 @@ error:
 }
 
 static res_T
-compute_probe_on_interface(struct stardis* stardis)
+compute_probe_on_interface(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   double uv[2] = { 0,0 };
@@ -442,8 +455,9 @@ compute_probe_on_interface(struct stardis* stardis)
   struct sdis_solve_probe_boundary_args args
     = SDIS_SOLVE_PROBE_BOUNDARY_ARGS_DEFAULT;
   FILE* stream = NULL;
+  struct time compute_start, compute_end;
 
-  ASSERT(stardis && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
+  ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
   ERR(check_probe_conform_to_type(stardis, 1, stardis->probe, &iprim, uv));
   ASSERT(iprim != SIZE_MAX);
 
@@ -454,9 +468,12 @@ compute_probe_on_interface(struct stardis* stardis)
   d2_set(args.time_range, stardis->time_range);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+    time_current(&compute_start);
     ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
       &green));
+    time_current(&compute_end);
     if(stardis->mode & MODE_BIN_GREEN) {
+      struct time output_end;
       ASSERT(!str_is_empty(&stardis->bin_green_filename));
       stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
       if(!stream) {
@@ -476,15 +493,23 @@ compute_probe_on_interface(struct stardis* stardis)
         ERR(dump_paths_end(green, stardis, stream));
         fclose(stream); stream = NULL;
       }
+      time_current(&output_end);
+      ERR(print_computation_time(NULL, stardis,
+        start, &compute_start, &compute_end, &output_end));
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    time_current(&compute_start);
     ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
+    time_current(&compute_end);
+    ERR(print_computation_time(estimator, stardis,
+      start, &compute_start, &compute_end, NULL));
     ERR(print_single_MC_result(estimator, stardis, stdout));
-    /* Dump paths recorded according to user settings */
+    
+    /* Dump recorded paths according to user settings */
     dump_ctx.stardis = stardis;
     dump_ctx.rank = 0;
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
@@ -578,7 +603,7 @@ error:
 }
 
 static res_T
-compute_camera(struct stardis* stardis)
+compute_camera(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   double proj_ratio;
@@ -590,8 +615,9 @@ compute_camera(struct stardis* stardis)
   size_t definition[2];
   size_t ix, iy;
   FILE* stream;
+  struct time compute_start, compute_end, output_end;
 
-  ASSERT(stardis
+  ASSERT(stardis && start
     && !(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN))
     && (stardis->mode & MODE_IR_COMPUTE));
 
@@ -622,7 +648,9 @@ compute_camera(struct stardis* stardis)
   args.register_paths = stardis->dump_paths;
 
   /* Launch the simulation */
+  time_current(&compute_start);
   ERR(sdis_solve_camera(stardis->sdis_scn, &args, &buf));
+  time_current(&compute_end);
 
   /* Write the image */
   if(str_is_empty(&stardis->camera.file_name))
@@ -642,7 +670,7 @@ compute_camera(struct stardis* stardis)
   if(!str_is_empty(&stardis->camera.file_name))
     fclose(stream);
 
-  /* Dump paths recorded according to user settings */
+  /* Dump recorded paths according to user settings */
   dump_ctx.stardis = stardis;
   dump_ctx.rank = 0;
   ERR(sdis_estimator_buffer_get_definition(buf, definition));
@@ -653,6 +681,9 @@ compute_camera(struct stardis* stardis)
       ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
     }
   }
+  time_current(&output_end);
+  ERR(print_computation_time(NULL, stardis,
+    start, &compute_start, &compute_end, NULL));
 
 end:
   if(cam) SDIS(camera_ref_put(cam));
@@ -663,7 +694,7 @@ error:
 }
 
 static res_T
-compute_medium(struct stardis* stardis)
+compute_medium(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   struct sdis_medium* medium = NULL;
@@ -672,8 +703,9 @@ compute_medium(struct stardis* stardis)
   struct sdis_solve_medium_args args = SDIS_SOLVE_MEDIUM_ARGS_DEFAULT;
   struct dump_path_context dump_ctx;
   FILE* stream = NULL;
+  struct time compute_start, compute_end;
 
-  ASSERT(stardis && (stardis->mode & MODE_MEDIUM_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_MEDIUM_COMPUTE));
 
   /* Find medium */
   medium = find_medium_by_name(stardis, &stardis->solve_name, NULL);
@@ -690,8 +722,11 @@ compute_medium(struct stardis* stardis)
   d2_set(args.time_range, stardis->time_range);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+    time_current(&compute_start);
     ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
+    time_current(&compute_end);
     if(stardis->mode & MODE_BIN_GREEN) {
+      struct time output_end;
       ASSERT(!str_is_empty(&stardis->bin_green_filename));
       stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
       if(!stream) {
@@ -711,15 +746,22 @@ compute_medium(struct stardis* stardis)
         ERR(dump_paths_end(green, stardis, stream));
         fclose(stream); stream = NULL;
       }
+      time_current(&output_end);
+      ERR(print_computation_time(NULL, stardis,
+        start, &compute_start, &compute_end, &output_end));
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    time_current(&compute_start);
     ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
+    time_current(&compute_end);
+    ERR(print_computation_time(estimator, stardis,
+      start, &compute_start, &compute_end, NULL));
     ERR(print_single_MC_result(estimator, stardis, stdout));
-    /* Dump paths recorded according to user settings */
+    /* Dump recorded paths according to user settings */
     dump_ctx.stardis = stardis;
     dump_ctx.rank = 0;
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
@@ -783,7 +825,7 @@ error:
 }
 
 static res_T
-compute_boundary(struct stardis* stardis)
+compute_boundary(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   struct sdis_green_function* green = NULL;
@@ -791,8 +833,9 @@ compute_boundary(struct stardis* stardis)
   struct dump_path_context dump_ctx;
   struct sdis_solve_boundary_args args = SDIS_SOLVE_BOUNDARY_ARGS_DEFAULT;
   FILE* stream = NULL;
+  struct time compute_start, compute_end;
 
-  ASSERT(stardis && (stardis->mode & MODE_BOUNDARY_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_BOUNDARY_COMPUTE));
 
   args.nrealisations = stardis->samples;
   args.primitives
@@ -803,8 +846,11 @@ compute_boundary(struct stardis* stardis)
   d2_set(args.time_range, stardis->time_range);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+    time_current(&compute_start);
     ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
+    time_current(&compute_end);
     if(stardis->mode & MODE_BIN_GREEN) {
+      struct time output_end;
       ASSERT(!str_is_empty(&stardis->bin_green_filename));
       stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
       if(!stream) {
@@ -824,15 +870,22 @@ compute_boundary(struct stardis* stardis)
         ERR(dump_paths_end(green, stardis, stream));
         fclose(stream); stream = NULL;
       }
+      time_current(&output_end);
+      ERR(print_computation_time(NULL, stardis,
+        start, &compute_start, &compute_end, &output_end));
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    time_current(&compute_start);
     ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
+    time_current(&compute_end);
+    ERR(print_computation_time(estimator, stardis,
+      start, &compute_start, &compute_end, NULL));
     ERR(print_single_MC_result(estimator, stardis, stdout));
-    /* Dump paths recorded according to user settings */
+    /* Dump recorded paths according to user settings */
     dump_ctx.stardis = stardis;
     dump_ctx.rank = 0;
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
@@ -848,7 +901,7 @@ error:
 }
 
 static res_T
-compute_flux_boundary(struct stardis* stardis)
+compute_flux_boundary(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   struct sdis_green_function* green = NULL;
@@ -856,8 +909,9 @@ compute_flux_boundary(struct stardis* stardis)
   struct sdis_solve_boundary_flux_args args
     = SDIS_SOLVE_BOUNDARY_FLUX_ARGS_DEFAULT;
   struct dump_path_context dump_ctx;
+  struct time compute_start, compute_end;
 
-  ASSERT(stardis && (stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE));
 
   args.nrealisations = stardis->samples;
   args.primitives
@@ -866,10 +920,14 @@ compute_flux_boundary(struct stardis* stardis)
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
   d2_set(args.time_range, stardis->time_range);
 
+  time_current(&compute_start);
   ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
+  time_current(&compute_end);
+  ERR(print_computation_time(estimator, stardis,
+    start, &compute_start, &compute_end, NULL));
   ERR(print_single_MC_result(estimator, stardis, stdout));
 
-  /* Dump paths recorded according to user settings */
+  /* Dump recorded paths according to user settings */
   dump_ctx.stardis = stardis;
   dump_ctx.rank = 0;
   ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
@@ -883,7 +941,7 @@ error:
 }
 
 static res_T
-compute_map(struct stardis* stardis)
+compute_map(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   struct sdis_green_function* green = NULL;
@@ -892,7 +950,8 @@ compute_map(struct stardis* stardis)
   int estimators_initialized = 0;
   size_t p;
 
-  ASSERT(stardis
+  (void)start;
+  ASSERT(stardis && start
     && (stardis->mode & MODE_MAP_COMPUTE)
     && !(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)));
 
@@ -1049,27 +1108,28 @@ error:
 
 res_T
 stardis_compute
-  (struct stardis* stardis)
+  (struct stardis* stardis,
+   struct time* start)
 {
   res_T res = RES_OK;
 
-  ASSERT(stardis && (stardis->mode & COMPUTE_MODES));
+  ASSERT(stardis && start && (stardis->mode & COMPUTE_MODES));
 
   /* Compute */
   if(stardis->mode & MODE_PROBE_COMPUTE)
-    ERR(compute_probe(stardis));
+    ERR(compute_probe(stardis, start));
   else if(stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
-    ERR(compute_probe_on_interface(stardis));
+    ERR(compute_probe_on_interface(stardis, start));
   else if(stardis->mode & MODE_IR_COMPUTE)
-    ERR(compute_camera(stardis));
+    ERR(compute_camera(stardis, start));
   else if(stardis->mode & MODE_MEDIUM_COMPUTE)
-    ERR(compute_medium(stardis));
+    ERR(compute_medium(stardis, start));
   else if(stardis->mode & MODE_BOUNDARY_COMPUTE)
-    ERR(compute_boundary(stardis));
+    ERR(compute_boundary(stardis, start));
   else if(stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE)
-    ERR(compute_flux_boundary(stardis));
+    ERR(compute_flux_boundary(stardis, start));
   else if(stardis->mode & MODE_MAP_COMPUTE)
-    ERR(compute_map(stardis));
+    ERR(compute_map(stardis, start));
   else FATAL("Unknown mode.\n");
 
 end:

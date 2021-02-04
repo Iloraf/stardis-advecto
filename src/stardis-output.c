@@ -32,6 +32,7 @@
 #include <rsys/hash_table.h>
 #include <rsys/logger.h>
 #include <rsys/str.h>
+#include <rsys/clock_time.h>
 
 #include <limits.h>
 #include <string.h>
@@ -1309,6 +1310,50 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
 exit:
   MEM_RM(stardis->allocator, trgs);
   MEM_RM(stardis->allocator, enc_status);
+  return res;
+error:
+  goto exit;
+}
+
+res_T
+print_computation_time
+  (struct sdis_estimator* estimator,
+   struct stardis* stardis,
+   struct time* start,
+   struct time* compute_start,
+   struct time* compute_end,
+   struct time* output_end)
+{
+  res_T res = RES_OK;
+  struct sdis_mc time;
+  struct time tmp;
+  char buf[128];
+  const int flag = TIME_MSEC | TIME_SEC | TIME_MIN | TIME_HOUR | TIME_DAY;
+
+  ASSERT(stardis && start && compute_start && compute_end);
+
+  time_sub(&tmp, compute_start, start);
+  time_dump(&tmp, flag, NULL, buf, sizeof(buf));
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Initialisation time = %s\n", buf);
+  time_sub(&tmp, compute_end, compute_start);
+  time_dump(&tmp, flag, NULL, buf, sizeof(buf));
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Computation time = %s\n", buf);
+  if(output_end) {
+    time_sub(&tmp, output_end, compute_end);
+    time_dump(&tmp, flag, NULL, buf, sizeof(buf));
+    logger_print(stardis->logger, LOG_OUTPUT,
+      "Result output time = %s\n", buf);
+  }
+
+  if(estimator) {
+    ERR(sdis_estimator_get_realisation_time(estimator, &time));
+    logger_print(stardis->logger, LOG_OUTPUT,
+      "Time per realisation (in usec) = %g +/- %g\n", time.E, time.SE);
+  }
+
+exit:
   return res;
 error:
   goto exit;

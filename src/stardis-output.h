@@ -31,6 +31,7 @@ struct stardis;
 struct geometry;
 struct vertex;
 struct darray_estimators;
+struct time;
 
 struct dump_path_context {
   unsigned long rank;
@@ -79,6 +80,15 @@ extern res_T
 dump_enclosure_related_stuff_at_the_end_of_vtk
   (struct stardis* stardis,
    FILE* stream);
+
+extern res_T
+print_computation_time
+  (struct sdis_estimator* estimator, /* Can be NULL */
+   struct stardis* stardis,
+    struct time* start,
+    struct time* computation_start,
+    struct time* computation_end,
+    struct time* output_end); /* Can be NULL */
 
 extern res_T
 print_single_MC_result

@@ -99,6 +99,7 @@ _______
                         | <f-bound-for-solid>
 
 <media-connection>    ::= <solid-fluid-connect>
+                        | <solid-solid-connect>
 
 <comment>             ::= "#" Any text introduced by the # character
 
@@ -132,6 +133,8 @@ _______
 <solid-fluid-connect> ::= "SOLID_FLUID_CONNECTION" <bound-name> <emissivity> \
                           <specular-fraction> <hc> <triangles>
 
+<solid-solid-connect> ::= "SOLID_SOLID_CONNECTION" <bound-name>  \
+                          <contact-resistance> <triangles>
 -------------------------------------
 
 <medium-name>         ::= STRING # no space allowed
@@ -166,6 +169,8 @@ _______
 <specular-fraction>   ::= REAL # in [0, 1]
 
 <hc>                  ::= REAL # in W/(m2.K); in [0, INF)
+
+<contact-resistance>  ::= REAL # in m2.K/W in [0, INF)
 
 <flux>                ::= REAL # in W/m2; in (-INF , INF)
 

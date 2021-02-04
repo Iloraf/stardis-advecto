@@ -1428,6 +1428,62 @@ error:
   goto end;
 }
 
+/* SOLID_SOLID_CONNECTION Name contact-resitance STL_filenames */
+static res_T
+process_ssc
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  size_t sz;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  stardis->counts.ssconnect_count++;
+
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  init_ss(stardis->allocator, &desc->d.ss_connect);
+
+  /* Use a medium ID even if there is no medium here
+   * As other cases use media IDs as unique IDs for read_sides_and_files calls
+   * we continue the trend to ensure connection ID is OK */
+  desc->type = DESC_SOLID_SOLID_CONNECT;
+  desc->d.ss_connect.connection_id = allocate_stardis_medium_id(stardis);
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid solid connection name");
+  ERR(description_set_name(stardis, &desc->d.ss_connect.name, tk));
+  if(find_description_by_name(stardis, &desc->d.ss_connect.name, NULL)
+    != desc)
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "contact resistance");
+  res = cstr_to_double(tk, &desc->d.ss_connect.tcr);
+  if(res != RES_OK
+    || desc->d.ss_connect.tcr < 0)
+  {
+    logger_print(stardis->logger, LOG_ERROR, "Invalid contact resistance: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
+
+end:
+  return res;
+error:
+  goto end;
+}
+
 static res_T
 read_imposed_temperature
   (struct stardis* stardis,
@@ -1779,6 +1835,8 @@ process_model_line
     ERR(process_flx(stardis, dummies, &tok_ctx));
   else if(0 == strcmp(tk, "SOLID_FLUID_CONNECTION"))
     ERR(process_sfc(stardis, &tok_ctx));
+  else if(0 == strcmp(tk, "SOLID_SOLID_CONNECTION"))
+    ERR(process_ssc(stardis, &tok_ctx));
   else if(0 == strcmp(tk, "SOLID"))
     ERR(process_solid(stardis, &tok_ctx));
   else if(0 == strcmp(tk, "FLUID"))

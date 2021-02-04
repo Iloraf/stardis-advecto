@@ -27,9 +27,12 @@ struct dummies;
  * Interface data
  ******************************************************************************/
 struct intface {
+  /* fluid - solid */
   double hc;
   double emissivity;
   double alpha;
+  /* solid - solid */
+  double tcr;
   /* Imposed compute temperature & flux */
   double imposed_temperature;
   double imposed_flux;

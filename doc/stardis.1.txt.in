@@ -95,7 +95,7 @@ EXCLUSIVE OPTIONS
   be in a medium. The probe coordinates must be in the same system as the
   geometry.
 
-*-P* _x,y,z[,time-range]_::
+*-P* _x,y,z[,time-range][,medium_name]_::
   Compute the temperature at the given probe on an interface at a given time.
   By default the compute time range is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The
   probe is supposed to be on an interface and is moved to the closest point of
@@ -108,14 +108,14 @@ EXCLUSIVE OPTIONS
   range is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The medium does not need to be
   connex.
 
-*-s* _file[,time-range]_::
+*-s* _file[,time-range][,FRONT|BACK]_::
   Compute the mean temperature on a given 2D region at a given time, the region
   being defined as the front sides of the triangles in the provided *STL* file.
   By default the compute time range is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
   These triangles are not added to the geometry, but must be part of it. The
   region does not need to be connex.
 
-*-S* _file[,time-range]_::
+*-S* _file[,time-range][,FRONT|BACK]_::
   Compute the by-triangle mean temperature on a given 2D region at a given
   time, the region being defined as the front sides of the triangles in the
   provided *STL* file. These triangles are not added to the geometry, but must

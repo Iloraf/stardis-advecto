@@ -75,6 +75,17 @@ interface_get_alpha
   return interface_props->alpha;
 }
 
+static double
+interface_get_tcr
+  (const struct sdis_interface_fragment* frag,
+   struct sdis_data* data)
+{
+  const struct intface* interface_props = sdis_data_cget(data);
+  (void)frag;
+  return interface_props->tcr;
+}
+
+
 /*******************************************************************************
  * Public Functions
  ******************************************************************************/
@@ -94,7 +105,8 @@ create_intface
   struct sdis_data* data = NULL;
   unsigned fd, bd, cd, descr[SG3D_PROP_TYPES_COUNT__];
   int fluid_count = 0, solid_count = 0;
-  int solid_fluid_connection_count = 0, connection_count = 0, boundary_count = 0;
+  int solid_fluid_connection_count = 0, solid_solid_connection_count = 0;
+  int connection_count = 0, boundary_count = 0;
   const struct description* descriptions;
   struct sdis_medium** media;
   res_T res = RES_OK;
@@ -185,7 +197,8 @@ create_intface
       struct sdis_medium* def_medium = NULL;
       unsigned ext_id;
       if(connect->type != DESC_SOLID_FLUID_CONNECT
-        && front_defined == back_defined)
+          && connect->type != DESC_SOLID_SOLID_CONNECT
+          && front_defined == back_defined)
       {
         /* 1 and only 1 defined */
         res = RES_BAD_ARG;
@@ -333,6 +346,20 @@ create_intface
           ASSERT(fluid_side_shader);
           fluid_side_shader->emissivity = interface_get_emissivity;
           fluid_side_shader->specular_fraction = interface_get_alpha;
+        }
+        break;
+      case DESC_SOLID_SOLID_CONNECT:
+        /* Both front and back should be defined */
+        if(solid_count != 2 || fluid_count != 0) {
+          res = RES_BAD_ARG;
+          goto error;
+        }
+        ASSERT(front_defined && back_defined);
+        connection_count++;
+        solid_solid_connection_count++;
+        interface_props->tcr = connect->d.ss_connect.tcr;
+        if(connect->d.ss_connect.tcr > 0) {
+          interface_shader.thermal_contact_resistance = interface_get_tcr;
         }
         break;
       default:

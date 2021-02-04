@@ -134,12 +134,16 @@ EXCLUSIVE OPTIONS
   F_BOUNDARY_FOR_SOLID or SOLID_FLUID_CONNECTION (see *stardis-input*(5)).
 
 *-R* [__sub-option__:...]::
-  Render an infrared image of the system through a pinhole camera and write it
-  to _standard output_. One can use all-default sub-options by
-  simply providing the colon character (*:*) alone as an argument. Please note
-  that the camera position must be outside the geometry or in a fluid.
+  Render an infrared image of the system through a pinhole camera. One can use
+  all-default sub-options by simply providing the colon character (*:*) alone
+  as an argument. Please note that the camera position must be outside the
+  geometry or in a fluid.
   Available sub-options are:
 
+  **file=**_output_file_;;
+    File name to use to write the infrared image to. If no file name is
+	provided, the result is written to _standard output_.
+	
   **fmt=**_image_file_format_;;
     Format of the image file in output. Can be *VTK* or *HT*. Default
     _image_file_format_ is @STARDIS_ARGS_DEFAULT_RENDERING_OUTPUT_FILE_FMT@.

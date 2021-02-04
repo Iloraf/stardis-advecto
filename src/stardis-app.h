@@ -636,10 +636,12 @@ struct camera {
   unsigned spp;
   unsigned img_width, img_height;
   int auto_look_at;
+  struct str file_name;
 };
 
 static INLINE void
-init_camera(struct camera* cam) {
+init_camera(struct mem_allocator* alloc, struct camera* cam) {
+  ASSERT(alloc && cam);
   d3(cam->pos, STARDIS_DEFAULT_RENDERING_POS);
   d3(cam->tgt, STARDIS_DEFAULT_RENDERING_TGT);
   d3(cam->up, STARDIS_DEFAULT_RENDERING_UP);
@@ -650,6 +652,13 @@ init_camera(struct camera* cam) {
   cam->img_height = STARDIS_DEFAULT_RENDERING_IMG_HEIGHT;
   d2(cam->time_range, STARDIS_DEFAULT_RENDERING_TIME);
   cam->auto_look_at = 1;
+  str_init(alloc, &cam->file_name);
+}
+
+static INLINE void
+release_camera(struct camera* cam) {
+  ASSERT(cam);
+  str_release(&cam->file_name);
 }
 
 static INLINE void

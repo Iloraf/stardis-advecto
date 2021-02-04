@@ -220,7 +220,7 @@ stardis_init
   stardis->senc3d_scn = NULL;
   stardis->mode = args->mode;
   stardis->counts = COUNTS_NULL;
-  init_camera(&stardis->camera);
+  init_camera(stardis->allocator, &stardis->camera);
   str_init(stardis->allocator, &stardis->solve_name);
   str_init(stardis->allocator, &stardis->paths_filename);
   str_init(stardis->allocator, &stardis->bin_green_filename);
@@ -430,6 +430,7 @@ stardis_release
       SDIS(medium_ref_put(darray_media_ptr_data_get(&stardis->media)[i]));
   }
   darray_media_ptr_release(&stardis->media);
+  release_camera(&stardis->camera);
 }
 
 res_T

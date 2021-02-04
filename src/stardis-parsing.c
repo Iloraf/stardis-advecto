@@ -986,6 +986,9 @@ parse_camera
         GET_OPTIONAL_TIME_RANGE(opt[1], 0, cam->time_range, logger, "%s",
           str_cget(&keep));
       }
+      else if(strcmp(opt[0], "FILE") == 0) {
+        ERR(str_set(&cam->file_name, opt[1]));
+      }
       else if(strcmp(opt[0], "FMT") == 0) {
         _strupr(opt[1]);
         if(strcmp(opt[1], "VTK") == 0)

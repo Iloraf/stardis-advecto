@@ -589,6 +589,7 @@ compute_camera(struct stardis* stardis)
   struct dump_path_context dump_ctx;
   size_t definition[2];
   size_t ix, iy;
+  FILE* stream;
 
   ASSERT(stardis
     && !(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN))
@@ -624,11 +625,22 @@ compute_camera(struct stardis* stardis)
   ERR(sdis_solve_camera(stardis->sdis_scn, &args, &buf));
 
   /* Write the image */
+  if(str_is_empty(&stardis->camera.file_name))
+    stream = stdout;
+  else {
+    stream = fopen(str_cget(&stardis->camera.file_name), "w");
+    if(!stream) {
+      res = RES_IO_ERR;
+      goto error;
+    }
+  }
   ASSERT(stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK
   || stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_HT);
   if(stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK)
-    ERR(dump_vtk_image(buf, stdout));
-  else ERR(dump_ht_image(buf, stdout));
+    ERR(dump_vtk_image(buf, stream));
+  else ERR(dump_ht_image(buf, stream));
+  if(!str_is_empty(&stardis->camera.file_name))
+    fclose(stream);
 
   /* Dump paths recorded according to user settings */
   dump_ctx.stardis = stardis;

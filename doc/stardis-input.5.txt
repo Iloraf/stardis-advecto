@@ -133,11 +133,13 @@ _______
 <solid-fluid-connect> ::= "SOLID_FLUID_CONNECTION" <bound-name> <emissivity> \
                           <specular-fraction> <hc> <triangles>
 
-<solid-solid-connect> ::= "SOLID_SOLID_CONNECTION" <bound-name>  \
+<solid-solid-connect> ::= "SOLID_SOLID_CONNECTION" <bound-name> \
                           <contact-resistance> <triangles>
+
 -------------------------------------
 
-<medium-name>         ::= STRING # no space allowed
+<medium-name>         ::= STRING # no space allowed, must not be parsable as a
+                                 # number, including INF and others
 
 <lambda>              ::= REAL # conductivity in W/(m.K); in ]0, INF)
 

@@ -756,17 +756,20 @@ parse_args
       break;
 
     case 'P':
-      if(args->mode & EXCLUSIVE_MODES) {
-        res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Options -%c and -%c are exclusive.\n",
-          (char)opt, mode_option(args->mode));
-        goto error;
+      {
+        static const char toto[] = "toto";
+        if(args->mode & EXCLUSIVE_MODES) {
+          res = RES_BAD_ARG;
+          logger_print(args->logger, LOG_ERROR,
+              "Options -%c and -%c are exclusive.\n",
+              (char)opt, mode_option(args->mode));
+          goto error;
+        }
+        args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
+        GET_POS_AND_OPTIONAL_TIME_RANGE_AND_OPTIONAL_MEDIUM(args->pos_and_time);
+        args->medium_name = toto;
+        break;
       }
-      args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
-      GET_POS_AND_OPTIONAL_TIME_RANGE(args->pos_and_time);
-      break;
-
     case 'r':
       res = cstr_to_double(optarg, &args->ref_temp);
       if(res != RES_OK

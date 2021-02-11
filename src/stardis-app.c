@@ -261,6 +261,9 @@ stardis_init
   else if(args->mode & MODE_MEDIUM_COMPUTE) {
     ERR(str_set(&stardis->solve_name, args->medium_name));
   }
+  else if(args->mode & MODE_PROBE_COMPUTE_ON_INTERFACE && args->medium_name) {
+    ERR(str_set(&stardis->solve_name, args->medium_name));
+  }
   else if(args->mode & SURFACE_COMPUTE_MODES) {
     ERR(str_set(&stardis->solve_name, args->solve_filename));
   }
@@ -573,6 +576,13 @@ validate_properties
         else if(solid_count + fluid_count == 0)
           *properties_conflict_status = SFCONNECT_BETWEEN_2_UNDEFS;
         else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_SOLID_SOLID_CONNECT:
+      if(solid_count != 2) {
+        /*if(soli_count == 1 && fluid_count == 1)*/
+          /**properties_conflict_status = SSCONNECT_BETWEEN_SOLID_AND_FLUID;*/
         goto end;
       }
       break;

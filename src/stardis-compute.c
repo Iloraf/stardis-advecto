@@ -461,6 +461,16 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   ERR(check_probe_conform_to_type(stardis, 1, stardis->probe, &iprim, uv));
   ASSERT(iprim != SIZE_MAX);
 
+  /* Find medium */
+  medium = find_medium_by_name(stardis, &stardis->solve_name, NULL);
+  if(medium == NULL) { /* Not found */
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot solve on this side '%s' (unknown medium)\n",
+      str_cget(&stardis->solve_name));
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
   args.nrealisations = stardis->samples;
   args.iprim = iprim;
   d3_set(args.uv, uv);

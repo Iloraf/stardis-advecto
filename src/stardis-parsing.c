@@ -30,24 +30,16 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#ifdef COMPILER_GCC
+#include <strings.h>
+#endif
 
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
 
-#ifdef COMPILER_GCC
-static char*
-_strupr
-  (char* s)
-{
-  char* ptr;
-  for(ptr = s; *ptr; ++ptr) {
-    int tmp = toupper(*ptr);
-    ASSERT(tmp == (char)tmp);
-    *ptr = (char)tmp;
-  }
-  return s;
-}
+#ifdef COMPILER_CL
+#define strcasecmp(s1, s2) _stricmp((s1), (s2))
 #endif
 
 static char**
@@ -225,17 +217,16 @@ read_sides_and_files
         }
         else break;
       }
-      _strupr(tk);
       add_geom_ctx.properties[SG3D_INTFACE] = SG3D_UNSPECIFIED_PROPERTY;
-      if(0 == strcmp(tk, "FRONT")) {
+      if(0 == strcasecmp(tk, "FRONT")) {
         add_geom_ctx.properties[SG3D_FRONT] = description_id;
         add_geom_ctx.properties[SG3D_BACK] = SG3D_UNSPECIFIED_PROPERTY;
       }
-      else if(0 == strcmp(tk, "BACK")) {
+      else if(0 == strcasecmp(tk, "BACK")) {
         add_geom_ctx.properties[SG3D_FRONT] = SG3D_UNSPECIFIED_PROPERTY;
         add_geom_ctx.properties[SG3D_BACK] = description_id;
       }
-      else if(0 == strcmp(tk, "BOTH")) {
+      else if(0 == strcasecmp(tk, "BOTH")) {
         add_geom_ctx.properties[SG3D_FRONT] = description_id;
         add_geom_ctx.properties[SG3D_BACK] = description_id;
       }
@@ -629,13 +620,13 @@ parse_args
         *ptr = '\0';
       }
       if(res == RES_OK) {
-        if(0 == strcmp(optarg, "all")) {
+        if(0 == strcasecmp(optarg, "all")) {
           args->dump_paths = DUMP_ALL;
         }
-        else if(0 == strcmp(optarg, "error")) {
+        else if(0 == strcasecmp(optarg, "error")) {
           args->dump_paths = DUMP_ERROR;
         }
-        else if(0 == strcmp(optarg, "success")) {
+        else if(0 == strcasecmp(optarg, "success")) {
           args->dump_paths = DUMP_SUCCESS;
         }
       }
@@ -981,19 +972,17 @@ parse_camera
         goto error;
       }
       ERR(str_set(&keep, opt[0]));
-      _strupr(opt[0]);
-      if(strcmp(opt[0], "T") == 0) {
+      if(strcasecmp(opt[0], "T") == 0) {
         GET_OPTIONAL_TIME_RANGE(opt[1], 0, cam->time_range, logger, "%s",
           str_cget(&keep));
       }
-      else if(strcmp(opt[0], "FILE") == 0) {
+      else if(strcasecmp(opt[0], "FILE") == 0) {
         ERR(str_set(&cam->file_name, opt[1]));
       }
-      else if(strcmp(opt[0], "FMT") == 0) {
-        _strupr(opt[1]);
-        if(strcmp(opt[1], "VTK") == 0)
+      else if(strcasecmp(opt[0], "FMT") == 0) {
+        if(strcasecmp(opt[1], "VTK") == 0)
           cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK;
-        else if(strcmp(opt[1], "HT") == 0)
+        else if(strcasecmp(opt[1], "HT") == 0)
           cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_HT;
         else {
           logger_print(logger, LOG_ERROR,
@@ -1003,27 +992,27 @@ parse_camera
           goto error;
         }
       }
-      else if(strcmp(opt[0], "FOV") == 0) {
+      else if(strcasecmp(opt[0], "FOV") == 0) {
         ERR(cstr_to_double(opt[1], &cam->fov));
       }
-      else if(strcmp(opt[0], "UP") == 0) {
+      else if(strcasecmp(opt[0], "UP") == 0) {
         ERR(cstr_to_list_double(opt[1], ',', cam->up, &len, 3));
       }
-      else if(strcmp(opt[0], "TGT") == 0) {
+      else if(strcasecmp(opt[0], "TGT") == 0) {
         ERR(cstr_to_list_double(opt[1], ',', cam->tgt, &len, 3));
         cam->auto_look_at = 0;
       }
-      else if(strcmp(opt[0], "POS") == 0) {
+      else if(strcasecmp(opt[0], "POS") == 0) {
         ERR(cstr_to_list_double(opt[1], ',', cam->pos, &len, 3));
         cam->auto_look_at = 0;
       }
-      else if(strcmp(opt[0], "IMG") == 0) {
+      else if(strcasecmp(opt[0], "IMG") == 0) {
         unsigned img_sz[2];
         ERR(cstr_to_list_uint(opt[1], 'x', img_sz, &len, 2));
         cam->img_width = img_sz[0];
         cam->img_height = img_sz[1];
       }
-      else if(strcmp(opt[0], "SPP") == 0) {
+      else if(strcasecmp(opt[0], "SPP") == 0) {
         ERR(cstr_to_uint(opt[1], &cam->spp));
       } else {
         logger_print(logger, LOG_ERROR,
@@ -1067,14 +1056,30 @@ description_set_name
 {
   res_T res = RES_OK;
   double foo;
+  const char* keywords[] = {
+    "AUTO", "BACK", "BOTH", "FLUID", "FRONT", "F_BOUNDARY_FOR_SOLID",
+    "H_BOUNDARY_FOR_FLUID", "H_BOUNDARY_FOR_SOLID", "SCALE", "SOLID",
+    "SOLID_FLUID_CONNECTION", "T_BOUNDARY_FOR_FLUID", "T_BOUNDARY_FOR_SOLID",
+    "UNKNOWN" };
+  int i;
   ASSERT(name && tk);
+
+  /* Use name before uppercasing it */
+  ERR(str_set(name, tk));
 
   if(RES_OK == cstr_to_double(tk, &foo)) {
     /* A number is not a sensible choice for a name! */
     res = RES_BAD_ARG;
     goto error;
   }
-  ERR(str_set(name, tk));
+  FOR_EACH(i, 0, sizeof(keywords) / sizeof(*keywords)) {
+    if(0 == strcasecmp(tk, keywords[i])) {
+      /* A keyword is not a sensible choice for a name! */
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+  /* Name is OK */
 
 end:
   return res;
@@ -1450,8 +1455,7 @@ read_imposed_temperature
     }
   } else {
     /* Could be 'unknown' */
-    _strupr(tk);
-    if(0 == strcmp(tk, "UNKNOWN")) {
+    if(0 == strcasecmp(tk, "UNKNOWN")) {
       *imposed_temperature = UNKNOWN_MEDIUM_TEMPERATURE;
     } else {
       res = RES_BAD_ARG;
@@ -1489,8 +1493,7 @@ read_delta
     }
   } else {
     /* Could be 'auto' */ 
-    _strupr(tk);
-    if(0 == strcmp(tk, "AUTO")) {
+    if(0 == strcasecmp(tk, "AUTO")) {
       /* Set to DELTA_AUTO until actual value is substituted */
       *delta = DELTA_AUTO;
     } else {
@@ -1765,25 +1768,24 @@ process_model_line
   str_init(stardis->allocator, &keep);
   ERR(str_set(&keep, line));
   CHK_TOK(strtok_r(line, " \t", &tok_ctx), "model line type");
-  _strupr(tk);
   
-  if(0 == strcmp(tk, "H_BOUNDARY_FOR_SOLID"))
+  if(0 == strcasecmp(tk, "H_BOUNDARY_FOR_SOLID"))
     ERR(process_h(stardis, dummies, DESC_BOUND_H_FOR_SOLID, &tok_ctx));
-  else if(0 == strcmp(tk, "H_BOUNDARY_FOR_FLUID"))
+  else if(0 == strcasecmp(tk, "H_BOUNDARY_FOR_FLUID"))
     ERR(process_h(stardis, dummies, DESC_BOUND_H_FOR_FLUID, &tok_ctx));
-  else if(0 == strcmp(tk, "T_BOUNDARY_FOR_SOLID"))
+  else if(0 == strcasecmp(tk, "T_BOUNDARY_FOR_SOLID"))
     ERR(process_t(stardis, dummies, DESC_BOUND_T_FOR_SOLID, &tok_ctx));
-  else if(0 == strcmp(tk, "T_BOUNDARY_FOR_FLUID"))
+  else if(0 == strcasecmp(tk, "T_BOUNDARY_FOR_FLUID"))
     ERR(process_t(stardis, dummies, DESC_BOUND_T_FOR_FLUID, &tok_ctx));
-  else if(0 == strcmp(tk, "F_BOUNDARY_FOR_SOLID"))
+  else if(0 == strcasecmp(tk, "F_BOUNDARY_FOR_SOLID"))
     ERR(process_flx(stardis, dummies, &tok_ctx));
-  else if(0 == strcmp(tk, "SOLID_FLUID_CONNECTION"))
+  else if(0 == strcasecmp(tk, "SOLID_FLUID_CONNECTION"))
     ERR(process_sfc(stardis, &tok_ctx));
-  else if(0 == strcmp(tk, "SOLID"))
+  else if(0 == strcasecmp(tk, "SOLID"))
     ERR(process_solid(stardis, &tok_ctx));
-  else if(0 == strcmp(tk, "FLUID"))
+  else if(0 == strcasecmp(tk, "FLUID"))
     ERR(process_fluid(stardis, &tok_ctx));
-  else if(0 == strcmp(tk, "SCALE"))
+  else if(0 == strcasecmp(tk, "SCALE"))
     ERR(process_scale(stardis, &tok_ctx));
   else {
     logger_print(stardis->logger, LOG_ERROR,

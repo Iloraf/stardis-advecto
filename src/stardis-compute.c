@@ -174,7 +174,7 @@ check_probe_conform_to_type
   (const struct stardis* stardis,
    const int move2boundary,
    double pos[3],
-   size_t* iprim,
+   unsigned* iprim,
    double uv[2])
 {
   res_T res = RES_OK;
@@ -371,7 +371,7 @@ compute_probe(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   double uv[2] = { 0,0 };
-  size_t iprim = SIZE_MAX;
+  unsigned iprim = UINT_MAX;
   struct sdis_green_function* green = NULL;
   struct sdis_estimator* estimator = NULL;
   struct dump_path_context dump_ctx;
@@ -448,7 +448,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   double uv[2] = { 0,0 };
-  size_t iprim = SIZE_MAX;
+  unsigned iprim = UINT_MAX;
   struct sdis_estimator* estimator = NULL;
   struct sdis_green_function* green = NULL;
   struct dump_path_context dump_ctx;
@@ -459,7 +459,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
 
   ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
   ERR(check_probe_conform_to_type(stardis, 1, stardis->probe, &iprim, uv));
-  ASSERT(iprim != SIZE_MAX);
+  ASSERT(iprim != UINT_MAX);
 
   /* Find medium */
   medium = find_medium_by_name(stardis, &stardis->solve_name, NULL);

@@ -952,86 +952,91 @@ parse_camera
   char** opt = NULL;
   struct camera* cam;
   struct str keep;
+  int i = 0;
   res_T res = RES_OK;
 
   ASSERT(cam_param && stardis);
   cam = &stardis->camera;
   line = split_line(cam_param, ':');
-  str_init(stardis->allocator, &keep);
+  if(!line) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
 
-  if(line) {
-    int i = 0;
-    for(i = 0; *(line + i); i++) {
-      size_t len = 0;
-      ERR(str_set(&keep, line[i]));
-      opt = split_line(line[i], '=');
-      if(!opt[0] || ! opt[1]  || opt[2]) {
-        if(res == RES_OK) res = RES_BAD_ARG;
-        logger_print((logger), LOG_ERROR,
-          "Invalid option syntax: %s\n", str_cget(&keep));
-        goto error;
-      }
-      ERR(str_set(&keep, opt[0]));
-      if(strcasecmp(opt[0], "T") == 0) {
-        GET_OPTIONAL_TIME_RANGE(opt[1], 0, cam->time_range, logger, "%s",
-          str_cget(&keep));
-      }
-      else if(strcasecmp(opt[0], "FILE") == 0) {
-        ERR(str_set(&cam->file_name, opt[1]));
-      }
-      else if(strcasecmp(opt[0], "FMT") == 0) {
-        if(strcasecmp(opt[1], "VTK") == 0)
-          cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK;
-        else if(strcasecmp(opt[1], "HT") == 0)
-          cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_HT;
-        else {
-          logger_print(logger, LOG_ERROR,
-            "Unexpected value for rendering option %s: %s.\n",
-            opt[0], opt[1]);
-          res = RES_BAD_ARG;
-          goto error;
-        }
-      }
-      else if(strcasecmp(opt[0], "FOV") == 0) {
-        ERR(cstr_to_double(opt[1], &cam->fov));
-      }
-      else if(strcasecmp(opt[0], "UP") == 0) {
-        ERR(cstr_to_list_double(opt[1], ',', cam->up, &len, 3));
-      }
-      else if(strcasecmp(opt[0], "TGT") == 0) {
-        ERR(cstr_to_list_double(opt[1], ',', cam->tgt, &len, 3));
-        cam->auto_look_at = 0;
-      }
-      else if(strcasecmp(opt[0], "POS") == 0) {
-        ERR(cstr_to_list_double(opt[1], ',', cam->pos, &len, 3));
-        cam->auto_look_at = 0;
-      }
-      else if(strcasecmp(opt[0], "IMG") == 0) {
-        unsigned img_sz[2];
-        ERR(cstr_to_list_uint(opt[1], 'x', img_sz, &len, 2));
-        cam->img_width = img_sz[0];
-        cam->img_height = img_sz[1];
-      }
-      else if(strcasecmp(opt[0], "SPP") == 0) {
-        ERR(cstr_to_uint(opt[1], &cam->spp));
-      } else {
+  str_init(stardis->allocator, &keep);
+  for(i = 0; *(line + i); i++) {
+    size_t len = 0;
+    ERR(str_set(&keep, line[i]));
+    opt = split_line(line[i], '=');
+    if(!opt[0] || !opt[1] || opt[2]) { /* We expect 2 parts */
+      if(res == RES_OK) res = RES_BAD_ARG;
+      logger_print((logger), LOG_ERROR,
+        "Invalid option syntax: %s\n", str_cget(&keep));
+      goto error;
+    }
+    if(strcasecmp(opt[0], "T") == 0) {
+      GET_OPTIONAL_TIME_RANGE(opt[1], 0, cam->time_range, logger, "%s", opt[0]);
+    }
+    else if(strcasecmp(opt[0], "FILE") == 0) {
+      ERR(str_set(&cam->file_name, opt[1]));
+    }
+    else if(strcasecmp(opt[0], "FMT") == 0) {
+      if(strcasecmp(opt[1], "VTK") == 0)
+        cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK;
+      else if(strcasecmp(opt[1], "HT") == 0)
+        cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_HT;
+      else {
         logger_print(logger, LOG_ERROR,
-          "Unexpected option for rendering mode: %s.\n",
-          opt[0]);
+          "Unexpected value for rendering option %s: %s.\n",
+          opt[0], opt[1]);
         res = RES_BAD_ARG;
         goto error;
       }
     }
+    else if(strcasecmp(opt[0], "FOV") == 0) {
+      ERR(cstr_to_double(opt[1], &cam->fov));
+    }
+    else if(strcasecmp(opt[0], "UP") == 0) {
+      ERR(cstr_to_list_double(opt[1], ',', cam->up, &len, 3));
+    }
+    else if(strcasecmp(opt[0], "TGT") == 0) {
+      ERR(cstr_to_list_double(opt[1], ',', cam->tgt, &len, 3));
+      cam->auto_look_at = 0;
+    }
+    else if(strcasecmp(opt[0], "POS") == 0) {
+      ERR(cstr_to_list_double(opt[1], ',', cam->pos, &len, 3));
+      cam->auto_look_at = 0;
+    }
+    else if(strcasecmp(opt[0], "IMG") == 0) {
+      unsigned img_sz[2];
+      ERR(cstr_to_list_uint(opt[1], 'x', img_sz, &len, 2));
+      cam->img_width = img_sz[0];
+      cam->img_height = img_sz[1];
+    }
+    else if(strcasecmp(opt[0], "SPP") == 0) {
+      ERR(cstr_to_uint(opt[1], &cam->spp));
+    } else {
+      logger_print(logger, LOG_ERROR,
+        "Unexpected option for rendering mode: %s.\n",
+        opt[0]);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+
+#define FREE_AARRAY(ARRAY) \
+if(ARRAY) {\
+  int i__ = 0; \
+  for(i__=0; *((ARRAY)+i__);i__++){\
+    free((ARRAY)[i__]);\
+  }\
+  free(ARRAY);\
+  (ARRAY) = NULL;\
+}
+
+    FREE_AARRAY(opt)
   }
 
 end:
-#define FREE_AARRAY(ARRAY) if(ARRAY) {\
-  int i = 0; \
-  for(i=0; *(ARRAY+i);i++){\
-    free(ARRAY[i]);\
-  }\
-  free(ARRAY);\
-}
   FREE_AARRAY(line)
   FREE_AARRAY(opt)
 #undef FREE_AARRAY

@@ -337,7 +337,8 @@ init_args
   /* Set default values */
   args->samples = STARDIS_DEFAULT_SAMPLES_COUNT;
   args->nthreads = SDIS_NTHREADS_DEFAULT;
-  d2(args->pos_and_time+3, STARDIS_DEFAULT_COMPUTE_TIME);
+  d2(args->pos_and_time+3,
+    STARDIS_DEFAULT_COMPUTE_TIME, STARDIS_DEFAULT_COMPUTE_TIME);
   args->ambient_temp = STARDIS_DEFAULT_AMBIENT_TEMP;
   args->ref_temp = STARDIS_DEFAULT_REFERENCE_TEMP;
   args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;

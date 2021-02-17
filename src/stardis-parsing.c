@@ -31,16 +31,14 @@
 #include <ctype.h>
 #include <string.h>
 #ifdef COMPILER_GCC
-#include <strings.h>
+#include <strings.h> /* strcasecmp */
+#else
+#define strcasecmp(s1, s2) _stricmp((s1), (s2))
 #endif
 
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
-
-#ifdef COMPILER_CL
-#define strcasecmp(s1, s2) _stricmp((s1), (s2))
-#endif
 
 static char**
 split_line
@@ -506,13 +504,23 @@ short_help
   fprintf(stream, "     Set the verbosity level.\n");
 }
 
+#define FREE_AARRAY(ARRAY) \
+if(ARRAY) {\
+  int i__ = 0; \
+  for(i__=0; *((ARRAY)+i__);i__++){\
+    free((ARRAY)[i__]);\
+  }\
+  free(ARRAY);\
+  (ARRAY) = NULL;\
+}
+
 /* Workaround for a gcc warning when GET_OPTIONAL_TIME_RANGE used with Rank=0 */
 FINLINE int is_less(size_t a, size_t b) { return a < b; }
 
 /* Get a time range from a coma-separated list of doubles
  * The first Rank values are mandatory, followed by an optional time range
  * that can be a single time */
-#define GET_OPTIONAL_TIME_RANGE(Src, Rank, Dst, Logger, OptionString, Option) \
+#define GET_OPTIONAL_TIME_RANGE(Src, Rank, Dst, Logger, OptionString, Option, FullSrc) \
   res = cstr_to_list_double((Src), ',', (Dst), &len, (Rank)+2); \
   if(res != RES_OK \
      || is_less(len, (Rank)) \
@@ -523,7 +531,7 @@ FINLINE int is_less(size_t a, size_t b) { return a < b; }
     if(res == RES_OK) res = RES_BAD_ARG; \
       logger_print((Logger), LOG_ERROR, \
       "Invalid argument for option "OptionString": %s\n", \
-      (Option), (Src)); \
+      (Option), (FullSrc)); \
     goto error; \
   } else { \
     if(len == (Rank)+1) (Dst)[(Rank)+1] = (Dst)[(Rank)];\
@@ -533,29 +541,33 @@ FINLINE int is_less(size_t a, size_t b) { return a < b; }
 #define GET_STR_AND_OPTIONAL_TIME_RANGE(Str, Time) \
   ptr = strchr(optarg, ','); /* First ',' */ \
   if(ptr) { /* Time range provided */ \
-    GET_OPTIONAL_TIME_RANGE(ptr+1, 0, (Time), args->logger, "-%c", opt); \
+    GET_OPTIONAL_TIME_RANGE(ptr+1, 0, (Time), args->logger, "-%c", opt, optarg); \
     *ptr = '\0'; \
   } \
   (Str) = optarg;
 
 /* Get a position followed by an optional time range */
-#define GET_POS_AND_OPTIONAL_TIME_RANGE(Dst) \
-  GET_OPTIONAL_TIME_RANGE(optarg, 3, (Dst), args->logger, "-%c", opt);
+#define GET_POS_AND_OPTIONAL_TIME_RANGE(Src, Dst, FullSrc) \
+  GET_OPTIONAL_TIME_RANGE((Src), 3, (Dst), args->logger, "-%c", opt, (FullSrc));
 
 res_T
 parse_args
   (const int argc,
    char** argv,
-   struct args* args)
+   struct args* args,
+   struct mem_allocator* allocator)
 {
   int opt = 0, n_used = 0;
   size_t len = 0;
   const char option_list[] = "a:c:dD:eF:gG:hm:M:n:p:P:r:R:s:S:t:vV:";
   char buf[128];
+  struct str keep;
+  char** line = NULL;
   res_T res = RES_OK;
 
   ASSERT(argv && args);
 
+  str_init(allocator, &keep);
   opterr = 0; /* No default error messages */
   while((opt = getopt(argc, argv, option_list)) != -1) {
     switch (opt) {
@@ -744,12 +756,10 @@ parse_args
         goto error;
       }
       args->mode |= MODE_PROBE_COMPUTE;
-      GET_POS_AND_OPTIONAL_TIME_RANGE(args->pos_and_time);
+      GET_POS_AND_OPTIONAL_TIME_RANGE(optarg, args->pos_and_time, optarg);
       break;
 
     case 'P':
-      {
-        static const char toto[] = "toto";
         if(args->mode & EXCLUSIVE_MODES) {
           res = RES_BAD_ARG;
           logger_print(args->logger, LOG_ERROR,
@@ -758,10 +768,33 @@ parse_args
           goto error;
         }
         args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
-        GET_POS_AND_OPTIONAL_TIME_RANGE_AND_OPTIONAL_MEDIUM(args->pos_and_time);
-        args->medium_name = toto;
+
+        ERR(str_set(&keep, optarg));
+        line = split_line(optarg, ':');
+        if(!line) {
+          res = RES_MEM_ERR;
+          str_release(&keep);
+          goto error;
+        }
+
+        /* We expect 1 or 2 parts in line */
+        if(!line[0] || (line[1] && line[2])) {
+          logger_print((args->logger), LOG_ERROR,
+            "Invalid argument for option ""-%c"": %s\n",
+            opt, str_cget(&keep));
+          str_release(&keep);
+          res = RES_BAD_ARG;
+          goto error;
+        }
+
+        /* First part is pos and optional time, optional second part is a
+         * medium name (OK if NULL) */
+        GET_POS_AND_OPTIONAL_TIME_RANGE(line[0], args->pos_and_time,
+          str_cget(&keep));
+        args->medium_name = optarg + strlen(line[0]) + 1;
+
         break;
-      }
+
     case 'r':
       res = cstr_to_double(optarg, &args->ref_temp);
       if(res != RES_OK
@@ -940,11 +973,14 @@ parse_args
   }
 
 end:
+  FREE_AARRAY(line);
+  str_release(&keep);
   return res;
 error:
   logger_print(args->logger, LOG_ERROR, "Use option -h to print help.\n");
   goto end;
 }
+
 
 res_T
 parse_camera
@@ -979,7 +1015,8 @@ parse_camera
       goto error;
     }
     if(strcasecmp(opt[0], "T") == 0) {
-      GET_OPTIONAL_TIME_RANGE(opt[1], 0, cam->time_range, logger, "%s", opt[0]);
+      GET_OPTIONAL_TIME_RANGE(opt[1], 0, cam->time_range, logger, "%s", opt[0],
+        str_cget(&keep));
     }
     else if(strcasecmp(opt[0], "FILE") == 0) {
       ERR(str_set(&cam->file_name, opt[1]));
@@ -1026,23 +1063,12 @@ parse_camera
       res = RES_BAD_ARG;
       goto error;
     }
-
-#define FREE_AARRAY(ARRAY) \
-if(ARRAY) {\
-  int i__ = 0; \
-  for(i__=0; *((ARRAY)+i__);i__++){\
-    free((ARRAY)[i__]);\
-  }\
-  free(ARRAY);\
-  (ARRAY) = NULL;\
-}
-
-    FREE_AARRAY(opt)
+    FREE_AARRAY(opt);
   }
 
 end:
-  FREE_AARRAY(line)
-  FREE_AARRAY(opt)
+  FREE_AARRAY(line);
+  FREE_AARRAY(opt);
 #undef FREE_AARRAY
 
   str_release(&keep);
@@ -1484,9 +1510,15 @@ process_ssc
   if(res != RES_OK
     || desc->d.ss_connect.tcr < 0)
   {
-    logger_print(stardis->logger, LOG_ERROR, "Invalid contact resistance: %s\n", tk);
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid contact resistance: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
+  }
+  else if(desc->d.ss_connect.tcr == 0) {
+    logger_print(stardis->logger, LOG_WARNING,
+      "Solid-solid connection %s: defining a contact resistance to 0 has "
+      "no effect\n", str_cget(&desc->d.ss_connect.name));
   }
 
   ASSERT(sz <= UINT_MAX);

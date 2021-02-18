@@ -378,9 +378,6 @@ stardis_init
     struct sdis_scene_create_args scn_args = SDIS_SCENE_CREATE_ARGS_DEFAULT;
     ASSERT(darray_interface_ptrs_size_get(&stardis->geometry.interf_bytrg)
       == tcount);
-    /* Can release enclosures as they are no longer needed if compute */
-    SENC3D(scene_ref_put(stardis->senc3d_scn));
-    stardis->senc3d_scn = NULL;
     scn_args.get_indices = sg3d_sdisXd_geometry_get_indices;
     scn_args.get_interface = sg3d_sdisXd_geometry_get_interface;
     scn_args.get_position = sg3d_sdisXd_geometry_get_position;

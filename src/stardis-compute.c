@@ -535,17 +535,23 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
 
     if(med_id != fmat_id && med_id != bmat_id) { /* Not here */
       logger_print(stardis->logger, LOG_ERROR,
-        "Medium '%s' is not used at this interface (prim id=%lu)\n",
-        solve_name, (unsigned long)iprim);
+        "Medium '%s' is not used at this interface (prim id=%u)\n",
+        solve_name, iprim);
       res = RES_BAD_ARG;
       goto error;
     }
     if(fmat_id == bmat_id) { /* Cannot differentiate */
+      unsigned encs[2];
+      ERR(senc3d_scene_get_triangle_enclosures(stardis->senc3d_scn, iprim,
+        encs));
       logger_print(stardis->logger, LOG_ERROR,
-        "Medium '%s' is used on both sides of this interface (prim id=%lu)\n",
-        solve_name, (unsigned long)iprim);
+        "Medium '%s' is used on both sides of this interface (prim id=%u)\n",
+        solve_name,iprim);
       logger_print(stardis->logger, LOG_ERROR,
         "Side must be defined using either FRONT or BACK.\n");
+      logger_print(stardis->logger, LOG_ERROR,
+        "FRONT side is related to enclosure %u, BACK side to enclosure %u.\n",
+        encs[SENC3D_FRONT], encs[SENC3D_BACK]);
       res = RES_BAD_ARG;
       goto error;
     }

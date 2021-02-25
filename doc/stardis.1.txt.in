@@ -111,14 +111,14 @@ EXCLUSIVE OPTIONS
   is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The medium region does not need
   to be connex.
 
-*-s* _file[,time[,time]][,FRONT|BACK]_::
+*-s* _file[,time[,time]]_::
   Compute the mean temperature on a given 2D region at a given time, the region
   being defined as the front sides of the triangles in the provided *STL* file.
   By default the compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
   These triangles are not added to the geometry, but must be part of it. The
   region does not need to be connex.
 
-*-S* _file[,time[,time]][,FRONT|BACK]_::
+*-S* _file[,time[,time]]_::
   Compute the by-triangle mean temperature on a given 2D region at a given
   time, the region being defined as the front sides of the triangles in the
   provided *STL* file. These triangles are not added to the geometry, but must

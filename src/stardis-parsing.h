@@ -175,7 +175,8 @@ extern res_T
 parse_args
   (const int argc,
    char** argv,
-   struct args* args);
+   struct args* args,
+   struct mem_allocator* allocator);
 
 extern res_T
 parse_camera

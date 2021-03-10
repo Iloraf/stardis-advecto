@@ -56,7 +56,7 @@ main
 
   ERR(init_args(&logger, &allocator, &args));
   args_initialized = 1;
-  ERR(parse_args(argc, argv, args));
+  ERR(parse_args(argc, argv, args, &allocator));
   mode = args->mode;
 
   if(mode & MODE_DUMP_HELP) {

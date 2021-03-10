@@ -95,11 +95,14 @@ EXCLUSIVE OPTIONS
   be in a medium. The probe coordinates must be in the same system as the
   geometry.
 
-*-P* _x,y,z[,time[,time]]_::
+*-P* _x,y,z[,time[,time]][:side_indicator]_::
   Compute the temperature at the given probe on an interface at a given time.
+  If the probe is on an interface where a thermal contact resistance is
+  defined, it is mandatory to provide a side indicator (either FRONT, BACK, or
+  a medium name), as the temperature differs between the two sides.
   By default the compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The
   probe is supposed to be on an interface and is moved to the closest point of
-  the closest interface before the computation start. The probe coordinates
+  the closest interface before the computation starts. The probe coordinates
   must be in the same system as the geometry.
 
 *-m* _medium_name[,time[,time]]_::

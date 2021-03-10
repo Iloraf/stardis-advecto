@@ -31,9 +31,17 @@
 #include <rsys/image.h>
 #include <rsys/clock_time.h>
 
+#ifdef COMPILER_GCC
+#include <strings.h> /* strcasecmp */
+#else
+#include <string.h>
+#define strcasecmp(s1, s2) _stricmp((s1), (s2))
+#endif
+
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
+
 
 struct filter_ctx {
   const struct stardis* stardis;
@@ -456,10 +464,154 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
     = SDIS_SOLVE_PROBE_BOUNDARY_ARGS_DEFAULT;
   FILE* stream = NULL;
   struct time compute_start, compute_end;
+  enum sdis_side compute_side;
+  unsigned prop[3];
+  const size_t dcount = darray_descriptions_size_get(&stardis->descriptions);
+  const struct description* descriptions
+    = darray_descriptions_cdata_get(&stardis->descriptions);
+  double tcr = 0;
+  const char* solve_name;
+  const char* compute_side_name = NULL;
+  const char* medium_name = NULL;
+  const struct description* intface_desc;
 
   ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
   ERR(check_probe_conform_to_type(stardis, 1, stardis->probe, &iprim, uv));
   ASSERT(iprim != UINT_MAX);
+
+  ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
+    (unsigned)iprim, prop));
+
+  ASSERT(prop[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
+    && prop[SG3D_INTFACE] < dcount);
+  intface_desc = descriptions + prop[SG3D_INTFACE];
+  if(intface_desc->type == DESC_SOLID_SOLID_CONNECT)
+    tcr = intface_desc->d.ss_connect.tcr;
+
+  solve_name = str_is_empty(&stardis->solve_name)
+    ? NULL : str_cget(&stardis->solve_name);
+  if(!solve_name) {
+    compute_side = SDIS_SIDE_NULL__; /* Side is let unspecified */
+  }
+  else if(0 == strcasecmp(solve_name, "FRONT")) {
+    const struct description* d;
+    ASSERT(prop[SG3D_FRONT] < dcount);
+    d = descriptions + prop[SG3D_FRONT];
+    ASSERT(d->type == DESC_MAT_SOLID || d->type == DESC_MAT_FLUID);
+    medium_name = str_cget(get_description_name(d));
+    compute_side = SDIS_FRONT;
+    compute_side_name = "FRONT";
+  }
+  else if(0 == strcasecmp(solve_name, "BACK")) {
+    const struct description* d;
+    ASSERT(prop[SG3D_BACK] < dcount);
+    d = descriptions + prop[SG3D_BACK];
+    ASSERT(d->type == DESC_MAT_SOLID || d->type == DESC_MAT_FLUID);
+    medium_name = str_cget(get_description_name(d));
+    compute_side = SDIS_BACK;
+    compute_side_name = "BACK";
+  } else { /* solve_name must be a medium name */
+    unsigned med_id, fmat_id, bmat_id;
+    const struct description* fd;
+    const struct description* bd;
+    struct sdis_medium* medium
+      = find_medium_by_name(stardis, &stardis->solve_name, &med_id);
+    if(medium == NULL) { /* Not found */
+      logger_print(stardis->logger, LOG_ERROR,
+        "Cannot locate side from medium name '%s' (unknown medium)\n",
+        solve_name);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+
+    fd = descriptions + prop[SG3D_FRONT];
+    bd = descriptions + prop[SG3D_BACK];
+    ASSERT(fd->type == DESC_MAT_SOLID || fd->type == DESC_MAT_FLUID);
+    fmat_id = (fd->type == DESC_MAT_SOLID)
+      ? fd->d.solid.solid_id : fd->d.fluid.fluid_id;
+    ASSERT(bd->type == DESC_MAT_SOLID || bd->type == DESC_MAT_FLUID);
+    bmat_id = (bd->type == DESC_MAT_SOLID)
+      ? bd->d.solid.solid_id : bd->d.fluid.fluid_id;
+
+    if(med_id != fmat_id && med_id != bmat_id) { /* Not here */
+      logger_print(stardis->logger, LOG_ERROR,
+        "Medium '%s' is not used at this interface (prim id=%u)\n",
+        solve_name, iprim);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    if(fmat_id == bmat_id) { /* Cannot differentiate */
+      unsigned encs[2];
+      ERR(senc3d_scene_get_triangle_enclosures(stardis->senc3d_scn, iprim,
+        encs));
+      logger_print(stardis->logger, LOG_ERROR,
+        "Medium '%s' is used on both sides of this interface (prim id=%u)\n",
+        solve_name,iprim);
+      logger_print(stardis->logger, LOG_ERROR,
+        "Side must be defined using either FRONT or BACK.\n");
+      logger_print(stardis->logger, LOG_ERROR,
+        "FRONT side is related to enclosure %u, BACK side to enclosure %u.\n",
+        encs[SENC3D_FRONT], encs[SENC3D_BACK]);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    medium_name = solve_name;
+    if(med_id == fmat_id) {
+      compute_side = SDIS_FRONT;
+      compute_side_name = "FRONT";
+    } else {
+      compute_side = SDIS_BACK;
+      compute_side_name = "BACK";
+    }
+  }
+
+  if(compute_side == SDIS_SIDE_NULL__) {
+    /* Cannot have defined a contact resistance here */
+    if(tcr != 0) {
+      const struct description* fdesc = NULL;
+      const struct description* bdesc = NULL;
+      if(prop[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY) {
+        ASSERT(prop[SG3D_FRONT] < dcount);
+        fdesc = descriptions + prop[SG3D_FRONT];
+      }
+      if(prop[SG3D_BACK] != SG3D_UNSPECIFIED_PROPERTY) {
+        ASSERT(prop[SG3D_BACK] < dcount);
+        bdesc = descriptions + prop[SG3D_BACK];
+      }
+      ASSERT(fdesc || bdesc);
+      logger_print(stardis->logger, LOG_ERROR,
+        "Cannot let probe computation side unspecified on an interface with a "
+        "non-nul thermal resistance.\n");
+      logger_print(stardis->logger, LOG_ERROR,
+        "Interface '%s',%s%s%s%s%s%s%s, resistance=%g K.m^2/W.\n",
+        str_cget(get_description_name(intface_desc)),
+        (fdesc ? " FRONT:'" : ""),
+        (fdesc ? str_cget(get_description_name(fdesc)) : ""),
+        (fdesc ? "'" : ""),
+        (fdesc && bdesc ? "," : ""),
+        (bdesc ? " BACK:'" : ""),
+        (bdesc ? str_cget(get_description_name(bdesc)) : ""),
+        (bdesc ? "'" : ""),
+        tcr);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    /* Any side is OK as temperature is the same */
+    compute_side = SDIS_FRONT;
+  } else if (tcr == 0) {
+    /* Warn if side defined and no resistance defined */
+    logger_print(stardis->logger, LOG_WARNING,
+      "Specifying a compute side at an interface with no contact resistance "
+      "is meaningless.\n");
+  }
+
+  if(tcr > 0) {
+    ASSERT(compute_side_name && medium_name);
+    logger_print(stardis->logger, LOG_OUTPUT,
+      "Probe computation on an interface with a thermal resistance = %g K.m^2/W "
+      "on %s side (medium is '%s').\n",
+      tcr, compute_side_name, medium_name);
+  }
 
   args.nrealisations = stardis->samples;
   args.iprim = iprim;

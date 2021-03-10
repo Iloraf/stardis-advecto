@@ -466,7 +466,6 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   struct time compute_start, compute_end;
   enum sdis_side compute_side;
   unsigned prop[3];
-  const size_t dcount = darray_descriptions_size_get(&stardis->descriptions);
   const struct description* descriptions
     = darray_descriptions_cdata_get(&stardis->descriptions);
   double tcr = 0;
@@ -474,6 +473,9 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   const char* compute_side_name = NULL;
   const char* medium_name = NULL;
   const struct description* intface_desc;
+#ifndef NDEBUG
+  const size_t dcount = darray_descriptions_size_get(&stardis->descriptions);
+#endif
 
   ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
   ERR(check_probe_conform_to_type(stardis, 1, stardis->probe, &iprim, uv));

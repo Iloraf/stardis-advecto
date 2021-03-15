@@ -654,7 +654,13 @@ dump_green_bin
   char* name_pool = NULL;
   char* pool_ptr;
   const char green_string[] = "GREEN_BIN_FILE:";
-  const unsigned file_fmt_version = 1;
+  const unsigned file_fmt_version = 2;
+  /* The following type must be identical to its stardis-green counterpart! */
+  struct bfile_green_counts {
+    unsigned desc_count, smed_count, fmed_count, tbound_count, hbound_count,
+      fbound_count, sfconnect_count, ssconnect_count, name_pool_sz;
+    size_t ok_count, failed_count;
+  } file_counts;
 
   ASSERT(green && stardis && stream);
 
@@ -663,6 +669,11 @@ dump_green_bin
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ASSERT(sz <= UINT_MAX);
   szd = (unsigned)sz;
+  ASSERT(szd ==
+    (stardis->counts.smed_count + stardis->counts.fmed_count
+      + stardis->counts.tbound_count + stardis->counts.hbound_count
+      + stardis->counts.fbound_count + stardis->counts.sfconnect_count
+      + stardis->counts.ssconnect_count));
   descs = darray_descriptions_cdata_get(&stardis->descriptions);
 
   /* Save names that do not fit inplace */
@@ -691,11 +702,18 @@ dump_green_bin
   FW(&file_fmt_version, 1);
 
   /* Write counts */
-  FW(&szd, 1);
-  FW(&stardis->counts, 1);
-  FW(&name_pool_sz, 1);
-  FW(&ok_count, 1);
-  FW(&failed_count, 1);
+  file_counts.desc_count = szd;
+  file_counts.smed_count = stardis->counts.smed_count;
+  file_counts.fmed_count = stardis->counts.fmed_count;
+  file_counts.tbound_count = stardis->counts.tbound_count;
+  file_counts.hbound_count = stardis->counts.hbound_count;
+  file_counts.fbound_count = stardis->counts.fbound_count;
+  file_counts.sfconnect_count = stardis->counts.sfconnect_count;
+  file_counts.ssconnect_count = stardis->counts.ssconnect_count;
+  file_counts.name_pool_sz = name_pool_sz;
+  file_counts.ok_count = ok_count;
+  file_counts.failed_count = failed_count;
+  FW(&file_counts, 1);
 
   /* Write descriptions*/
   FW(descs, szd);

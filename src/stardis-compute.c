@@ -472,7 +472,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   const char* solve_name;
   const char* compute_side_name = NULL;
   const char* medium_name = NULL;
-  const struct description* intface_desc;
+  const struct description* intface_desc = NULL;
 #ifndef NDEBUG
   const size_t dcount = darray_descriptions_size_get(&stardis->descriptions);
 #endif
@@ -484,86 +484,88 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
     (unsigned)iprim, prop));
 
-  ASSERT(prop[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
-    && prop[SG3D_INTFACE] < dcount);
-  intface_desc = descriptions + prop[SG3D_INTFACE];
-  if(intface_desc->type == DESC_SOLID_SOLID_CONNECT)
-    tcr = intface_desc->d.ss_connect.tcr;
+  if(prop[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY) {
+    ASSERT(prop[SG3D_INTFACE] < dcount);
+    intface_desc = descriptions + prop[SG3D_INTFACE];
+    if(intface_desc->type == DESC_SOLID_SOLID_CONNECT)
+      tcr = intface_desc->d.ss_connect.tcr;
+  }
 
-  solve_name = str_is_empty(&stardis->solve_name)
-    ? NULL : str_cget(&stardis->solve_name);
-  if(!solve_name) {
+  if(str_is_empty(&stardis->solve_name)) {
+    solve_name = NULL;
     compute_side = SDIS_SIDE_NULL__; /* Side is let unspecified */
-  }
-  else if(0 == strcasecmp(solve_name, "FRONT")) {
-    const struct description* d;
-    ASSERT(prop[SG3D_FRONT] < dcount);
-    d = descriptions + prop[SG3D_FRONT];
-    ASSERT(d->type == DESC_MAT_SOLID || d->type == DESC_MAT_FLUID);
-    medium_name = str_cget(get_description_name(d));
-    compute_side = SDIS_FRONT;
-    compute_side_name = "FRONT";
-  }
-  else if(0 == strcasecmp(solve_name, "BACK")) {
-    const struct description* d;
-    ASSERT(prop[SG3D_BACK] < dcount);
-    d = descriptions + prop[SG3D_BACK];
-    ASSERT(d->type == DESC_MAT_SOLID || d->type == DESC_MAT_FLUID);
-    medium_name = str_cget(get_description_name(d));
-    compute_side = SDIS_BACK;
-    compute_side_name = "BACK";
-  } else { /* solve_name must be a medium name */
-    unsigned med_id, fmat_id, bmat_id;
-    const struct description* fd;
-    const struct description* bd;
-    struct sdis_medium* medium
-      = find_medium_by_name(stardis, &stardis->solve_name, &med_id);
-    if(medium == NULL) { /* Not found */
-      logger_print(stardis->logger, LOG_ERROR,
-        "Cannot locate side from medium name '%s' (unknown medium)\n",
-        solve_name);
-      res = RES_BAD_ARG;
-      goto error;
-    }
-
-    fd = descriptions + prop[SG3D_FRONT];
-    bd = descriptions + prop[SG3D_BACK];
-    ASSERT(fd->type == DESC_MAT_SOLID || fd->type == DESC_MAT_FLUID);
-    fmat_id = (fd->type == DESC_MAT_SOLID)
-      ? fd->d.solid.solid_id : fd->d.fluid.fluid_id;
-    ASSERT(bd->type == DESC_MAT_SOLID || bd->type == DESC_MAT_FLUID);
-    bmat_id = (bd->type == DESC_MAT_SOLID)
-      ? bd->d.solid.solid_id : bd->d.fluid.fluid_id;
-
-    if(med_id != fmat_id && med_id != bmat_id) { /* Not here */
-      logger_print(stardis->logger, LOG_ERROR,
-        "Medium '%s' is not used at this interface (prim id=%u)\n",
-        solve_name, iprim);
-      res = RES_BAD_ARG;
-      goto error;
-    }
-    if(fmat_id == bmat_id) { /* Cannot differentiate */
-      unsigned encs[2];
-      ERR(senc3d_scene_get_triangle_enclosures(stardis->senc3d_scn, iprim,
-        encs));
-      logger_print(stardis->logger, LOG_ERROR,
-        "Medium '%s' is used on both sides of this interface (prim id=%u)\n",
-        solve_name,iprim);
-      logger_print(stardis->logger, LOG_ERROR,
-        "Side must be defined using either FRONT or BACK.\n");
-      logger_print(stardis->logger, LOG_ERROR,
-        "FRONT side is related to enclosure %u, BACK side to enclosure %u.\n",
-        encs[SENC3D_FRONT], encs[SENC3D_BACK]);
-      res = RES_BAD_ARG;
-      goto error;
-    }
-    medium_name = solve_name;
-    if(med_id == fmat_id) {
+  } else {
+    solve_name = str_cget(&stardis->solve_name);
+    if(0 == strcasecmp(solve_name, "FRONT")) {
+      const struct description* d;
+      ASSERT(prop[SG3D_FRONT] < dcount);
+      d = descriptions + prop[SG3D_FRONT];
+      ASSERT(d->type == DESC_MAT_SOLID || d->type == DESC_MAT_FLUID);
+      medium_name = str_cget(get_description_name(d));
       compute_side = SDIS_FRONT;
       compute_side_name = "FRONT";
-    } else {
+    }
+    else if(0 == strcasecmp(solve_name, "BACK")) {
+      const struct description* d;
+      ASSERT(prop[SG3D_BACK] < dcount);
+      d = descriptions + prop[SG3D_BACK];
+      ASSERT(d->type == DESC_MAT_SOLID || d->type == DESC_MAT_FLUID);
+      medium_name = str_cget(get_description_name(d));
       compute_side = SDIS_BACK;
       compute_side_name = "BACK";
+    } else { /* solve_name must be a medium name */
+      unsigned med_id, fmat_id, bmat_id;
+      const struct description* fd;
+      const struct description* bd;
+      struct sdis_medium* medium
+        = find_medium_by_name(stardis, &stardis->solve_name, &med_id);
+      if(medium == NULL) { /* Not found */
+        logger_print(stardis->logger, LOG_ERROR,
+          "Cannot locate side from medium name '%s' (unknown medium)\n",
+          solve_name);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+
+      fd = descriptions + prop[SG3D_FRONT];
+      bd = descriptions + prop[SG3D_BACK];
+      ASSERT(fd->type == DESC_MAT_SOLID || fd->type == DESC_MAT_FLUID);
+      fmat_id = (fd->type == DESC_MAT_SOLID)
+        ? fd->d.solid.solid_id : fd->d.fluid.fluid_id;
+      ASSERT(bd->type == DESC_MAT_SOLID || bd->type == DESC_MAT_FLUID);
+      bmat_id = (bd->type == DESC_MAT_SOLID)
+        ? bd->d.solid.solid_id : bd->d.fluid.fluid_id;
+
+      if(med_id != fmat_id && med_id != bmat_id) { /* Not here */
+        logger_print(stardis->logger, LOG_ERROR,
+          "Medium '%s' is not used at this interface (prim id=%u)\n",
+          solve_name, iprim);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+      if(fmat_id == bmat_id) { /* Cannot differentiate */
+        unsigned encs[2];
+        ERR(senc3d_scene_get_triangle_enclosures(stardis->senc3d_scn, iprim,
+          encs));
+        logger_print(stardis->logger, LOG_ERROR,
+          "Medium '%s' is used on both sides of this interface (prim id=%u)\n",
+          solve_name,iprim);
+        logger_print(stardis->logger, LOG_ERROR,
+          "Side must be defined using either FRONT or BACK.\n");
+        logger_print(stardis->logger, LOG_ERROR,
+          "FRONT side is related to enclosure %u, BACK side to enclosure %u.\n",
+          encs[SENC3D_FRONT], encs[SENC3D_BACK]);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+      medium_name = solve_name;
+      if(med_id == fmat_id) {
+        compute_side = SDIS_FRONT;
+        compute_side_name = "FRONT";
+      } else {
+        compute_side = SDIS_BACK;
+        compute_side_name = "BACK";
+      }
     }
   }
 

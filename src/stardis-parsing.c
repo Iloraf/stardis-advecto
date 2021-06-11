@@ -791,7 +791,8 @@ parse_args
          * medium name (OK if NULL) */
         GET_POS_AND_OPTIONAL_TIME_RANGE(line[0], args->pos_and_time,
           str_cget(&keep));
-        args->medium_name = optarg + strlen(line[0]) + 1;
+        if(line[1])
+          args->medium_name = optarg + strlen(line[0]) + 1;
 
         break;
 

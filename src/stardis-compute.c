@@ -620,7 +620,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   args.nrealisations = stardis->samples;
   args.iprim = iprim;
   d3_set(args.uv, uv);
-  args.side = SDIS_FRONT;
+  args.side = compute_side;
   d2_set(args.time_range, stardis->time_range);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {

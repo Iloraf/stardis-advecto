@@ -103,6 +103,8 @@ struct args {
   char* bin_green_filename;
   char* end_paths_filename;
   char* paths_filename;
+  char* rndgen_state_in_filename;
+  char* rndgen_state_out_filename;
   char* chunks_prefix;
   size_t samples;
   unsigned nthreads;

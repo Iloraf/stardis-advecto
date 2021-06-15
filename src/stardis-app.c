@@ -225,6 +225,8 @@ stardis_init
   str_init(stardis->allocator, &stardis->paths_filename);
   str_init(stardis->allocator, &stardis->bin_green_filename);
   str_init(stardis->allocator, &stardis->end_paths_filename);
+  str_init(stardis->allocator, &stardis->rndgen_state_in_filename);
+  str_init(stardis->allocator, &stardis->rndgen_state_out_filename);
   str_init(stardis->allocator, &stardis->chunks_prefix);
   darray_size_t_init(stardis->allocator, &stardis->compute_surface.primitives);
   darray_sides_init(stardis->allocator, &stardis->compute_surface.sides);
@@ -361,6 +363,14 @@ stardis_init
     }
     if(args->end_paths_filename) {
       ERR(str_set(&stardis->end_paths_filename, args->end_paths_filename));
+    }
+    if(args->rndgen_state_in_filename) {
+      ERR(str_set(&stardis->rndgen_state_in_filename,
+        args->rndgen_state_in_filename));
+    }
+    if(args->rndgen_state_out_filename) {
+      ERR(str_set(&stardis->rndgen_state_out_filename,
+        args->rndgen_state_out_filename));
     }
   }
 

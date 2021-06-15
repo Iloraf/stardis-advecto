@@ -25,6 +25,7 @@
 
 #include<star/senc3d.h>
 #include<star/sg3d.h>
+#include<star/ssp.h>
 
 #include <rsys/math.h>
 #include <rsys/mem_allocator.h>
@@ -1822,4 +1823,24 @@ exit:
   return res;
 error:
   goto exit;
+}
+
+res_T
+write_random_generator_state
+  (struct sdis_estimator* estimator,
+   FILE* stream)
+{
+  res_T res;
+  struct ssp_rng* state;
+  res = sdis_estimator_get_rng_state(estimator, &state);
+  if(res != RES_OK) return res;
+  return ssp_rng_write(state, stream);
+}
+
+res_T
+read_random_generator_state
+  (struct ssp_rng* state,
+   FILE* stream)
+{
+  return ssp_rng_read(state, stream);
 }

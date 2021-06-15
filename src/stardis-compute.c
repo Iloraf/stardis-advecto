@@ -24,6 +24,7 @@
 
 #include <star/s3d.h>
 #include <star/sg3d_sXd_helper.h>
+#include <star/ssp.h>
 
 #include <rsys/double3.h>
 #include <rsys/double2.h>
@@ -428,6 +429,17 @@ compute_probe(struct stardis* stardis, struct time* start)
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
+    /* Input random state? */
+    if(!str_is_empty(&stardis->rndgen_state_in_filename)) {
+      stream = fopen(str_cget(&stardis->rndgen_state_in_filename), "r");
+      if(!stream) {
+        res = RES_IO_ERR;
+        goto error;
+      }
+      ERR(ssp_rng_create(stardis->allocator, &ssp_rng_mt19937_64, &args.rng_state));
+      ERR(read_random_generator_state(args.rng_state, stream));
+      fclose(stream); stream = NULL;
+    }
     args.register_paths = stardis->dump_paths;
     time_current(&compute_start);
     ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
@@ -440,6 +452,17 @@ compute_probe(struct stardis* stardis, struct time* start)
     dump_ctx.stardis = stardis;
     dump_ctx.rank = 0;
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+
+    /* Output random state? */
+    if(!str_is_empty(&stardis->rndgen_state_out_filename)) {
+      stream = fopen(str_cget(&stardis->rndgen_state_out_filename), "wb");
+      if(!stream) {
+        res = RES_IO_ERR;
+        goto error;
+      }
+      ERR(write_random_generator_state(estimator, stream));
+      fclose(stream); stream = NULL;
+    }
   }
 
 end:

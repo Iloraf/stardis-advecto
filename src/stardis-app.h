@@ -814,6 +814,8 @@ struct stardis {
   struct str paths_filename;
   struct str bin_green_filename;
   struct str end_paths_filename;
+  struct str rndgen_state_in_filename;
+  struct str rndgen_state_out_filename;
   struct str chunks_prefix;
   int mode;
   size_t samples;

@@ -85,3 +85,11 @@ Add radiative transfer computations. To achieve this, media gain 2 new parameter
 
 - Allow probe computations on conductive-only thermal systems.
 - Allow Dirichlet and h.dT boundary conditions.
+
+## License
+
+Copyright (C) 2018-2021 |Meso|Star> (<contact@meso-star.com>). Stardis is free
+software released under the GPL v3+ license: GNU GPL version 3 or later. You
+are welcome to redistribute it under certain conditions; refer to the COPYING
+file for details.
+

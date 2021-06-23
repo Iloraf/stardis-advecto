@@ -515,7 +515,7 @@ if(ARRAY) {\
 }
 
 /* Workaround for a gcc warning when GET_OPTIONAL_TIME_RANGE used with Rank=0 */
-FINLINE int is_less(size_t a, size_t b) { return a < b; }
+static FINLINE int is_less(size_t a, size_t b) { return a < b; }
 
 /* Get a time range from a coma-separated list of doubles
  * The first Rank values are mandatory, followed by an optional time range

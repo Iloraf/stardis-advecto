@@ -395,6 +395,28 @@ compute_probe(struct stardis* stardis, struct time* start)
   d3_set(args.position, stardis->probe);
   d2_set(args.time_range, stardis->time_range);
 
+  /* Input random state? */
+  if(!str_is_empty(&stardis->rndgen_state_in_filename)) {
+    const char* name = str_cget(&stardis->rndgen_state_in_filename);
+    stream = fopen(name, "r");
+    if(!stream) {
+      res = RES_IO_ERR;
+      logger_print(stardis->logger, LOG_ERROR,
+        "Could not open generator's state file ('%s').\n",
+        name);
+      goto error;
+    }
+    ERR(ssp_rng_create(stardis->allocator, &ssp_rng_mt19937_64, &args.rng_state));
+    res =  read_random_generator_state(args.rng_state, stream);
+    if(res != RES_OK) {
+      logger_print(stardis->logger, LOG_ERROR,
+        "Could not read random generator's state ('%s').\n",
+        name);
+      goto error;
+    }
+    fclose(stream); stream = NULL;
+  }
+
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     time_current(&compute_start);
     ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
@@ -428,17 +450,6 @@ compute_probe(struct stardis* stardis, struct time* start)
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
-    /* Input random state? */
-    if(!str_is_empty(&stardis->rndgen_state_in_filename)) {
-      stream = fopen(str_cget(&stardis->rndgen_state_in_filename), "r");
-      if(!stream) {
-        res = RES_IO_ERR;
-        goto error;
-      }
-      ERR(ssp_rng_create(stardis->allocator, &ssp_rng_mt19937_64, &args.rng_state));
-      ERR(read_random_generator_state(args.rng_state, stream));
-      fclose(stream); stream = NULL;
-    }
     args.register_paths = stardis->dump_paths;
     time_current(&compute_start);
     ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
@@ -451,23 +462,28 @@ compute_probe(struct stardis* stardis, struct time* start)
     dump_ctx.stardis = stardis;
     dump_ctx.rank = 0;
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+  }
 
-    /* Output random state? */
-    if(!str_is_empty(&stardis->rndgen_state_out_filename)) {
-      stream = fopen(str_cget(&stardis->rndgen_state_out_filename), "wb");
-      if(!stream) {
-        res = RES_IO_ERR;
-        goto error;
-      }
-      ERR(write_random_generator_state(estimator, stream));
-      fclose(stream); stream = NULL;
+  /* Output random state? */
+  if(!str_is_empty(&stardis->rndgen_state_out_filename)) {
+    const char* name = str_cget(&stardis->rndgen_state_out_filename);
+    stream = fopen(name, "wb");
+    if(!stream) {
+      res = RES_IO_ERR;
+      logger_print(stardis->logger, LOG_ERROR,
+        "Could not write random generator's state ('%s').\n",
+        name);
+      goto error;
     }
+    ERR(write_random_generator_state(estimator, stream));
+    fclose(stream); stream = NULL;
   }
 
 end:
   if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;
 error:
   goto end;

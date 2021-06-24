@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,8 +42,6 @@
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
-
-
 struct filter_ctx {
   const struct stardis* stardis;
   unsigned prim;
@@ -86,7 +84,8 @@ static int
 hit_filter
   (const struct s3d_hit* hit,
    const float ray_org[3],
-   const float* invalid_, /* In closest_point queries ray_dir is not informed */
+   const float ray_dir[3],
+   const float ray_range[2],
    void* ray_data,
    void* filter_data)
 {
@@ -98,7 +97,7 @@ hit_filter
   unsigned descr[SG3D_PROP_TYPES_COUNT__];
   const struct stardis* stardis;
 
-  (void)ray_org; (void)invalid_; (void)filter_data;
+  (void)ray_org; (void)ray_dir; (void)ray_range; (void)filter_data;
   ASSERT(hit && filter_ctx);
   ASSERT(hit->uv[0] == CLAMP(hit->uv[0], 0, 1));
   ASSERT(hit->uv[1] == CLAMP(hit->uv[1], 0, 1));

@@ -893,10 +893,26 @@ parse_args
       break;
 
     case 'x':
+      if(!(args->mode & RANDOM_RW_MODES)) {
+        res = RES_BAD_ARG;
+        print_multiple_modes(buf, sizeof(buf), RANDOM_RW_MODES, 0);
+        logger_print(args->logger, LOG_ERROR,
+          "Option -%c can only be used in conjunction with one of the following options: %s.\n",
+          (char)opt, buf);
+        goto error;
+      }
       args->rndgen_state_in_filename = optarg;
       break;
 
     case 'X':
+      if(!(args->mode & RANDOM_RW_MODES)) {
+        res = RES_BAD_ARG;
+        print_multiple_modes(buf, sizeof(buf), RANDOM_RW_MODES, 0);
+        logger_print(args->logger, LOG_ERROR,
+          "Option -%c can only be used in conjunction with one of the following options: %s.\n",
+          (char)opt, buf);
+        goto error;
+      }
       args->rndgen_state_out_filename = optarg;
       break;
     }

@@ -24,6 +24,7 @@
 
 #include <star/s3d.h>
 #include <star/sg3d_sXd_helper.h>
+#include <star/ssp.h>
 
 #include <rsys/double3.h>
 #include <rsys/double2.h>
@@ -373,6 +374,43 @@ error:
   goto end;
 }
 
+#define READ_RANDOM_STATE(Name) \
+  if(!str_is_empty(Name)) { \
+    const char* name = str_cget(Name); \
+    stream = fopen(name, "r"); \
+    if(!stream) { \
+      res = RES_IO_ERR; \
+      logger_print(stardis->logger, LOG_ERROR, \
+        "Could not open generator's state file ('%s').\n", \
+        name); \
+      goto error; \
+    } \
+    ERR(ssp_rng_create(stardis->allocator, &ssp_rng_mt19937_64, &args.rng_state)); \
+    res =  read_random_generator_state(args.rng_state, stream); \
+    if(res != RES_OK) { \
+      logger_print(stardis->logger, LOG_ERROR, \
+        "Could not read random generator's state ('%s').\n", \
+        name); \
+      goto error; \
+    } \
+    fclose(stream); stream = NULL; \
+  }
+
+#define WRITE_RANDOM_STATE(Name) \
+  if(!str_is_empty(Name)) { \
+    const char* name = str_cget(Name); \
+    stream = fopen(name, "wb"); \
+    if(!stream) { \
+      res = RES_IO_ERR; \
+      logger_print(stardis->logger, LOG_ERROR, \
+        "Could not write random generator's state ('%s').\n", \
+        name); \
+      goto error; \
+    } \
+    ERR(write_random_generator_state(estimator, stream)); \
+    fclose(stream); stream = NULL; \
+  }
+
 static res_T
 compute_probe(struct stardis* stardis, struct time* start)
 {
@@ -393,6 +431,9 @@ compute_probe(struct stardis* stardis, struct time* start)
   args.nrealisations = stardis->samples;
   d3_set(args.position, stardis->probe);
   d2_set(args.time_range, stardis->time_range);
+
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     time_current(&compute_start);
@@ -441,10 +482,14 @@ compute_probe(struct stardis* stardis, struct time* start)
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
 
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
 end:
   if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;
 error:
   goto end;
@@ -622,6 +667,9 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   args.side = compute_side;
   d2_set(args.time_range, stardis->time_range);
 
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
+
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     time_current(&compute_start);
     ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
@@ -670,10 +718,14 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
 
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
 end:
   if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;
 error:
   goto end;
@@ -876,6 +928,9 @@ compute_medium(struct stardis* stardis, struct time* start)
   args.medium = medium;
   d2_set(args.time_range, stardis->time_range);
 
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
+
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     time_current(&compute_start);
     ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
@@ -922,10 +977,14 @@ compute_medium(struct stardis* stardis, struct time* start)
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
 
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
 end:
   if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;
 error:
   goto end;
@@ -1000,6 +1059,9 @@ compute_boundary(struct stardis* stardis, struct time* start)
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
   d2_set(args.time_range, stardis->time_range);
 
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
+
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
     time_current(&compute_start);
     ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
@@ -1046,10 +1108,14 @@ compute_boundary(struct stardis* stardis, struct time* start)
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
 
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
 end:
   if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;
 error:
   goto end;
@@ -1064,6 +1130,7 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
   struct sdis_solve_boundary_flux_args args
     = SDIS_SOLVE_BOUNDARY_FLUX_ARGS_DEFAULT;
   struct dump_path_context dump_ctx;
+  FILE* stream = NULL;
   struct time compute_start, compute_end;
 
   ASSERT(stardis && start && (stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE));
@@ -1074,6 +1141,9 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
   args.nprimitives
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
   d2_set(args.time_range, stardis->time_range);
+
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
 
   time_current(&compute_start);
   ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
@@ -1087,9 +1157,13 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
   dump_ctx.rank = 0;
   ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
 
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
 end:
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;
 error:
   goto end;
@@ -1146,6 +1220,9 @@ end:
 error:
   goto end;
 }
+
+#undef READ_RANDOM_STATE
+#undef WRITE_RANDOM_STATE
 
 /*******************************************************************************
  * Public Functions

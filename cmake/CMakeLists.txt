@@ -75,6 +75,7 @@ find_package(Star3D 0.8 REQUIRED)
 find_package(StarEnc3D 0.5.3 REQUIRED)
 find_package(Stardis 0.12 REQUIRED)
 find_package(StarSTL 0.3.3 REQUIRED)
+find_package(StarSP 0.8.1 REQUIRED)
 if(MSVC)
   find_package(MuslGetopt REQUIRED)
 endif()
@@ -86,6 +87,7 @@ include_directories(
   ${StarEnc3D_INCLUDE_DIR}
   ${Stardis_INCLUDE_DIR}
   ${StarSTL_INCLUDE_DIR}
+  ${StarSP_INCLUDE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR})
 if(MSVC)
   include_directories(${MuslGetopt_INCLUDE_DIR})
@@ -97,11 +99,11 @@ include(rcmake_runtime)
 
 if(CMAKE_COMPILER_IS_GNUCC)
   rcmake_append_runtime_dirs(_runtime_dirs
-    RSys Stardis Star3D StarGeom3D StarEnc3D StarSTL)
+    RSys Stardis Star3D StarGeom3D StarEnc3D StarSTL StarSP)
 endif()
 if(MSVC)
   rcmake_append_runtime_dirs(_runtime_dirs
-    RSys MuslGetopt Stardis Star3D StarGeom3D StarEnc3D StarSTL)
+    RSys MuslGetopt Stardis Star3D StarGeom3D StarEnc3D StarSTL StarSP)
 endif()
 
 ###############################################################################
@@ -156,7 +158,7 @@ set_target_properties(stardis
   PROPERTIES VERSION ${SDIS_VERSION})
 
 target_link_libraries(stardis
-  Stardis Star3D StarGeom3D StarEnc3D StarSTL RSys ${GETOPT_LIB} ${MATH_LIB})
+  Stardis Star3D StarGeom3D StarEnc3D StarSTL StarSP RSys ${GETOPT_LIB} ${MATH_LIB})
 
 ###############################################################################
 # Define output & install directories

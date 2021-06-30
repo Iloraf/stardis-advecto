@@ -81,7 +81,11 @@ enum stardis_mode {
 
   USE_STDOUT_MODES
   = MODE_DUMP_C_CHUNKS | MODE_DUMP_VTK | MODE_DUMP_HELP | MODE_DUMP_VERSION
-  | MODE_IR_COMPUTE | MODE_GREEN
+  | MODE_IR_COMPUTE | MODE_GREEN,
+
+  RANDOM_RW_MODES
+    = MODE_PROBE_COMPUTE | MODE_PROBE_COMPUTE_ON_INTERFACE | MODE_MEDIUM_COMPUTE
+    | MODE_BOUNDARY_COMPUTE | MODE_FLUX_BOUNDARY_COMPUTE
 };
 
 STATIC_ASSERT(GREEN_COMPATIBLE_MODES == (COMPUTE_MODES & GREEN_COMPATIBLE_MODES), 
@@ -103,6 +107,8 @@ struct args {
   char* bin_green_filename;
   char* end_paths_filename;
   char* paths_filename;
+  char* rndgen_state_in_filename;
+  char* rndgen_state_out_filename;
   char* chunks_prefix;
   size_t samples;
   unsigned nthreads;

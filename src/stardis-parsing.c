@@ -502,6 +502,12 @@ short_help
 
   fprintf(stream, "\n  -V LEVEL\n");
   fprintf(stream, "     Set the verbosity level.\n");
+
+  fprintf(stream, "\n  -x <FILE>\n");
+  fprintf(stream, "     Use a random generator's state read from a file.\n");
+
+  fprintf(stream, "\n  -X <FILE>\n");
+  fprintf(stream, "     Save the final random generator's state in a file.\n");
 }
 
 #define FREE_AARRAY(ARRAY) \
@@ -559,7 +565,7 @@ parse_args
 {
   int opt = 0, n_used = 0;
   size_t len = 0;
-  const char option_list[] = "a:c:dD:eF:gG:hm:M:n:p:P:r:R:s:S:t:vV:";
+  const char option_list[] = "a:c:dD:eF:gG:hm:M:n:p:P:r:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -885,6 +891,30 @@ parse_args
         goto error;
       }
       break;
+
+    case 'x':
+      if(!(args->mode & RANDOM_RW_MODES)) {
+        res = RES_BAD_ARG;
+        print_multiple_modes(buf, sizeof(buf), RANDOM_RW_MODES, 0);
+        logger_print(args->logger, LOG_ERROR,
+          "Option -%c can only be used in conjunction with one of the following options: %s.\n",
+          (char)opt, buf);
+        goto error;
+      }
+      args->rndgen_state_in_filename = optarg;
+      break;
+
+    case 'X':
+      if(!(args->mode & RANDOM_RW_MODES)) {
+        res = RES_BAD_ARG;
+        print_multiple_modes(buf, sizeof(buf), RANDOM_RW_MODES, 0);
+        logger_print(args->logger, LOG_ERROR,
+          "Option -%c can only be used in conjunction with one of the following options: %s.\n",
+          (char)opt, buf);
+        goto error;
+      }
+      args->rndgen_state_out_filename = optarg;
+      break;
     }
   }
 
@@ -971,6 +1001,26 @@ parse_args
         , mode_option(MODE_BIN_GREEN));
       goto error;
     }
+  }
+
+  if(args->rndgen_state_in_filename && !(args->mode & COMPUTE_MODES)) {
+    res = RES_BAD_ARG;
+    print_multiple_modes(buf, sizeof(buf), COMPUTE_MODES, 0);
+    logger_print(args->logger, LOG_ERROR,
+      "Option -x can only be used in conjunction with an option"
+      " that launch a MC computation (%s).\n",
+      buf);
+    goto error;
+  }
+
+  if(args->rndgen_state_out_filename && !(args->mode & COMPUTE_MODES)) {
+    res = RES_BAD_ARG;
+    print_multiple_modes(buf, sizeof(buf), COMPUTE_MODES, 0);
+    logger_print(args->logger, LOG_ERROR,
+      "Option -X can only be used in conjunction with an option"
+      " that launch a MC computation (%s).\n",
+      buf);
+    goto error;
   }
 
 end:

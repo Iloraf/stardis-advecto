@@ -32,6 +32,7 @@ struct geometry;
 struct vertex;
 struct darray_estimators;
 struct time;
+struct ssp_rng;
 
 struct dump_path_context {
   unsigned long rank;
@@ -115,6 +116,16 @@ dump_compute_region_at_the_end_of_vtk
 extern res_T
 dump_model_as_c_chunks
   (struct stardis* stardis,
+   FILE* stream);
+
+extern res_T
+write_random_generator_state
+  (struct sdis_estimator* estimator,
+   FILE* stream);
+
+extern res_T
+read_random_generator_state
+  (struct ssp_rng* state,
    FILE* stream);
 
 #endif

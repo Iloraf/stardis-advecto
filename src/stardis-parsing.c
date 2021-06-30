@@ -508,6 +508,13 @@ short_help
 
   fprintf(stream, "\n  -X <FILE>\n");
   fprintf(stream, "     Save the final random generator's state in a file.\n");
+
+  fprintf(stream,
+"\nCopyright (C) 2018-2021 |Meso|Star> <contact@meso-star.com>.\n"
+"stardis is free software released under the GNU GPL license, version 3 or later.\n"
+"You are free to change or redistribute it under certain conditions\n"
+"<http://gnu.org/licenses/gpl.html>.\n");
+
 }
 
 #define FREE_AARRAY(ARRAY) \

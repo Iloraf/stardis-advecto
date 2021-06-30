@@ -33,6 +33,13 @@ variable the install directories of its dependencies.
 
 ## Release notes
 
+### Version 0.6
+
+- Add thermal contact resistances.
+- Add serialization for random generator's state.
+- Bugfixes in arguments parsing.
+- Fix Green output file padding.
+
 ### Version 0.5.1
 
 - Fix a memleak

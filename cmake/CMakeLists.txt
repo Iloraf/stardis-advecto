@@ -1,4 +1,4 @@
-# Copyright (C) 2018-2020 |Meso|Star>
+# Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@ set_property(CACHE STARDIS_DOC PROPERTY STRINGS
 # Generate files
 ###############################################################################
 set(STARDIS_ARGS_DEFAULT_AMBIENT_TEMP "300")
-set(STARDIS_ARGS_DEFAULT_COMPUTE_TIME "INF, INF")
+set(STARDIS_ARGS_DEFAULT_COMPUTE_TIME "INF")
 set(STARDIS_ARGS_DEFAULT_RENDERING_FOV "70") # degrees
 set(STARDIS_ARGS_DEFAULT_RENDERING_IMG_HEIGHT "480")
 set(STARDIS_ARGS_DEFAULT_RENDERING_IMG_WIDTH "640")
@@ -55,8 +55,8 @@ configure_file(${SDIS_SOURCE_DIR}/../doc/stardis.1.txt.in
   ${CMAKE_CURRENT_BINARY_DIR}/doc/stardis.1.txt @ONLY)
 
 set(SDIS_VERSION_MAJOR 0)
-set(SDIS_VERSION_MINOR 5)
-set(SDIS_VERSION_PATCH 1)
+set(SDIS_VERSION_MINOR 6)
+set(SDIS_VERSION_PATCH 0)
 set(SDIS_VERSION ${SDIS_VERSION_MAJOR}.${SDIS_VERSION_MINOR}.${SDIS_VERSION_PATCH})
 
 configure_file(${SDIS_SOURCE_DIR}/stardis-default.h.in
@@ -68,13 +68,14 @@ configure_file(${SDIS_SOURCE_DIR}/stardis-version.h.in
 ###############################################################################
 # Check dependencies
 ###############################################################################
-find_package(RCMake 0.4 REQUIRED)
-find_package(RSys 0.11 REQUIRED)
+find_package(RCMake 0.4.1 REQUIRED)
+find_package(RSys 0.12 REQUIRED)
 find_package(StarGeom3D 0.1 REQUIRED)
-find_package(Star3D 0.7.3 REQUIRED)
-find_package(StarEnc3D 0.4.2 REQUIRED)
-find_package(Stardis 0.11 REQUIRED)
-find_package(StarSTL 0.3 REQUIRED)
+find_package(Star3D 0.8 REQUIRED)
+find_package(StarEnc3D 0.5.3 REQUIRED)
+find_package(Stardis 0.12 REQUIRED)
+find_package(StarSTL 0.3.3 REQUIRED)
+find_package(StarSP 0.8.1 REQUIRED)
 if(MSVC)
   find_package(MuslGetopt REQUIRED)
 endif()
@@ -86,6 +87,7 @@ include_directories(
   ${StarEnc3D_INCLUDE_DIR}
   ${Stardis_INCLUDE_DIR}
   ${StarSTL_INCLUDE_DIR}
+  ${StarSP_INCLUDE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR})
 if(MSVC)
   include_directories(${MuslGetopt_INCLUDE_DIR})
@@ -97,11 +99,11 @@ include(rcmake_runtime)
 
 if(CMAKE_COMPILER_IS_GNUCC)
   rcmake_append_runtime_dirs(_runtime_dirs
-    RSys Stardis Star3D StarGeom3D StarEnc3D StarSTL)
+    RSys Stardis Star3D StarGeom3D StarEnc3D StarSTL StarSP)
 endif()
 if(MSVC)
   rcmake_append_runtime_dirs(_runtime_dirs
-    RSys MuslGetopt Stardis Star3D StarGeom3D StarEnc3D StarSTL)
+    RSys MuslGetopt Stardis Star3D StarGeom3D StarEnc3D StarSTL StarSP)
 endif()
 
 ###############################################################################
@@ -156,7 +158,7 @@ set_target_properties(stardis
   PROPERTIES VERSION ${SDIS_VERSION})
 
 target_link_libraries(stardis
-  Stardis Star3D StarGeom3D StarEnc3D StarSTL RSys ${GETOPT_LIB} ${MATH_LIB})
+  Stardis Star3D StarGeom3D StarEnc3D StarSTL StarSP RSys ${GETOPT_LIB} ${MATH_LIB})
 
 ###############################################################################
 # Define output & install directories

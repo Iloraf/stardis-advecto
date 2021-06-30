@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #include <rsys/rsys.h>
 #include <rsys/mem_allocator.h>
 #include <rsys/logger.h>
+#include <rsys/clock_time.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -38,7 +39,10 @@ main
   struct mem_allocator allocator;
   struct logger logger;
   int mode = 0;
+  struct time start;
   res_T res = RES_OK;
+
+  time_current(&start);
 
   ERR(mem_init_proxy_allocator(&allocator, &mem_default_allocator));
   allocator_initialized = 1;
@@ -52,7 +56,7 @@ main
 
   ERR(init_args(&logger, &allocator, &args));
   args_initialized = 1;
-  ERR(parse_args(argc, argv, args));
+  ERR(parse_args(argc, argv, args, &allocator));
   mode = args->mode;
 
   if(mode & MODE_DUMP_HELP) {
@@ -99,7 +103,7 @@ main
   }
 
   ASSERT(mode & COMPUTE_MODES);
-  ERR(stardis_compute(&stardis));
+  ERR(stardis_compute(&stardis, &start));
 
 exit:
   if(args_initialized) release_args(args);

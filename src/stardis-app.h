@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -106,6 +106,7 @@ enum description_type {
   DESC_BOUND_T_FOR_SOLID,
   DESC_BOUND_F_FOR_SOLID,
   DESC_SOLID_FLUID_CONNECT,
+  DESC_SOLID_SOLID_CONNECT,
   DESCRIPTION_TYPE_COUNT__,
   DESC_OUTSIDE
 };
@@ -415,6 +416,58 @@ cp_release_sf_connect
   return cp_sf_connect(dst, src);
 }
 
+struct solid_solid_connect {
+  struct str name;
+  double tcr;
+  unsigned connection_id;
+};
+
+static FINLINE void
+release_ss_connect(struct solid_solid_connect* connect)
+{
+  str_release(&connect->name);
+}
+
+static FINLINE void
+init_ss(struct mem_allocator* allocator, struct solid_solid_connect* dst)
+{
+  str_init(allocator, &dst->name);
+  dst->tcr = 0;
+  dst->connection_id = UINT_MAX;
+}
+
+static res_T
+str_print_ss_connect
+  (struct str* str,
+   const struct solid_solid_connect* c)
+{
+  res_T res = RES_OK;
+  ASSERT(str && c);
+  STR_APPEND_PRINTF(str, "Solid-Solid connection '%s':", ARG1( str_cget(&c->name) ) );
+  STR_APPEND_PRINTF(str, " contact resistance=%g", ARG1( c->tcr ) );
+end:
+  return res;
+error:
+  goto end;
+}
+
+static FINLINE res_T
+cp_ss_connect
+  (struct solid_solid_connect* dst, const struct solid_solid_connect* src)
+{
+  dst->connection_id = src->connection_id;
+  dst->tcr = src->tcr;
+  return str_copy(&dst->name, &src->name);
+}
+
+static FINLINE res_T
+cp_release_ss_connect
+  (struct solid_solid_connect* dst, struct solid_solid_connect* src)
+{
+  return cp_ss_connect(dst, src);
+}
+
+
 struct description {
   enum description_type type;
   union {
@@ -424,6 +477,7 @@ struct description {
     struct f_boundary f_boundary;
     struct h_boundary h_boundary;
     struct solid_fluid_connect sf_connect;
+    struct solid_solid_connect ss_connect;
   } d;
 };
 
@@ -459,6 +513,9 @@ release_description(struct description* desc)
     break;
   case DESC_SOLID_FLUID_CONNECT:
     release_sf_connect(&desc->d.sf_connect);
+    break;
+  case DESC_SOLID_SOLID_CONNECT:
+    release_ss_connect(&desc->d.ss_connect);
     break;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
@@ -496,6 +553,9 @@ str_print_description
   case DESC_SOLID_FLUID_CONNECT:
     ERR(str_print_sf_connect(str, &desc->d.sf_connect));
     break;
+  case DESC_SOLID_SOLID_CONNECT:
+    ERR(str_print_ss_connect(str, &desc->d.ss_connect));
+    break;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
@@ -525,6 +585,8 @@ get_description_name
     return &desc->d.f_boundary.name;
   case DESC_SOLID_FLUID_CONNECT:
     return &desc->d.sf_connect.name;
+  case DESC_SOLID_SOLID_CONNECT:
+    return &desc->d.ss_connect.name;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
@@ -582,7 +644,14 @@ cp_description
     }
     ERR(cp_sf_connect(&dst->d.sf_connect, &src->d.sf_connect));
     break;
-  default:
+  case DESC_SOLID_SOLID_CONNECT:
+    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
+      dst->type = src->type;
+      init_ss(src->d.ss_connect.name.allocator, &dst->d.ss_connect);
+    }
+    ERR(cp_ss_connect(&dst->d.ss_connect, &src->d.ss_connect));
+    break;
+ default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
 end:
@@ -616,6 +685,7 @@ description_get_medium_id
     *id = desc->d.f_boundary.mat_id;
     return;
   case DESC_SOLID_FLUID_CONNECT: /* No medium linked to SF */
+  case DESC_SOLID_SOLID_CONNECT: /* No medium linked to SS */
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
@@ -636,10 +706,12 @@ struct camera {
   unsigned spp;
   unsigned img_width, img_height;
   int auto_look_at;
+  struct str file_name;
 };
 
 static INLINE void
-init_camera(struct camera* cam) {
+init_camera(struct mem_allocator* alloc, struct camera* cam) {
+  ASSERT(alloc && cam);
   d3(cam->pos, STARDIS_DEFAULT_RENDERING_POS);
   d3(cam->tgt, STARDIS_DEFAULT_RENDERING_TGT);
   d3(cam->up, STARDIS_DEFAULT_RENDERING_UP);
@@ -650,6 +722,13 @@ init_camera(struct camera* cam) {
   cam->img_height = STARDIS_DEFAULT_RENDERING_IMG_HEIGHT;
   d2(cam->time_range, STARDIS_DEFAULT_RENDERING_TIME);
   cam->auto_look_at = 1;
+  str_init(alloc, &cam->file_name);
+}
+
+static INLINE void
+release_camera(struct camera* cam) {
+  ASSERT(cam);
+  str_release(&cam->file_name);
 }
 
 static INLINE void
@@ -690,10 +769,10 @@ log_prt_fn(const char* msg, void* ctx)
 
 struct counts {
   unsigned smed_count, fmed_count, tbound_count, hbound_count,
-    fbound_count, sfconnect_count;
+    fbound_count, sfconnect_count, ssconnect_count;
 };
 #define COUNTS_NULL__ {\
-  0, 0, 0, 0, 0, 0\
+  0, 0, 0, 0, 0, 0, 0\
  }
 
 /* Type to store the primitives of a compute region */
@@ -712,6 +791,7 @@ struct compute_surface {
   struct darray_size_t primitives;
   struct darray_sides sides;
   struct darray_uint err_triangles;
+  double area; /* in m2, regardless of scale factor */
 };
 
 struct stardis {
@@ -734,6 +814,8 @@ struct stardis {
   struct str paths_filename;
   struct str bin_green_filename;
   struct str end_paths_filename;
+  struct str rndgen_state_in_filename;
+  struct str rndgen_state_out_filename;
   struct str chunks_prefix;
   int mode;
   size_t samples;

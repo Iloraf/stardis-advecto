@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,9 +27,12 @@ struct dummies;
  * Interface data
  ******************************************************************************/
 struct intface {
+  /* fluid - solid */
   double hc;
   double emissivity;
   double alpha;
+  /* solid - solid */
+  double tcr;
   /* Imposed compute temperature & flux */
   double imposed_temperature;
   double imposed_flux;

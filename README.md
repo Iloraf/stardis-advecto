@@ -25,13 +25,20 @@ as well as on the [OpenMP](http://www.openmp.org) 2.0 specification to
 parallelize its computations.
 
 
-First ensure that CMake and a C89 compiler that implements the OpenMP 2.0
-specification are installed on your system. Then install the RCMake package as
-well as all the aforementioned prerequisites. Finally generate the project from
+First ensure that CMake and a C compiler are installed on your system.
+Then install the RCMake package as well as all the aforementioned
+prerequisites. Finally generate the project from
 the `cmake/CMakeLists.txt` file by appending to the `CMAKE_PREFIX_PATH`
 variable the install directories of its dependencies.
 
 ## Release notes
+
+### Version 0.6
+
+- Add thermal contact resistances.
+- Add serialization for random generator's state.
+- Bugfixes in arguments parsing.
+- Fix Green output file padding.
 
 ### Version 0.5.1
 
@@ -85,3 +92,11 @@ Add radiative transfer computations. To achieve this, media gain 2 new parameter
 
 - Allow probe computations on conductive-only thermal systems.
 - Allow Dirichlet and h.dT boundary conditions.
+
+## License
+
+Copyright (C) 2018-2021 |Meso|Star> (<contact@meso-star.com>). Stardis is free
+software released under the GPL v3+ license: GNU GPL version 3 or later. You
+are welcome to redistribute it under certain conditions; refer to the COPYING
+file for details.
+

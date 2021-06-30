@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,6 +31,8 @@ struct stardis;
 struct geometry;
 struct vertex;
 struct darray_estimators;
+struct time;
+struct ssp_rng;
 
 struct dump_path_context {
   unsigned long rank;
@@ -81,6 +83,15 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
    FILE* stream);
 
 extern res_T
+print_computation_time
+  (struct sdis_estimator* estimator, /* Can be NULL */
+   struct stardis* stardis,
+    struct time* start,
+    struct time* computation_start,
+    struct time* computation_end,
+    struct time* output_end); /* Can be NULL */
+
+extern res_T
 print_single_MC_result
   (struct sdis_estimator* estimator,
    struct stardis* stardis,
@@ -105,6 +116,16 @@ dump_compute_region_at_the_end_of_vtk
 extern res_T
 dump_model_as_c_chunks
   (struct stardis* stardis,
+   FILE* stream);
+
+extern res_T
+write_random_generator_state
+  (struct sdis_estimator* estimator,
+   FILE* stream);
+
+extern res_T
+read_random_generator_state
+  (struct ssp_rng* state,
    FILE* stream);
 
 #endif

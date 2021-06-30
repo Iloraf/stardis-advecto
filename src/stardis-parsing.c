@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,25 +30,15 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#ifdef COMPILER_GCC
+#include <strings.h> /* strcasecmp */
+#else
+#define strcasecmp(s1, s2) _stricmp((s1), (s2))
+#endif
 
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
-
-#ifdef COMPILER_GCC
-static char*
-_strupr
-  (char* s)
-{
-  char* ptr;
-  for(ptr = s; *ptr; ++ptr) {
-    int tmp = toupper(*ptr);
-    ASSERT(tmp == (char)tmp);
-    *ptr = (char)tmp;
-  }
-  return s;
-}
-#endif
 
 static char**
 split_line
@@ -225,17 +215,16 @@ read_sides_and_files
         }
         else break;
       }
-      _strupr(tk);
       add_geom_ctx.properties[SG3D_INTFACE] = SG3D_UNSPECIFIED_PROPERTY;
-      if(0 == strcmp(tk, "FRONT")) {
+      if(0 == strcasecmp(tk, "FRONT")) {
         add_geom_ctx.properties[SG3D_FRONT] = description_id;
         add_geom_ctx.properties[SG3D_BACK] = SG3D_UNSPECIFIED_PROPERTY;
       }
-      else if(0 == strcmp(tk, "BACK")) {
+      else if(0 == strcasecmp(tk, "BACK")) {
         add_geom_ctx.properties[SG3D_FRONT] = SG3D_UNSPECIFIED_PROPERTY;
         add_geom_ctx.properties[SG3D_BACK] = description_id;
       }
-      else if(0 == strcmp(tk, "BOTH")) {
+      else if(0 == strcasecmp(tk, "BOTH")) {
         add_geom_ctx.properties[SG3D_FRONT] = description_id;
         add_geom_ctx.properties[SG3D_BACK] = description_id;
       }
@@ -346,7 +335,8 @@ init_args
   /* Set default values */
   args->samples = STARDIS_DEFAULT_SAMPLES_COUNT;
   args->nthreads = SDIS_NTHREADS_DEFAULT;
-  d2(args->pos_and_time+3, STARDIS_DEFAULT_COMPUTE_TIME);
+  d2(args->pos_and_time+3,
+    STARDIS_DEFAULT_COMPUTE_TIME, STARDIS_DEFAULT_COMPUTE_TIME);
   args->ambient_temp = STARDIS_DEFAULT_AMBIENT_TEMP;
   args->ref_temp = STARDIS_DEFAULT_REFERENCE_TEMP;
   args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;
@@ -512,15 +502,31 @@ short_help
 
   fprintf(stream, "\n  -V LEVEL\n");
   fprintf(stream, "     Set the verbosity level.\n");
+
+  fprintf(stream, "\n  -x <FILE>\n");
+  fprintf(stream, "     Use a random generator's state read from a file.\n");
+
+  fprintf(stream, "\n  -X <FILE>\n");
+  fprintf(stream, "     Save the final random generator's state in a file.\n");
+}
+
+#define FREE_AARRAY(ARRAY) \
+if(ARRAY) {\
+  int i__ = 0; \
+  for(i__=0; *((ARRAY)+i__);i__++){\
+    free((ARRAY)[i__]);\
+  }\
+  free(ARRAY);\
+  (ARRAY) = NULL;\
 }
 
 /* Workaround for a gcc warning when GET_OPTIONAL_TIME_RANGE used with Rank=0 */
-FINLINE int is_less(size_t a, size_t b) { return a < b; }
+static FINLINE int is_less(size_t a, size_t b) { return a < b; }
 
 /* Get a time range from a coma-separated list of doubles
  * The first Rank values are mandatory, followed by an optional time range
  * that can be a single time */
-#define GET_OPTIONAL_TIME_RANGE(Src, Rank, Dst, Logger, OptionString, Option) \
+#define GET_OPTIONAL_TIME_RANGE(Src, Rank, Dst, Logger, OptionString, Option, FullSrc) \
   res = cstr_to_list_double((Src), ',', (Dst), &len, (Rank)+2); \
   if(res != RES_OK \
      || is_less(len, (Rank)) \
@@ -531,7 +537,7 @@ FINLINE int is_less(size_t a, size_t b) { return a < b; }
     if(res == RES_OK) res = RES_BAD_ARG; \
       logger_print((Logger), LOG_ERROR, \
       "Invalid argument for option "OptionString": %s\n", \
-      (Option), (Src)); \
+      (Option), (FullSrc)); \
     goto error; \
   } else { \
     if(len == (Rank)+1) (Dst)[(Rank)+1] = (Dst)[(Rank)];\
@@ -541,29 +547,33 @@ FINLINE int is_less(size_t a, size_t b) { return a < b; }
 #define GET_STR_AND_OPTIONAL_TIME_RANGE(Str, Time) \
   ptr = strchr(optarg, ','); /* First ',' */ \
   if(ptr) { /* Time range provided */ \
-    GET_OPTIONAL_TIME_RANGE(ptr+1, 0, (Time), args->logger, "-%c", opt); \
+    GET_OPTIONAL_TIME_RANGE(ptr+1, 0, (Time), args->logger, "-%c", opt, optarg); \
     *ptr = '\0'; \
   } \
   (Str) = optarg;
 
 /* Get a position followed by an optional time range */
-#define GET_POS_AND_OPTIONAL_TIME_RANGE(Dst) \
-  GET_OPTIONAL_TIME_RANGE(optarg, 3, (Dst), args->logger, "-%c", opt);
+#define GET_POS_AND_OPTIONAL_TIME_RANGE(Src, Dst, FullSrc) \
+  GET_OPTIONAL_TIME_RANGE((Src), 3, (Dst), args->logger, "-%c", opt, (FullSrc));
 
 res_T
 parse_args
   (const int argc,
    char** argv,
-   struct args* args)
+   struct args* args,
+   struct mem_allocator* allocator)
 {
   int opt = 0, n_used = 0;
   size_t len = 0;
-  const char option_list[] = "a:c:dD:eF:gG:hm:M:n:p:P:r:R:s:S:t:vV:";
+  const char option_list[] = "a:c:dD:eF:gG:hm:M:n:p:P:r:R:s:S:t:vV:x:X:";
   char buf[128];
+  struct str keep;
+  char** line = NULL;
   res_T res = RES_OK;
 
   ASSERT(argv && args);
 
+  str_init(allocator, &keep);
   opterr = 0; /* No default error messages */
   while((opt = getopt(argc, argv, option_list)) != -1) {
     switch (opt) {
@@ -629,13 +639,13 @@ parse_args
         *ptr = '\0';
       }
       if(res == RES_OK) {
-        if(0 == strcmp(optarg, "all")) {
+        if(0 == strcasecmp(optarg, "all")) {
           args->dump_paths = DUMP_ALL;
         }
-        else if(0 == strcmp(optarg, "error")) {
+        else if(0 == strcasecmp(optarg, "error")) {
           args->dump_paths = DUMP_ERROR;
         }
-        else if(0 == strcmp(optarg, "success")) {
+        else if(0 == strcasecmp(optarg, "success")) {
           args->dump_paths = DUMP_SUCCESS;
         }
       }
@@ -752,20 +762,45 @@ parse_args
         goto error;
       }
       args->mode |= MODE_PROBE_COMPUTE;
-      GET_POS_AND_OPTIONAL_TIME_RANGE(args->pos_and_time);
+      GET_POS_AND_OPTIONAL_TIME_RANGE(optarg, args->pos_and_time, optarg);
       break;
 
     case 'P':
-      if(args->mode & EXCLUSIVE_MODES) {
-        res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Options -%c and -%c are exclusive.\n",
-          (char)opt, mode_option(args->mode));
-        goto error;
-      }
-      args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
-      GET_POS_AND_OPTIONAL_TIME_RANGE(args->pos_and_time);
-      break;
+        if(args->mode & EXCLUSIVE_MODES) {
+          res = RES_BAD_ARG;
+          logger_print(args->logger, LOG_ERROR,
+              "Options -%c and -%c are exclusive.\n",
+              (char)opt, mode_option(args->mode));
+          goto error;
+        }
+        args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
+
+        ERR(str_set(&keep, optarg));
+        line = split_line(optarg, ':');
+        if(!line) {
+          res = RES_MEM_ERR;
+          str_release(&keep);
+          goto error;
+        }
+
+        /* We expect 1 or 2 parts in line */
+        if(!line[0] || (line[1] && line[2])) {
+          logger_print((args->logger), LOG_ERROR,
+            "Invalid argument for option ""-%c"": %s\n",
+            opt, str_cget(&keep));
+          str_release(&keep);
+          res = RES_BAD_ARG;
+          goto error;
+        }
+
+        /* First part is pos and optional time, optional second part is a
+         * medium name (OK if NULL) */
+        GET_POS_AND_OPTIONAL_TIME_RANGE(line[0], args->pos_and_time,
+          str_cget(&keep));
+        if(line[1])
+          args->medium_name = optarg + strlen(line[0]) + 1;
+
+        break;
 
     case 'r':
       res = cstr_to_double(optarg, &args->ref_temp);
@@ -856,6 +891,30 @@ parse_args
         goto error;
       }
       break;
+
+    case 'x':
+      if(!(args->mode & RANDOM_RW_MODES)) {
+        res = RES_BAD_ARG;
+        print_multiple_modes(buf, sizeof(buf), RANDOM_RW_MODES, 0);
+        logger_print(args->logger, LOG_ERROR,
+          "Option -%c can only be used in conjunction with one of the following options: %s.\n",
+          (char)opt, buf);
+        goto error;
+      }
+      args->rndgen_state_in_filename = optarg;
+      break;
+
+    case 'X':
+      if(!(args->mode & RANDOM_RW_MODES)) {
+        res = RES_BAD_ARG;
+        print_multiple_modes(buf, sizeof(buf), RANDOM_RW_MODES, 0);
+        logger_print(args->logger, LOG_ERROR,
+          "Option -%c can only be used in conjunction with one of the following options: %s.\n",
+          (char)opt, buf);
+        goto error;
+      }
+      args->rndgen_state_out_filename = optarg;
+      break;
     }
   }
 
@@ -944,12 +1003,35 @@ parse_args
     }
   }
 
+  if(args->rndgen_state_in_filename && !(args->mode & COMPUTE_MODES)) {
+    res = RES_BAD_ARG;
+    print_multiple_modes(buf, sizeof(buf), COMPUTE_MODES, 0);
+    logger_print(args->logger, LOG_ERROR,
+      "Option -x can only be used in conjunction with an option"
+      " that launch a MC computation (%s).\n",
+      buf);
+    goto error;
+  }
+
+  if(args->rndgen_state_out_filename && !(args->mode & COMPUTE_MODES)) {
+    res = RES_BAD_ARG;
+    print_multiple_modes(buf, sizeof(buf), COMPUTE_MODES, 0);
+    logger_print(args->logger, LOG_ERROR,
+      "Option -X can only be used in conjunction with an option"
+      " that launch a MC computation (%s).\n",
+      buf);
+    goto error;
+  }
+
 end:
+  FREE_AARRAY(line);
+  str_release(&keep);
   return res;
 error:
   logger_print(args->logger, LOG_ERROR, "Use option -h to print help.\n");
   goto end;
 }
+
 
 res_T
 parse_camera
@@ -961,87 +1043,83 @@ parse_camera
   char** opt = NULL;
   struct camera* cam;
   struct str keep;
+  int i = 0;
   res_T res = RES_OK;
 
   ASSERT(cam_param && stardis);
   cam = &stardis->camera;
   line = split_line(cam_param, ':');
-  str_init(stardis->allocator, &keep);
+  if(!line) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
 
-  if(line) {
-    int i = 0;
-    for(i = 0; *(line + i); i++) {
-      size_t len = 0;
-      ERR(str_set(&keep, line[i]));
-      opt = split_line(line[i], '=');
-      if(!opt[0] || ! opt[1]  || opt[2]) {
-        if(res == RES_OK) res = RES_BAD_ARG;
-        logger_print((logger), LOG_ERROR,
-          "Invalid option syntax: %s\n", str_cget(&keep));
-        goto error;
-      }
-      ERR(str_set(&keep, opt[0]));
-      _strupr(opt[0]);
-      if(strcmp(opt[0], "T") == 0) {
-        GET_OPTIONAL_TIME_RANGE(opt[1], 0, cam->time_range, logger, "%s",
-          str_cget(&keep));
-      }
-      else if(strcmp(opt[0], "FMT") == 0) {
-        _strupr(opt[1]);
-        if(strcmp(opt[1], "VTK") == 0)
-          cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK;
-        else if(strcmp(opt[1], "HT") == 0)
-          cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_HT;
-        else {
-          logger_print(logger, LOG_ERROR,
-            "Unexpected value for rendering option %s: %s.\n",
-            opt[0], opt[1]);
-          res = RES_BAD_ARG;
-          goto error;
-        }
-      }
-      else if(strcmp(opt[0], "FOV") == 0) {
-        ERR(cstr_to_double(opt[1], &cam->fov));
-      }
-      else if(strcmp(opt[0], "UP") == 0) {
-        ERR(cstr_to_list_double(opt[1], ',', cam->up, &len, 3));
-      }
-      else if(strcmp(opt[0], "TGT") == 0) {
-        ERR(cstr_to_list_double(opt[1], ',', cam->tgt, &len, 3));
-        cam->auto_look_at = 0;
-      }
-      else if(strcmp(opt[0], "POS") == 0) {
-        ERR(cstr_to_list_double(opt[1], ',', cam->pos, &len, 3));
-        cam->auto_look_at = 0;
-      }
-      else if(strcmp(opt[0], "IMG") == 0) {
-        unsigned img_sz[2];
-        ERR(cstr_to_list_uint(opt[1], 'x', img_sz, &len, 2));
-        cam->img_width = img_sz[0];
-        cam->img_height = img_sz[1];
-      }
-      else if(strcmp(opt[0], "SPP") == 0) {
-        ERR(cstr_to_uint(opt[1], &cam->spp));
-      } else {
+  str_init(stardis->allocator, &keep);
+  for(i = 0; *(line + i); i++) {
+    size_t len = 0;
+    ERR(str_set(&keep, line[i]));
+    opt = split_line(line[i], '=');
+    if(!opt[0] || !opt[1] || opt[2]) { /* We expect 2 parts */
+      if(res == RES_OK) res = RES_BAD_ARG;
+      logger_print((logger), LOG_ERROR,
+        "Invalid option syntax: %s\n", str_cget(&keep));
+      goto error;
+    }
+    if(strcasecmp(opt[0], "T") == 0) {
+      GET_OPTIONAL_TIME_RANGE(opt[1], 0, cam->time_range, logger, "%s", opt[0],
+        str_cget(&keep));
+    }
+    else if(strcasecmp(opt[0], "FILE") == 0) {
+      ERR(str_set(&cam->file_name, opt[1]));
+    }
+    else if(strcasecmp(opt[0], "FMT") == 0) {
+      if(strcasecmp(opt[1], "VTK") == 0)
+        cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK;
+      else if(strcasecmp(opt[1], "HT") == 0)
+        cam->fmt = STARDIS_RENDERING_OUTPUT_FILE_FMT_HT;
+      else {
         logger_print(logger, LOG_ERROR,
-          "Unexpected option for rendering mode: %s.\n",
-          opt[0]);
+          "Unexpected value for rendering option %s: %s.\n",
+          opt[0], opt[1]);
         res = RES_BAD_ARG;
         goto error;
       }
     }
+    else if(strcasecmp(opt[0], "FOV") == 0) {
+      ERR(cstr_to_double(opt[1], &cam->fov));
+    }
+    else if(strcasecmp(opt[0], "UP") == 0) {
+      ERR(cstr_to_list_double(opt[1], ',', cam->up, &len, 3));
+    }
+    else if(strcasecmp(opt[0], "TGT") == 0) {
+      ERR(cstr_to_list_double(opt[1], ',', cam->tgt, &len, 3));
+      cam->auto_look_at = 0;
+    }
+    else if(strcasecmp(opt[0], "POS") == 0) {
+      ERR(cstr_to_list_double(opt[1], ',', cam->pos, &len, 3));
+      cam->auto_look_at = 0;
+    }
+    else if(strcasecmp(opt[0], "IMG") == 0) {
+      unsigned img_sz[2];
+      ERR(cstr_to_list_uint(opt[1], 'x', img_sz, &len, 2));
+      cam->img_width = img_sz[0];
+      cam->img_height = img_sz[1];
+    }
+    else if(strcasecmp(opt[0], "SPP") == 0) {
+      ERR(cstr_to_uint(opt[1], &cam->spp));
+    } else {
+      logger_print(logger, LOG_ERROR,
+        "Unexpected option for rendering mode: %s.\n",
+        opt[0]);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    FREE_AARRAY(opt);
   }
 
 end:
-#define FREE_AARRAY(ARRAY) if(ARRAY) {\
-  int i = 0; \
-  for(i=0; *(ARRAY+i);i++){\
-    free(ARRAY[i]);\
-  }\
-  free(ARRAY);\
-}
-  FREE_AARRAY(line)
-  FREE_AARRAY(opt)
+  FREE_AARRAY(line);
+  FREE_AARRAY(opt);
 #undef FREE_AARRAY
 
   str_release(&keep);
@@ -1055,6 +1133,46 @@ error:
 #undef GET_STR_AND_OPTIONAL_TIME_RANGE
 #undef GET_POS_AND_OPTIONAL_TIME_RANGE
 #undef GET_OPTIONAL_TIME_RANGE
+
+static res_T
+description_set_name
+  (struct stardis* stardis,
+   struct str* name,
+   const char* tk)
+{
+  res_T res = RES_OK;
+  double foo;
+  const char* keywords[] = {
+    "AUTO", "BACK", "BOTH", "FLUID", "FRONT", "F_BOUNDARY_FOR_SOLID",
+    "H_BOUNDARY_FOR_FLUID", "H_BOUNDARY_FOR_SOLID", "SCALE", "SOLID",
+    "SOLID_FLUID_CONNECTION", "T_BOUNDARY_FOR_FLUID", "T_BOUNDARY_FOR_SOLID",
+    "UNKNOWN" };
+  int i;
+  ASSERT(name && tk);
+
+  /* Use name before uppercasing it */
+  ERR(str_set(name, tk));
+
+  if(RES_OK == cstr_to_double(tk, &foo)) {
+    /* A number is not a sensible choice for a name! */
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  FOR_EACH(i, 0, sizeof(keywords) / sizeof(*keywords)) {
+    if(0 == strcasecmp(tk, keywords[i])) {
+      /* A keyword is not a sensible choice for a name! */
+      res = RES_BAD_ARG;
+      goto error;
+    }
+  }
+  /* Name is OK */
+
+end:
+  return res;
+error:
+  logger_print(stardis->logger, LOG_ERROR, "Invalid name: %s\n", tk);
+  goto end;
+}
 
 static struct description*
 find_description_by_name
@@ -1102,7 +1220,7 @@ process_h
   desc->type = type;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "h boundary name");
-  ERR(str_set(&desc->d.h_boundary.name, tk));
+  ERR(description_set_name(stardis, &desc->d.h_boundary.name, tk));
   if(find_description_by_name(stardis, &desc->d.h_boundary.name, NULL)
     != desc)
   {
@@ -1209,7 +1327,7 @@ process_t
     ? get_dummy_solid_id(stardis, dummies) : get_dummy_fluid_id(stardis, dummies);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature boundary name");
-  ERR(str_set(&desc->d.t_boundary.name, tk));
+  ERR(description_set_name(stardis, &desc->d.t_boundary.name, tk));
   if(find_description_by_name(stardis, &desc->d.t_boundary.name, NULL)
     != desc)
   {
@@ -1295,7 +1413,7 @@ process_flx
   desc->d.f_boundary.mat_id = get_dummy_fluid_id(stardis, dummies);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "flux boundary name");
-  ERR(str_set(&desc->d.f_boundary.name, tk));
+  ERR(description_set_name(stardis, &desc->d.f_boundary.name, tk));
   if(find_description_by_name(stardis, &desc->d.f_boundary.name, NULL)
     != desc)
   {
@@ -1351,7 +1469,7 @@ process_sfc
   desc->d.sf_connect.connection_id = allocate_stardis_medium_id(stardis);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid fluid connection name");
-  ERR(str_set(&desc->d.sf_connect.name, tk));
+  ERR(description_set_name(stardis, &desc->d.sf_connect.name, tk));
   if(find_description_by_name(stardis, &desc->d.sf_connect.name, NULL)
     != desc)
   {
@@ -1401,6 +1519,68 @@ error:
   goto end;
 }
 
+/* SOLID_SOLID_CONNECTION Name contact-resitance STL_filenames */
+static res_T
+process_ssc
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  size_t sz;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  stardis->counts.ssconnect_count++;
+
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  init_ss(stardis->allocator, &desc->d.ss_connect);
+
+  /* Use a medium ID even if there is no medium here
+   * As other cases use media IDs as unique IDs for read_sides_and_files calls
+   * we continue the trend to ensure connection ID is OK */
+  desc->type = DESC_SOLID_SOLID_CONNECT;
+  desc->d.ss_connect.connection_id = allocate_stardis_medium_id(stardis);
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid solid connection name");
+  ERR(description_set_name(stardis, &desc->d.ss_connect.name, tk));
+  if(find_description_by_name(stardis, &desc->d.ss_connect.name, NULL)
+    != desc)
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "contact resistance");
+  res = cstr_to_double(tk, &desc->d.ss_connect.tcr);
+  if(res != RES_OK
+    || desc->d.ss_connect.tcr < 0)
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid contact resistance: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  else if(desc->d.ss_connect.tcr == 0) {
+    logger_print(stardis->logger, LOG_WARNING,
+      "Solid-solid connection %s: defining a contact resistance to 0 has "
+      "no effect\n", str_cget(&desc->d.ss_connect.name));
+  }
+
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
+
+end:
+  return res;
+error:
+  goto end;
+}
+
 static res_T
 read_imposed_temperature
   (struct stardis* stardis,
@@ -1423,8 +1603,7 @@ read_imposed_temperature
     }
   } else {
     /* Could be 'unknown' */
-    _strupr(tk);
-    if(0 == strcmp(tk, "UNKNOWN")) {
+    if(0 == strcasecmp(tk, "UNKNOWN")) {
       *imposed_temperature = UNKNOWN_MEDIUM_TEMPERATURE;
     } else {
       res = RES_BAD_ARG;
@@ -1462,8 +1641,7 @@ read_delta
     }
   } else {
     /* Could be 'auto' */ 
-    _strupr(tk);
-    if(0 == strcmp(tk, "AUTO")) {
+    if(0 == strcasecmp(tk, "AUTO")) {
       /* Set to DELTA_AUTO until actual value is substituted */
       *delta = DELTA_AUTO;
     } else {
@@ -1508,7 +1686,7 @@ process_solid
   desc->d.solid.desc_id = (unsigned)sz;
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid name");
-  ERR(str_set(&desc->d.solid.name, tk));
+  ERR(description_set_name(stardis, &desc->d.solid.name, tk));
   if(find_description_by_name(stardis, &desc->d.solid.name, NULL)
     != desc)
   {
@@ -1614,7 +1792,7 @@ process_fluid
   desc->d.fluid.desc_id = (unsigned)sz;
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "fluid name");
-  ERR(str_set(&desc->d.fluid.name, tk));
+  ERR(description_set_name(stardis, &desc->d.fluid.name, tk));
   if(find_description_by_name(stardis, &desc->d.fluid.name, NULL)
     != desc)
   {
@@ -1738,25 +1916,26 @@ process_model_line
   str_init(stardis->allocator, &keep);
   ERR(str_set(&keep, line));
   CHK_TOK(strtok_r(line, " \t", &tok_ctx), "model line type");
-  _strupr(tk);
   
-  if(0 == strcmp(tk, "H_BOUNDARY_FOR_SOLID"))
+  if(0 == strcasecmp(tk, "H_BOUNDARY_FOR_SOLID"))
     ERR(process_h(stardis, dummies, DESC_BOUND_H_FOR_SOLID, &tok_ctx));
-  else if(0 == strcmp(tk, "H_BOUNDARY_FOR_FLUID"))
+  else if(0 == strcasecmp(tk, "H_BOUNDARY_FOR_FLUID"))
     ERR(process_h(stardis, dummies, DESC_BOUND_H_FOR_FLUID, &tok_ctx));
-  else if(0 == strcmp(tk, "T_BOUNDARY_FOR_SOLID"))
+  else if(0 == strcasecmp(tk, "T_BOUNDARY_FOR_SOLID"))
     ERR(process_t(stardis, dummies, DESC_BOUND_T_FOR_SOLID, &tok_ctx));
-  else if(0 == strcmp(tk, "T_BOUNDARY_FOR_FLUID"))
+  else if(0 == strcasecmp(tk, "T_BOUNDARY_FOR_FLUID"))
     ERR(process_t(stardis, dummies, DESC_BOUND_T_FOR_FLUID, &tok_ctx));
-  else if(0 == strcmp(tk, "F_BOUNDARY_FOR_SOLID"))
+  else if(0 == strcasecmp(tk, "F_BOUNDARY_FOR_SOLID"))
     ERR(process_flx(stardis, dummies, &tok_ctx));
-  else if(0 == strcmp(tk, "SOLID_FLUID_CONNECTION"))
+  else if(0 == strcasecmp(tk, "SOLID_FLUID_CONNECTION"))
     ERR(process_sfc(stardis, &tok_ctx));
-  else if(0 == strcmp(tk, "SOLID"))
+  else if(0 == strcasecmp(tk, "SOLID_SOLID_CONNECTION"))
+    ERR(process_ssc(stardis, &tok_ctx));
+  else if(0 == strcasecmp(tk, "SOLID"))
     ERR(process_solid(stardis, &tok_ctx));
-  else if(0 == strcmp(tk, "FLUID"))
+  else if(0 == strcasecmp(tk, "FLUID"))
     ERR(process_fluid(stardis, &tok_ctx));
-  else if(0 == strcmp(tk, "SCALE"))
+  else if(0 == strcasecmp(tk, "SCALE"))
     ERR(process_scale(stardis, &tok_ctx));
   else {
     logger_print(stardis->logger, LOG_ERROR,

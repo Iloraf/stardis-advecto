@@ -48,7 +48,7 @@ the evaluation of the propagator (a.k.a the *Green function*).
 The propagator is of great value for thermicist engineers as it gives some
 crucial information to analyse heat transfers in the system. It helps engineers
 answer questions like _"Where from does the heat come at this location?"_.
-Propagators seamlessly agregate all the provided geometrical and physical
+Propagators seamlessly aggregate all the provided geometrical and physical
 information on the system in an unbiased and very-fast statistical model.
 
 *stardis*(1) also provides two additional functionalities: converting the
@@ -60,12 +60,10 @@ to radiative transfer physics (Delatorre [1]) combined with conduction's
 statistical formulation (Kac [2] and Muller [3]). Thanks to recent advances in
 computer graphics technology which has already been a game changer in the
 cinema industry (FX and animated movies), this theoretical framework can now
-be practically used on the most geometrically complex systems. While this
-capability is part of the StarEngine Star3D library, it is internally powered
-by Intel® Rendering Framework: Embree.
+be practically used on the most geometrically complex systems.
 
 Everytime the linear assumption is relevant, this theoretical framework allows
-to encompass all the heat transfer mecanisms (conductive-convective-radiative)
+to encompass all the heat transfer mechanisms (conductive-convective-radiative)
 in an unified statistical model. Such systems can be solved by a Monte-Carlo
 approach just by sampling heat paths. This can be seen as an extension of
 Monte-Carlo algorithms that solve radiative transfer by sampling optical paths.
@@ -91,57 +89,64 @@ MANDATORY OPTIONS
 
 EXCLUSIVE OPTIONS
 -----------------
-*-p* _x,y,z[,time-range]_::
+*-p* _x,y,z[,time[,time]]_::
   Compute the temperature at the given probe at a given time. By default the
-  compute time range is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The probe must
+  compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The probe must
   be in a medium. The probe coordinates must be in the same system as the
   geometry.
 
-*-P* _x,y,z[,time-range]_::
+*-P* _x,y,z[,time[,time]][:side_indicator]_::
   Compute the temperature at the given probe on an interface at a given time.
-  By default the compute time range is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The
+  If the probe is on an interface where a thermal contact resistance is
+  defined, it is mandatory to provide a side indicator (either FRONT, BACK, or
+  a medium name), as the temperature differs between the two sides.
+  By default the compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The
   probe is supposed to be on an interface and is moved to the closest point of
-  the closest interface before the computation start. The probe coordinates
+  the closest interface before the computation starts. The probe coordinates
   must be in the same system as the geometry.
 
-*-m* _medium_name[,time-range]_::
+*-m* _medium_name[,time[,time]]_::
   Compute the mean temperature in a given medium at a given time. The medium
   name must be part of the system description. By default the compute time
-  range is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The medium does not need to be
-  connex.
+  is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The medium region does not need
+  to be connex.
 
-*-s* _file[,time-range]_::
+*-s* _file[,time[,time]]_::
   Compute the mean temperature on a given 2D region at a given time, the region
   being defined as the front sides of the triangles in the provided *STL* file.
-  By default the compute time range is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
+  By default the compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
   These triangles are not added to the geometry, but must be part of it. The
   region does not need to be connex.
 
-*-S* _file[,time-range]_::
+*-S* _file[,time[,time]]_::
   Compute the by-triangle mean temperature on a given 2D region at a given
   time, the region being defined as the front sides of the triangles in the
-  provided *VTK* file. These triangles are not added to the geometry, but must
-  be part of it. By default the compute time range is
+  provided *STL* file. These triangles are not added to the geometry, but must
+  be part of it. By default the compute time is
   @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The region does not need to be connex.
 
-*-F* _file[,time-range]_::
+*-F* _file[,time[,time]]_::
   Compute the mean flux on a given 2D region at a given time, the region
-  being defined as the front sides of the triangles in the provided *VTK* file.
+  being defined as the front sides of the triangles in the provided *STL* file.
   These triangles are not added to the geometry, but must be part of it. Flux
   is accounted positive when going from the front side to the back side, at a
-  single-triangle level. By default the compute time range is
+  single-triangle level. By default the compute time is
   @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@. The region does not need to be connex,
   but it can currently only include geometry appearing in description lines
   starting with H_BOUNDARY_FOR_SOLID, H_BOUNDARY_FOR_FLUID,
   F_BOUNDARY_FOR_SOLID or SOLID_FLUID_CONNECTION (see *stardis-input*(5)).
 
 *-R* [__sub-option__:...]::
-  Render an infrared image of the system through a pinhole camera and write it
-  to _standard output_. One can use all-default sub-options by
-  simply providing the colon character (*:*) alone as an argument. Please note
-  that the camera position must be outside the geometry or in a fluid.
+  Render an infrared image of the system through a pinhole camera. One can use
+  all-default sub-options by simply providing the colon character (*:*) alone
+  as an argument. Please note that the camera position must be outside the
+  geometry or in a fluid.
   Available sub-options are:
 
+  **file=**_output_file_;;
+    File name to use to write the infrared image to. If no file name is
+	provided, the result is written to _standard output_.
+	
   **fmt=**_image_file_format_;;
     Format of the image file in output. Can be *VTK* or *HT*. Default
     _image_file_format_ is @STARDIS_ARGS_DEFAULT_RENDERING_OUTPUT_FILE_FMT@.
@@ -164,8 +169,8 @@ EXCLUSIVE OPTIONS
     Number of samples per pixel.
     By default, use @STARDIS_ARGS_DEFAULT_RENDERING_SPP@ samples per pixel.
 
-  **t=**_time-range_;;
-    Rendering time range. By default _time-range_ is
+  **t=**_time[,time]_;;
+    Rendering time. By default the rendering time is
     @STARDIS_ARGS_DEFAULT_RENDERING_TIME@.
 
   **tgt=**_x_**,**_y_**,**_z_;;
@@ -202,7 +207,7 @@ options that write to  _standard output_ (-g, -h, -R, -v).
   rank starting at index 00000000, and possibly followed by *_err* for failure
   paths: prefix00000000.vtk, prefix00000001_err.vtk, ...
 +
-This option can only be used in conjuction with options that compute a
+This option can only be used in conjunction with options that compute a
 result (-F, -m, -P, -p, -R, -S, -s) and cannot be used in conjunction with
 options -g or -G.
 
@@ -254,6 +259,16 @@ different temperature, flux or volumic power values.
   and informative messages). All the messages are written to _standard error_.
   Default verbosity *level* is @STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL@.
 
+*-x* _file_name_::
+  Read the provided file and use its content to initialize the random
+  generator's internal state. Used in conjunction with the *-X* option, this
+  can be used to ensure statistical independence between subsequent
+  computations.
+
+*-X* _file_name_::
+  Write the random generator's internal state, as it is at the end of the
+  computation, to the provided file.
+
 EXAMPLES
 --------
 Preprocess the system as described in *scene 5.txt* when intending to compute
@@ -284,6 +299,12 @@ time range. The system is read from the file *model.txt*:
 
     $ stardis -M model.txt -p 1,2.5,0,50,5000
 
+Compute 3 probe temperatures, ensuring statistical independence:
+
+    $ stardis -M model.txt -p 1,1.5,0,50,5000 -Xstate1
+    $ stardis -M model.txt -p 1,2.5,0,50,5000 -xstate1 -Xstate2
+    $ stardis -M model.txt -p 1,3.5,0,50,5000 -xstate2
+
 Render the system as described in *scene.txt* with default settings:
 
     $ stardis -M scene.txt -R :
@@ -299,7 +320,7 @@ post-processed using *htpp*(1) with default settings to obtain a png file.
       -D error,err_path_ > img.ht
     $ htpp -o img.pgn -v -m default img.ht
 
-Compute the Green fonction that computes the temperature at the probe point
+Compute the Green function that computes the temperature at the probe point
 *0, 0, 0* at steady state. The system is read from the file *model.txt* and
 the Green function is written to the *probe.green file* and the heat paths'
 ends are written to the *probe_ends.csv* file:

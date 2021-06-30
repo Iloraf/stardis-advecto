@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -220,15 +220,18 @@ stardis_init
   stardis->senc3d_scn = NULL;
   stardis->mode = args->mode;
   stardis->counts = COUNTS_NULL;
-  init_camera(&stardis->camera);
+  init_camera(stardis->allocator, &stardis->camera);
   str_init(stardis->allocator, &stardis->solve_name);
   str_init(stardis->allocator, &stardis->paths_filename);
   str_init(stardis->allocator, &stardis->bin_green_filename);
   str_init(stardis->allocator, &stardis->end_paths_filename);
+  str_init(stardis->allocator, &stardis->rndgen_state_in_filename);
+  str_init(stardis->allocator, &stardis->rndgen_state_out_filename);
   str_init(stardis->allocator, &stardis->chunks_prefix);
   darray_size_t_init(stardis->allocator, &stardis->compute_surface.primitives);
   darray_sides_init(stardis->allocator, &stardis->compute_surface.sides);
   darray_uint_init(stardis->allocator, &stardis->compute_surface.err_triangles);
+  stardis->compute_surface.area = 0;
   stardis->samples = args->samples;
   stardis->nthreads = args->nthreads;
   stardis->scale_factor = -1; /* invalid value */
@@ -258,6 +261,9 @@ stardis_init
     ERR(parse_camera(stardis->logger, args->camera, stardis));
   }
   else if(args->mode & MODE_MEDIUM_COMPUTE) {
+    ERR(str_set(&stardis->solve_name, args->medium_name));
+  }
+  else if(args->mode & MODE_PROBE_COMPUTE_ON_INTERFACE && args->medium_name) {
     ERR(str_set(&stardis->solve_name, args->medium_name));
   }
   else if(args->mode & SURFACE_COMPUTE_MODES) {
@@ -309,6 +315,8 @@ stardis_init
         goto error;
       }
     }
+    logger_print(stardis->logger, LOG_OUTPUT, "Compute surface area is %g m2\n",
+      stardis->compute_surface.area);
   }
 
   /* Create enclosures */
@@ -356,6 +364,14 @@ stardis_init
     if(args->end_paths_filename) {
       ERR(str_set(&stardis->end_paths_filename, args->end_paths_filename));
     }
+    if(args->rndgen_state_in_filename) {
+      ERR(str_set(&stardis->rndgen_state_in_filename,
+        args->rndgen_state_in_filename));
+    }
+    if(args->rndgen_state_out_filename) {
+      ERR(str_set(&stardis->rndgen_state_out_filename,
+        args->rndgen_state_out_filename));
+    }
   }
 
   /* If computation is on a volume, check medium is known */
@@ -372,9 +388,6 @@ stardis_init
     struct sdis_scene_create_args scn_args = SDIS_SCENE_CREATE_ARGS_DEFAULT;
     ASSERT(darray_interface_ptrs_size_get(&stardis->geometry.interf_bytrg)
       == tcount);
-    /* Can release enclosures as they are no longer needed if compute */
-    SENC3D(scene_ref_put(stardis->senc3d_scn));
-    stardis->senc3d_scn = NULL;
     scn_args.get_indices = sg3d_sdisXd_geometry_get_indices;
     scn_args.get_interface = sg3d_sdisXd_geometry_get_interface;
     scn_args.get_position = sg3d_sdisXd_geometry_get_position;
@@ -427,6 +440,7 @@ stardis_release
       SDIS(medium_ref_put(darray_media_ptr_data_get(&stardis->media)[i]));
   }
   darray_media_ptr_release(&stardis->media);
+  release_camera(&stardis->camera);
 }
 
 res_T
@@ -569,6 +583,13 @@ validate_properties
         else if(solid_count + fluid_count == 0)
           *properties_conflict_status = SFCONNECT_BETWEEN_2_UNDEFS;
         else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
+    case DESC_SOLID_SOLID_CONNECT:
+      if(solid_count != 2) {
+        /*if(soli_count == 1 && fluid_count == 1)*/
+          /**properties_conflict_status = SSCONNECT_BETWEEN_SOLID_AND_FLUID;*/
         goto end;
       }
       break;

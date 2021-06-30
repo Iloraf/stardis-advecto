@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,16 +24,24 @@
 
 #include <star/s3d.h>
 #include <star/sg3d_sXd_helper.h>
+#include <star/ssp.h>
 
 #include <rsys/double3.h>
 #include <rsys/double2.h>
 #include <rsys/logger.h>
 #include <rsys/image.h>
+#include <rsys/clock_time.h>
+
+#ifdef COMPILER_GCC
+#include <strings.h> /* strcasecmp */
+#else
+#include <string.h>
+#define strcasecmp(s1, s2) _stricmp((s1), (s2))
+#endif
 
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
-
 struct filter_ctx {
   const struct stardis* stardis;
   unsigned prim;
@@ -76,19 +84,20 @@ static int
 hit_filter
   (const struct s3d_hit* hit,
    const float ray_org[3],
-   const float* invalid_, /* In closest_point queries ray_dir is not informed */
+   const float ray_dir[3],
+   const float ray_range[2],
    void* ray_data,
    void* filter_data)
 {
   struct filter_ctx* filter_ctx = ray_data;
   float s, dir[3];
-  enum senc3d_side hit_side;
+  enum sg3d_property_type prop;
   struct s3d_attrib interf_pos;
   const struct description* descriptions;
   unsigned descr[SG3D_PROP_TYPES_COUNT__];
   const struct stardis* stardis;
 
-  (void)ray_org; (void)invalid_; (void)filter_data;
+  (void)ray_org; (void)ray_dir; (void)ray_range; (void)filter_data;
   ASSERT(hit && filter_ctx);
   ASSERT(hit->uv[0] == CLAMP(hit->uv[0], 0, 1));
   ASSERT(hit->uv[1] == CLAMP(hit->uv[1], 0, 1));
@@ -143,11 +152,11 @@ hit_filter
     filter_ctx->probe_on_boundary = 0;
   }
 
-  /* Determine which side was hit
+  /* Determine which side was hit and the property to look at.
    * Warning: following Embree 2 convention for geometrical normals,
    * the Star3D hit normals are left-handed */
-  hit_side = (s > 0) ? SG3D_BACK : SG3D_FRONT;
-  if(descr[hit_side] == SG3D_UNSPECIFIED_PROPERTY) {
+  prop = (s > 0) ? SG3D_BACK : SG3D_FRONT;
+  if(descr[prop] == SG3D_UNSPECIFIED_PROPERTY) {
     filter_ctx->prim = hit->prim.prim_id;
     filter_ctx->desc = NULL;
     f3_set(filter_ctx->pos, interf_pos.value);
@@ -156,7 +165,7 @@ hit_filter
     filter_ctx->probe_on_boundary = 0;
   } else {
     filter_ctx->prim = hit->prim.prim_id;
-    filter_ctx->desc = descriptions + descr[hit_side];
+    filter_ctx->desc = descriptions + descr[prop];
     f3_set(filter_ctx->pos, interf_pos.value);
     filter_ctx->dist = hit->distance;
     filter_ctx->outside = 0;
@@ -173,7 +182,7 @@ check_probe_conform_to_type
   (const struct stardis* stardis,
    const int move2boundary,
    double pos[3],
-   size_t* iprim,
+   unsigned* iprim,
    double uv[2])
 {
   res_T res = RES_OK;
@@ -365,19 +374,57 @@ error:
   goto end;
 }
 
+#define READ_RANDOM_STATE(Name) \
+  if(!str_is_empty(Name)) { \
+    const char* name = str_cget(Name); \
+    stream = fopen(name, "r"); \
+    if(!stream) { \
+      res = RES_IO_ERR; \
+      logger_print(stardis->logger, LOG_ERROR, \
+        "Could not open generator's state file ('%s').\n", \
+        name); \
+      goto error; \
+    } \
+    ERR(ssp_rng_create(stardis->allocator, &ssp_rng_mt19937_64, &args.rng_state)); \
+    res =  read_random_generator_state(args.rng_state, stream); \
+    if(res != RES_OK) { \
+      logger_print(stardis->logger, LOG_ERROR, \
+        "Could not read random generator's state ('%s').\n", \
+        name); \
+      goto error; \
+    } \
+    fclose(stream); stream = NULL; \
+  }
+
+#define WRITE_RANDOM_STATE(Name) \
+  if(!str_is_empty(Name)) { \
+    const char* name = str_cget(Name); \
+    stream = fopen(name, "wb"); \
+    if(!stream) { \
+      res = RES_IO_ERR; \
+      logger_print(stardis->logger, LOG_ERROR, \
+        "Could not write random generator's state ('%s').\n", \
+        name); \
+      goto error; \
+    } \
+    ERR(write_random_generator_state(estimator, stream)); \
+    fclose(stream); stream = NULL; \
+  }
+
 static res_T
-compute_probe(struct stardis* stardis)
+compute_probe(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   double uv[2] = { 0,0 };
-  size_t iprim = SIZE_MAX;
+  unsigned iprim = UINT_MAX;
   struct sdis_green_function* green = NULL;
   struct sdis_estimator* estimator = NULL;
   struct dump_path_context dump_ctx;
   struct sdis_solve_probe_args args = SDIS_SOLVE_PROBE_ARGS_DEFAULT;
   FILE* stream = NULL;
+  struct time compute_start, compute_end;
 
-  ASSERT(stardis && (stardis->mode & MODE_PROBE_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE));
 
   ERR(check_probe_conform_to_type(stardis, 0, stardis->probe, &iprim, uv));
 
@@ -385,9 +432,15 @@ compute_probe(struct stardis* stardis)
   d3_set(args.position, stardis->probe);
   d2_set(args.time_range, stardis->time_range);
 
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
+
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+    time_current(&compute_start);
     ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
+    time_current(&compute_end);
     if(stardis->mode & MODE_BIN_GREEN) {
+      struct time output_end;
       ASSERT(!str_is_empty(&stardis->bin_green_filename));
       stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
       if(!stream) {
@@ -407,56 +460,223 @@ compute_probe(struct stardis* stardis)
         ERR(dump_paths_end(green, stardis, stream));
         fclose(stream); stream = NULL;
       }
+      time_current(&output_end);
+      ERR(print_computation_time(NULL, stardis,
+        start, &compute_start, &compute_end, &output_end));
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    time_current(&compute_start);
     ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
+    time_current(&compute_end);
+    ERR(print_computation_time(estimator, stardis,
+      start, &compute_start, &compute_end, NULL));
     ERR(print_single_MC_result(estimator, stardis, stdout));
-    /* Dump paths recorded according to user settings */
+    
+    /* Dump recorded paths according to user settings */
     dump_ctx.stardis = stardis;
     dump_ctx.rank = 0;
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
 
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
 end:
   if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;
 error:
   goto end;
 }
 
 static res_T
-compute_probe_on_interface(struct stardis* stardis)
+compute_probe_on_interface(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   double uv[2] = { 0,0 };
-  size_t iprim = SIZE_MAX;
+  unsigned iprim = UINT_MAX;
   struct sdis_estimator* estimator = NULL;
   struct sdis_green_function* green = NULL;
   struct dump_path_context dump_ctx;
   struct sdis_solve_probe_boundary_args args
     = SDIS_SOLVE_PROBE_BOUNDARY_ARGS_DEFAULT;
   FILE* stream = NULL;
+  struct time compute_start, compute_end;
+  enum sdis_side compute_side;
+  unsigned prop[3];
+  const struct description* descriptions
+    = darray_descriptions_cdata_get(&stardis->descriptions);
+  double tcr = 0;
+  const char* solve_name;
+  const char* compute_side_name = NULL;
+  const char* medium_name = NULL;
+  const struct description* intface_desc = NULL;
+#ifndef NDEBUG
+  const size_t dcount = darray_descriptions_size_get(&stardis->descriptions);
+#endif
 
-  ASSERT(stardis && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
+  ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
   ERR(check_probe_conform_to_type(stardis, 1, stardis->probe, &iprim, uv));
-  ASSERT(iprim != SIZE_MAX);
+  ASSERT(iprim != UINT_MAX);
+
+  ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
+    (unsigned)iprim, prop));
+
+  if(prop[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY) {
+    ASSERT(prop[SG3D_INTFACE] < dcount);
+    intface_desc = descriptions + prop[SG3D_INTFACE];
+    if(intface_desc->type == DESC_SOLID_SOLID_CONNECT)
+      tcr = intface_desc->d.ss_connect.tcr;
+  }
+
+  if(str_is_empty(&stardis->solve_name)) {
+    solve_name = NULL;
+    compute_side = SDIS_SIDE_NULL__; /* Side is let unspecified */
+  } else {
+    solve_name = str_cget(&stardis->solve_name);
+    if(0 == strcasecmp(solve_name, "FRONT")) {
+      const struct description* d;
+      ASSERT(prop[SG3D_FRONT] < dcount);
+      d = descriptions + prop[SG3D_FRONT];
+      ASSERT(d->type == DESC_MAT_SOLID || d->type == DESC_MAT_FLUID);
+      medium_name = str_cget(get_description_name(d));
+      compute_side = SDIS_FRONT;
+      compute_side_name = "FRONT";
+    }
+    else if(0 == strcasecmp(solve_name, "BACK")) {
+      const struct description* d;
+      ASSERT(prop[SG3D_BACK] < dcount);
+      d = descriptions + prop[SG3D_BACK];
+      ASSERT(d->type == DESC_MAT_SOLID || d->type == DESC_MAT_FLUID);
+      medium_name = str_cget(get_description_name(d));
+      compute_side = SDIS_BACK;
+      compute_side_name = "BACK";
+    } else { /* solve_name must be a medium name */
+      unsigned med_id, fmat_id, bmat_id;
+      const struct description* fd;
+      const struct description* bd;
+      struct sdis_medium* medium
+        = find_medium_by_name(stardis, &stardis->solve_name, &med_id);
+      if(medium == NULL) { /* Not found */
+        logger_print(stardis->logger, LOG_ERROR,
+          "Cannot locate side from medium name '%s' (unknown medium)\n",
+          solve_name);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+
+      fd = descriptions + prop[SG3D_FRONT];
+      bd = descriptions + prop[SG3D_BACK];
+      ASSERT(fd->type == DESC_MAT_SOLID || fd->type == DESC_MAT_FLUID);
+      fmat_id = (fd->type == DESC_MAT_SOLID)
+        ? fd->d.solid.solid_id : fd->d.fluid.fluid_id;
+      ASSERT(bd->type == DESC_MAT_SOLID || bd->type == DESC_MAT_FLUID);
+      bmat_id = (bd->type == DESC_MAT_SOLID)
+        ? bd->d.solid.solid_id : bd->d.fluid.fluid_id;
+
+      if(med_id != fmat_id && med_id != bmat_id) { /* Not here */
+        logger_print(stardis->logger, LOG_ERROR,
+          "Medium '%s' is not used at this interface (prim id=%u)\n",
+          solve_name, iprim);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+      if(fmat_id == bmat_id) { /* Cannot differentiate */
+        unsigned encs[2];
+        ERR(senc3d_scene_get_triangle_enclosures(stardis->senc3d_scn, iprim,
+          encs));
+        logger_print(stardis->logger, LOG_ERROR,
+          "Medium '%s' is used on both sides of this interface (prim id=%u)\n",
+          solve_name,iprim);
+        logger_print(stardis->logger, LOG_ERROR,
+          "Side must be defined using either FRONT or BACK.\n");
+        logger_print(stardis->logger, LOG_ERROR,
+          "FRONT side is related to enclosure %u, BACK side to enclosure %u.\n",
+          encs[SENC3D_FRONT], encs[SENC3D_BACK]);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+      medium_name = solve_name;
+      if(med_id == fmat_id) {
+        compute_side = SDIS_FRONT;
+        compute_side_name = "FRONT";
+      } else {
+        compute_side = SDIS_BACK;
+        compute_side_name = "BACK";
+      }
+    }
+  }
+
+  if(compute_side == SDIS_SIDE_NULL__) {
+    /* Cannot have defined a contact resistance here */
+    if(tcr != 0) {
+      const struct description* fdesc = NULL;
+      const struct description* bdesc = NULL;
+      if(prop[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY) {
+        ASSERT(prop[SG3D_FRONT] < dcount);
+        fdesc = descriptions + prop[SG3D_FRONT];
+      }
+      if(prop[SG3D_BACK] != SG3D_UNSPECIFIED_PROPERTY) {
+        ASSERT(prop[SG3D_BACK] < dcount);
+        bdesc = descriptions + prop[SG3D_BACK];
+      }
+      ASSERT(fdesc || bdesc);
+      logger_print(stardis->logger, LOG_ERROR,
+        "Cannot let probe computation side unspecified on an interface with a "
+        "non-nul thermal resistance.\n");
+      logger_print(stardis->logger, LOG_ERROR,
+        "Interface '%s',%s%s%s%s%s%s%s, resistance=%g K.m^2/W.\n",
+        str_cget(get_description_name(intface_desc)),
+        (fdesc ? " FRONT:'" : ""),
+        (fdesc ? str_cget(get_description_name(fdesc)) : ""),
+        (fdesc ? "'" : ""),
+        (fdesc && bdesc ? "," : ""),
+        (bdesc ? " BACK:'" : ""),
+        (bdesc ? str_cget(get_description_name(bdesc)) : ""),
+        (bdesc ? "'" : ""),
+        tcr);
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    /* Any side is OK as temperature is the same */
+    compute_side = SDIS_FRONT;
+  } else if (tcr == 0) {
+    /* Warn if side defined and no resistance defined */
+    logger_print(stardis->logger, LOG_WARNING,
+      "Specifying a compute side at an interface with no contact resistance "
+      "is meaningless.\n");
+  }
+
+  if(tcr > 0) {
+    ASSERT(compute_side_name && medium_name);
+    logger_print(stardis->logger, LOG_OUTPUT,
+      "Probe computation on an interface with a thermal resistance = %g K.m^2/W "
+      "on %s side (medium is '%s').\n",
+      tcr, compute_side_name, medium_name);
+  }
 
   args.nrealisations = stardis->samples;
   args.iprim = iprim;
   d3_set(args.uv, uv);
-  args.side = SDIS_FRONT;
+  args.side = compute_side;
   d2_set(args.time_range, stardis->time_range);
 
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
+
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+    time_current(&compute_start);
     ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
       &green));
+    time_current(&compute_end);
     if(stardis->mode & MODE_BIN_GREEN) {
+      struct time output_end;
       ASSERT(!str_is_empty(&stardis->bin_green_filename));
       stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
       if(!stream) {
@@ -476,24 +696,36 @@ compute_probe_on_interface(struct stardis* stardis)
         ERR(dump_paths_end(green, stardis, stream));
         fclose(stream); stream = NULL;
       }
+      time_current(&output_end);
+      ERR(print_computation_time(NULL, stardis,
+        start, &compute_start, &compute_end, &output_end));
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    time_current(&compute_start);
     ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
+    time_current(&compute_end);
+    ERR(print_computation_time(estimator, stardis,
+      start, &compute_start, &compute_end, NULL));
     ERR(print_single_MC_result(estimator, stardis, stdout));
-    /* Dump paths recorded according to user settings */
+    
+    /* Dump recorded paths according to user settings */
     dump_ctx.stardis = stardis;
     dump_ctx.rank = 0;
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
 
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
 end:
   if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;
 error:
   goto end;
@@ -578,7 +810,7 @@ error:
 }
 
 static res_T
-compute_camera(struct stardis* stardis)
+compute_camera(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   double proj_ratio;
@@ -589,8 +821,10 @@ compute_camera(struct stardis* stardis)
   struct dump_path_context dump_ctx;
   size_t definition[2];
   size_t ix, iy;
+  FILE* stream;
+  struct time compute_start, compute_end, output_end;
 
-  ASSERT(stardis
+  ASSERT(stardis && start
     && !(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN))
     && (stardis->mode & MODE_IR_COMPUTE));
 
@@ -621,16 +855,29 @@ compute_camera(struct stardis* stardis)
   args.register_paths = stardis->dump_paths;
 
   /* Launch the simulation */
+  time_current(&compute_start);
   ERR(sdis_solve_camera(stardis->sdis_scn, &args, &buf));
+  time_current(&compute_end);
 
   /* Write the image */
+  if(str_is_empty(&stardis->camera.file_name))
+    stream = stdout;
+  else {
+    stream = fopen(str_cget(&stardis->camera.file_name), "w");
+    if(!stream) {
+      res = RES_IO_ERR;
+      goto error;
+    }
+  }
   ASSERT(stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK
   || stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_HT);
   if(stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK)
-    ERR(dump_vtk_image(buf, stdout));
-  else ERR(dump_ht_image(buf, stdout));
+    ERR(dump_vtk_image(buf, stream));
+  else ERR(dump_ht_image(buf, stream));
+  if(!str_is_empty(&stardis->camera.file_name))
+    fclose(stream);
 
-  /* Dump paths recorded according to user settings */
+  /* Dump recorded paths according to user settings */
   dump_ctx.stardis = stardis;
   dump_ctx.rank = 0;
   ERR(sdis_estimator_buffer_get_definition(buf, definition));
@@ -641,6 +888,9 @@ compute_camera(struct stardis* stardis)
       ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
     }
   }
+  time_current(&output_end);
+  ERR(print_computation_time(NULL, stardis,
+    start, &compute_start, &compute_end, NULL));
 
 end:
   if(cam) SDIS(camera_ref_put(cam));
@@ -651,7 +901,7 @@ error:
 }
 
 static res_T
-compute_medium(struct stardis* stardis)
+compute_medium(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   struct sdis_medium* medium = NULL;
@@ -660,8 +910,9 @@ compute_medium(struct stardis* stardis)
   struct sdis_solve_medium_args args = SDIS_SOLVE_MEDIUM_ARGS_DEFAULT;
   struct dump_path_context dump_ctx;
   FILE* stream = NULL;
+  struct time compute_start, compute_end;
 
-  ASSERT(stardis && (stardis->mode & MODE_MEDIUM_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_MEDIUM_COMPUTE));
 
   /* Find medium */
   medium = find_medium_by_name(stardis, &stardis->solve_name, NULL);
@@ -677,9 +928,15 @@ compute_medium(struct stardis* stardis)
   args.medium = medium;
   d2_set(args.time_range, stardis->time_range);
 
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
+
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+    time_current(&compute_start);
     ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
+    time_current(&compute_end);
     if(stardis->mode & MODE_BIN_GREEN) {
+      struct time output_end;
       ASSERT(!str_is_empty(&stardis->bin_green_filename));
       stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
       if(!stream) {
@@ -699,24 +956,35 @@ compute_medium(struct stardis* stardis)
         ERR(dump_paths_end(green, stardis, stream));
         fclose(stream); stream = NULL;
       }
+      time_current(&output_end);
+      ERR(print_computation_time(NULL, stardis,
+        start, &compute_start, &compute_end, &output_end));
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    time_current(&compute_start);
     ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
+    time_current(&compute_end);
+    ERR(print_computation_time(estimator, stardis,
+      start, &compute_start, &compute_end, NULL));
     ERR(print_single_MC_result(estimator, stardis, stdout));
-    /* Dump paths recorded according to user settings */
+    /* Dump recorded paths according to user settings */
     dump_ctx.stardis = stardis;
     dump_ctx.rank = 0;
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
 
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
 end:
   if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;
 error:
   goto end;
@@ -771,7 +1039,7 @@ error:
 }
 
 static res_T
-compute_boundary(struct stardis* stardis)
+compute_boundary(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   struct sdis_green_function* green = NULL;
@@ -779,8 +1047,9 @@ compute_boundary(struct stardis* stardis)
   struct dump_path_context dump_ctx;
   struct sdis_solve_boundary_args args = SDIS_SOLVE_BOUNDARY_ARGS_DEFAULT;
   FILE* stream = NULL;
+  struct time compute_start, compute_end;
 
-  ASSERT(stardis && (stardis->mode & MODE_BOUNDARY_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_BOUNDARY_COMPUTE));
 
   args.nrealisations = stardis->samples;
   args.primitives
@@ -790,9 +1059,15 @@ compute_boundary(struct stardis* stardis)
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
   d2_set(args.time_range, stardis->time_range);
 
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
+
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+    time_current(&compute_start);
     ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
+    time_current(&compute_end);
     if(stardis->mode & MODE_BIN_GREEN) {
+      struct time output_end;
       ASSERT(!str_is_empty(&stardis->bin_green_filename));
       stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
       if(!stream) {
@@ -812,31 +1087,42 @@ compute_boundary(struct stardis* stardis)
         ERR(dump_paths_end(green, stardis, stream));
         fclose(stream); stream = NULL;
       }
+      time_current(&output_end);
+      ERR(print_computation_time(NULL, stardis,
+        start, &compute_start, &compute_end, &output_end));
     }
     if(stardis->mode & MODE_GREEN) {
       ERR(dump_green_ascii(green, stardis, stdout));
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    time_current(&compute_start);
     ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
+    time_current(&compute_end);
+    ERR(print_computation_time(estimator, stardis,
+      start, &compute_start, &compute_end, NULL));
     ERR(print_single_MC_result(estimator, stardis, stdout));
-    /* Dump paths recorded according to user settings */
+    /* Dump recorded paths according to user settings */
     dump_ctx.stardis = stardis;
     dump_ctx.rank = 0;
     ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
   }
 
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
 end:
   if(stream) fclose(stream);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;
 error:
   goto end;
 }
 
 static res_T
-compute_flux_boundary(struct stardis* stardis)
+compute_flux_boundary(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   struct sdis_green_function* green = NULL;
@@ -844,8 +1130,10 @@ compute_flux_boundary(struct stardis* stardis)
   struct sdis_solve_boundary_flux_args args
     = SDIS_SOLVE_BOUNDARY_FLUX_ARGS_DEFAULT;
   struct dump_path_context dump_ctx;
+  FILE* stream = NULL;
+  struct time compute_start, compute_end;
 
-  ASSERT(stardis && (stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE));
 
   args.nrealisations = stardis->samples;
   args.primitives
@@ -854,24 +1142,35 @@ compute_flux_boundary(struct stardis* stardis)
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
   d2_set(args.time_range, stardis->time_range);
 
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
+
+  time_current(&compute_start);
   ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
+  time_current(&compute_end);
+  ERR(print_computation_time(estimator, stardis,
+    start, &compute_start, &compute_end, NULL));
   ERR(print_single_MC_result(estimator, stardis, stdout));
 
-  /* Dump paths recorded according to user settings */
+  /* Dump recorded paths according to user settings */
   dump_ctx.stardis = stardis;
   dump_ctx.rank = 0;
   ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
 
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
 end:
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;
 error:
   goto end;
 }
 
 static res_T
-compute_map(struct stardis* stardis)
+compute_map(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   struct sdis_green_function* green = NULL;
@@ -880,7 +1179,8 @@ compute_map(struct stardis* stardis)
   int estimators_initialized = 0;
   size_t p;
 
-  ASSERT(stardis
+  (void)start;
+  ASSERT(stardis && start
     && (stardis->mode & MODE_MAP_COMPUTE)
     && !(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)));
 
@@ -920,6 +1220,9 @@ end:
 error:
   goto end;
 }
+
+#undef READ_RANDOM_STATE
+#undef WRITE_RANDOM_STATE
 
 /*******************************************************************************
  * Public Functions
@@ -972,6 +1275,8 @@ read_compute_surface
   struct add_geom_ctx add_geom_ctx;
   struct sg3d_geometry_add_callbacks callbacks = SG3D_ADD_CALLBACKS_NULL__;
   const char* file;
+  size_t i;
+  double _2area = 0;
 
   ASSERT(stardis);
 
@@ -1006,6 +1311,26 @@ read_compute_surface
     goto error;
   }
 
+  /* Compute area of the compute surface */
+  FOR_EACH(i, 0, add_geom_ctx.stl_desc.triangles_count) {
+    const unsigned* trg = add_geom_ctx.stl_desc.indices + (i * 3);
+    const float* v0f = add_geom_ctx.stl_desc.vertices + (trg[0] * 3);
+    const float* v1f = add_geom_ctx.stl_desc.vertices + (trg[1] * 3);
+    const float* v2f = add_geom_ctx.stl_desc.vertices + (trg[2] * 3);
+    double v0[3], v1[3], v2[3], edge0[3], edge1[3], normal[3], norm;
+
+    /* Compute component area and volume */
+    d3_sub(edge0, d3_set_f3(v1, v1f), d3_set_f3(v0, v0f));
+    d3_sub(edge1, d3_set_f3(v2, v2f), d3_set_f3(v0, v0f));
+    d3_cross(normal, edge0, edge1);
+    norm = d3_normalize(normal, normal);
+    ASSERT(norm);
+    _2area += norm;
+  }
+
+  stardis->compute_surface.area = _2area * 0.5
+    * stardis->scale_factor * stardis->scale_factor;
+
 end:
   if(sstl) SSTL(ref_put(sstl));
   return res;
@@ -1015,27 +1340,28 @@ error:
 
 res_T
 stardis_compute
-  (struct stardis* stardis)
+  (struct stardis* stardis,
+   struct time* start)
 {
   res_T res = RES_OK;
 
-  ASSERT(stardis && (stardis->mode & COMPUTE_MODES));
+  ASSERT(stardis && start && (stardis->mode & COMPUTE_MODES));
 
   /* Compute */
   if(stardis->mode & MODE_PROBE_COMPUTE)
-    ERR(compute_probe(stardis));
+    ERR(compute_probe(stardis, start));
   else if(stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
-    ERR(compute_probe_on_interface(stardis));
+    ERR(compute_probe_on_interface(stardis, start));
   else if(stardis->mode & MODE_IR_COMPUTE)
-    ERR(compute_camera(stardis));
+    ERR(compute_camera(stardis, start));
   else if(stardis->mode & MODE_MEDIUM_COMPUTE)
-    ERR(compute_medium(stardis));
+    ERR(compute_medium(stardis, start));
   else if(stardis->mode & MODE_BOUNDARY_COMPUTE)
-    ERR(compute_boundary(stardis));
+    ERR(compute_boundary(stardis, start));
   else if(stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE)
-    ERR(compute_flux_boundary(stardis));
+    ERR(compute_flux_boundary(stardis, start));
   else if(stardis->mode & MODE_MAP_COMPUTE)
-    ERR(compute_map(stardis));
+    ERR(compute_map(stardis, start));
   else FATAL("Unknown mode.\n");
 
 end:

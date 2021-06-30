@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2020 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 #include <rsys/dynamic_array.h>
 
 struct stardis;
+struct time;
 struct str;
 
 #define DARRAY_NAME estimators
@@ -34,7 +35,8 @@ find_medium_by_name
 
 extern LOCAL_SYM res_T
 stardis_compute
-  (struct stardis* stardis);
+  (struct stardis* stardis,
+   struct time* start);
 
 extern LOCAL_SYM res_T
 read_compute_surface

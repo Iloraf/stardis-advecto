@@ -55,8 +55,8 @@ configure_file(${SDIS_SOURCE_DIR}/../doc/stardis.1.txt.in
   ${CMAKE_CURRENT_BINARY_DIR}/doc/stardis.1.txt @ONLY)
 
 set(SDIS_VERSION_MAJOR 0)
-set(SDIS_VERSION_MINOR 5)
-set(SDIS_VERSION_PATCH 1)
+set(SDIS_VERSION_MINOR 6)
+set(SDIS_VERSION_PATCH 0)
 set(SDIS_VERSION ${SDIS_VERSION_MAJOR}.${SDIS_VERSION_MINOR}.${SDIS_VERSION_PATCH})
 
 configure_file(${SDIS_SOURCE_DIR}/stardis-default.h.in

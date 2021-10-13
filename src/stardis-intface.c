@@ -295,7 +295,7 @@ create_intface
           ASSERT(!front_med);
           front_med = media[ext_id];
         }
-        /* The imposed T is for the 2 sides (until there is contact resistnces) */
+        /* The imposed T is for the 2 sides (until there is contact resistances) */
         interface_shader.front.temperature = interface_get_temperature;
         interface_shader.back.temperature = interface_get_temperature;
         if(connect->type == DESC_BOUND_T_FOR_SOLID) {

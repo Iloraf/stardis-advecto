@@ -8,4 +8,5 @@ tmp
 *.[ao]
 *~
 tags
+*.orig
 

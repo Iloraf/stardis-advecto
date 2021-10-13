@@ -1900,7 +1900,7 @@ error:
  * H_BOUNDARY_FOR_SOLID Name emissivity specular_fraction hc T_env STL_filenames
  * H_BOUNDARY_FOR_FLUID Name emissivity specular_fraction hc T_env STL_filenames
  * T_BOUNDARY_FOR_SOLID Name T STL_filenames
- * T_BOUNDARY_FOR_FLUID Name T hc STL_filenames
+ * T_BOUNDARY_FOR_FLUID Name T emissivity specular_fraction hc STL_filenames */
  * F_BOUNDARY_FOR_SOLID Name F STL_filenames
  * SOLID_FLUID_CONNECTION Name emissivity specular_fraction hc STL_filenames
  * SCALE scale_factor

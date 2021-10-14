@@ -148,8 +148,9 @@ EXCLUSIVE OPTIONS
 	provided, the result is written to _standard output_.
 	
   **fmt=**_image_file_format_;;
-    Format of the image file in output. Can be *VTK* or *HT*. Default
-    _image_file_format_ is @STARDIS_ARGS_DEFAULT_RENDERING_OUTPUT_FILE_FMT@.
+    Format of the image file in output. Can be *VTK*, or *HT* (see
+    htrdr-image(5) and  htpp(1)). Default _image_file_format_ is
+    @STARDIS_ARGS_DEFAULT_RENDERING_OUTPUT_FILE_FMT@.
 
   **fov=**_angle_;;
     Horizontal field of view of the camera in [30, 120] degrees. By default
@@ -340,3 +341,4 @@ SEE ALSO
 *stardis-output*(5),
 *sgreen*(1),
 *htpp*(1)
+*htrdr-image*(5)

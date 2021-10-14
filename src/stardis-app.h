@@ -102,7 +102,6 @@ enum description_type {
   DESC_MAT_FLUID,
   DESC_BOUND_H_FOR_FLUID,
   DESC_BOUND_H_FOR_SOLID,
-  DESC_BOUND_T_FOR_FLUID,
   DESC_BOUND_T_FOR_SOLID,
   DESC_BOUND_F_FOR_SOLID,
   DESC_SOLID_FLUID_CONNECT,
@@ -114,7 +113,7 @@ enum description_type {
 #define DESC_IS_H(D) \
   ((D) == DESC_BOUND_H_FOR_SOLID || (D) == DESC_BOUND_H_FOR_FLUID)
 #define DESC_IS_T(D) \
-  ((D) == DESC_BOUND_T_FOR_SOLID || (D) == DESC_BOUND_T_FOR_FLUID)
+  ((D) == DESC_BOUND_T_FOR_SOLID)
 #define DESC_IS_F(D) \
   ((D) == DESC_BOUND_F_FOR_SOLID)
 #define DESC_IS_MEDIUM(D) \
@@ -291,10 +290,6 @@ str_print_t_boundary
    ARG3( (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
     str_cget(&b->name), b->imposed_temperature ) );
 
-  if(type == DESC_BOUND_T_FOR_FLUID) {
-    STR_APPEND_PRINTF(str, "emissivity=%g, specular_fraction=%g hc=%g ",
-      ARG3( b->emissivity, b->specular_fraction, b->hc ) );
-  }
   STR_APPEND_PRINTF(str, "(using medium %u as external medium)",
     ARG1( b->mat_id ) );
 end:
@@ -505,7 +500,6 @@ release_description(struct description* desc)
     release_h_boundary(&desc->d.h_boundary);
     break;
   case DESC_BOUND_T_FOR_SOLID:
-  case DESC_BOUND_T_FOR_FLUID:
     release_t_boundary(&desc->d.t_boundary);
     break;
   case DESC_BOUND_F_FOR_SOLID:
@@ -540,7 +534,6 @@ str_print_description
     ERR(str_print_fluid(str, &desc->d.fluid));
     break;
   case DESC_BOUND_T_FOR_SOLID:
-  case DESC_BOUND_T_FOR_FLUID:
     ERR(str_print_t_boundary(str, &desc->d.t_boundary, desc->type));
     break;
   case DESC_BOUND_H_FOR_SOLID:
@@ -576,7 +569,6 @@ get_description_name
   case DESC_MAT_FLUID:
     return &desc->d.fluid.name;
   case DESC_BOUND_T_FOR_SOLID:
-  case DESC_BOUND_T_FOR_FLUID:
     return &desc->d.t_boundary.name;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
@@ -623,7 +615,6 @@ cp_description
     ERR(cp_h_boundary(&dst->d.h_boundary, &src->d.h_boundary));
     break;
   case DESC_BOUND_T_FOR_SOLID:
-  case DESC_BOUND_T_FOR_FLUID:
     if(dst->type == DESCRIPTION_TYPE_COUNT__) {
       dst->type = src->type;
       init_t(src->d.t_boundary.name.allocator, &dst->d.t_boundary);
@@ -678,7 +669,6 @@ description_get_medium_id
     *id = desc->d.h_boundary.mat_id;
     return;
   case DESC_BOUND_T_FOR_SOLID:
-  case DESC_BOUND_T_FOR_FLUID:
     *id = desc->d.t_boundary.mat_id;
     return;
   case DESC_BOUND_F_FOR_SOLID:

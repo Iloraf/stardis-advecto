@@ -93,7 +93,6 @@ _______
                         | <fluid-frontier>
 
 <medium-boundary>     ::= <t-bound-for-solid>
-                        | <t-bound-for-fluid>
                         | <h-bound-for-solid>
                         | <h-bound-for-fluid>
                         | <f-bound-for-solid>
@@ -117,8 +116,6 @@ _______
 <t-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> \
                           <triangles>
 
-<t-bound-for-fluid>   ::= "T_BOUNDARY_FOR_FLUID" <bound-name> <temperature> \
-                          <emissivity> <specular-fraction> <hc> <triangles>
 
 <h-bound-for-solid>   ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <emissivity> \
                           <specular-fraction> <hc> <outside-temperature> \

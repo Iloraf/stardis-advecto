@@ -536,18 +536,6 @@ validate_properties
         goto end;
       }
       break;
-    case DESC_BOUND_T_FOR_FLUID:
-      if(!(solid_count == 0 && fluid_count == 1)) {
-        if(solid_count + fluid_count == 2)
-          *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_DEFS;
-        else if(solid_count + fluid_count == 0)
-          *properties_conflict_status = BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS;
-        else if(solid_count == 1)
-          *properties_conflict_status = BOUND_T_FOR_FLUID_ENCLOSING_SOLID;
-        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
-        goto end;
-      }
-      break;
     case DESC_BOUND_T_FOR_SOLID:
       if(!(solid_count == 1 && fluid_count == 0)) {
         if(solid_count + fluid_count == 2)

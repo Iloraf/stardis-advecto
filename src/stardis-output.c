@@ -982,8 +982,6 @@ dump_green_ascii
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct t_boundary* bd;
-      if(desc->type != DESC_BOUND_T_FOR_SOLID)
-        continue;
       bd = &desc->d.t_boundary;
       fprintf(stream, "%u\t%s\t%g\n",
         i, str_cget(&bd->name), bd->imposed_temperature);

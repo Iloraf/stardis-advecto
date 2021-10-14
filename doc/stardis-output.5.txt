@@ -309,9 +309,6 @@ _______
 
  struct t_boundary {
    struct str name;
-   double emissivity;
-   double specular_fraction;
-   double hc;
    double imposed_temperature;
    unsigned mat_id;
  };
@@ -338,7 +335,6 @@ _______
    DESC_MAT_FLUID,
    DESC_BOUND_H_FOR_FLUID,
    DESC_BOUND_H_FOR_SOLID,
-   DESC_BOUND_T_FOR_FLUID,
    DESC_BOUND_T_FOR_SOLID,
    DESC_BOUND_F_FOR_SOLID,
    DESC_SOLID_FLUID_CONNECT,

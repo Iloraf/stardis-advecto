@@ -275,13 +275,11 @@ create_intface
         /* The imposed T is for the 2 sides (until there is contact resistances) */
         interface_shader.front.temperature = interface_get_temperature;
         interface_shader.back.temperature = interface_get_temperature;
-        if(connect->type == DESC_BOUND_T_FOR_SOLID) {
-          /* Set emissivity to 1 to allow radiative paths comming from
-           * a possible external fluid to 'see' the imposed T */
-          ASSERT(fluid_side_shader);
-          fluid_side_shader->emissivity = interface_get_emissivity;
-          interface_props->emissivity = 1;
-        }
+        /* Set emissivity to 1 to allow radiative paths comming from
+         * a possible external fluid to 'see' the imposed T */
+        ASSERT(fluid_side_shader);
+        fluid_side_shader->emissivity = interface_get_emissivity;
+        interface_props->emissivity = 1;
         ASSERT(connect->d.t_boundary.imposed_temperature >= 0);
         interface_props->imposed_temperature
           = connect->d.t_boundary.imposed_temperature;

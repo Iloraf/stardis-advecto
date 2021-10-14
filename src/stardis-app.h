@@ -75,10 +75,7 @@ enum properties_conflict_t {
   BOUND_H_FOR_SOLID_BETWEEN_2_DEFS,
   BOUND_H_FOR_SOLID_BETWEEN_2_UNDEFS,
   BOUND_H_FOR_SOLID_ENCLOSING_FLUID,
-  BOUND_T_FOR_FLUID_BETWEEN_2_DEFS,
-  BOUND_T_FOR_FLUID_BETWEEN_2_UNDEFS,
-  BOUND_T_FOR_FLUID_ENCLOSING_SOLID,
-  BOUND_T_FOR_SOLID_BETWEEN_2_DEFS,
+  BOUND_T_FOR_SOLID_BETWEEN_2_DEFS = 10,
   BOUND_T_FOR_SOLID_BETWEEN_2_UNDEFS,
   BOUND_T_FOR_SOLID_ENCLOSING_FLUID,
   BOUND_F_FOR_SOLID_BETWEEN_2_DEFS,
@@ -254,9 +251,6 @@ cp_h_boundary(struct h_boundary* dst, const struct h_boundary* src)
 
 struct t_boundary {
   struct str name;
-  double emissivity;
-  double specular_fraction;
-  double hc;
   double imposed_temperature;
   unsigned mat_id;
 };
@@ -265,9 +259,6 @@ static FINLINE void
 init_t(struct mem_allocator* allocator, struct t_boundary* dst)
 {
   str_init(allocator, &dst->name);
-  dst->emissivity = 0;
-  dst->specular_fraction = 0;
-  dst->hc = 0;
   dst->imposed_temperature = -1;
   dst->mat_id = UINT_MAX;
 }
@@ -281,14 +272,12 @@ release_t_boundary(struct t_boundary* bound)
 static res_T
 str_print_t_boundary
   (struct str* str,
-   const struct t_boundary* b,
-   const enum description_type type)
+   const struct t_boundary* b)
 {
   res_T res = RES_OK;
   ASSERT(str && b && DESC_IS_T(type));
-  STR_APPEND_PRINTF(str, "T boundary for %s '%s': T=%g ",
-   ARG3( (type == DESC_BOUND_T_FOR_SOLID ? "solid" : "fluid"),
-    str_cget(&b->name), b->imposed_temperature ) );
+  STR_APPEND_PRINTF(str, "T boundary for solid '%s': T=%g ",
+   ARG2( str_cget(&b->name), b->imposed_temperature ) );
 
   STR_APPEND_PRINTF(str, "(using medium %u as external medium)",
     ARG1( b->mat_id ) );
@@ -301,9 +290,6 @@ error:
 static FINLINE res_T
 cp_t_boundary(struct t_boundary* dst, const struct t_boundary* src)
 {
-  dst->emissivity = src->emissivity;
-  dst->specular_fraction = src->specular_fraction;
-  dst->hc = src->hc;
   dst->imposed_temperature = src->imposed_temperature;
   dst->mat_id = src->mat_id;
   return str_copy(&dst->name, &src->name);
@@ -534,7 +520,7 @@ str_print_description
     ERR(str_print_fluid(str, &desc->d.fluid));
     break;
   case DESC_BOUND_T_FOR_SOLID:
-    ERR(str_print_t_boundary(str, &desc->d.t_boundary, desc->type));
+    ERR(str_print_t_boundary(str, &desc->d.t_boundary));
     break;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:

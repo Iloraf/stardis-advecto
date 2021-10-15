@@ -76,10 +76,10 @@ continue a description next line. However, this trick is not part of the
 actual output, that continues on a single line. On the other hand, multiple
 lines not using the *\* convenience in multi-lines descriptions are truly
 different lines of output. Also, text appearing between quote marks is a
-verbatim part of the output, except the quote characters, *#something*
-denotes a count (the number of something), and the math symbols '*\+*'
+verbatim part of the output, except the quote characters, *\#something*
+denotes a count (the number of something), and the math operators '*+*'
 and '***', when not verbatim, are used with the usual meaning (like in
-#something+1). Finally, text introduced by the *#* character in a description,
+\#something+1). Finally, text introduced by the *#* character in a description,
 when neither verbatim nor count, is a comment and is not part of the output.
 
 == OUTPUT
@@ -165,6 +165,7 @@ _______
 <ext-probe-position>  ::= "[" <x-value> "," <y-value> "," <z-value> "]"
 
 <ext-time>            ::= "at t=" <time-value> "="
+                        | "with t in [" <time-value> <time-value> "] ="
 
 <ext-temp-estimate>   ::= <expected-value> "K +/-" <standard-deviation>
 

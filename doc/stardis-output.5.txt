@@ -540,11 +540,11 @@ _______
 -------------------------------------
 
 <end-name>           ::= STRING # the name of the boundary at the end of the
-                                # heat path, or AMBIANT for radiative ending
+                                # heat path, or AMBIENT for radiative ending
 
 <end-id>             ::= INTEGER # in [0 #boundaries]
                                  # order is the order in the description file,
-                                 # AMBIANT's id being #boundaries
+                                 # AMBIENT's id being #boundaries
 
 <x>                  ::= REAL
 

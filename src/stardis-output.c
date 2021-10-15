@@ -443,7 +443,7 @@ dump_sample_end
     size_t ambient_id = darray_descriptions_size_get(e_ctx->desc);
     ASSERT(ambient_id <= UINT_MAX);
     /* End, End ID, X, Y, Z, Elapsed time */
-    fprintf(stream, "AMBIANT, %u, 0, 0, 0, %g\n",
+    fprintf(stream, "AMBIENT, %u, 0, 0, 0, %g\n",
       (unsigned)ambient_id, elapsed);
   } else {
     struct sdis_point pt = SDIS_POINT_NULL;

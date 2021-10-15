@@ -1152,8 +1152,7 @@ description_set_name
   const char* keywords[] = {
     "AUTO", "BACK", "BOTH", "FLUID", "FRONT", "F_BOUNDARY_FOR_SOLID",
     "H_BOUNDARY_FOR_FLUID", "H_BOUNDARY_FOR_SOLID", "SCALE", "SOLID",
-    "SOLID_FLUID_CONNECTION", "T_BOUNDARY_FOR_FLUID", "T_BOUNDARY_FOR_SOLID",
-    "UNKNOWN" };
+    "SOLID_FLUID_CONNECTION", "T_BOUNDARY_FOR_SOLID", "UNKNOWN" };
   int i;
   ASSERT(name && tk);
 

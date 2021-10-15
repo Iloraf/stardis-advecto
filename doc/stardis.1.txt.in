@@ -242,11 +242,6 @@ different temperature, flux or volumic power values.
   Number of Monte-Carlo samples. By default *samples-count* is set to
   @STARDIS_ARGS_DEFAULT_SAMPLES_COUNT@.
 
-*-r* _reference_::
-  Set the reference temperature used for the linearization of the radiative
-  transfer, in Kelvin. By default *reference*
-  is @STARDIS_ARGS_DEFAULT_REFERENCE_TEMP@.
-
 *-t* _threads-count_::
   Hint on the number of threads to use. By default use as many threads as CPU
   cores.

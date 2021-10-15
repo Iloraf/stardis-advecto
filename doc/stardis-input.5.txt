@@ -117,17 +117,17 @@ _______
                           <triangles>
 
 
-<h-bound-for-solid>   ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <emissivity> \
+<h-bound-for-solid>   ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <Tref> <emissivity> \
                           <specular-fraction> <hc> <outside-temperature> \
                           <triangles>
 
-<h-bound-for-fluid>   ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <emissivity> \
+<h-bound-for-fluid>   ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <Tref> <emissivity> \
                           <specular-fraction> <hc> <outside-temperature> \
                           <triangles>
 
 <f-bound-for-solid>   ::= "F_BOUNDARY_FOR_SOLID" <bound-name> <flux> <triangles>
 
-<solid-fluid-connect> ::= "SOLID_FLUID_CONNECTION" <bound-name> <emissivity> \
+<solid-fluid-connect> ::= "SOLID_FLUID_CONNECTION" <bound-name> <Tref> <emissivity> \
                           <specular-fraction> <hc> <triangles>
 
 <solid-solid-connect> ::= "SOLID_SOLID_CONNECTION" <bound-name> \
@@ -162,6 +162,8 @@ _______
 <triangle-sides>      ::= <side-specifier> <file-name> [ <triangle-sides> ]
 
 <bound-name>          ::= STRING # no space allowed
+
+<Tref>                ::= REAL # in [0, inf)
 
 <emissivity>          ::= REAL # in [0, 1]
 

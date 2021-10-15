@@ -195,6 +195,7 @@ error:
 
 struct h_boundary {
   struct str name;
+  double ref_temperature;
   double emissivity;
   double specular_fraction;
   double hc;
@@ -206,6 +207,7 @@ static FINLINE void
 init_h(struct mem_allocator* allocator, struct h_boundary* dst)
 {
   str_init(allocator, &dst->name);
+  dst->ref_temperature = 0;
   dst->emissivity = 0;
   dst->specular_fraction = 0;
   dst->hc = 0;
@@ -228,10 +230,11 @@ str_print_h_boundary
   res_T res = RES_OK;
   ASSERT(str && b && DESC_IS_H(type));
   STR_APPEND_PRINTF(str,
-    "H boundary for %s '%s': emissivity=%g specular_fraction=%g hc=%g T=%g "
-    "(using medium %u as external medium)",
-    ARG7( (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"), str_cget(&b->name),
-      b->emissivity, b->specular_fraction, b->hc, b->imposed_temperature, b->mat_id ) );
+    "H boundary for %s '%s': ref_temperature=%g emissivity=%g specular_fraction=%g "
+    "hc=%g T=%g (using medium %u as external medium)",
+    ARG8( (type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"), str_cget(&b->name),
+      b->ref_temperature, b->emissivity, b->specular_fraction, b->hc,
+      b->imposed_temperature, b->mat_id ) );
 end:
   return res;
 error:
@@ -341,6 +344,7 @@ cp_f_boundary(struct f_boundary* dst, const struct f_boundary* src)
 
 struct solid_fluid_connect {
   struct str name;
+  double ref_temperature;
   double emissivity;
   double specular_fraction;
   double hc;
@@ -357,6 +361,7 @@ static FINLINE void
 init_sf(struct mem_allocator* allocator, struct solid_fluid_connect* dst)
 {
   str_init(allocator, &dst->name);
+  dst->ref_temperature = 0;
   dst->emissivity = 0;
   dst->specular_fraction = 0;
   dst->hc = 0;
@@ -370,9 +375,9 @@ str_print_sf_connect
 {
   res_T res = RES_OK;
   ASSERT(str && c);
-  STR_APPEND_PRINTF(str, "Solid-Fluid connection '%s':", ARG1( str_cget(&c->name) ) );
-  STR_APPEND_PRINTF(str, " emissivity=%g, specular_fraction=%g hc=%g",
-      ARG3( c->emissivity, c->specular_fraction, c->hc ) );
+  STR_APPEND_PRINTF(str, "Solid-Fluid connection '%s': ", ARG1( str_cget(&c->name) ) );
+  STR_APPEND_PRINTF(str, "ref_temperature=%g emissivity=%g, specular_fraction=%g hc=%g",
+      ARG4( c->ref_temperature, c->emissivity, c->specular_fraction, c->hc ) );
 end:
   return res;
 error:
@@ -383,10 +388,11 @@ static FINLINE res_T
 cp_sf_connect
   (struct solid_fluid_connect* dst, const struct solid_fluid_connect* src)
 {
-  dst->connection_id = src->connection_id;
-  dst->specular_fraction = src->specular_fraction;
+  dst->ref_temperature = src->ref_temperature;
   dst->emissivity = src->emissivity;
+  dst->specular_fraction = src->specular_fraction;
   dst->hc = src->hc;
+  dst->connection_id = src->connection_id;
   return str_copy(&dst->name, &src->name);
 }
 
@@ -424,8 +430,8 @@ str_print_ss_connect
 {
   res_T res = RES_OK;
   ASSERT(str && c);
-  STR_APPEND_PRINTF(str, "Solid-Solid connection '%s':", ARG1( str_cget(&c->name) ) );
-  STR_APPEND_PRINTF(str, " contact resistance=%g", ARG1( c->tcr ) );
+  STR_APPEND_PRINTF(str, "Solid-Solid connection '%s': ", ARG1( str_cget(&c->name) ) );
+  STR_APPEND_PRINTF(str, "contact resistance=%g", ARG1( c->tcr ) );
 end:
   return res;
 error:

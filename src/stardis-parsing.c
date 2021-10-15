@@ -338,7 +338,6 @@ init_args
   d2(args->pos_and_time+3,
     STARDIS_DEFAULT_COMPUTE_TIME, STARDIS_DEFAULT_COMPUTE_TIME);
   args->ambient_temp = STARDIS_DEFAULT_AMBIENT_TEMP;
-  args->ref_temp = STARDIS_DEFAULT_REFERENCE_TEMP;
   args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;
 
 end:
@@ -572,7 +571,7 @@ parse_args
 {
   int opt = 0, n_used = 0;
   size_t len = 0;
-  const char option_list[] = "a:c:dD:eF:gG:hm:M:n:p:P:r:R:s:S:t:vV:x:X:";
+  const char option_list[] = "a:c:dD:eF:gG:hm:M:n:p:P:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -808,19 +807,6 @@ parse_args
           args->medium_name = optarg + strlen(line[0]) + 1;
 
         break;
-
-    case 'r':
-      res = cstr_to_double(optarg, &args->ref_temp);
-      if(res != RES_OK
-        || args->ref_temp < 0)
-      {
-        if(res == RES_OK) res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
-      break;
 
     case 'R':
       if(args->mode & EXCLUSIVE_MODES) {
@@ -1200,8 +1186,8 @@ find_description_by_name
   return NULL;
 }
 
-/* H_BOUNDARY_FOR_SOLID Name emissivity specular_fraction hc T_env STL_filenames
- * H_BOUNDARY_FOR_FLUID Name emissivity specular_fraction hc T_env STL_filenames */
+/* H_BOUNDARY_FOR_SOLID Name ref_temperature emissivity specular_fraction hc T_env STL_filenames
+ * H_BOUNDARY_FOR_FLUID Name ref_temperature emissivity specular_fraction hc T_env STL_filenames */
 static res_T
 process_h
   (struct stardis* stardis,
@@ -1236,6 +1222,15 @@ process_h
     goto end;
   }
 
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "ref_temperature");
+  res = cstr_to_double(tk, &desc->d.h_boundary.ref_temperature);
+  if(res != RES_OK
+    || desc->d.h_boundary.ref_temperature < 0)
+  {
+    logger_print(stardis->logger, LOG_ERROR, "Invalid reference temperature: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
   res = cstr_to_double(tk, &desc->d.h_boundary.emissivity);
   if(res != RES_OK
@@ -1413,7 +1408,7 @@ error:
   goto end;
 }
 
-/* SOLID_FLUID_CONNECTION Name emissivity specular_fraction hc STL_filenames */
+/* SOLID_FLUID_CONNECTION Name ref_temperature emissivity specular_fraction hc STL_filenames */
 static res_T
 process_sfc
   (struct stardis* stardis,
@@ -1450,6 +1445,15 @@ process_sfc
     goto end;
   }
 
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "ref_temperature");
+  res = cstr_to_double(tk, &desc->d.h_boundary.ref_temperature);
+  if(res != RES_OK
+    || desc->d.h_boundary.ref_temperature < 0)
+  {
+    logger_print(stardis->logger, LOG_ERROR, "Invalid reference temperature: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
   res = cstr_to_double(tk, &desc->d.sf_connect.emissivity);
   if(res != RES_OK
@@ -1861,11 +1865,11 @@ error:
 /* Read medium or boundary line; should be one of:
  * SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_filenames
  * FLUID Name rho cp Tinit Timposed STL_filenames
- * H_BOUNDARY_FOR_SOLID Name emissivity specular_fraction hc T_env STL_filenames
- * H_BOUNDARY_FOR_FLUID Name emissivity specular_fraction hc T_env STL_filenames
+ * H_BOUNDARY_FOR_SOLID Name ref_temperature emissivity specular_fraction hc T_env STL_filenames
+ * H_BOUNDARY_FOR_FLUID Name ref_temperature emissivity specular_fraction hc T_env STL_filenames
  * T_BOUNDARY_FOR_SOLID Name T STL_filenames
  * F_BOUNDARY_FOR_SOLID Name F STL_filenames
- * SOLID_FLUID_CONNECTION Name emissivity specular_fraction hc STL_filenames
+ * SOLID_FLUID_CONNECTION Name ref_temperature emissivity specular_fraction hc STL_filenames
  * SCALE scale_factor
  *
  * STL_filenames = { { FRONT | BACK | BOTH } STL_filename }+

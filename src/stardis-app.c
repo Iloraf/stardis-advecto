@@ -236,7 +236,6 @@ stardis_init
   stardis->nthreads = args->nthreads;
   stardis->scale_factor = -1; /* invalid value */
   stardis->ambient_temp = args->ambient_temp;
-  stardis->ref_temp = args->ref_temp;
   stardis->dump_paths = SDIS_HEAT_PATH_NONE;
   if(args->dump_paths & DUMP_ERROR)
     stardis->dump_paths |= SDIS_HEAT_PATH_FAILURE;
@@ -395,7 +394,6 @@ stardis_init
     scn_args.nvertices = vcount;
     scn_args.fp_to_meter = stardis->scale_factor;
     scn_args.trad = stardis->ambient_temp;
-    scn_args.tref = stardis->ref_temp;
     scn_args.context = &create_context;
     res = sdis_scene_create(stardis->dev, &scn_args, &stardis->sdis_scn);
     if(res != RES_OK) {

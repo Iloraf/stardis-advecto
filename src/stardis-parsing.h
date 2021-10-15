@@ -114,7 +114,7 @@ struct args {
   unsigned nthreads;
   double pos_and_time[5];
   enum stardis_mode mode;
-  double ambient_temp, ref_temp;
+  double ambient_temp;
   char* camera;
   enum dump_path_type dump_paths;
   int verbose;

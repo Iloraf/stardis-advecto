@@ -33,6 +33,13 @@ variable the install directories of its dependencies.
 
 ## Release notes
 
+### Version 0.7
+
+- Remove the boundary condition `T_BOUNDARY_FOR_FLUID`: it was exactly the same
+  than `H_BOUNDARY_FOR_FLUID` that should now be used instead.
+- Sets the required version of Star-SampPling to 0.12. This version fixes
+  compilation errors with gcc 11 but introduces API breaks.
+
 ### Version 0.6
 
 - Add thermal contact resistances.
@@ -65,9 +72,9 @@ variable the install directories of its dependencies.
 
 ### Version 0.3.2
 
-- Add the solve_probe_boundary feature. The solve_probe_boundary VS
-  solve_probe selection is automated according the probe-geometry distance.
-  solve_probe_boundary is called for probe points closer than 2.1 delta
+- Add the `solve_probe_boundary` feature. The `solve_probe_boundary` VS
+  `solve_probe` selection is automated according the probe-geometry distance.
+  `solve_probe_boundary` is called for probe points closer than 2.1 delta
   from geometry.
 - Add flux boundary conditions.
 
@@ -76,13 +83,13 @@ variable the install directories of its dependencies.
 Add radiative transfer computations. To achieve this, media gain 2 new parameters: 
 
 - emissivity;
-- specular_fraction.
+- `specular_fraction`.
 
 ### Version 0.3
 
 - Upgrade stardis-solver to v0.3.
 - Add volumic power sources on solids;
-- Allow to use the fp_to_meter parameter of the stardis-solver solve function;
+- Allow to use the `fp_to_meter` parameter of the stardis-solver solve function;
 - Add a dump geometry feature. It outputs the geometry as it is sent to
   stardis-solver in VTK format, together with the front and back media and
   boundary conditions information.

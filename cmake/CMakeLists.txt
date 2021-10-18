@@ -55,7 +55,7 @@ configure_file(${SDIS_SOURCE_DIR}/../doc/stardis.1.txt.in
   ${CMAKE_CURRENT_BINARY_DIR}/doc/stardis.1.txt @ONLY)
 
 set(SDIS_VERSION_MAJOR 0)
-set(SDIS_VERSION_MINOR 6)
+set(SDIS_VERSION_MINOR 7)
 set(SDIS_VERSION_PATCH 0)
 set(SDIS_VERSION ${SDIS_VERSION_MAJOR}.${SDIS_VERSION_MINOR}.${SDIS_VERSION_PATCH})
 
@@ -75,7 +75,7 @@ find_package(Star3D 0.8 REQUIRED)
 find_package(StarEnc3D 0.5.3 REQUIRED)
 find_package(Stardis 0.12 REQUIRED)
 find_package(StarSTL 0.3.3 REQUIRED)
-find_package(StarSP 0.8.1 REQUIRED)
+find_package(StarSP 0.12 REQUIRED)
 if(MSVC)
   find_package(MuslGetopt REQUIRED)
 endif()

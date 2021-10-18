@@ -508,6 +508,13 @@ short_help
 
   fprintf(stream, "\n  -X <FILE>\n");
   fprintf(stream, "     Save the final random generator's state in a file.\n");
+
+  fprintf(stream,
+"\nCopyright (C) 2018-2021 |Meso|Star> <contact@meso-star.com>.\n"
+"stardis is free software released under the GNU GPL license, version 3 or later.\n"
+"You are free to change or redistribute it under certain conditions\n"
+"<http://gnu.org/licenses/gpl.html>.\n");
+
 }
 
 #define FREE_AARRAY(ARRAY) \
@@ -1299,13 +1306,11 @@ error:
   goto end;
 }
 
-/* T_BOUNDARY_FOR_SOLID Name T STL_filenames
- * T_BOUNDARY_FOR_FLUID Name T emissivity specular_fraction hc STL_filenames */
+/* T_BOUNDARY_FOR_SOLID Name T STL_filenames */
 static res_T
 process_t
   (struct stardis* stardis,
    struct dummies* dummies,
-   const enum description_type type,
    char** tok_ctx)
 {
   char* tk = NULL;
@@ -1322,9 +1327,8 @@ process_t
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
   init_t(stardis->allocator, &desc->d.t_boundary);
 
-  desc->type = type;
-  desc->d.t_boundary.mat_id = (type == DESC_BOUND_T_FOR_FLUID)
-    ? get_dummy_solid_id(stardis, dummies) : get_dummy_fluid_id(stardis, dummies);
+  desc->type = DESC_BOUND_T_FOR_SOLID;
+  desc->d.t_boundary.mat_id = get_dummy_fluid_id(stardis, dummies);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature boundary name");
   ERR(description_set_name(stardis, &desc->d.t_boundary.name, tk));
@@ -1345,38 +1349,6 @@ process_t
     logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
-  }
-  if(type == DESC_BOUND_T_FOR_FLUID) {
-    CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
-    res = cstr_to_double(tk, &desc->d.t_boundary.emissivity);
-    if(res != RES_OK
-      || desc->d.t_boundary.emissivity < 0
-      || desc->d.t_boundary.emissivity > 1)
-    {
-      logger_print(stardis->logger, LOG_ERROR, "Invalid emissivity: %s\n", tk);
-      if(res == RES_OK) res = RES_BAD_ARG;
-      goto end;
-    }
-    CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "specular fraction");
-    res = cstr_to_double(tk, &desc->d.t_boundary.specular_fraction);
-    if(res != RES_OK
-      || desc->d.t_boundary.specular_fraction < 0
-      || desc->d.t_boundary.specular_fraction > 1)
-    {
-      logger_print(stardis->logger, LOG_ERROR,
-        "Invalid specular fraction: %s\n", tk);
-      if(res == RES_OK) res = RES_BAD_ARG;
-      goto end;
-    }
-    CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "hc");
-    res = cstr_to_double(tk, &desc->d.t_boundary.hc);
-    if(res != RES_OK
-      || desc->d.t_boundary.hc < 0)
-    {
-      logger_print(stardis->logger, LOG_ERROR, "Invalid hc: %s\n", tk);
-      if(res == RES_OK) res = RES_BAD_ARG;
-      goto end;
-    }
   }
 
   ASSERT(sz <= UINT_MAX);
@@ -1893,7 +1865,6 @@ error:
  * H_BOUNDARY_FOR_SOLID Name emissivity specular_fraction hc T_env STL_filenames
  * H_BOUNDARY_FOR_FLUID Name emissivity specular_fraction hc T_env STL_filenames
  * T_BOUNDARY_FOR_SOLID Name T STL_filenames
- * T_BOUNDARY_FOR_FLUID Name T hc STL_filenames
  * F_BOUNDARY_FOR_SOLID Name F STL_filenames
  * SOLID_FLUID_CONNECTION Name emissivity specular_fraction hc STL_filenames
  * SCALE scale_factor
@@ -1922,9 +1893,7 @@ process_model_line
   else if(0 == strcasecmp(tk, "H_BOUNDARY_FOR_FLUID"))
     ERR(process_h(stardis, dummies, DESC_BOUND_H_FOR_FLUID, &tok_ctx));
   else if(0 == strcasecmp(tk, "T_BOUNDARY_FOR_SOLID"))
-    ERR(process_t(stardis, dummies, DESC_BOUND_T_FOR_SOLID, &tok_ctx));
-  else if(0 == strcasecmp(tk, "T_BOUNDARY_FOR_FLUID"))
-    ERR(process_t(stardis, dummies, DESC_BOUND_T_FOR_FLUID, &tok_ctx));
+    ERR(process_t(stardis, dummies, &tok_ctx));
   else if(0 == strcasecmp(tk, "F_BOUNDARY_FOR_SOLID"))
     ERR(process_flx(stardis, dummies, &tok_ctx));
   else if(0 == strcasecmp(tk, "SOLID_FLUID_CONNECTION"))

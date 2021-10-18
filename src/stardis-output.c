@@ -95,7 +95,6 @@ merge_flux_terms
 
   switch (descs[desc_id].type) {
   case DESC_BOUND_T_FOR_SOLID:
-  case DESC_BOUND_T_FOR_FLUID:
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
     FATAL("Cannot have a flux term here.\n"); break;
@@ -444,7 +443,7 @@ dump_sample_end
     size_t ambient_id = darray_descriptions_size_get(e_ctx->desc);
     ASSERT(ambient_id <= UINT_MAX);
     /* End, End ID, X, Y, Z, Elapsed time */
-    fprintf(stream, "AMBIANT, %u, 0, 0, 0, %g\n",
+    fprintf(stream, "AMBIENT, %u, 0, 0, 0, %g\n",
       (unsigned)ambient_id, elapsed);
   } else {
     struct sdis_point pt = SDIS_POINT_NULL;
@@ -807,7 +806,6 @@ print_sample
     desc_id = d__->desc_id;
     switch (descs[desc_id].type) {
     case DESC_BOUND_T_FOR_SOLID:
-    case DESC_BOUND_T_FOR_FLUID:
       fprintf(w_ctx->stream, "T\t%u", desc_id);
       break;
     case DESC_BOUND_H_FOR_SOLID:
@@ -984,8 +982,6 @@ dump_green_ascii
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct t_boundary* bd;
-      if(desc->type != DESC_BOUND_T_FOR_SOLID
-        && desc->type != DESC_BOUND_T_FOR_FLUID) continue;
       bd = &desc->d.t_boundary;
       fprintf(stream, "%u\t%s\t%g\n",
         i, str_cget(&bd->name), bd->imposed_temperature);

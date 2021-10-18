@@ -255,37 +255,14 @@ create_intface
           fluid_side_shader->specular_fraction = interface_get_alpha;
         }
         break;
-      case DESC_BOUND_T_FOR_FLUID:
-        if(sdis_medium_get_type(def_medium) != SDIS_FLUID) {
-          res = RES_BAD_ARG;
-          goto error;
-        }
-        type_checked = 1;
-        interface_shader.convection_coef_upper_bound = connect->d.t_boundary.hc;
-        interface_props->hc = connect->d.t_boundary.hc;
-        if(connect->d.t_boundary.hc > 0) {
-          ASSERT(connect->type == DESC_BOUND_T_FOR_FLUID);
-          interface_shader.convection_coef = interface_get_convection_coef;
-        }
-        interface_props->emissivity = connect->d.t_boundary.emissivity;
-        interface_props->alpha = connect->d.t_boundary.specular_fraction;
-        if(connect->d.t_boundary.emissivity > 0) {
-          ASSERT(fluid_side_shader);
-          fluid_side_shader->emissivity = interface_get_emissivity;
-          fluid_side_shader->specular_fraction = interface_get_alpha;
-        }
-        /* fall through */
       case DESC_BOUND_T_FOR_SOLID:
-        if(!type_checked
-          &&  sdis_medium_get_type(def_medium) != SDIS_SOLID)
-        {
+        if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
           res = RES_BAD_ARG;
           goto error;
         }
         ext_id = connect->d.t_boundary.mat_id; /* External material id */
         ASSERT(ext_id < darray_media_ptr_size_get(&stardis->media));
-        ASSERT(sdis_medium_get_type(media[ext_id])
-          == (connect->type == DESC_BOUND_T_FOR_FLUID ? SDIS_SOLID: SDIS_FLUID));
+        ASSERT(sdis_medium_get_type(media[ext_id]) == SDIS_FLUID);
         connection_count++;
         boundary_count++;
         if(front_defined) {
@@ -295,16 +272,14 @@ create_intface
           ASSERT(!front_med);
           front_med = media[ext_id];
         }
-        /* The imposed T is for the 2 sides (until there is contact resistnces) */
+        /* The imposed T is for the 2 sides (until there is contact resistances) */
         interface_shader.front.temperature = interface_get_temperature;
         interface_shader.back.temperature = interface_get_temperature;
-        if(connect->type == DESC_BOUND_T_FOR_SOLID) {
-          /* Set emissivity to 1 to allow radiative paths comming from
-           * a possible external fluid to 'see' the imposed T */
-          ASSERT(fluid_side_shader);
-          fluid_side_shader->emissivity = interface_get_emissivity;
-          interface_props->emissivity = 1;
-        }
+        /* Set emissivity to 1 to allow radiative paths comming from
+         * a possible external fluid to 'see' the imposed T */
+        ASSERT(fluid_side_shader);
+        fluid_side_shader->emissivity = interface_get_emissivity;
+        interface_props->emissivity = 1;
         ASSERT(connect->d.t_boundary.imposed_temperature >= 0);
         interface_props->imposed_temperature
           = connect->d.t_boundary.imposed_temperature;

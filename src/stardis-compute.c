@@ -385,7 +385,7 @@ error:
         name); \
       goto error; \
     } \
-    ERR(ssp_rng_create(stardis->allocator, &ssp_rng_mt19937_64, &args.rng_state)); \
+    ERR(ssp_rng_create(stardis->allocator, SSP_RNG_MT19937_64, &args.rng_state)); \
     res =  read_random_generator_state(args.rng_state, stream); \
     if(res != RES_OK) { \
       logger_print(stardis->logger, LOG_ERROR, \

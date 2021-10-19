@@ -275,7 +275,7 @@ str_print_t_boundary
    const struct t_boundary* b)
 {
   res_T res = RES_OK;
-  ASSERT(str && b && DESC_IS_T(type));
+  ASSERT(str && b);
   STR_APPEND_PRINTF(str, "T boundary for solid '%s': T=%g ",
    ARG2( str_cget(&b->name), b->imposed_temperature ) );
 

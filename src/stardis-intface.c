@@ -56,6 +56,16 @@ interface_get_flux
 }
 
 static double
+interface_get_ref_temperature
+  (const struct sdis_interface_fragment* frag,
+   struct sdis_data* data)
+{
+  const struct intface* interface_props = sdis_data_cget(data);
+  (void)frag;
+  return interface_props->ref_temperature;
+}
+
+static double
 interface_get_emissivity
   (const struct sdis_interface_fragment* frag,
    struct sdis_data* data)
@@ -249,8 +259,9 @@ create_intface
         if(connect->d.h_boundary.hc > 0) {
           interface_shader.convection_coef = interface_get_convection_coef;
         }
+        ASSERT(fluid_side_shader);
+        fluid_side_shader->reference_temperature = interface_get_ref_temperature;
         if(connect->d.h_boundary.emissivity > 0) {
-          ASSERT(fluid_side_shader);
           fluid_side_shader->emissivity = interface_get_emissivity;
           fluid_side_shader->specular_fraction = interface_get_alpha;
         }
@@ -278,6 +289,7 @@ create_intface
         /* Set emissivity to 1 to allow radiative paths comming from
          * a possible external fluid to 'see' the imposed T */
         ASSERT(fluid_side_shader);
+        fluid_side_shader->reference_temperature = interface_get_ref_temperature;
         fluid_side_shader->emissivity = interface_get_emissivity;
         interface_props->emissivity = 1;
         ASSERT(connect->d.t_boundary.imposed_temperature >= 0);
@@ -317,8 +329,9 @@ create_intface
         if(connect->d.sf_connect.hc > 0) {
           interface_shader.convection_coef = interface_get_convection_coef;
         }
+        ASSERT(fluid_side_shader);
+        fluid_side_shader->reference_temperature = interface_get_ref_temperature;
         if(connect->d.sf_connect.emissivity > 0) {
-          ASSERT(fluid_side_shader);
           fluid_side_shader->emissivity = interface_get_emissivity;
           fluid_side_shader->specular_fraction = interface_get_alpha;
         }

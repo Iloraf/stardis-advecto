@@ -29,6 +29,7 @@ struct dummies;
 struct intface {
   /* fluid - solid */
   double hc;
+  double ref_temperature;
   double emissivity;
   double alpha;
   /* solid - solid */

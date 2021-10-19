@@ -33,6 +33,10 @@ variable the install directories of its dependencies.
 
 ## Release notes
 
+### Version 0.7.1
+
+Fix debug build.
+
 ### Version 0.7
 
 - Remove the boundary condition `T_BOUNDARY_FOR_FLUID`: it was exactly the same

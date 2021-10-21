@@ -33,6 +33,11 @@ variable the install directories of its dependencies.
 
 ## Release notes
 
+### Version 0.7.2
+
+Fix the binary file format of the green function: the fileformat has been
+updated without incrementing the version of the serialised data.
+
 ### Version 0.7.1
 
 Fix debug build.

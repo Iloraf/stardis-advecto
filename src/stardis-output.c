@@ -654,7 +654,7 @@ dump_green_bin
   char* name_pool = NULL;
   char* pool_ptr;
   const char green_string[] = "GREEN_BIN_FILE:";
-  const unsigned file_fmt_version = 2;
+  const unsigned file_fmt_version = 3;
   /* The following type must be identical to its stardis-green counterpart! */
   struct bfile_green_counts {
     unsigned desc_count, smed_count, fmed_count, tbound_count, hbound_count,

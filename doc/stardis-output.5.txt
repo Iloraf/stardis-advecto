@@ -693,25 +693,22 @@ _______
                         | "4" # H_BOUNDARY_FOR_SOLID between 2 defined media
                         | "5" # H_BOUNDARY_FOR_SOLID between 2 undefined media
                         | "6" # H_BOUNDARY_FOR_SOLID enclosing a fluid
-                        | "7" # T_BOUNDARY_FOR_FLUID between 2 defined media
-                        | "8" # T_BOUNDARY_FOR_FLUID between 2 undefined media
-                        | "9" # T_BOUNDARY_FOR_FLUID enclosing a solid
-                        | "10" # T_BOUNDARY_FOR_SOLID between 2 defined media
-                        | "11" # T_BOUNDARY_FOR_SOLID between 2 undefined media
-                        | "12" # T_BOUNDARY_FOR_SOLID enclosing a fluid
-                        | "13" # F_BOUNDARY_FOR_FLUID between 2 defined media
-                        | "14" # F_BOUNDARY_FOR_FLUID between 2 undefined media
-                        | "15" # F_BOUNDARY_FOR_SOLID enclosing a fluid
-                        | "16" # SOLID_FLUID_CONNECTION between 2 solids
-                        | "17" # SOLID_FLUID_CONNECTION between 2 fluids
-                        | "18" # SOLID_FLUID_CONNECTION used as boundary
-                        | "19" # SOLID_FLUID_CONNECTION between 2 undefined
+                        | "7" # T_BOUNDARY_FOR_SOLID between 2 defined media
+                        | "8" # T_BOUNDARY_FOR_SOLID between 2 undefined media
+                        | "9" # T_BOUNDARY_FOR_SOLID enclosing a fluid
+                        | "10" # F_BOUNDARY_FOR_FLUID between 2 defined media
+                        | "11" # F_BOUNDARY_FOR_FLUID between 2 undefined media
+                        | "12" # F_BOUNDARY_FOR_SOLID enclosing a fluid
+                        | "13" # SOLID_FLUID_CONNECTION between 2 solids
+                        | "14" # SOLID_FLUID_CONNECTION between 2 fluids
+                        | "15" # SOLID_FLUID_CONNECTION used as boundary
+                        | "16" # SOLID_FLUID_CONNECTION between 2 undefined
                                # media
-                        | "20" # no connexion between 2 fluids
-                        | "21" # no connexion between a solid and a fluid
-                        | "22" # no boundary around a fluid
-                        | "23" # no boundary around a solid
-                        | "24" # invalid part of a compute surface
+                        | "17" # no connexion between 2 fluids
+                        | "18" # no connexion between a solid and a fluid
+                        | "19" # no boundary around a fluid
+                        | "20" # no boundary around a solid
+                        | "21" # invalid part of a compute surface
                           <trg-prop-conflicts> # #triangles statuses
 
 <real3>               ::= REAL REAL REAL

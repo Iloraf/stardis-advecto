@@ -244,10 +244,11 @@ error:
 static FINLINE res_T
 cp_h_boundary(struct h_boundary* dst, const struct h_boundary* src)
 {
-  dst->specular_fraction = src->specular_fraction;
-  dst->imposed_temperature = src->imposed_temperature;
+  dst->ref_temperature = src->ref_temperature;
   dst->emissivity = src->emissivity;
+  dst->specular_fraction = src->specular_fraction;
   dst->hc = src->hc;
+  dst->imposed_temperature = src->imposed_temperature;
   dst->mat_id = src->mat_id;
   return str_copy(&dst->name, &src->name);
 }

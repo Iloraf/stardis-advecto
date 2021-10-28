@@ -249,7 +249,6 @@ _______
                    <descriptions>
                    <concatenated-names> # char[names-pool-size]
                    ambient-temperature # double
-                   reference-temperature # double
                    time-range # double[2]
                    <samples>
 
@@ -316,6 +315,7 @@ _______
 
  struct h_boundary {
    struct str name;
+   double ref_temperature;
    double emissivity;
    double specular_fraction;
    double hc;
@@ -325,6 +325,7 @@ _______
 
  struct solid_fluid_connect {
    struct str name;
+   double ref_temperature;
    double emissivity;
    double specular_fraction;
    double hc;
@@ -390,14 +391,14 @@ _______
                         "# ID Name temperature"
                         <t-bounds>
                         "# H Boundaries"
-                        "# ID Name emissivity specular_fraction hc T_env"
+                        "# ID Name ref_temperature emissivity specular_fraction hc T_env"
                         <h-bounds>
                         "# F Boundaries"
                         "# ID Name flux"
                         <f-bounds>
-                        "# Radiative Temperatures"
-                        "# ID Rad_Temp Lin_Temp"
-                        <rad-temps>
+                        "# Radiative Temperature"
+                        "# ID Rad_Temp"
+                        <rad-temp>
                         "# Samples"
                         "# end #power_terms #flux_terms power_term_1 ... \
                         power_term_n flux_term_1 ... flux_term_n"
@@ -425,7 +426,7 @@ _______
 <f-bounds>          ::= <f-bound>
                         <f-bounds> # #f-bounds f-bound descriptions
 
-<rad-temps>         ::= <green-id> <rad-temp> <lin-temp>
+<rad-temp>          ::= <green-id> <ambient-temp>
 
 <samples>           ::= <sample>
                         <samples> # #samples sample descriptions
@@ -443,12 +444,11 @@ _______
 
 <t-bound>           ::= <green-id> <name> <temperature>
 
-<h-bound>           ::= <green-id> <name> <emissivity> <specular_fraction> \
-                        <hc> <temperature>
+<h-bound>           ::= <green-id> <name> <ref_temperature> <emissivity> \
+                        <specular_fraction> <hc> <temperature>
 
 <f-bound>           ::= <green-id> <name> <flux>
 
-<rad-temps>         ::= <green-id> <ambient-temp> <lin-temp>
 
 <name>              ::= STRING # no space allowed
 
@@ -467,6 +467,8 @@ _______
                       | "NONE" if not imposed
 
 <temperature>       ::= REAL # in [0, INF)
+
+<ref-temperature>   ::= REAL # in [0, INF)
 
 <emissivity>        ::= REAL # in [0, 1]
 

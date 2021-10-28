@@ -722,9 +722,8 @@ dump_green_bin
   if(name_pool_sz)
     FW(name_pool, name_pool_sz);
 
-  /* Write radiative temperatures */
+  /* Write ambient temperatures */
   FW(&stardis->ambient_temp, 1);
-  FW(&stardis->ref_temp, 1);
 
   /* Write time range */
   FW(&stardis->time_range, 2);
@@ -989,16 +988,16 @@ dump_green_ascii
   }
   if(stardis->counts.hbound_count) {
     fprintf(stream, "# H Boundaries\n");
-    fprintf(stream, "# ID Name emissivity specular_fraction hc T_env\n");
+    fprintf(stream, "# ID Name ref_temperature emissivity specular_fraction hc T_env\n");
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct h_boundary* bd;
       if(desc->type != DESC_BOUND_H_FOR_SOLID
         && desc->type != DESC_BOUND_H_FOR_FLUID) continue;
       bd = &desc->d.h_boundary;
-      fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\n",
-        i, str_cget(&bd->name), bd->emissivity, bd->specular_fraction,
-        bd->hc, bd->imposed_temperature);
+      fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\t%g\n",
+        i, str_cget(&bd->name), bd->ref_temperature, bd->emissivity,
+        bd->specular_fraction, bd->hc, bd->imposed_temperature);
     }
   }
   if(stardis->counts.fbound_count) {
@@ -1014,11 +1013,11 @@ dump_green_ascii
     }
   }
 
-  /* Radiative Temperatures */
-  fprintf(stream, "# Radiative Temperatures\n");
-  fprintf(stream, "# ID Amb_Temp Lin_Temp\n");
-  fprintf(stream, "%u\t%g\t%g\n",
-    szd, stardis->ambient_temp, stardis->ref_temp);
+  /* Radiative Temperature */
+  fprintf(stream, "# Radiative Temperature\n");
+  fprintf(stream, "# ID Amb_Temp\n");
+  fprintf(stream, "%u\t%g\n",
+    szd, stardis->ambient_temp);
 
   fprintf(stream, "# Samples\n");
   fprintf(stream,

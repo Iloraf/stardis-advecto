@@ -263,7 +263,7 @@ check_probe_conform_to_type
         if(filter_ctx.dist > 0.5 * delta) {
           logger_print(stardis->logger, LOG_WARNING,
             "Probe was %g delta from closest boundary. "
-            "Consider using -P instead of -p.\n",
+            "Consider using -p instead of -P.\n",
             filter_ctx.dist / delta);
         } else {
           if(filter_ctx.dist != 0)

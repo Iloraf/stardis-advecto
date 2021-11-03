@@ -1446,9 +1446,9 @@ process_sfc
   }
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "ref_temperature");
-  res = cstr_to_double(tk, &desc->d.h_boundary.ref_temperature);
+  res = cstr_to_double(tk, &desc->d.sf_connect.ref_temperature);
   if(res != RES_OK
-    || desc->d.h_boundary.ref_temperature < 0)
+    || desc->d.sf_connect.ref_temperature < 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid reference temperature: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;

@@ -337,7 +337,6 @@ init_args
   args->nthreads = SDIS_NTHREADS_DEFAULT;
   d2(args->pos_and_time+3,
     STARDIS_DEFAULT_COMPUTE_TIME, STARDIS_DEFAULT_COMPUTE_TIME);
-  args->ambient_temp = STARDIS_DEFAULT_AMBIENT_TEMP;
   args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;
 
 end:
@@ -463,9 +462,6 @@ short_help
   fprintf(stream, "\nOther options\n");
   fprintf(stream, "-------------------\n");
 
-  fprintf(stream, "\n  -a AMBIENT_TEMP\n");
-  fprintf(stream, "     Set the ambient radiative temperature.\n");
-
   fprintf(stream, "\n  -c NAMES_PREFIX\n");
   fprintf(stream, "     Dump the geometry and property ids to stdout as C chunks.\n");
 
@@ -571,7 +567,7 @@ parse_args
 {
   int opt = 0, n_used = 0;
   size_t len = 0;
-  const char option_list[] = "a:c:dD:eF:gG:hm:M:n:p:P:R:s:S:t:vV:x:X:";
+  const char option_list[] = "c:dD:eF:gG:hm:M:n:p:P:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -597,19 +593,6 @@ parse_args
       }
       goto error;
     }
-
-    case 'a':
-      res = cstr_to_double(optarg, &args->ambient_temp);
-      if(res != RES_OK
-        || args->ambient_temp < 0)
-      {
-        if(res == RES_OK) res = RES_BAD_ARG;
-        logger_print(args->logger, LOG_ERROR,
-          "Invalid argument for option -%c: %s\n",
-          opt, optarg);
-        goto error;
-      }
-      break;
 
     case 'c':
       if(args->mode & USE_STDOUT_MODES) {
@@ -1138,7 +1121,8 @@ description_set_name
   const char* keywords[] = {
     "AUTO", "BACK", "BOTH", "FLUID", "FRONT", "F_BOUNDARY_FOR_SOLID",
     "H_BOUNDARY_FOR_FLUID", "H_BOUNDARY_FOR_SOLID", "SCALE", "SOLID",
-    "SOLID_FLUID_CONNECTION", "T_BOUNDARY_FOR_SOLID", "UNKNOWN" };
+    "SOLID_FLUID_CONNECTION", "SOLID_SOLID_CONNECTION", "TRAD",
+    "T_BOUNDARY_FOR_SOLID", "UNKNOWN" };
   int i;
   ASSERT(name && tk);
 
@@ -1231,6 +1215,7 @@ process_h
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  stardis->tmax = MMAX(stardis->tmax, desc->d.h_boundary.ref_temperature);
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
   res = cstr_to_double(tk, &desc->d.h_boundary.emissivity);
   if(res != RES_OK
@@ -1270,6 +1255,7 @@ process_h
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  stardis->tmax = MMAX(stardis->tmax, desc->d.h_boundary.imposed_temperature);
 
   if(type == DESC_BOUND_H_FOR_FLUID)
     desc->d.h_boundary.mat_id = get_dummy_solid_id(stardis, dummies);
@@ -1344,6 +1330,7 @@ process_t
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  stardis->tmax = MMAX(stardis->tmax, desc->d.t_boundary.imposed_temperature);
 
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
@@ -1454,6 +1441,7 @@ process_sfc
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  stardis->tmax = MMAX(stardis->tmax, desc->d.sf_connect.ref_temperature);
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
   res = cstr_to_double(tk, &desc->d.sf_connect.emissivity);
   if(res != RES_OK
@@ -1708,6 +1696,7 @@ process_solid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  stardis->tmax = MMAX(stardis->tmax, desc->d.solid.tinit);
   ERR(read_imposed_temperature(stardis, &desc->d.solid.imposed_temperature,
     tok_ctx));
   if(desc->d.solid.imposed_temperature >= 0
@@ -1719,6 +1708,7 @@ process_solid
       desc->d.solid.tinit, desc->d.solid.imposed_temperature); res = RES_BAD_ARG;
     goto end;
   }
+  stardis->tmax = MMAX(stardis->tmax, desc->d.solid.imposed_temperature);
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "volumic power");
   res = cstr_to_double(tk, &desc->d.solid.vpower);
   if(res != RES_OK) {
@@ -1804,6 +1794,7 @@ process_fluid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  stardis->tmax = MMAX(stardis->tmax, desc->d.fluid.tinit);
 
   ERR(read_imposed_temperature(stardis, &desc->d.fluid.imposed_temperature,
     tok_ctx));
@@ -1816,6 +1807,7 @@ process_fluid
       desc->d.fluid.tinit, desc->d.fluid.imposed_temperature); res = RES_BAD_ARG;
     goto end;
   }
+  stardis->tmax = MMAX(stardis->tmax, desc->d.fluid.imposed_temperature);
 
   ERR(create_solver_fluid(stardis, &desc->d.fluid));
 
@@ -1862,6 +1854,51 @@ error:
   goto end;
 }
 
+/* TRAD Trad Trad_ref */
+static res_T
+process_radiative
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  if(stardis->trad_def) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "TRAD cannot be specified twice\n");
+    res = RES_BAD_ARG;
+    goto end;
+  }
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "Trad");
+  res = cstr_to_double(tk, &stardis->trad);
+  if(res != RES_OK
+    || stardis->trad < 0)
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid Trad: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "Trad reference");
+  res = cstr_to_double(tk, &stardis->trad_ref);
+  if(res != RES_OK
+    || stardis->trad_ref < 0)
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid Trad reference: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  stardis->trad_def = 1;
+
+end:
+  return res;
+error:
+  goto end;
+}
+
 /* Read medium or boundary line; should be one of:
  * SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_filenames
  * FLUID Name rho cp Tinit Timposed STL_filenames
@@ -1871,6 +1908,7 @@ error:
  * F_BOUNDARY_FOR_SOLID Name F STL_filenames
  * SOLID_FLUID_CONNECTION Name ref_temperature emissivity specular_fraction hc STL_filenames
  * SCALE scale_factor
+ * TRAD Trad Trad_ref
  *
  * STL_filenames = { { FRONT | BACK | BOTH } STL_filename }+
  */
@@ -1909,6 +1947,8 @@ process_model_line
     ERR(process_fluid(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "SCALE"))
     ERR(process_scale(stardis, &tok_ctx));
+  else if(0 == strcasecmp(tk, "TRAD"))
+    ERR(process_radiative(stardis, &tok_ctx));
   else {
     logger_print(stardis->logger, LOG_ERROR,
       "Unknown description type: %s\n", tk);

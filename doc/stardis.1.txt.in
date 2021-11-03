@@ -186,10 +186,6 @@ EXCLUSIVE OPTIONS
 
 OTHER OPTIONS
 -------------
-*-a* _ambient_::
-  Set the ambient radiative temperature for the whole system, in Kelvin. By
-  default *ambient* is @STARDIS_ARGS_DEFAULT_AMBIENT_TEMP@.
-
 *-d*::
   Write the geometry to _standard output_ in VTK format along with various
   properties, including possible errors. If this option is used, no

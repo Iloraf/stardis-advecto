@@ -254,6 +254,7 @@ create_intface
         else front_med = media[ext_id];
         interface_shader.convection_coef_upper_bound = connect->d.h_boundary.hc;
         interface_props->hc = connect->d.h_boundary.hc;
+        interface_props->ref_temperature = connect->d.h_boundary.ref_temperature;
         interface_props->emissivity = connect->d.h_boundary.emissivity;
         interface_props->alpha = connect->d.h_boundary.specular_fraction;
         if(connect->d.h_boundary.hc > 0) {
@@ -324,6 +325,7 @@ create_intface
         solid_fluid_connection_count++;
         interface_shader.convection_coef_upper_bound = connect->d.sf_connect.hc;
         interface_props->hc = connect->d.sf_connect.hc;
+        interface_props->ref_temperature = connect->d.sf_connect.ref_temperature;
         interface_props->emissivity = connect->d.sf_connect.emissivity;
         interface_props->alpha = connect->d.sf_connect.specular_fraction;
         if(connect->d.sf_connect.hc > 0) {

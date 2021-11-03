@@ -80,6 +80,12 @@ read_model
     stardis->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
   logger_print(stardis->logger, LOG_OUTPUT,
     "Scaling factor is %g\n", stardis->scale_factor);
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Trad is %g, Trad reference is %g\n", stardis->trad, stardis->trad_ref);
+  stardis->tmax = MMAX(stardis->tmax, stardis->trad);
+  stardis->tmax = MMAX(stardis->tmax, stardis->trad_ref);
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "System Tmax is %g\n", stardis->tmax);
 
   ASSERT(!f && !txtrdr);
 exit:
@@ -235,7 +241,9 @@ stardis_init
   stardis->samples = args->samples;
   stardis->nthreads = args->nthreads;
   stardis->scale_factor = -1; /* invalid value */
-  stardis->ambient_temp = args->ambient_temp;
+  stardis->trad = STARDIS_DEFAULT_TRAD;
+  stardis->trad_ref = STARDIS_DEFAULT_TRAD_REFERENCE;
+  stardis->trad_def = 0;
   stardis->dump_paths = SDIS_HEAT_PATH_NONE;
   if(args->dump_paths & DUMP_ERROR)
     stardis->dump_paths |= SDIS_HEAT_PATH_FAILURE;
@@ -393,7 +401,9 @@ stardis_init
     scn_args.nprimitives = tcount;
     scn_args.nvertices = vcount;
     scn_args.fp_to_meter = stardis->scale_factor;
-    scn_args.trad = stardis->ambient_temp;
+    scn_args.trad.temperature = stardis->trad;
+    scn_args.trad.reference = stardis->trad_ref;
+    scn_args.tmax = stardis->tmax;
     scn_args.context = &create_context;
     res = sdis_scene_create(stardis->dev, &scn_args, &stardis->sdis_scn);
     if(res != RES_OK) {

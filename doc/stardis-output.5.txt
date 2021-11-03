@@ -210,7 +210,7 @@ Note that to be able to explore different values of volumic power when
 applying the Green function, it must have been generated with these values
 being non-zero. On the other hand, any temperature or flux value in boundary
 descriptions can be modified when applying the Green function, as well as the
-ambient temperature.
+ambient radiative temperature (Trad).
 
 The output in green mode is made of tables containing the different media and
 boundaries and their imposed temperature, flux and volumic power values,
@@ -222,7 +222,7 @@ be computed as the mean and standard deviation of the samples of the *Green
 function* computed using these settings. Each sample can be computed as
 follows:
 
-* Get the temperature of the ending boundary, medium or ambient;
+* Get the temperature of the ending boundary, medium or Trad;
 * Add the temperature gain of each power term;
 * Add the temperature gain of each flux term.
 
@@ -248,7 +248,8 @@ _______
                    #failed-samples # size_t
                    <descriptions>
                    <concatenated-names> # char[names-pool-size]
-                   ambient-temperature # double
+                   Trad # double
+                   Trad-reference # double
                    time-range # double[2]
                    <samples>
 
@@ -398,7 +399,7 @@ _______
                         <f-bounds>
                         "# Radiative Temperature"
                         "# ID Rad_Temp"
-                        <rad-temp>
+                        <rad-temps>
                         "# Samples"
                         "# end #power_terms #flux_terms power_term_1 ... \
                         power_term_n flux_term_1 ... flux_term_n"
@@ -426,7 +427,7 @@ _______
 <f-bounds>          ::= <f-bound>
                         <f-bounds> # #f-bounds f-bound descriptions
 
-<rad-temp>          ::= <green-id> <ambient-temp>
+<rad-temps>         ::= <green-id> <Trad> <Trad-ref>
 
 <samples>           ::= <sample>
                         <samples> # #samples sample descriptions
@@ -478,9 +479,9 @@ _______
 
 <flux>              ::= REAL # in (-INF, INF)
 
-<ambient-temp>      ::= REAL # in [0, INF)
+<Trad>              ::= REAL # in [0, INF)
 
-<lin-temp>          ::= REAL # in [0, INF)
+<Trad-ref>          ::= REAL # in [0, INF)
 
 <green-id>          ::= INTEGER # in [0 #green-sources[
 
@@ -490,7 +491,7 @@ _______
 <end-type>          ::= "T" # sample ends at an t-bound
                       | "H" # sample ends at an h-bound
                             # a sample cannot end at an f-bound
-                      | "A" # sample ends with ambient temperature
+                      | "R" # sample ends with Trad
                       | "F" # sample ends in a fluid with known temperature
                       | "S" # sample ends in a solid with known temperature
 
@@ -542,11 +543,11 @@ _______
 -------------------------------------
 
 <end-name>           ::= STRING # the name of the boundary at the end of the
-                                # heat path, or AMBIENT for radiative ending
+                                # heat path, or TRAD for radiative ending
 
 <end-id>             ::= INTEGER # in [0 #boundaries]
                                  # order is the order in the description file,
-                                 # AMBIENT's id being #boundaries
+                                 # TRAD's id being #boundaries
 
 <x>                  ::= REAL
 

@@ -801,10 +801,12 @@ struct stardis {
   struct str rndgen_state_out_filename;
   struct str chunks_prefix;
   int mode;
+  int trad_def;
   size_t samples;
   unsigned nthreads;
   double scale_factor;
-  double ambient_temp, ref_temp;
+  double trad, trad_ref;
+  double tmax;
   struct mem_allocator* allocator;
   struct logger* logger;
   struct sdis_device* dev;

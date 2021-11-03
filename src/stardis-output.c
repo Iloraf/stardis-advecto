@@ -440,11 +440,11 @@ dump_sample_end
   ERR(sdis_green_path_get_elapsed_time(path, &elapsed));
   ERR(sdis_green_path_get_end_type(path, &end_type));
   if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
-    size_t ambient_id = darray_descriptions_size_get(e_ctx->desc);
-    ASSERT(ambient_id <= UINT_MAX);
+    size_t trad_id = darray_descriptions_size_get(e_ctx->desc);
+    ASSERT(trad_id <= UINT_MAX);
     /* End, End ID, X, Y, Z, Elapsed time */
-    fprintf(stream, "AMBIENT, %u, 0, 0, 0, %g\n",
-      (unsigned)ambient_id, elapsed);
+    fprintf(stream, "TRAD, %u, 0, 0, 0, %g\n",
+      (unsigned)trad_id, elapsed);
   } else {
     struct sdis_point pt = SDIS_POINT_NULL;
     struct sdis_data* data = NULL;
@@ -471,10 +471,10 @@ dump_sample_end
         data = sdis_medium_get_data(pt.data.mdmvert.medium);
         pos = pt.data.mdmvert.vertex.P;
         if(pt.data.mdmvert.vertex.P[0] == INF) {
-          /* Radiative output (ambient temperature) */
+          /* Radiative output (Trad) */
           size_t sz = darray_descriptions_size_get(e_ctx->desc);
           ASSERT(sz <= UINT_MAX);
-          id = (unsigned)sz; /* Ambient ID */
+          id = (unsigned)sz; /* Trad ID */
         }
         else if(type == SDIS_FLUID) {
           struct fluid* d__ = sdis_data_get(data);
@@ -519,10 +519,10 @@ dump_sample
   stream = w_ctx->stream;
   ERR(sdis_green_path_get_end_type(path, &end_type));
   if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
-    size_t ambient_id = darray_descriptions_size_get(w_ctx->desc);
-    ASSERT(ambient_id <= UINT_MAX);
+    size_t trad_id = darray_descriptions_size_get(w_ctx->desc);
+    ASSERT(trad_id <= UINT_MAX);
     header.at_initial = 0;
-    header.id = (unsigned)ambient_id;
+    header.id = (unsigned)trad_id;
   } else {
     struct sdis_point pt = SDIS_POINT_NULL;
     struct sdis_data* data = NULL;
@@ -557,10 +557,10 @@ dump_sample
         t0 = medium_get_t0(pt.data.mdmvert.medium);
         header.at_initial = (pt.data.mdmvert.vertex.time <= t0);
         if(pt.data.mdmvert.vertex.P[0] == INF) {
-          /* Radiative output (ambient temperature) */
+          /* Radiative output (Trad) */
           sz = darray_descriptions_size_get(w_ctx->desc);
           ASSERT(sz <= UINT_MAX);
-          header.id = (unsigned)sz; /* Ambient ID */
+          header.id = (unsigned)sz; /* Trad ID */
         }
         else if(type == SDIS_FLUID) {
           struct fluid* d__ = sdis_data_get(data);
@@ -722,8 +722,9 @@ dump_green_bin
   if(name_pool_sz)
     FW(name_pool, name_pool_sz);
 
-  /* Write ambient temperatures */
-  FW(&stardis->ambient_temp, 1);
+  /* Write radiative temperatures */
+  FW(&stardis->trad, 1);
+  FW(&stardis->trad_ref, 1);
 
   /* Write time range */
   FW(&stardis->time_range, 2);
@@ -791,7 +792,7 @@ print_sample
   /* For each path, prints:
    * # end #power_terms #flux_terms power_term_1  ... power_term_n flux_term_1 ... flux_term_n
    * with:
-   * - end = end_type end_id; end_type = T | H | A | F | S
+   * - end = end_type end_id; end_type = T | H | R | F | S
    * - power_term_i = power_type_i power_id_i factor_i
    * - flux_term_i = flux_id_i factor_i
    */
@@ -822,10 +823,10 @@ print_sample
     type = sdis_medium_get_type(pt.data.mdmvert.medium);
     data = sdis_medium_get_data(pt.data.mdmvert.medium);
     if(pt.data.mdmvert.vertex.P[0] == INF) {
-      /* Radiative output (ambient temperature)*/
+      /* Radiative output (Trad)*/
       size_t sz = darray_descriptions_size_get(w_ctx->desc);
       ASSERT(sz <= UINT_MAX);
-      fprintf(w_ctx->stream, "A\t%u", (unsigned)sz);
+      fprintf(w_ctx->stream, "R\t%u", (unsigned)sz);
     }
     else if(type == SDIS_FLUID) {
       struct fluid* d__ = sdis_data_get(data);
@@ -1014,15 +1015,15 @@ dump_green_ascii
   }
 
   /* Radiative Temperature */
-  fprintf(stream, "# Radiative Temperature\n");
-  fprintf(stream, "# ID Amb_Temp\n");
-  fprintf(stream, "%u\t%g\n",
-    szd, stardis->ambient_temp);
+  fprintf(stream, "# Radiative Temperatures\n");
+  fprintf(stream, "# ID Trad Trad_Ref\n");
+  fprintf(stream, "%u\t%g\t%g\n",
+    szd, stardis->trad, stardis->trad_ref);
 
   fprintf(stream, "# Samples\n");
   fprintf(stream,
     "# end #power_terms #flux_terms power_term_1 ... power_term_n flux_term_1 ... flux_term_n\n");
-  fprintf(stream, "# end = end_type end_id; end_type = T | H | A | F | S\n");
+  fprintf(stream, "# end = end_type end_id; end_type = T | H | R | F | S\n");
   fprintf(stream, "# power_term_i = power_id_i factor_i\n");
   fprintf(stream, "# flux_term_i = flux_id_i factor_i\n");
 

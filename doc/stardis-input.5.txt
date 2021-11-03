@@ -76,7 +76,6 @@ description.
 [verse]
 _______
 <thermal-system>      ::= <description-lines>
-                        [ <scaling-factor> ]
 
 <description-lines>   ::= <description-line>
                         [ <description-lines> ]
@@ -84,8 +83,8 @@ _______
 <description-line>    ::= [ <medium-frontier> ] [ <comment> ]
                         | [ <medium-boundary> ] [ <comment> ]
                         | [ <media-connection> ] [ <comment> ]
-
-<scaling-factor>      ::= "SCALE" <scaling_factor> [ <comment> ]
+                        | [ <scaling-factor> ] [ <comment> ] # at most once
+                        | [ <radiative-temps> ] [ <comment > ] # at most once
 
 -------------------------------------
 
@@ -133,6 +132,10 @@ _______
 <solid-solid-connect> ::= "SOLID_SOLID_CONNECTION" <bound-name> \
                           <contact-resistance> <triangles>
 
+<scaling-factor>      ::= "SCALE" <scaling_factor> [ <comment> ]
+
+<radiative-temps>     ::= "TRAD" <radiative-temp> <radiative-temp-ref>
+
 -------------------------------------
 
 <medium-name>         ::= STRING # no space allowed, must not be parsable as a
@@ -176,6 +179,10 @@ _______
 <flux>                ::= REAL # in W/m2; in (-INF , INF)
 
 <triangles>           ::= <file-name> [ <triangles> ]
+
+<radiative-temp>      ::= REAL # in [0, inf)
+
+<radiative-temp-ref>  ::= REAL # in [0, inf)
 
 -------------------------------------
 

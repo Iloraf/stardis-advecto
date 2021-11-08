@@ -1215,7 +1215,8 @@ process_h
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->tmax = MMAX(stardis->tmax, desc->d.h_boundary.ref_temperature);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], desc->d.h_boundary.ref_temperature);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], desc->d.h_boundary.ref_temperature);
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
   res = cstr_to_double(tk, &desc->d.h_boundary.emissivity);
   if(res != RES_OK
@@ -1255,7 +1256,6 @@ process_h
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->tmax = MMAX(stardis->tmax, desc->d.h_boundary.imposed_temperature);
 
   if(type == DESC_BOUND_H_FOR_FLUID)
     desc->d.h_boundary.mat_id = get_dummy_solid_id(stardis, dummies);
@@ -1330,7 +1330,6 @@ process_t
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->tmax = MMAX(stardis->tmax, desc->d.t_boundary.imposed_temperature);
 
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
@@ -1441,7 +1440,8 @@ process_sfc
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->tmax = MMAX(stardis->tmax, desc->d.sf_connect.ref_temperature);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], desc->d.sf_connect.ref_temperature);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], desc->d.sf_connect.ref_temperature);
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
   res = cstr_to_double(tk, &desc->d.sf_connect.emissivity);
   if(res != RES_OK
@@ -1696,7 +1696,6 @@ process_solid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->tmax = MMAX(stardis->tmax, desc->d.solid.tinit);
   ERR(read_imposed_temperature(stardis, &desc->d.solid.imposed_temperature,
     tok_ctx));
   if(desc->d.solid.imposed_temperature >= 0
@@ -1708,7 +1707,6 @@ process_solid
       desc->d.solid.tinit, desc->d.solid.imposed_temperature); res = RES_BAD_ARG;
     goto end;
   }
-  stardis->tmax = MMAX(stardis->tmax, desc->d.solid.imposed_temperature);
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "volumic power");
   res = cstr_to_double(tk, &desc->d.solid.vpower);
   if(res != RES_OK) {
@@ -1794,7 +1792,6 @@ process_fluid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->tmax = MMAX(stardis->tmax, desc->d.fluid.tinit);
 
   ERR(read_imposed_temperature(stardis, &desc->d.fluid.imposed_temperature,
     tok_ctx));
@@ -1807,7 +1804,6 @@ process_fluid
       desc->d.fluid.tinit, desc->d.fluid.imposed_temperature); res = RES_BAD_ARG;
     goto end;
   }
-  stardis->tmax = MMAX(stardis->tmax, desc->d.fluid.imposed_temperature);
 
   ERR(create_solver_fluid(stardis, &desc->d.fluid));
 

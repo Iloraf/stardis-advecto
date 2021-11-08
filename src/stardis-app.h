@@ -806,7 +806,7 @@ struct stardis {
   unsigned nthreads;
   double scale_factor;
   double trad, trad_ref;
-  double tmax;
+  double t_range[2];
   struct mem_allocator* allocator;
   struct logger* logger;
   struct sdis_device* dev;

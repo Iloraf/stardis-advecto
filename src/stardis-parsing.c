@@ -1175,7 +1175,6 @@ find_description_by_name
 static res_T
 process_h
   (struct stardis* stardis,
-   struct dummies* dummies,
    const enum description_type type,
    char** tok_ctx)
 {
@@ -1191,13 +1190,12 @@ process_h
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz+1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  init_h(stardis->allocator, &desc->d.h_boundary);
-
+  ERR(init_h(stardis->allocator, &desc->d.h_boundary));
   desc->type = type;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "h boundary name");
-  ERR(description_set_name(stardis, &desc->d.h_boundary.name, tk));
-  if(find_description_by_name(stardis, &desc->d.h_boundary.name, NULL)
+  ERR(description_set_name(stardis, &desc->d.h_boundary->name, tk));
+  if(find_description_by_name(stardis, &desc->d.h_boundary->name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
@@ -1207,31 +1205,31 @@ process_h
   }
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "ref_temperature");
-  res = cstr_to_double(tk, &desc->d.h_boundary.ref_temperature);
+  res = cstr_to_double(tk, &desc->d.h_boundary->ref_temperature);
   if(res != RES_OK
-    || desc->d.h_boundary.ref_temperature < 0)
+    || desc->d.h_boundary->ref_temperature < 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid reference temperature: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->t_range[0] = MMIN(stardis->t_range[0], desc->d.h_boundary.ref_temperature);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], desc->d.h_boundary.ref_temperature);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], desc->d.h_boundary->ref_temperature);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], desc->d.h_boundary->ref_temperature);
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
-  res = cstr_to_double(tk, &desc->d.h_boundary.emissivity);
+  res = cstr_to_double(tk, &desc->d.h_boundary->emissivity);
   if(res != RES_OK
-    || desc->d.h_boundary.emissivity < 0
-    || desc->d.h_boundary.emissivity > 1)
+    || desc->d.h_boundary->emissivity < 0
+    || desc->d.h_boundary->emissivity > 1)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid emissivity: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "specular fraction");
-  res = cstr_to_double(tk, &desc->d.h_boundary.specular_fraction);
+  res = cstr_to_double(tk, &desc->d.h_boundary->specular_fraction);
   if(res != RES_OK
-    || desc->d.h_boundary.specular_fraction < 0
-    || desc->d.h_boundary.specular_fraction > 1)
+    || desc->d.h_boundary->specular_fraction < 0
+    || desc->d.h_boundary->specular_fraction > 1)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid specular fraction: %s\n", tk);
@@ -1239,18 +1237,18 @@ process_h
     goto end;
   }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "hc");
-  res = cstr_to_double(tk, &desc->d.h_boundary.hc);
+  res = cstr_to_double(tk, &desc->d.h_boundary->hc);
   if(res != RES_OK
-    || desc->d.h_boundary.hc < 0)
+    || desc->d.h_boundary->hc < 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid hc: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature");
-  res = cstr_to_double(tk, &desc->d.h_boundary.imposed_temperature);
+  res = cstr_to_double(tk, &desc->d.h_boundary->imposed_temperature);
   if(res != RES_OK
-    || desc->d.h_boundary.imposed_temperature < 0)
+    || desc->d.h_boundary->imposed_temperature < 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -1258,23 +1256,24 @@ process_h
   }
 
   if(type == DESC_BOUND_H_FOR_FLUID)
-    desc->d.h_boundary.mat_id = get_dummy_solid_id(stardis, dummies);
+    ERR(get_dummy_solid_id(stardis, &desc->d.h_boundary->mat_id));
   else {
-    struct fluid fluid_props;
-    init_fluid(stardis->allocator, &fluid_props);
-    fluid_props.fluid_id = allocate_stardis_medium_id(stardis);
-    desc->d.h_boundary.mat_id = fluid_props.fluid_id;
+    struct fluid* fluid = NULL;
+    ERR(init_fluid(stardis->allocator, &fluid));
+    fluid->fluid_id = allocate_stardis_medium_id(stardis);
+    desc->d.h_boundary->mat_id = fluid->fluid_id;
+    desc->d.h_boundary->possible_external_fluid = fluid;
     ASSERT(sz <= UINT_MAX);
-    fluid_props.desc_id = (unsigned)sz;
-    fluid_props.imposed_temperature
-      = desc->d.h_boundary.imposed_temperature;
-    fluid_props.is_outside = 1;
-    fluid_props.is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
-    ERR(create_solver_fluid(stardis, &fluid_props));
+    fluid->desc_id = (unsigned)sz;
+    fluid->imposed_temperature
+      = desc->d.h_boundary->imposed_temperature;
+    fluid->is_outside = 1;
+    fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+    ERR(create_solver_fluid(stardis, fluid));
     logger_print(stardis->logger, LOG_OUTPUT,
       "External fluid created: T=%g (it is medium %u)\n",
-      fluid_props.imposed_temperature,
-      fluid_props.fluid_id);
+      fluid->imposed_temperature,
+      fluid->fluid_id);
   }
 
   ASSERT(sz <= UINT_MAX);
@@ -1290,7 +1289,6 @@ error:
 static res_T
 process_t
   (struct stardis* stardis,
-   struct dummies* dummies,
    char** tok_ctx)
 {
   char* tk = NULL;
@@ -1305,14 +1303,14 @@ process_t
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  init_t(stardis->allocator, &desc->d.t_boundary);
-
+  ERR(init_t(stardis->allocator, &desc->d.t_boundary));
   desc->type = DESC_BOUND_T_FOR_SOLID;
-  desc->d.t_boundary.mat_id = get_dummy_fluid_id(stardis, dummies);
+
+  ERR(get_dummy_fluid_id(stardis, &desc->d.t_boundary->mat_id));
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature boundary name");
-  ERR(description_set_name(stardis, &desc->d.t_boundary.name, tk));
-  if(find_description_by_name(stardis, &desc->d.t_boundary.name, NULL)
+  ERR(description_set_name(stardis, &desc->d.t_boundary->name, tk));
+  if(find_description_by_name(stardis, &desc->d.t_boundary->name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
@@ -1322,9 +1320,9 @@ process_t
   }
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature");
-  res = cstr_to_double(tk, &desc->d.t_boundary.imposed_temperature);
+  res = cstr_to_double(tk, &desc->d.t_boundary->imposed_temperature);
   if(res != RES_OK
-    || desc->d.t_boundary.imposed_temperature < 0)
+    || desc->d.t_boundary->imposed_temperature < 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -1344,7 +1342,6 @@ error:
 static res_T
 process_flx
   (struct stardis* stardis,
-   struct dummies* dummies,
    char** tok_ctx)
 {
   char* tk = NULL;
@@ -1359,14 +1356,14 @@ process_flx
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  init_f(stardis->allocator, &desc->d.f_boundary);
-
+  ERR(init_f(stardis->allocator, &desc->d.f_boundary));
   desc->type = DESC_BOUND_F_FOR_SOLID;
-  desc->d.f_boundary.mat_id = get_dummy_fluid_id(stardis, dummies);
+
+  ERR(get_dummy_fluid_id(stardis, &desc->d.f_boundary->mat_id));
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "flux boundary name");
-  ERR(description_set_name(stardis, &desc->d.f_boundary.name, tk));
-  if(find_description_by_name(stardis, &desc->d.f_boundary.name, NULL)
+  ERR(description_set_name(stardis, &desc->d.f_boundary->name, tk));
+  if(find_description_by_name(stardis, &desc->d.f_boundary->name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
@@ -1376,9 +1373,9 @@ process_flx
   }
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "flux");
-  res = cstr_to_double(tk, &desc->d.f_boundary.imposed_flux);
+  res = cstr_to_double(tk, &desc->d.f_boundary->imposed_flux);
   if(res != RES_OK
-    || desc->d.f_boundary.imposed_flux == SDIS_FLUX_NONE) {
+    || desc->d.f_boundary->imposed_flux == SDIS_FLUX_NONE) {
     /* Flux can be < 0 but not undefined */
     if(res == RES_OK) res = RES_BAD_ARG;
     logger_print(stardis->logger, LOG_ERROR, "Invalid flux: %s\n", tk);
@@ -1412,17 +1409,17 @@ process_sfc
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  init_sf(stardis->allocator, &desc->d.sf_connect);
+  ERR(init_sf(stardis->allocator, &desc->d.sf_connect));
+  desc->type = DESC_SOLID_FLUID_CONNECT;
 
   /* Use a medium ID even if there is no medium here
    * As other cases use media IDs as unique IDs for read_sides_and_files calls
    * we continue the trend to ensure connection ID is OK */
-  desc->type = DESC_SOLID_FLUID_CONNECT;
-  desc->d.sf_connect.connection_id = allocate_stardis_medium_id(stardis);
+  desc->d.sf_connect->connection_id = allocate_stardis_medium_id(stardis);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid fluid connection name");
-  ERR(description_set_name(stardis, &desc->d.sf_connect.name, tk));
-  if(find_description_by_name(stardis, &desc->d.sf_connect.name, NULL)
+  ERR(description_set_name(stardis, &desc->d.sf_connect->name, tk));
+  if(find_description_by_name(stardis, &desc->d.sf_connect->name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
@@ -1432,31 +1429,31 @@ process_sfc
   }
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "ref_temperature");
-  res = cstr_to_double(tk, &desc->d.sf_connect.ref_temperature);
+  res = cstr_to_double(tk, &desc->d.sf_connect->ref_temperature);
   if(res != RES_OK
-    || desc->d.sf_connect.ref_temperature < 0)
+    || desc->d.sf_connect->ref_temperature < 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid reference temperature: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->t_range[0] = MMIN(stardis->t_range[0], desc->d.sf_connect.ref_temperature);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], desc->d.sf_connect.ref_temperature);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], desc->d.sf_connect->ref_temperature);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], desc->d.sf_connect->ref_temperature);
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "emissivity");
-  res = cstr_to_double(tk, &desc->d.sf_connect.emissivity);
+  res = cstr_to_double(tk, &desc->d.sf_connect->emissivity);
   if(res != RES_OK
-    || desc->d.sf_connect.emissivity < 0
-    || desc->d.h_boundary.emissivity > 1)
+    || desc->d.sf_connect->emissivity < 0
+    || desc->d.h_boundary->emissivity > 1)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid emissivity: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "specular fraction");
-  res = cstr_to_double(tk, &desc->d.sf_connect.specular_fraction);
+  res = cstr_to_double(tk, &desc->d.sf_connect->specular_fraction);
   if(res != RES_OK
-    || desc->d.sf_connect.specular_fraction < 0
-    || desc->d.sf_connect.specular_fraction > 1)
+    || desc->d.sf_connect->specular_fraction < 0
+    || desc->d.sf_connect->specular_fraction > 1)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid specular fraction: %s\n", tk);
@@ -1464,9 +1461,9 @@ process_sfc
     goto end;
   }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "hc");
-  res = cstr_to_double(tk, &desc->d.sf_connect.hc);
+  res = cstr_to_double(tk, &desc->d.sf_connect->hc);
   if(res != RES_OK
-    || desc->d.sf_connect.hc < 0)
+    || desc->d.sf_connect->hc < 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid hc: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -1500,17 +1497,17 @@ process_ssc
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  init_ss(stardis->allocator, &desc->d.ss_connect);
+  ERR(init_ss(stardis->allocator, &desc->d.ss_connect));
+  desc->type = DESC_SOLID_SOLID_CONNECT;
 
   /* Use a medium ID even if there is no medium here
    * As other cases use media IDs as unique IDs for read_sides_and_files calls
    * we continue the trend to ensure connection ID is OK */
-  desc->type = DESC_SOLID_SOLID_CONNECT;
-  desc->d.ss_connect.connection_id = allocate_stardis_medium_id(stardis);
+  desc->d.ss_connect->connection_id = allocate_stardis_medium_id(stardis);
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid solid connection name");
-  ERR(description_set_name(stardis, &desc->d.ss_connect.name, tk));
-  if(find_description_by_name(stardis, &desc->d.ss_connect.name, NULL)
+  ERR(description_set_name(stardis, &desc->d.ss_connect->name, tk));
+  if(find_description_by_name(stardis, &desc->d.ss_connect->name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
@@ -1520,19 +1517,19 @@ process_ssc
   }
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "contact resistance");
-  res = cstr_to_double(tk, &desc->d.ss_connect.tcr);
+  res = cstr_to_double(tk, &desc->d.ss_connect->tcr);
   if(res != RES_OK
-    || desc->d.ss_connect.tcr < 0)
+    || desc->d.ss_connect->tcr < 0)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid contact resistance: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  else if(desc->d.ss_connect.tcr == 0) {
+  else if(desc->d.ss_connect->tcr == 0) {
     logger_print(stardis->logger, LOG_WARNING,
       "Solid-solid connection %s: defining a contact resistance to 0 has "
-      "no effect\n", str_cget(&desc->d.ss_connect.name));
+      "no effect\n", str_cget(&desc->d.ss_connect->name));
   }
 
   ASSERT(sz <= UINT_MAX);
@@ -1639,18 +1636,18 @@ process_solid
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  init_solid(stardis->allocator, &desc->d.solid);
-
+  ERR(init_solid(stardis->allocator, &desc->d.solid));
   desc->type = DESC_MAT_SOLID;
-  desc->d.solid.solid_id = allocate_stardis_medium_id(stardis);
-  desc->d.solid.is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
-  desc->d.solid.is_outside = 0;
+
+  desc->d.solid->solid_id = allocate_stardis_medium_id(stardis);
+  desc->d.solid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  desc->d.solid->is_outside = 0;
   ASSERT(sz <= UINT_MAX);
-  desc->d.solid.desc_id = (unsigned)sz;
+  desc->d.solid->desc_id = (unsigned)sz;
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid name");
-  ERR(description_set_name(stardis, &desc->d.solid.name, tk));
-  if(find_description_by_name(stardis, &desc->d.solid.name, NULL)
+  ERR(description_set_name(stardis, &desc->d.solid->name, tk));
+  if(find_description_by_name(stardis, &desc->d.solid->name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
@@ -1660,55 +1657,55 @@ process_solid
   }
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "lambda");
-  res = cstr_to_double(tk, &desc->d.solid.lambda);
+  res = cstr_to_double(tk, &desc->d.solid->lambda);
   if(res != RES_OK
-    || desc->d.solid.lambda <= 0)
+    || desc->d.solid->lambda <= 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid lambda: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "rho");
-  res = cstr_to_double(tk, &desc->d.solid.rho);
+  res = cstr_to_double(tk, &desc->d.solid->rho);
   if(res != RES_OK
-    || desc->d.solid.rho <= 0)
+    || desc->d.solid->rho <= 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid rho: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "cp");
-  res = cstr_to_double(tk, &desc->d.solid.cp);
+  res = cstr_to_double(tk, &desc->d.solid->cp);
   if(res != RES_OK
-    || desc->d.solid.cp <= 0)
+    || desc->d.solid->cp <= 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid cp: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  ERR(read_delta(stardis, &desc->d.solid.delta, tok_ctx));
+  ERR(read_delta(stardis, &desc->d.solid->delta, tok_ctx));
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "Tinit");
-  res = cstr_to_double(tk, &desc->d.solid.tinit);
+  res = cstr_to_double(tk, &desc->d.solid->tinit);
   if(res != RES_OK
-    || desc->d.solid.tinit < 0)
+    || desc->d.solid->tinit < 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid Tinit: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  ERR(read_imposed_temperature(stardis, &desc->d.solid.imposed_temperature,
+  ERR(read_imposed_temperature(stardis, &desc->d.solid->imposed_temperature,
     tok_ctx));
-  if(desc->d.solid.imposed_temperature >= 0
-    && desc->d.solid.imposed_temperature != desc->d.solid.tinit)
+  if(desc->d.solid->imposed_temperature >= 0
+    && desc->d.solid->imposed_temperature != desc->d.solid->tinit)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Imposed temperature, if defined, must match initial temperature "
       "(initial: %g; imposed: %g)\n",
-      desc->d.solid.tinit, desc->d.solid.imposed_temperature); res = RES_BAD_ARG;
+      desc->d.solid->tinit, desc->d.solid->imposed_temperature); res = RES_BAD_ARG;
     goto end;
   }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "volumic power");
-  res = cstr_to_double(tk, &desc->d.solid.vpower);
+  res = cstr_to_double(tk, &desc->d.solid->vpower);
   if(res != RES_OK) {
     /* VPower can be < 0 */
     logger_print(stardis->logger, LOG_ERROR, "Invalid volumic power: %s\n", tk);
@@ -1745,18 +1742,18 @@ process_fluid
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  init_fluid(stardis->allocator, &desc->d.fluid);
-
+  ERR(init_fluid(stardis->allocator, &desc->d.fluid));
   desc->type = DESC_MAT_FLUID;
-  desc->d.fluid.fluid_id = allocate_stardis_medium_id(stardis);
-  desc->d.fluid.is_outside = 0;
-  desc->d.fluid.is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+
+  desc->d.fluid->fluid_id = allocate_stardis_medium_id(stardis);
+  desc->d.fluid->is_outside = 0;
+  desc->d.fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   ASSERT(sz <= UINT_MAX);
-  desc->d.fluid.desc_id = (unsigned)sz;
+  desc->d.fluid->desc_id = (unsigned)sz;
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "fluid name");
-  ERR(description_set_name(stardis, &desc->d.fluid.name, tk));
-  if(find_description_by_name(stardis, &desc->d.fluid.name, NULL)
+  ERR(description_set_name(stardis, &desc->d.fluid->name, tk));
+  if(find_description_by_name(stardis, &desc->d.fluid->name, NULL)
     != desc)
   {
     logger_print(stardis->logger, LOG_ERROR,
@@ -1766,46 +1763,46 @@ process_fluid
   }
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "rho");
-  res = cstr_to_double(tk, &desc->d.fluid.rho);
+  res = cstr_to_double(tk, &desc->d.fluid->rho);
   if(res != RES_OK
-    || desc->d.fluid.rho <= 0)
+    || desc->d.fluid->rho <= 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid rho: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "cp");
-  res = cstr_to_double(tk, &desc->d.fluid.cp);
+  res = cstr_to_double(tk, &desc->d.fluid->cp);
   if(res != RES_OK
-    || desc->d.fluid.cp <= 0)
+    || desc->d.fluid->cp <= 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid cp: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "Tinit");
-  res = cstr_to_double(tk, &desc->d.fluid.tinit);
+  res = cstr_to_double(tk, &desc->d.fluid->tinit);
   if(res != RES_OK
-    || desc->d.fluid.tinit < 0)
+    || desc->d.fluid->tinit < 0)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid Tinit: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
 
-  ERR(read_imposed_temperature(stardis, &desc->d.fluid.imposed_temperature,
+  ERR(read_imposed_temperature(stardis, &desc->d.fluid->imposed_temperature,
     tok_ctx));
-  if(desc->d.fluid.imposed_temperature >= 0
-    && desc->d.fluid.imposed_temperature != desc->d.fluid.tinit)
+  if(desc->d.fluid->imposed_temperature >= 0
+    && desc->d.fluid->imposed_temperature != desc->d.fluid->tinit)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Imposed temperature, if defined, must match initial temperature "
       "(initial: %g; imposed: %g)\n",
-      desc->d.fluid.tinit, desc->d.fluid.imposed_temperature); res = RES_BAD_ARG;
+      desc->d.fluid->tinit, desc->d.fluid->imposed_temperature); res = RES_BAD_ARG;
     goto end;
   }
 
-  ERR(create_solver_fluid(stardis, &desc->d.fluid));
+  ERR(create_solver_fluid(stardis, desc->d.fluid));
 
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
@@ -1912,8 +1909,7 @@ res_T
 process_model_line
   (const char* file_name,
    char* line,
-   struct stardis* stardis,
-   struct dummies* dummies)
+   struct stardis* stardis)
 {
   res_T res = RES_OK;
   struct str keep;
@@ -1926,13 +1922,13 @@ process_model_line
   CHK_TOK(strtok_r(line, " \t", &tok_ctx), "model line type");
   
   if(0 == strcasecmp(tk, "H_BOUNDARY_FOR_SOLID"))
-    ERR(process_h(stardis, dummies, DESC_BOUND_H_FOR_SOLID, &tok_ctx));
+    ERR(process_h(stardis, DESC_BOUND_H_FOR_SOLID, &tok_ctx));
   else if(0 == strcasecmp(tk, "H_BOUNDARY_FOR_FLUID"))
-    ERR(process_h(stardis, dummies, DESC_BOUND_H_FOR_FLUID, &tok_ctx));
+    ERR(process_h(stardis, DESC_BOUND_H_FOR_FLUID, &tok_ctx));
   else if(0 == strcasecmp(tk, "T_BOUNDARY_FOR_SOLID"))
-    ERR(process_t(stardis, dummies, &tok_ctx));
+    ERR(process_t(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "F_BOUNDARY_FOR_SOLID"))
-    ERR(process_flx(stardis, dummies, &tok_ctx));
+    ERR(process_flx(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "SOLID_FLUID_CONNECTION"))
     ERR(process_sfc(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "SOLID_SOLID_CONNECTION"))
@@ -1962,46 +1958,68 @@ error:
   goto end;
 }
 
-unsigned
+res_T
 get_dummy_solid_id
   (struct stardis* stardis,
-   struct dummies* dummies)
+   unsigned* id)
 {
-  struct solid dummy;
-  if(dummies->dummy_solid)
-    return dummies->dummy_solid_id;
+  res_T res = RES_OK;
+  struct solid* dummy = NULL;
+  struct dummies* dummies;
+  ASSERT(stardis && id);
+  dummies = &stardis->dummies;
+  if(dummies->dummy_solid) {
+    *id = dummies->dummy_solid_id;
+    goto end;
+  }
+  ERR(init_solid(stardis->allocator, &dummy));
+  dummies->stardis_solid = dummy;
   dummies->dummy_solid_id = allocate_stardis_medium_id(stardis);
-  init_solid(stardis->allocator, &dummy);
-  dummy.solid_id = dummies->dummy_solid_id;
-  dummy.is_outside = 1;
-  dummy.is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
-  create_solver_solid(stardis, &dummy);
+  dummy->solid_id = dummies->dummy_solid_id;
+  dummy->is_outside = 1;
+  dummy->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  create_solver_solid(stardis, dummy);
   dummies->dummy_solid
     = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_solid_id];
   logger_print(stardis->logger, LOG_OUTPUT,
     "Dummy solid created: (it is medium %u)\n",
     dummies->dummy_solid_id);
-  return dummies->dummy_solid_id;
+  *id = dummies->dummy_solid_id;
+end:
+  return res;
+error:
+  goto end;
 }
 
-unsigned
+res_T
 get_dummy_fluid_id
   (struct stardis* stardis,
-   struct dummies* dummies)
+   unsigned* id)
 {
-  struct fluid dummy;
-  if(dummies->dummy_fluid)
-    return dummies->dummy_fluid_id;
+  res_T res = RES_OK;
+  struct fluid* dummy = NULL;
+  struct dummies* dummies;
+  ASSERT(stardis && id);
+  dummies = &stardis->dummies;
+  if(dummies->dummy_fluid) {
+    *id = dummies->dummy_fluid_id;
+    goto end;
+  }
+  ERR(init_fluid(stardis->allocator, &dummy));
+  dummies->stardis_fluid = dummy;
   dummies->dummy_fluid_id = allocate_stardis_medium_id(stardis);
-  init_fluid(stardis->allocator, &dummy);
-  dummy.fluid_id = dummies->dummy_fluid_id;
-  dummy.is_outside = 1;
-  dummy.is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
-  create_solver_fluid(stardis, &dummy);
+  dummy->fluid_id = dummies->dummy_fluid_id;
+  dummy->is_outside = 1;
+  dummy->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  create_solver_fluid(stardis, dummy);
   dummies->dummy_fluid
     = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_fluid_id];
   logger_print(stardis->logger, LOG_OUTPUT,
     "Dummy fluid created: (it is medium %u)\n",
     dummies->dummy_fluid_id);
-  return dummies->dummy_fluid_id;
+  *id = dummies->dummy_fluid_id;
+end:
+  return res;
+error:
+  goto end;
 }

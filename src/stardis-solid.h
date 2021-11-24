@@ -20,6 +20,7 @@
 #include <rsys/str.h>
 
 struct stardis;
+struct mem_allocator;
 
 /*******************************************************************************
  * Solid data
@@ -40,17 +41,16 @@ struct solid {
   unsigned solid_id;
 };
 
-LOCAL_SYM void
-init_solid(struct mem_allocator* allocator, struct solid* dst);
+LOCAL_SYM res_T
+init_solid(struct mem_allocator* allocator, struct solid** dst);
 
 LOCAL_SYM void
-release_solid(struct solid* solid);
+release_solid
+  (struct solid* desc,
+   struct mem_allocator* allocator);
 
 LOCAL_SYM res_T
-str_print_solid(struct str* str, const struct solid* s);
-
-LOCAL_SYM res_T
-cp_solid(struct solid* dst, const struct solid* src);
+str_print_solid(struct str* str, const struct solid* solid);
 
 LOCAL_SYM res_T
 create_solver_solid

@@ -125,12 +125,15 @@ enum description_type {
 struct dummies {
   struct sdis_medium* dummy_fluid;
   unsigned dummy_fluid_id;
+  struct fluid* stardis_fluid;
   struct sdis_medium* dummy_solid;
   unsigned dummy_solid_id;
+  struct solid* stardis_solid;
 };
 #define DUMMIES_NULL__ {\
-  NULL, UINT_MAX, NULL, UINT_MAX\
+  NULL, UINT_MAX, NULL, NULL, UINT_MAX, NULL\
 }
+static const struct dummies DUMMIES_NULL;
 
 static FINLINE void
 init_media_ptr
@@ -193,6 +196,29 @@ error:
 
 /******************************************************************************/
 
+struct fluid;
+struct solid;
+struct t_boundary;
+struct f_boundary;
+struct h_boundary;
+struct solid_fluid_connect;
+struct solid_solid_connect;
+
+struct description {
+  enum description_type type;
+  union {
+    struct fluid* fluid;
+    struct solid* solid;
+    struct t_boundary* t_boundary;
+    struct f_boundary* f_boundary;
+    struct h_boundary* h_boundary;
+    struct solid_fluid_connect* sf_connect;
+    struct solid_solid_connect* ss_connect;
+  } d;
+};
+
+/******************************************************************************/
+
 struct h_boundary {
   struct str name;
   double ref_temperature;
@@ -201,24 +227,49 @@ struct h_boundary {
   double hc;
   double imposed_temperature;
   unsigned mat_id;
+  struct fluid* possible_external_fluid; /* if H for solid */
 };
 
-static FINLINE void
-init_h(struct mem_allocator* allocator, struct h_boundary* dst)
+static FINLINE res_T
+init_h
+  (struct mem_allocator* allocator,
+   struct h_boundary** dst)
 {
-  str_init(allocator, &dst->name);
-  dst->ref_temperature = 0;
-  dst->emissivity = 0;
-  dst->specular_fraction = 0;
-  dst->hc = 0;
-  dst->imposed_temperature = -1;
-  dst->mat_id = UINT_MAX;
+  res_T res = RES_OK;
+  int str_initialized = 0;
+  ASSERT(allocator && dst && *dst == NULL);
+  *dst = MEM_ALLOC(allocator, sizeof(struct h_boundary));
+  if(! *dst) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  str_init(allocator, &(*dst)->name);
+  (*dst)->ref_temperature = 0;
+  (*dst)->emissivity = 0;
+  (*dst)->specular_fraction = 0;
+  (*dst)->hc = 0;
+  (*dst)->imposed_temperature = -1;
+  (*dst)->mat_id = UINT_MAX;
+  (*dst)->possible_external_fluid = NULL;
+end:
+  return res;
+error:
+  if(str_initialized) str_release(&(*dst)->name);
+  if(*dst) MEM_RM(allocator, *dst);
+  goto end;
 }
 
 static FINLINE void
-release_h_boundary(struct h_boundary* bound)
+release_h_boundary
+  (struct h_boundary* bound,
+   struct mem_allocator* allocator)
 {
+  ASSERT(bound && allocator);
   str_release(&bound->name);
+  if(bound->possible_external_fluid) {
+    release_fluid(bound->possible_external_fluid, allocator);
+  }
+  MEM_RM(allocator, bound);
 }
 
 static res_T
@@ -241,36 +292,44 @@ error:
   goto end;
 }
 
-static FINLINE res_T
-cp_h_boundary(struct h_boundary* dst, const struct h_boundary* src)
-{
-  dst->ref_temperature = src->ref_temperature;
-  dst->emissivity = src->emissivity;
-  dst->specular_fraction = src->specular_fraction;
-  dst->hc = src->hc;
-  dst->imposed_temperature = src->imposed_temperature;
-  dst->mat_id = src->mat_id;
-  return str_copy(&dst->name, &src->name);
-}
-
 struct t_boundary {
   struct str name;
   double imposed_temperature;
   unsigned mat_id;
 };
 
-static FINLINE void
-init_t(struct mem_allocator* allocator, struct t_boundary* dst)
+static FINLINE res_T
+init_t
+  (struct mem_allocator* allocator,
+   struct t_boundary** dst)
 {
-  str_init(allocator, &dst->name);
-  dst->imposed_temperature = -1;
-  dst->mat_id = UINT_MAX;
+  res_T res = RES_OK;
+  int str_initialized = 0;
+  ASSERT(allocator && dst && *dst == NULL);
+  *dst = MEM_ALLOC(allocator, sizeof(struct t_boundary));
+  if(! *dst) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  str_init(allocator, &(*dst)->name);
+  (*dst)->imposed_temperature = -1;
+  (*dst)->mat_id = UINT_MAX;
+end:
+  return res;
+error:
+  if(str_initialized) str_release(&(*dst)->name);
+  if(*dst) MEM_RM(allocator, *dst);
+  goto end;
 }
 
 static FINLINE void
-release_t_boundary(struct t_boundary* bound)
+release_t_boundary
+  (struct t_boundary* bound,
+   struct mem_allocator* allocator)
 {
+  ASSERT(bound && allocator);
   str_release(&bound->name);
+  MEM_RM(allocator, bound);
 }
 
 static res_T
@@ -291,32 +350,44 @@ error:
   goto end;
 }
 
-static FINLINE res_T
-cp_t_boundary(struct t_boundary* dst, const struct t_boundary* src)
-{
-  dst->imposed_temperature = src->imposed_temperature;
-  dst->mat_id = src->mat_id;
-  return str_copy(&dst->name, &src->name);
-}
-
 struct f_boundary {
   struct str name;
   double imposed_flux;
   unsigned mat_id;
 };
 
-static FINLINE void
-init_f(struct mem_allocator* allocator, struct f_boundary* dst)
+static FINLINE res_T
+init_f
+  (struct mem_allocator* allocator,
+   struct f_boundary** dst)
 {
-  str_init(allocator, &dst->name);
-  dst->mat_id = UINT_MAX;
-  dst->imposed_flux = -1;
+  res_T res = RES_OK;
+  int str_initialized = 0;
+  ASSERT(allocator && dst && *dst == NULL);
+  *dst = MEM_ALLOC(allocator, sizeof(struct f_boundary));
+  if(! *dst) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  str_init(allocator, &(*dst)->name);
+  (*dst)->mat_id = UINT_MAX;
+  (*dst)->imposed_flux = -1;
+end:
+  return res;
+error:
+  if(str_initialized) str_release(&(*dst)->name);
+  if(*dst) MEM_RM(allocator, *dst);
+  goto end;
 }
 
 static FINLINE void
-release_f_boundary(struct f_boundary* bound)
+release_f_boundary
+  (struct f_boundary* bound,
+   struct mem_allocator* allocator)
 {
+  ASSERT(bound && allocator);
   str_release(&bound->name);
+  MEM_RM(allocator, bound);
 }
 
 static res_T
@@ -335,14 +406,6 @@ error:
   goto end;
 }
 
-static FINLINE res_T
-cp_f_boundary(struct f_boundary* dst, const struct f_boundary* src)
-{
-  dst->imposed_flux = src->imposed_flux;
-  dst->mat_id = src->mat_id;
-  return str_copy(&dst->name, &src->name);
-}
-
 struct solid_fluid_connect {
   struct str name;
   double ref_temperature;
@@ -353,20 +416,40 @@ struct solid_fluid_connect {
 };
 
 static FINLINE void
-release_sf_connect(struct solid_fluid_connect* connect)
+release_sf_connect
+  (struct solid_fluid_connect* connect,
+   struct mem_allocator* allocator)
 {
+  ASSERT(connect && allocator);
   str_release(&connect->name);
+  MEM_RM(allocator, connect);
 }
 
-static FINLINE void
-init_sf(struct mem_allocator* allocator, struct solid_fluid_connect* dst)
+static FINLINE res_T
+init_sf
+  (struct mem_allocator* allocator,
+   struct solid_fluid_connect** dst)
 {
-  str_init(allocator, &dst->name);
-  dst->ref_temperature = 0;
-  dst->emissivity = 0;
-  dst->specular_fraction = 0;
-  dst->hc = 0;
-  dst->connection_id = UINT_MAX;
+  res_T res = RES_OK;
+  int str_initialized = 0;
+  ASSERT(allocator && dst && *dst == NULL);
+  *dst = MEM_ALLOC(allocator, sizeof(struct solid_fluid_connect));
+  if(! *dst) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  str_init(allocator, &(*dst)->name);
+  (*dst)->ref_temperature = 0;
+  (*dst)->emissivity = 0;
+  (*dst)->specular_fraction = 0;
+  (*dst)->hc = 0;
+  (*dst)->connection_id = UINT_MAX;
+end:
+  return res;
+error:
+  if(str_initialized) str_release(&(*dst)->name);
+  if(*dst) MEM_RM(allocator, *dst);
+  goto end;
 }
 
 static res_T
@@ -385,25 +468,6 @@ error:
   goto end;
 }
 
-static FINLINE res_T
-cp_sf_connect
-  (struct solid_fluid_connect* dst, const struct solid_fluid_connect* src)
-{
-  dst->ref_temperature = src->ref_temperature;
-  dst->emissivity = src->emissivity;
-  dst->specular_fraction = src->specular_fraction;
-  dst->hc = src->hc;
-  dst->connection_id = src->connection_id;
-  return str_copy(&dst->name, &src->name);
-}
-
-static FINLINE res_T
-cp_release_sf_connect
-  (struct solid_fluid_connect* dst, struct solid_fluid_connect* src)
-{
-  return cp_sf_connect(dst, src);
-}
-
 struct solid_solid_connect {
   struct str name;
   double tcr;
@@ -411,17 +475,37 @@ struct solid_solid_connect {
 };
 
 static FINLINE void
-release_ss_connect(struct solid_solid_connect* connect)
+release_ss_connect
+  (struct solid_solid_connect* connect,
+   struct mem_allocator* allocator)
 {
+  ASSERT(connect && allocator);
   str_release(&connect->name);
+  MEM_RM(allocator, connect);
 }
 
-static FINLINE void
-init_ss(struct mem_allocator* allocator, struct solid_solid_connect* dst)
+static FINLINE res_T
+init_ss
+  (struct mem_allocator* allocator,
+   struct solid_solid_connect** dst)
 {
-  str_init(allocator, &dst->name);
-  dst->tcr = 0;
-  dst->connection_id = UINT_MAX;
+  res_T res = RES_OK;
+  int str_initialized = 0;
+  ASSERT(allocator && dst && *dst == NULL);
+  *dst = MEM_ALLOC(allocator, sizeof(struct solid_solid_connect));
+  if(! *dst) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  str_init(allocator, &(*dst)->name);
+  (*dst)->tcr = 0;
+  (*dst)->connection_id = UINT_MAX;
+end:
+  return res;
+error:
+  if(str_initialized) str_release(&(*dst)->name);
+  if(*dst) MEM_RM(allocator, *dst);
+  goto end;
 }
 
 static res_T
@@ -440,69 +524,45 @@ error:
 }
 
 static FINLINE res_T
-cp_ss_connect
-  (struct solid_solid_connect* dst, const struct solid_solid_connect* src)
-{
-  dst->connection_id = src->connection_id;
-  dst->tcr = src->tcr;
-  return str_copy(&dst->name, &src->name);
-}
-
-static FINLINE res_T
-cp_release_ss_connect
-  (struct solid_solid_connect* dst, struct solid_solid_connect* src)
-{
-  return cp_ss_connect(dst, src);
-}
-
-
-struct description {
-  enum description_type type;
-  union {
-    struct fluid fluid;
-    struct solid solid;
-    struct t_boundary t_boundary;
-    struct f_boundary f_boundary;
-    struct h_boundary h_boundary;
-    struct solid_fluid_connect sf_connect;
-    struct solid_solid_connect ss_connect;
-  } d;
-};
-
-static FINLINE res_T
-init_description(struct mem_allocator* alloc, struct description* desc)
+init_description
+  (struct mem_allocator* alloc,
+   struct description* desc)
 {
   ASSERT(desc);
   (void)alloc;
   desc->type = DESCRIPTION_TYPE_COUNT__;
+  desc->d.fluid = NULL;
   return RES_OK;
 }
 
 static FINLINE void
-release_description(struct description* desc)
+release_description
+  (struct description* desc,
+   struct mem_allocator* allocator)
 {
+  ASSERT(desc && allocator);
   switch (desc->type) {
   case DESC_MAT_SOLID:
-    release_solid(&desc->d.solid);
+    release_solid(desc->d.solid, allocator);
     break;
   case DESC_MAT_FLUID:
-    release_fluid(&desc->d.fluid);
+    release_fluid(desc->d.fluid, allocator);
     break;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
-    release_h_boundary(&desc->d.h_boundary);
+    release_h_boundary(desc->d.h_boundary, allocator);
     break;
   case DESC_BOUND_T_FOR_SOLID:
-    release_t_boundary(&desc->d.t_boundary);
+    release_t_boundary(desc->d.t_boundary, allocator);
     break;
   case DESC_BOUND_F_FOR_SOLID:
-    release_f_boundary(&desc->d.f_boundary);
+    release_f_boundary(desc->d.f_boundary, allocator);
     break;
   case DESC_SOLID_FLUID_CONNECT:
-    release_sf_connect(&desc->d.sf_connect);
+    release_sf_connect(desc->d.sf_connect, allocator);
     break;
   case DESC_SOLID_SOLID_CONNECT:
-    release_ss_connect(&desc->d.ss_connect);
+    release_ss_connect(desc->d.ss_connect, allocator);
     break;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
@@ -521,26 +581,26 @@ str_print_description
   ERR(str_printf(str, "Description %u: ", rank));
   switch (desc->type) {
   case DESC_MAT_SOLID:
-    ERR(str_print_solid(str, &desc->d.solid));
+    ERR(str_print_solid(str, desc->d.solid));
     break;
   case DESC_MAT_FLUID:
-    ERR(str_print_fluid(str, &desc->d.fluid));
+    ERR(str_print_fluid(str, desc->d.fluid));
     break;
   case DESC_BOUND_T_FOR_SOLID:
-    ERR(str_print_t_boundary(str, &desc->d.t_boundary));
+    ERR(str_print_t_boundary(str, desc->d.t_boundary));
     break;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
-    ERR(str_print_h_boundary(str, &desc->d.h_boundary, desc->type));
+    ERR(str_print_h_boundary(str, desc->d.h_boundary, desc->type));
     break;
   case DESC_BOUND_F_FOR_SOLID:
-    ERR(str_print_f_boundary(str, &desc->d.f_boundary));
+    ERR(str_print_f_boundary(str, desc->d.f_boundary));
     break;
   case DESC_SOLID_FLUID_CONNECT:
-    ERR(str_print_sf_connect(str, &desc->d.sf_connect));
+    ERR(str_print_sf_connect(str, desc->d.sf_connect));
     break;
   case DESC_SOLID_SOLID_CONNECT:
-    ERR(str_print_ss_connect(str, &desc->d.ss_connect));
+    ERR(str_print_ss_connect(str, desc->d.ss_connect));
     break;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
@@ -558,90 +618,23 @@ get_description_name
   ASSERT(desc);
   switch (desc->type) {
   case DESC_MAT_SOLID:
-    return &desc->d.solid.name;
+    return &desc->d.solid->name;
   case DESC_MAT_FLUID:
-    return &desc->d.fluid.name;
+    return &desc->d.fluid->name;
   case DESC_BOUND_T_FOR_SOLID:
-    return &desc->d.t_boundary.name;
+    return &desc->d.t_boundary->name;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
-    return &desc->d.h_boundary.name;
+    return &desc->d.h_boundary->name;
   case DESC_BOUND_F_FOR_SOLID:
-    return &desc->d.f_boundary.name;
+    return &desc->d.f_boundary->name;
   case DESC_SOLID_FLUID_CONNECT:
-    return &desc->d.sf_connect.name;
+    return &desc->d.sf_connect->name;
   case DESC_SOLID_SOLID_CONNECT:
-    return &desc->d.ss_connect.name;
+    return &desc->d.ss_connect->name;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
-}
-
-static FINLINE res_T
-cp_description
-  (struct description* dst,
-   const struct description* src)
-{
-  res_T res = RES_OK;
-  ASSERT(src && dst);
-  switch (src->type) {
-  case DESC_MAT_SOLID:
-    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
-      dst->type = src->type;
-      init_solid(src->d.solid.name.allocator, &dst->d.solid);
-    }
-    ERR(cp_solid(&dst->d.solid, &src->d.solid));
-    break;
-  case DESC_MAT_FLUID:
-    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
-      dst->type = src->type;
-      init_fluid(src->d.fluid.name.allocator, &dst->d.fluid);
-    }
-    ERR(cp_fluid(&dst->d.fluid, &src->d.fluid));
-    break;
-  case DESC_BOUND_H_FOR_SOLID:
-  case DESC_BOUND_H_FOR_FLUID:
-    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
-      dst->type = src->type;
-      init_h(src->d.h_boundary.name.allocator, &dst->d.h_boundary);
-    }
-    ERR(cp_h_boundary(&dst->d.h_boundary, &src->d.h_boundary));
-    break;
-  case DESC_BOUND_T_FOR_SOLID:
-    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
-      dst->type = src->type;
-      init_t(src->d.t_boundary.name.allocator, &dst->d.t_boundary);
-    }
-    ERR(cp_t_boundary(&dst->d.t_boundary, &src->d.t_boundary));
-    break;
-  case DESC_BOUND_F_FOR_SOLID:
-    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
-      dst->type = src->type;
-      init_f(src->d.f_boundary.name.allocator, &dst->d.f_boundary);
-    }
-    ERR(cp_f_boundary(&dst->d.f_boundary, &src->d.f_boundary));
-    break;
-  case DESC_SOLID_FLUID_CONNECT:
-    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
-      dst->type = src->type;
-      init_sf(src->d.sf_connect.name.allocator, &dst->d.sf_connect);
-    }
-    ERR(cp_sf_connect(&dst->d.sf_connect, &src->d.sf_connect));
-    break;
-  case DESC_SOLID_SOLID_CONNECT:
-    if(dst->type == DESCRIPTION_TYPE_COUNT__) {
-      dst->type = src->type;
-      init_ss(src->d.ss_connect.name.allocator, &dst->d.ss_connect);
-    }
-    ERR(cp_ss_connect(&dst->d.ss_connect, &src->d.ss_connect));
-    break;
- default:
-    FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
-  }
-end:
-  return res;
-error:
-  goto end;
 }
 
 static FINLINE void
@@ -652,20 +645,20 @@ description_get_medium_id
   ASSERT(desc && id);
   switch (desc->type) {
   case DESC_MAT_SOLID:
-    *id = desc->d.solid.solid_id;
+    *id = desc->d.solid->solid_id;
     return;
   case DESC_MAT_FLUID:
-    *id = desc->d.fluid.fluid_id;
+    *id = desc->d.fluid->fluid_id;
     return;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
-    *id = desc->d.h_boundary.mat_id;
+    *id = desc->d.h_boundary->mat_id;
     return;
   case DESC_BOUND_T_FOR_SOLID:
-    *id = desc->d.t_boundary.mat_id;
+    *id = desc->d.t_boundary->mat_id;
     return;
   case DESC_BOUND_F_FOR_SOLID:
-    *id = desc->d.f_boundary.mat_id;
+    *id = desc->d.f_boundary->mat_id;
     return;
   case DESC_SOLID_FLUID_CONNECT: /* No medium linked to SF */
   case DESC_SOLID_SOLID_CONNECT: /* No medium linked to SS */
@@ -766,8 +759,6 @@ struct counts {
 #define DARRAY_NAME descriptions
 #define DARRAY_DATA struct description
 #define DARRAY_FUNCTOR_INIT init_description
-#define DARRAY_FUNCTOR_COPY cp_description
-#define DARRAY_FUNCTOR_RELEASE release_description
 #include <rsys/dynamic_array.h>
 
 struct compute_surface {
@@ -778,6 +769,7 @@ struct compute_surface {
 };
 
 struct stardis {
+  struct dummies dummies; /* dummy meterials for boundaries' outside */
   struct geometry geometry;
   struct sdis_scene* sdis_scn; /* The solver scene */
   struct darray_descriptions descriptions;  /* Materials and boundaries */

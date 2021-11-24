@@ -246,10 +246,10 @@ check_probe_conform_to_type
           "Could not determine the medium probe is in.\n");
     } else {
       if(filter_ctx.desc->type == DESC_MAT_SOLID) {
-        double delta = filter_ctx.desc->d.solid.delta;
+        double delta = filter_ctx.desc->d.solid->delta;
         ASSERT(delta < INF);
         logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe was in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid.name));
+          "Probe was in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid->name));
         if(filter_ctx.dist > 2 * delta) {
           logger_print(stardis->logger, LOG_ERROR,
             "Probe moved to (%g, %g, %g), primitive %u, uv = (%g, %g).\n",
@@ -274,7 +274,7 @@ check_probe_conform_to_type
       } else {
         /* TODO: check move length wrt local geometry? */
         logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe was in fluid '%s'.\n", str_cget(&filter_ctx.desc->d.fluid.name));
+          "Probe was in fluid '%s'.\n", str_cget(&filter_ctx.desc->d.fluid->name));
         logger_print(stardis->logger, LOG_OUTPUT,
           "Probe distance from closest boundary was %g.\n", filter_ctx.dist);
       }
@@ -329,9 +329,9 @@ check_probe_conform_to_type
       goto error;
     }
     logger_print(stardis->logger, LOG_OUTPUT,
-      "Probe is in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid.name));
+      "Probe is in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid->name));
     if(filter_ctx.desc->type == DESC_MAT_SOLID) {
-      double delta = filter_ctx.desc->d.solid.delta;
+      double delta = filter_ctx.desc->d.solid->delta;
       if(filter_ctx.dist < 0.25 * delta) {
         logger_print(stardis->logger, LOG_ERROR,
           "Probe is %g delta from closest boundary. Use -P instead of -p.\n",
@@ -356,7 +356,7 @@ check_probe_conform_to_type
       logger_print(stardis->logger, LOG_WARNING,
         "Probe is in fluid '%s': computing fluid temperature, "
         "not using a specific position.\n",
-        str_cget(&filter_ctx.desc->d.fluid.name));
+        str_cget(&filter_ctx.desc->d.fluid->name));
       /* In fluid; TODO: check distance wrt local geometry (use 4V/S?) */
     }
   }
@@ -532,7 +532,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
     ASSERT(prop[SG3D_INTFACE] < dcount);
     intface_desc = descriptions + prop[SG3D_INTFACE];
     if(intface_desc->type == DESC_SOLID_SOLID_CONNECT)
-      tcr = intface_desc->d.ss_connect.tcr;
+      tcr = intface_desc->d.ss_connect->tcr;
   }
 
   if(str_is_empty(&stardis->solve_name)) {
@@ -575,10 +575,10 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
       bd = descriptions + prop[SG3D_BACK];
       ASSERT(fd->type == DESC_MAT_SOLID || fd->type == DESC_MAT_FLUID);
       fmat_id = (fd->type == DESC_MAT_SOLID)
-        ? fd->d.solid.solid_id : fd->d.fluid.fluid_id;
+        ? fd->d.solid->solid_id : fd->d.fluid->fluid_id;
       ASSERT(bd->type == DESC_MAT_SOLID || bd->type == DESC_MAT_FLUID);
       bmat_id = (bd->type == DESC_MAT_SOLID)
-        ? bd->d.solid.solid_id : bd->d.fluid.fluid_id;
+        ? bd->d.solid->solid_id : bd->d.fluid->fluid_id;
 
       if(med_id != fmat_id && med_id != bmat_id) { /* Not here */
         logger_print(stardis->logger, LOG_ERROR,
@@ -1243,8 +1243,8 @@ find_medium_by_name
     struct description*
       desc = darray_descriptions_data_get(&stardis->descriptions) + i;
     if(desc->type == DESC_MAT_SOLID) {
-      if(str_eq(name, &desc->d.solid.name)) {
-        unsigned id = desc->d.solid.solid_id;
+      if(str_eq(name, &desc->d.solid->name)) {
+        unsigned id = desc->d.solid->solid_id;
         ASSERT(darray_media_ptr_size_get(&stardis->media) > id);
         medium = darray_media_ptr_data_get(&stardis->media)[id];
         if(out_id) *out_id = id;
@@ -1252,8 +1252,8 @@ find_medium_by_name
       }
     }
     else if(desc->type == DESC_MAT_FLUID) {
-      if(str_eq(name, &desc->d.fluid.name)) {
-        unsigned id = desc->d.fluid.fluid_id;
+      if(str_eq(name, &desc->d.fluid->name)) {
+        unsigned id = desc->d.fluid->fluid_id;
         ASSERT(darray_media_ptr_size_get(&stardis->media) > id);
         medium = darray_media_ptr_data_get(&stardis->media)[id];
         if(out_id) *out_id = id;

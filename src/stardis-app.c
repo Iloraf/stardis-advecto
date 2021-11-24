@@ -33,7 +33,6 @@
 #include <string.h>
 
 static const struct dummies DUMMIES_NULL = DUMMIES_NULL__;
-
 static const struct counts COUNTS_NULL = COUNTS_NULL__;
 
 /*******************************************************************************
@@ -42,8 +41,7 @@ static const struct counts COUNTS_NULL = COUNTS_NULL__;
 static res_T
 read_model
   (const struct darray_str* model_files,
-   struct stardis* stardis,
-   struct dummies* dummies)
+   struct stardis* stardis)
 {
   res_T res = RES_OK;
   const struct str* files = NULL;
@@ -51,7 +49,7 @@ read_model
   FILE* f = NULL;
   struct txtrdr* txtrdr = NULL;
 
-  ASSERT(model_files && stardis && dummies);
+  ASSERT(model_files && stardis);
   files = darray_str_cdata_get(model_files);
   FOR_EACH(i, 0, darray_str_size_get(model_files)) {
     const char* name = str_cget(files + i);
@@ -69,7 +67,7 @@ read_model
       ERR(txtrdr_read_line(txtrdr));
       line = txtrdr_get_line(txtrdr);
       if(!line) break;
-      ERR(process_model_line(name, line, stardis, dummies));
+      ERR(process_model_line(name, line, stardis));
     }
     txtrdr_ref_put(txtrdr);
     txtrdr = NULL;
@@ -124,7 +122,7 @@ check_delta_and_create_solid
   if(stardis->senc3d_scn) {
     /* Due to previous errors, senc3d_scn can be unavailable */
     unsigned e, ecount = 0;
-    const unsigned desc_id = description->d.solid.desc_id;
+    const unsigned desc_id = description->d.solid->desc_id;
 
     /* The enclosures where created using description ids */
     ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn,
@@ -159,31 +157,31 @@ check_delta_and_create_solid
           logger_print(stardis->logger, LOG_WARNING,
             "Solid '%s' is used in %u different enclosures that have different "
             "delta requirements.\n",
-            str_cget(&description->d.solid.name), ecount);
+            str_cget(&description->d.solid->name), ecount);
         /* Delta needs to be substituted with actual value */
-        if(description->d.solid.delta == DELTA_AUTO) {
-          description->d.solid.delta = delta_range[0];
+        if(description->d.solid->delta == DELTA_AUTO) {
+          description->d.solid->delta = delta_range[0];
           logger_print(stardis->logger, LOG_OUTPUT,
             "Auto delta for solid '%s' set to %g\n",
-            str_cget(&description->d.solid.name), description->d.solid.delta);
+            str_cget(&description->d.solid->name), description->d.solid->delta);
         } else {
           int too_small
-            = (delta_range[0] > description->d.solid.delta * acceptance_ratio);
+            = (delta_range[0] > description->d.solid->delta * acceptance_ratio);
           int too_big
-            = (delta_range[0] * acceptance_ratio < description->d.solid.delta);
+            = (delta_range[0] * acceptance_ratio < description->d.solid->delta);
           /* Check if user delta is OK */
           if(too_small || too_big) {
             logger_print(stardis->logger, LOG_WARNING,
               "User delta for solid '%s' seems too %s: %g; "
               "auto delta would have set it to %g.\n",
-              str_cget(&description->d.solid.name), (too_big ? "big" : "small"),
-              description->d.solid.delta, delta_range[0]);
+              str_cget(&description->d.solid->name), (too_big ? "big" : "small"),
+              description->d.solid->delta, delta_range[0]);
           }
         }
       }
     }
   }
-  ERR(create_solver_solid(stardis, &description->d.solid));
+  ERR(create_solver_solid(stardis, description->d.solid));
 
 end:
   if(enc) SENC3D(enclosure_ref_put(enc));
@@ -205,7 +203,6 @@ stardis_init
 {
   res_T tmp_res, res = RES_OK;
   struct sg3d_sdisXd_scene_create_context create_context;
-  struct dummies dummies = DUMMIES_NULL;
   struct htable_intface htable_interfaces;
   struct str str;
   unsigned i, vcount, tcount, ocount, count;
@@ -215,6 +212,7 @@ stardis_init
 
   str_init(allocator, &str);
   /* Init everithing that cannot fail */
+  stardis->dummies = DUMMIES_NULL;
   stardis->logger = logger;
   stardis->allocator = allocator;
   htable_intface_init(stardis->allocator, &htable_interfaces);
@@ -280,7 +278,7 @@ stardis_init
   else if(args->mode & MODE_DUMP_C_CHUNKS) {
     ERR(str_set(&stardis->chunks_prefix, args->chunks_prefix));
   }
-  ERR(read_model(&args->model_files, stardis, &dummies));
+  ERR(read_model(&args->model_files, stardis));
 
   create_context.geometry = stardis->geometry.sg3d;
   create_context.app_interface_getter = geometry_get_interface;
@@ -439,6 +437,10 @@ stardis_release
   str_release(&stardis->bin_green_filename);
   str_release(&stardis->end_paths_filename);
   str_release(&stardis->chunks_prefix);
+  FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
+    struct description* d = darray_descriptions_data_get(&stardis->descriptions) +i;
+    release_description(d, stardis->allocator);
+  }
   darray_descriptions_release(&stardis->descriptions);
   release_geometry(&stardis->geometry);
   darray_size_t_release(&stardis->compute_surface.primitives);
@@ -450,6 +452,12 @@ stardis_release
   }
   darray_media_ptr_release(&stardis->media);
   release_camera(&stardis->camera);
+  if(stardis->dummies.stardis_fluid) {
+    release_fluid(stardis->dummies.stardis_fluid, stardis->allocator);
+  }
+  if(stardis->dummies.stardis_solid) {
+    release_solid(stardis->dummies.stardis_solid, stardis->allocator);
+  }
 }
 
 res_T

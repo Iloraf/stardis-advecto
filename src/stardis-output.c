@@ -932,7 +932,7 @@ dump_green_ascii
       const struct description* desc = descs + i;
       const struct solid* sl;
       if(desc->type != DESC_MAT_SOLID) continue;
-      sl = &desc->d.solid;
+      sl = desc->d.solid;
       fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g",
         i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower);
       if(sl->tinit >= 0) {
@@ -954,7 +954,7 @@ dump_green_ascii
       const struct description* desc = descs + i;
       const struct fluid* fl;
       if(desc->type != DESC_MAT_FLUID) continue;
-      fl = &desc->d.fluid;
+      fl = desc->d.fluid;
       if(fl->imposed_temperature >= 0) {
         fprintf(stream, "%u\t%s\t%g\t%g",
           i, str_cget(&fl->name), fl->rho, fl->cp);
@@ -982,7 +982,7 @@ dump_green_ascii
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct t_boundary* bd;
-      bd = &desc->d.t_boundary;
+      bd = desc->d.t_boundary;
       fprintf(stream, "%u\t%s\t%g\n",
         i, str_cget(&bd->name), bd->imposed_temperature);
     }
@@ -995,7 +995,7 @@ dump_green_ascii
       const struct h_boundary* bd;
       if(desc->type != DESC_BOUND_H_FOR_SOLID
         && desc->type != DESC_BOUND_H_FOR_FLUID) continue;
-      bd = &desc->d.h_boundary;
+      bd = desc->d.h_boundary;
       fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\t%g\n",
         i, str_cget(&bd->name), bd->ref_temperature, bd->emissivity,
         bd->specular_fraction, bd->hc, bd->imposed_temperature);
@@ -1008,7 +1008,7 @@ dump_green_ascii
       const struct description* desc = descs + i;
       const struct f_boundary* bd;
       if(desc->type != DESC_BOUND_F_FOR_SOLID) continue;
-      bd = &desc->d.f_boundary;
+      bd = desc->d.f_boundary;
       fprintf(stream, "%u\t%s\t%g\n",
         i, str_cget(&bd->name), bd->imposed_flux);
     }

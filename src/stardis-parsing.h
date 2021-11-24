@@ -193,17 +193,16 @@ extern LOCAL_SYM res_T
 process_model_line
   (const char* file_name,
    char* line,
-   struct stardis* stardis,
-   struct dummies* dummies);
+   struct stardis* stardis);
 
-extern LOCAL_SYM unsigned
+extern LOCAL_SYM res_T
 get_dummy_solid_id
   (struct stardis* stardis,
-   struct dummies* dummies);
+   unsigned* id);
 
-extern LOCAL_SYM unsigned
+extern LOCAL_SYM res_T
 get_dummy_fluid_id
   (struct stardis* stardis,
-   struct dummies* dummies);
+   unsigned* id);
 
 #endif /*ARGS_H*/

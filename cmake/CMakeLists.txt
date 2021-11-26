@@ -118,6 +118,7 @@ endif()
 ###############################################################################
 set(SDIS_FILES_SRC
   stardis-app.c
+  stardis-args.c
   stardis-compute.c
   stardis-fluid.c
   stardis-intface.c
@@ -128,6 +129,7 @@ set(SDIS_FILES_SRC
 
 set(SDIS_FILES_INC
   stardis-app.h
+  stardis-args.h
   stardis-compute.h
   stardis-default.h.in
   stardis-fluid.h

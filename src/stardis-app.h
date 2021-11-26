@@ -16,6 +16,7 @@
 #ifndef STARDIS_APP_H
 #define STARDIS_APP_H
 
+#include "stardis-args.h"
 #include "stardis-parsing.h"
 #include "stardis-default.h"
 #include "stardis-solid.h"

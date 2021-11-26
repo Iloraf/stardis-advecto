@@ -249,7 +249,7 @@ check_probe_conform_to_type
         struct solid* solid = filter_ctx.desc->d.solid;
         ASSERT(solid->delta < INF);
         logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe was in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid->name));
+          "Probe was in solid '%s'.\n", str_cget(&solid->name));
         if(filter_ctx.dist > 2 * solid->delta) {
           logger_print(stardis->logger, LOG_ERROR,
             "Probe moved to (%g, %g, %g), primitive %u, uv = (%g, %g).\n",

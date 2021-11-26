@@ -1443,7 +1443,7 @@ process_sfc
   res = cstr_to_double(tk, &desc->d.sf_connect->emissivity);
   if(res != RES_OK
     || desc->d.sf_connect->emissivity < 0
-    || desc->d.h_boundary->emissivity > 1)
+    || desc->d.sf_connect->emissivity > 1)
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid emissivity: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;

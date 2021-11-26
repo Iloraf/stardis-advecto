@@ -145,7 +145,7 @@ create_solver_solid
   if(solid_props->solid_id >= darray_media_ptr_size_get(&stardis->media)) {
     ERR(darray_media_ptr_resize(&stardis->media, solid_props->solid_id + 1));
   }
-  ASSERT(darray_media_ptr_data_get(&stardis->media)[solid_props->solid_id] == NULL);
+  ASSERT(!darray_media_ptr_data_get(&stardis->media)[solid_props->solid_id]);
   ERR(sdis_solid_create(stardis->dev, &solid_shader, data,
     darray_media_ptr_data_get(&stardis->media) + solid_props->solid_id));
 

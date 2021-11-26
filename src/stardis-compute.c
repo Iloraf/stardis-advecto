@@ -246,30 +246,30 @@ check_probe_conform_to_type
           "Could not determine the medium probe is in.\n");
     } else {
       if(filter_ctx.desc->type == DESC_MAT_SOLID) {
-        double delta = filter_ctx.desc->d.solid->delta;
-        ASSERT(delta < INF);
+        struct solid* solid = filter_ctx.desc->d.solid;
+        ASSERT(solid->delta < INF);
         logger_print(stardis->logger, LOG_OUTPUT,
           "Probe was in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid->name));
-        if(filter_ctx.dist > 2 * delta) {
+        if(filter_ctx.dist > 2 * solid->delta) {
           logger_print(stardis->logger, LOG_ERROR,
             "Probe moved to (%g, %g, %g), primitive %u, uv = (%g, %g).\n",
             SPLIT3(filter_ctx.pos), hit.prim.prim_id, SPLIT2(hit.uv));
           logger_print(stardis->logger, LOG_ERROR,
             "Move is %g delta long. Use -p instead of -P.\n",
-            filter_ctx.dist / delta);
+            filter_ctx.dist / solid->delta);
           res = RES_BAD_ARG;
           goto error;
         }
-        if(filter_ctx.dist > 0.5 * delta) {
+        if(filter_ctx.dist > 0.5 * solid->delta) {
           logger_print(stardis->logger, LOG_WARNING,
             "Probe was %g delta from closest boundary. "
             "Consider using -p instead of -P.\n",
-            filter_ctx.dist / delta);
+            filter_ctx.dist / solid->delta);
         } else {
           if(filter_ctx.dist != 0)
             logger_print(stardis->logger, LOG_OUTPUT,
               "Probe was %g delta from closest boundary.\n",
-              filter_ctx.dist / delta);
+              filter_ctx.dist / solid->delta);
         }
       } else {
         /* TODO: check move length wrt local geometry? */
@@ -331,26 +331,26 @@ check_probe_conform_to_type
     logger_print(stardis->logger, LOG_OUTPUT,
       "Probe is in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid->name));
     if(filter_ctx.desc->type == DESC_MAT_SOLID) {
-      double delta = filter_ctx.desc->d.solid->delta;
-      if(filter_ctx.dist < 0.25 * delta) {
+      struct solid* solid = filter_ctx.desc->d.solid;
+      if(filter_ctx.dist < 0.25 * solid->delta) {
         logger_print(stardis->logger, LOG_ERROR,
           "Probe is %g delta from closest boundary. Use -P instead of -p.\n",
-          filter_ctx.dist / delta);
+          filter_ctx.dist / solid->delta);
         logger_print(stardis->logger, LOG_ERROR,
           "Closest geometry is primitive %u, uv = (%g, %g).\n",
           hit.prim.prim_id, SPLIT2(hit.uv));
         res = RES_BAD_ARG;
         goto error;
       }
-      if(filter_ctx.dist < 0.5 * delta) {
+      if(filter_ctx.dist < 0.5 * solid->delta) {
         logger_print(stardis->logger, LOG_WARNING,
           "Probe is %g delta from closest boundary. "
           "Consider using -P instead of -p.\n",
-          filter_ctx.dist / delta);
+          filter_ctx.dist / solid->delta);
       } else {
         logger_print(stardis->logger, LOG_OUTPUT,
           "Probe is %g delta from closest boundary.\n",
-          filter_ctx.dist / delta);
+          filter_ctx.dist / solid->delta);
       }
     } else {
       logger_print(stardis->logger, LOG_WARNING,
@@ -544,7 +544,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
       const struct description* d;
       ASSERT(prop[SG3D_FRONT] < dcount);
       d = descriptions + prop[SG3D_FRONT];
-      ASSERT(d->type == DESC_MAT_SOLID || d->type == DESC_MAT_FLUID);
+      ASSERT(DESC_IS_MEDIUM(d->type));
       medium_name = str_cget(get_description_name(d));
       compute_side = SDIS_FRONT;
       compute_side_name = "FRONT";
@@ -553,7 +553,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
       const struct description* d;
       ASSERT(prop[SG3D_BACK] < dcount);
       d = descriptions + prop[SG3D_BACK];
-      ASSERT(d->type == DESC_MAT_SOLID || d->type == DESC_MAT_FLUID);
+      ASSERT(DESC_IS_MEDIUM(d->type));
       medium_name = str_cget(get_description_name(d));
       compute_side = SDIS_BACK;
       compute_side_name = "BACK";
@@ -573,12 +573,10 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
 
       fd = descriptions + prop[SG3D_FRONT];
       bd = descriptions + prop[SG3D_BACK];
-      ASSERT(fd->type == DESC_MAT_SOLID || fd->type == DESC_MAT_FLUID);
-      fmat_id = (fd->type == DESC_MAT_SOLID)
-        ? fd->d.solid->solid_id : fd->d.fluid->fluid_id;
-      ASSERT(bd->type == DESC_MAT_SOLID || bd->type == DESC_MAT_FLUID);
-      bmat_id = (bd->type == DESC_MAT_SOLID)
-        ? bd->d.solid->solid_id : bd->d.fluid->fluid_id;
+      ASSERT(DESC_IS_MEDIUM(fd->type));
+      ASSERT(DESC_IS_MEDIUM(bd->type));
+      description_get_medium_id(fd, &fmat_id);
+      description_get_medium_id(bd, &bmat_id);
 
       if(med_id != fmat_id && med_id != bmat_id) { /* Not here */
         logger_print(stardis->logger, LOG_ERROR,
@@ -1240,26 +1238,14 @@ find_medium_by_name
   ASSERT(stardis && name);
 
   FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
-    struct description*
-      desc = darray_descriptions_data_get(&stardis->descriptions) + i;
-    if(desc->type == DESC_MAT_SOLID) {
-      if(str_eq(name, &desc->d.solid->name)) {
-        unsigned id = desc->d.solid->solid_id;
-        ASSERT(darray_media_ptr_size_get(&stardis->media) > id);
-        medium = darray_media_ptr_data_get(&stardis->media)[id];
-        if(out_id) *out_id = id;
-        break;
-      }
-    }
-    else if(desc->type == DESC_MAT_FLUID) {
-      if(str_eq(name, &desc->d.fluid->name)) {
-        unsigned id = desc->d.fluid->fluid_id;
-        ASSERT(darray_media_ptr_size_get(&stardis->media) > id);
-        medium = darray_media_ptr_data_get(&stardis->media)[id];
-        if(out_id) *out_id = id;
-        break;
-      }
-    }
+    unsigned id;
+    struct description* desc =
+      darray_descriptions_data_get(&stardis->descriptions) + i;
+    description_get_medium_id(desc, &id);
+    ASSERT(darray_media_ptr_size_get(&stardis->media) > id);
+    medium = darray_media_ptr_data_get(&stardis->media)[id];
+    if(out_id) *out_id = id;
+    break;
   }
   return medium;
 }

@@ -114,6 +114,7 @@ check_delta_and_create_solid
   double ratio, delta_range[2] = { DBL_MAX, -DBL_MAX };
   const double acceptance_ratio = 3;
   struct senc3d_enclosure_header header;
+  struct solid* solid = description->d.solid;
 
   ASSERT(stardis && description && description->type == DESC_MAT_SOLID);
 
@@ -122,7 +123,7 @@ check_delta_and_create_solid
   if(stardis->senc3d_scn) {
     /* Due to previous errors, senc3d_scn can be unavailable */
     unsigned e, ecount = 0;
-    const unsigned desc_id = description->d.solid->desc_id;
+    const unsigned desc_id = solid->desc_id;
 
     /* The enclosures where created using description ids */
     ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn,
@@ -157,31 +158,31 @@ check_delta_and_create_solid
           logger_print(stardis->logger, LOG_WARNING,
             "Solid '%s' is used in %u different enclosures that have different "
             "delta requirements.\n",
-            str_cget(&description->d.solid->name), ecount);
+            str_cget(&solid->name), ecount);
         /* Delta needs to be substituted with actual value */
-        if(description->d.solid->delta == DELTA_AUTO) {
-          description->d.solid->delta = delta_range[0];
+        if(solid->delta == DELTA_AUTO) {
+          solid->delta = delta_range[0];
           logger_print(stardis->logger, LOG_OUTPUT,
             "Auto delta for solid '%s' set to %g\n",
-            str_cget(&description->d.solid->name), description->d.solid->delta);
+            str_cget(&solid->name), solid->delta);
         } else {
           int too_small
-            = (delta_range[0] > description->d.solid->delta * acceptance_ratio);
+            = (delta_range[0] > solid->delta * acceptance_ratio);
           int too_big
-            = (delta_range[0] * acceptance_ratio < description->d.solid->delta);
+            = (delta_range[0] * acceptance_ratio < solid->delta);
           /* Check if user delta is OK */
           if(too_small || too_big) {
             logger_print(stardis->logger, LOG_WARNING,
               "User delta for solid '%s' seems too %s: %g; "
               "auto delta would have set it to %g.\n",
-              str_cget(&description->d.solid->name), (too_big ? "big" : "small"),
-              description->d.solid->delta, delta_range[0]);
+              str_cget(&solid->name), (too_big ? "big" : "small"),
+              solid->delta, delta_range[0]);
           }
         }
       }
     }
   }
-  ERR(create_solver_solid(stardis, description->d.solid));
+  ERR(create_solver_solid(stardis, solid));
 
 end:
   if(enc) SENC3D(enclosure_ref_put(enc));
@@ -490,8 +491,7 @@ error:
   if(properties[(Rank)] == SG3D_UNSPECIFIED_PROPERTY) undef_count++;\
   else {\
     ASSERT(properties[(Rank)] < darray_descriptions_size_get(&stardis->descriptions));\
-    ASSERT(descs[properties[(Rank)]].type == DESC_MAT_SOLID\
-      || descs[properties[(Rank)]].type == DESC_MAT_FLUID);\
+    ASSERT(DESC_IS_MEDIUM(descs[properties[(Rank)]].type));\
     if(descs[properties[(Rank)]].type == DESC_MAT_SOLID) solid_count++;\
     else fluid_count++;\
   }\

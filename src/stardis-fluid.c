@@ -97,7 +97,7 @@ create_solver_fluid
   if(fluid_props->fluid_id >= darray_media_ptr_size_get(&stardis->media)) {
     ERR(darray_media_ptr_resize(&stardis->media, fluid_props->fluid_id + 1));
   }
-  ASSERT(darray_media_ptr_data_get(&stardis->media)[fluid_props->fluid_id] == NULL);
+  ASSERT(!darray_media_ptr_data_get(&stardis->media)[fluid_props->fluid_id]);
   ERR(sdis_fluid_create(stardis->dev, &fluid_shader, data,
     darray_media_ptr_data_get(&stardis->media) + fluid_props->fluid_id));
 

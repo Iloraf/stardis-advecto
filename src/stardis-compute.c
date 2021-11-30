@@ -469,6 +469,7 @@ compute_probe(struct stardis* stardis, struct time* start)
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    args.picard_order = stardis->picard_order;
     time_current(&compute_start);
     ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
     time_current(&compute_end);
@@ -703,6 +704,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    args.picard_order = stardis->picard_order;
     time_current(&compute_start);
     ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
     time_current(&compute_end);
@@ -851,6 +853,7 @@ compute_camera(struct stardis* stardis, struct time* start)
   args.image_resolution[1] = height;
   args.spp = (size_t)stardis->camera.spp;
   args.register_paths = stardis->dump_paths;
+  args.picard_order = stardis->picard_order;
 
   /* Launch the simulation */
   time_current(&compute_start);
@@ -963,6 +966,7 @@ compute_medium(struct stardis* stardis, struct time* start)
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    args.picard_order = stardis->picard_order;
     time_current(&compute_start);
     ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
     time_current(&compute_end);
@@ -1094,6 +1098,7 @@ compute_boundary(struct stardis* stardis, struct time* start)
     }
   } else {
     args.register_paths = stardis->dump_paths;
+    args.picard_order = stardis->picard_order;
     time_current(&compute_start);
     ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
     time_current(&compute_end);
@@ -1138,6 +1143,7 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
     = darray_size_t_cdata_get(&stardis->compute_surface.primitives);
   args.nprimitives
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
+  args.picard_order = stardis->picard_order;
   d2_set(args.time_range, stardis->time_range);
 
   /* Input random state? */
@@ -1199,6 +1205,7 @@ compute_map(struct stardis* stardis, struct time* start)
       = darray_size_t_size_get(&stardis->compute_surface.primitives);
     d2_set(args.time_range, stardis->time_range);
     args.register_paths = stardis->dump_paths;
+    args.picard_order = stardis->picard_order;
 
     ERR(sdis_solve_boundary(stardis->sdis_scn, &args,
       darray_estimators_data_get(&estimators) + p));

@@ -96,11 +96,12 @@ struct args {
   char* rndgen_state_in_filename;
   char* rndgen_state_out_filename;
   char* chunks_prefix;
-  size_t samples;
-  unsigned nthreads;
-  double pos_and_time[5];
-  enum stardis_mode mode;
   char* camera;
+  size_t samples;
+  double pos_and_time[5];
+  unsigned nthreads;
+  unsigned picard_order;
+  enum stardis_mode mode;
   enum dump_path_type dump_paths;
   int verbose;
 };

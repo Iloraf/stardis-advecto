@@ -284,9 +284,6 @@ short_help
   fprintf(stream, "\n  -n SAMPLE_COUNT\n");
   fprintf(stream, "     Set the number of Monte-Carlo samples.\n");
 
-  fprintf(stream, "\n  -r REFERENCE_TEMP\n");
-  fprintf(stream, "     Set the temperature used for the linearization of the radiative transfer.\n");
-
   fprintf(stream, "\n  -t NUM_OF_THREADS\n");
   fprintf(stream, "     Hint on the number of threads.\n");
 

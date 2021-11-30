@@ -292,16 +292,16 @@ static struct description*
 find_description_by_name
   (struct stardis* stardis,
    const struct str* name,
-   size_t* out_id)
+   const struct description* self)
 {
   size_t i;
-  ASSERT(stardis && name);
+  ASSERT(stardis && name && self);
 
   FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
     struct description* desc
       = darray_descriptions_data_get(&stardis->descriptions) + i;
+    if(self == desc) continue;
     if(str_eq(name, get_description_name(desc))) {
-      if(out_id) *out_id = i;
       return desc;
     }
   }
@@ -329,15 +329,13 @@ process_h
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz+1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_h(stardis->allocator, &desc->d.h_boundary));
   h_boundary = desc->d.h_boundary;
-  ERR(init_h(stardis->allocator, &h_boundary));
   desc->type = type;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "h boundary name");
   ERR(description_set_name(stardis, &h_boundary->name, tk));
-  if(find_description_by_name(stardis, &h_boundary->name, NULL)
-    != desc)
-  {
+  if(find_description_by_name(stardis, &h_boundary->name, desc)) {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -444,17 +442,15 @@ process_t
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_t(stardis->allocator, &desc->d.t_boundary));
   t_boundary = desc->d.t_boundary;
-  ERR(init_t(stardis->allocator, &t_boundary));
   desc->type = DESC_BOUND_T_FOR_SOLID;
 
   ERR(get_dummy_fluid_id(stardis, &t_boundary->mat_id));
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "temperature boundary name");
   ERR(description_set_name(stardis, &t_boundary->name, tk));
-  if(find_description_by_name(stardis, &t_boundary->name, NULL)
-    != desc)
-  {
+  if(find_description_by_name(stardis, &t_boundary->name, desc)) {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -499,17 +495,15 @@ process_flx
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_f(stardis->allocator, &desc->d.f_boundary));
   f_boundary = desc->d.f_boundary;
-  ERR(init_f(stardis->allocator, &f_boundary));
   desc->type = DESC_BOUND_F_FOR_SOLID;
 
   ERR(get_dummy_fluid_id(stardis, &f_boundary->mat_id));
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "flux boundary name");
   ERR(description_set_name(stardis, &f_boundary->name, tk));
-  if(find_description_by_name(stardis, &f_boundary->name, NULL)
-    != desc)
-  {
+  if(find_description_by_name(stardis, &f_boundary->name, desc)) {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -554,8 +548,8 @@ process_sfc
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_sf(stardis->allocator, &desc->d.sf_connect));
   sf_connect = desc->d.sf_connect;
-  ERR(init_sf(stardis->allocator, &sf_connect));
   desc->type = DESC_SOLID_FLUID_CONNECT;
 
   /* Use a medium ID even if there is no medium here
@@ -565,9 +559,7 @@ process_sfc
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid fluid connection name");
   ERR(description_set_name(stardis, &sf_connect->name, tk));
-  if(find_description_by_name(stardis, &sf_connect->name, NULL)
-    != desc)
-  {
+  if(find_description_by_name(stardis, &sf_connect->name, desc)) {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -644,8 +636,8 @@ process_ssc
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_ss(stardis->allocator, &desc->d.ss_connect));
   ss_connect = desc->d.ss_connect;
-  ERR(init_ss(stardis->allocator, &ss_connect));
   desc->type = DESC_SOLID_SOLID_CONNECT;
 
   /* Use a medium ID even if there is no medium here
@@ -655,9 +647,7 @@ process_ssc
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid solid connection name");
   ERR(description_set_name(stardis, &ss_connect->name, tk));
-  if(find_description_by_name(stardis, &ss_connect->name, NULL)
-    != desc)
-  {
+  if(find_description_by_name(stardis, &ss_connect->name, desc)) {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -785,8 +775,8 @@ process_solid
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_solid(stardis->allocator, &desc->d.solid));
   solid = desc->d.solid;
-  ERR(init_solid(stardis->allocator, &solid));
   desc->type = DESC_MAT_SOLID;
 
   solid->solid_id = allocate_stardis_medium_id(stardis);
@@ -797,9 +787,7 @@ process_solid
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid name");
   ERR(description_set_name(stardis, &solid->name, tk));
-  if(find_description_by_name(stardis, &solid->name, NULL)
-    != desc)
-  {
+  if(find_description_by_name(stardis, &solid->name, desc)) {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -894,8 +882,8 @@ process_fluid
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_fluid(stardis->allocator, &desc->d.fluid));
   fluid = desc->d.fluid;
-  ERR(init_fluid(stardis->allocator, &fluid));
   desc->type = DESC_MAT_FLUID;
 
   fluid->fluid_id = allocate_stardis_medium_id(stardis);
@@ -906,9 +894,7 @@ process_fluid
   
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "fluid name");
   ERR(description_set_name(stardis, &fluid->name, tk));
-  if(find_description_by_name(stardis, &fluid->name, NULL)
-    != desc)
-  {
+  if(find_description_by_name(stardis, &fluid->name, desc)) {
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;

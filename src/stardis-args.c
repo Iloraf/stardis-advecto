@@ -523,10 +523,10 @@ parse_args
       break;
     }
     case 'n': {
-      unsigned long n;
-      res = cstr_to_ulong(optarg, &n);
+      long n;
+      res = cstr_to_long(optarg, &n);
       if(res != RES_OK
-        || n == 0)
+        || n <= 0)
       {
         if(res == RES_OK) res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
@@ -534,7 +534,7 @@ parse_args
           opt, optarg);
         goto error;
       }
-      args->samples = n;
+      args->samples = (unsigned long)n;
       n_used = 1;
       break;
     }
@@ -626,8 +626,9 @@ parse_args
       break;
     }
 
-    case 't':
-      res = cstr_to_uint(optarg, &args->nthreads);
+    case 't': {
+      int nt;
+      res = cstr_to_int(optarg, &nt);
       if(res != RES_OK
         || args->nthreads <= 0)
       {
@@ -637,7 +638,9 @@ parse_args
           opt, optarg);
         goto error;
       }
+      args->nthreads = (unsigned)nt;
       break;
+    }
 
     case 'v':
       if(args->mode & USE_STDOUT_MODES) {
@@ -858,7 +861,15 @@ parse_camera
       }
     }
     else if(strcasecmp(opt[0], "FOV") == 0) {
-      ERR(cstr_to_double(opt[1], &cam->fov));
+      res = cstr_to_double(opt[1], &cam->fov);
+      if(res != RES_OK
+        || cam->fov <= 0)
+      {
+        if(res == RES_OK) res = RES_BAD_ARG;
+        logger_print((logger), LOG_ERROR,
+          "Invalid %s option: %s\n", opt[0], opt[1]);
+        goto error;
+      }
     }
     else if(strcasecmp(opt[0], "UP") == 0) {
       ERR(cstr_to_list_double(opt[1], ',', cam->up, &len, 3));
@@ -873,12 +884,32 @@ parse_camera
     }
     else if(strcasecmp(opt[0], "IMG") == 0) {
       unsigned img_sz[2];
-      ERR(cstr_to_list_uint(opt[1], 'x', img_sz, &len, 2));
+      res = cstr_to_list_uint(opt[1], 'x', img_sz, &len, 2);
+      if(res != RES_OK
+        /* mimic cstr_to_list_int() possible behaviour; but it doesnt exist */
+        || img_sz[0] == 0 || img_sz[0] > INT_MAX
+        || img_sz[1] == 0 || img_sz[1] > INT_MAX)
+      {
+        if(res == RES_OK) res = RES_BAD_ARG;
+        logger_print((logger), LOG_ERROR,
+          "Invalid %s option: %s\n", opt[0], opt[1]);
+        goto error;
+      }
       cam->img_width = img_sz[0];
       cam->img_height = img_sz[1];
     }
     else if(strcasecmp(opt[0], "SPP") == 0) {
-      ERR(cstr_to_uint(opt[1], &cam->spp));
+      int ssp;
+      res = cstr_to_int(opt[1], &ssp);
+      if(res != RES_OK
+        || ssp <= 0)
+      {
+        if(res == RES_OK) res = RES_BAD_ARG;
+        logger_print((logger), LOG_ERROR,
+          "Invalid %s option: %s\n", opt[0], opt[1]);
+        goto error;
+      }
+      cam->spp = (unsigned)ssp;
     } else {
       logger_print(logger, LOG_ERROR,
         "Unexpected option for rendering mode: %s.\n",

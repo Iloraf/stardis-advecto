@@ -392,6 +392,8 @@ process_h
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  stardis->t_range[0] = MMIN(stardis->t_range[0], h_boundary->imposed_temperature);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], h_boundary->imposed_temperature);
 
   if(type == DESC_BOUND_H_FOR_FLUID)
     ERR(get_dummy_solid_id(stardis, &h_boundary->mat_id));
@@ -466,6 +468,8 @@ process_t
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  stardis->t_range[0] = MMIN(stardis->t_range[0], t_boundary->imposed_temperature);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], t_boundary->imposed_temperature);
 
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
@@ -831,6 +835,8 @@ process_solid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  stardis->t_range[0] = MMIN(stardis->t_range[0], solid->tinit);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], solid->tinit);
   ERR(read_imposed_temperature(stardis, &solid->imposed_temperature,
     tok_ctx));
   if(solid->imposed_temperature >= 0
@@ -843,6 +849,9 @@ process_solid
     res = RES_BAD_ARG;
     goto end;
   }
+  if(solid->imposed_temperature >= 0)
+    stardis->t_range[0] = MMIN(stardis->t_range[0], solid->imposed_temperature);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], solid->imposed_temperature);
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "volumic power");
   res = cstr_to_double(tk, &solid->vpower);
   if(res != RES_OK) {
@@ -928,7 +937,8 @@ process_fluid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-
+  stardis->t_range[0] = MMIN(stardis->t_range[0], fluid->tinit);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], fluid->tinit);
   ERR(read_imposed_temperature(stardis, &fluid->imposed_temperature,
     tok_ctx));
   if(fluid->imposed_temperature >= 0
@@ -941,6 +951,9 @@ process_fluid
     res = RES_BAD_ARG;
     goto end;
   }
+  if(fluid->imposed_temperature >= 0)
+    stardis->t_range[0] = MMIN(stardis->t_range[0], fluid->imposed_temperature);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], fluid->imposed_temperature);
 
   ERR(create_solver_fluid(stardis, fluid));
 

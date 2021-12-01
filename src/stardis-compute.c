@@ -1241,6 +1241,8 @@ find_medium_by_name
     unsigned id;
     struct description* desc =
       darray_descriptions_data_get(&stardis->descriptions) + i;
+    if(!str_eq(name, get_description_name(desc)))
+      continue;
     description_get_medium_id(desc, &id);
     ASSERT(darray_media_ptr_size_get(&stardis->media) > id);
     medium = darray_media_ptr_data_get(&stardis->media)[id];

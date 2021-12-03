@@ -523,6 +523,14 @@ process_flx
     logger_print(stardis->logger, LOG_ERROR, "Invalid flux: %s\n", tk);
     goto end;
   }
+  if(f_boundary->imposed_flux != 0 && stardis->picard_order > 1) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot have a flux defined at a boundary (here %f) if Picard order "
+      "is not 1 (here order is %u)\n",
+      f_boundary->imposed_flux, stardis->picard_order);
+    res = RES_BAD_ARG;
+    goto end;
+  }
 
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
@@ -857,6 +865,14 @@ process_solid
   if(res != RES_OK) {
     /* VPower can be < 0 */
     logger_print(stardis->logger, LOG_ERROR, "Invalid volumic power: %s\n", tk);
+    goto end;
+  }
+  if(solid->vpower != 0 && stardis->picard_order > 1) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot have volumic power (here %f) if Picard order is not 1 "
+      "(here order is %u)\n",
+      solid->vpower, stardis->picard_order);
+    res = RES_BAD_ARG;
     goto end;
   }
 

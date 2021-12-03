@@ -83,7 +83,9 @@ read_model
   stardis->t_range[0] = MMIN(stardis->t_range[0], stardis->trad_ref);
   stardis->t_range[1] = MMAX(stardis->t_range[1], stardis->trad_ref);
   logger_print(stardis->logger, LOG_OUTPUT,
-    "System Tref range is [%g %g]\n", SPLIT2(stardis->t_range));
+    "System T range is [%g %g]\n", SPLIT2(stardis->t_range));
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Picard order is %u\n", stardis->picard_order);
 
   ASSERT(!f && !txtrdr);
 exit:
@@ -239,6 +241,7 @@ stardis_init
   stardis->compute_surface.area = 0;
   stardis->samples = args->samples;
   stardis->nthreads = args->nthreads;
+  stardis->picard_order = args->picard_order;
   stardis->scale_factor = -1; /* invalid value */
   stardis->trad = STARDIS_DEFAULT_TRAD;
   stardis->trad_ref = STARDIS_DEFAULT_TRAD_REFERENCE;

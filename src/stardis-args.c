@@ -181,9 +181,10 @@ init_args
   args->logger = logger;
   args->allocator = allocator;
   darray_str_init(allocator, &args->model_files);
-  /* Set default values */
+  /* Set non-zero default values */
   args->samples = STARDIS_DEFAULT_SAMPLES_COUNT;
   args->nthreads = SDIS_NTHREADS_DEFAULT;
+  args->picard_order = STARDIS_DEFAULT_PICARD_ORDER;
   d2(args->pos_and_time+3,
     STARDIS_DEFAULT_COMPUTE_TIME, STARDIS_DEFAULT_COMPUTE_TIME);
   args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;
@@ -228,13 +229,13 @@ short_help
   print_version(stream);
 
   fprintf(stream, "\nMandatory options\n");
-  fprintf(stream, "-------------------\n");
+  fprintf(stream,   "-----------------\n");
 
   fprintf(stream, "\n  -M <FILE>\n");
   fprintf(stream, "     Read a text file that contains (partial) description of the model.\n");
 
   fprintf(stream, "\nExclusive options\n");
-  fprintf(stream, "-------------------\n");
+  fprintf(stream,   "-----------------\n");
 
   fprintf(stream, "\n  -F STL_FILE[,TIME-RANGE]\n");
   fprintf(stream, "     Compute the mean flux on a given 2D region at a given time.\n");
@@ -258,7 +259,7 @@ short_help
   fprintf(stream, "     Compute the by-triangle mean temperature on a given 2D region.\n");
 
   fprintf(stream, "\nOther options\n");
-  fprintf(stream, "-------------------\n");
+  fprintf(stream,   "-------------\n");
 
   fprintf(stream, "\n  -c NAMES_PREFIX\n");
   fprintf(stream, "     Dump the geometry and property ids to stdout as C chunks.\n");
@@ -283,6 +284,9 @@ short_help
 
   fprintf(stream, "\n  -n SAMPLE_COUNT\n");
   fprintf(stream, "     Set the number of Monte-Carlo samples.\n");
+
+  fprintf(stream, "\n  -o\n");
+  fprintf(stream, "     Set the order for the Picard linearization of radiative transfer.\n");
 
   fprintf(stream, "\n  -t NUM_OF_THREADS\n");
   fprintf(stream, "     Hint on the number of threads.\n");
@@ -359,9 +363,9 @@ parse_args
    struct args* args,
    struct mem_allocator* allocator)
 {
-  int opt = 0, n_used = 0;
+  int opt = 0, n_used = 0, o_used = 0;
   size_t len = 0;
-  const char option_list[] = "c:dD:eF:gG:hm:M:n:p:P:R:s:S:t:vV:x:X:";
+  const char option_list[] = "c:dD:eF:gG:hm:M:n:o:p:P:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -533,6 +537,23 @@ parse_args
       }
       args->samples = (unsigned long)n;
       n_used = 1;
+      break;
+    }
+
+    case 'o': {
+      int order;
+      res = cstr_to_int(optarg, &order);
+      if(res != RES_OK
+        || order <= 0)
+      {
+        if(res == RES_OK) res = RES_BAD_ARG;
+        logger_print(args->logger, LOG_ERROR,
+          "Invalid argument for option -%c: %s\n",
+          opt, optarg);
+        goto error;
+      }
+      args->picard_order = (unsigned)order;
+      o_used = 1;
       break;
     }
 
@@ -724,6 +745,17 @@ parse_args
     logger_print(args->logger, LOG_ERROR,
       "Option -%c can only be used in conjunction with: %s\n",
       mode_option(args->mode & (MODE_BIN_GREEN | MODE_GREEN)), buf);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  if(args->mode & (MODE_BIN_GREEN | MODE_GREEN)
+    && o_used && args->picard_order > 1)
+  {
+    logger_print(args->logger, LOG_ERROR,
+      "Option -%c cannot be used if Picard order is not 1 (here order is %u)\n",
+      mode_option(args->mode & (MODE_BIN_GREEN | MODE_GREEN)),
+        args->picard_order);
     res = RES_BAD_ARG;
     goto error;
   }

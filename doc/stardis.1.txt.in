@@ -29,12 +29,14 @@ SYNOPSIS
 *stardis* *-M* <__file__> [_option_]
 
 DESCRIPTION
------------
-*stardis* solves coupled thermal systems under the linear assumption. Here
-coupled refers to conductive, convective and radiative transfers, and linear
-means that each phenomena is represented using a model that is linear
-with temperature. *stardis* can deal with complex geometries as well as
-high-frequency external solicitations over a very long period of time,
+*stardis* solves coupled thermal systems: conductive, convective and 
+radiative transfers are solved together.  The physical model used for
+conduction is the local unstationary heat conduction equation.
+Convection fluxes are assumed to be linear with temperature, and radiation
+is assumed to be integrated over the whole thermal spectral range,
+therefore radiative heat fluxes are proportionnal to a difference of
+temperatures to the power 4.  *stardis* can deal with complex geometries as
+well as high-frequency external solicitations over a very long period of time,
 relative to the characteristic time of the system. The provided system
 description should comply with the *stardis-input*(5) format.
 
@@ -62,13 +64,23 @@ computer graphics technology which has already been a game changer in the
 cinema industry (FX and animated movies), this theoretical framework can now
 be practically used on the most geometrically complex systems.
 
-Everytime the linear assumption is relevant, this theoretical framework allows
-to encompass all the heat transfer mechanisms (conductive-convective-radiative)
-in an unified statistical model. Such systems can be solved by a Monte-Carlo
-approach just by sampling heat paths. This can be seen as an extension of
-Monte-Carlo algorithms that solve radiative transfer by sampling optical paths.
-A main property of this approach is that the resulting algorithms does not rely
-on a volume mesh of the system.
+Monte-Carlo algorithms associated with convective and conductive processes
+consist in sampling heat paths: this can be seen as an extension of
+Monte-Carlo algorithms that solve monochromatic radiative transfer.
+The radiative transfer algorithm, based on the Picard method, is also based
+on sampling radiative paths. However, since stardis solves the spectrally
+integrated radiative transfer, the process can be recursive: secondary heat
+paths (convective, conductive and radiative) may be necessary along the
+sampling of an initial radiative path.
+
+The solution may not be sufficiently converged with a Picard order equal
+to 1 in the presence of high temperature gradients.
+Increasing the Picard order may be necessary in this case, until the
+required convergence is reached.
+
+A main property of this approach is that the resulting algorithms do
+not rely on a volumic mesh of the system: only the representation
+of interfaces is necessary.
 
 [1] Delatorre et al., Monte Carlo advances and concentrated solar applications,
 Solar Energy, 2014
@@ -237,6 +249,14 @@ different temperature, flux or volumic power values.
 *-n* _samples-count_::
   Number of Monte-Carlo samples. By default *samples-count* is set to
   @STARDIS_ARGS_DEFAULT_SAMPLES_COUNT@.
+
+*-o* _Picard_order_::
+  Determine the iteration level used with the Picard method to deal with
+  non-linear radiative transfer accross the model.
+  By default *Picard_order* is set to @STARDIS_ARGS_DEFAULT_PICARD_ORDER@.
+  Note that a Picard order greater than 1 is incompatible both with Green
+  computations and models including volumic power sources or non zero flux
+  at a boundary.
 
 *-t* _threads-count_::
   Hint on the number of threads to use. By default use as many threads as CPU

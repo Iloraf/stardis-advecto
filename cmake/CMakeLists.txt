@@ -126,7 +126,11 @@ set(SDIS_FILES_SRC
   stardis-main.c
   stardis-output.c
   stardis-parsing.c
+  stardis-prog.c
   stardis-solid.c)
+
+set(SDIS_FILES_INC_API
+  stardis-prog-common.h)
 
 set(SDIS_FILES_INC
   stardis-app.h
@@ -137,6 +141,7 @@ set(SDIS_FILES_INC
   stardis-intface.h
   stardis-output.h
   stardis-parsing.h
+  stardis-prog.h
   stardis-solid.h
   stardis-version.h.in)
 
@@ -145,6 +150,7 @@ set(SDIS_FILES_DOC COPYING README.md)
 # Prepend each file by `SDIS_SOURCE_DIR'
 rcmake_prepend_path(SDIS_FILES_SRC ${SDIS_SOURCE_DIR})
 rcmake_prepend_path(SDIS_FILES_INC ${SDIS_SOURCE_DIR})
+rcmake_prepend_path(SDIS_FILES_INC_API ${SDIS_SOURCE_DIR})
 rcmake_prepend_path(SDIS_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
 add_executable(stardis
@@ -171,6 +177,7 @@ install(TARGETS stardis
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
+install(FILES ${SDIS_FILES_INC_API} DESTINATION include/)
 install(FILES ${SDIS_FILES_DOC} DESTINATION share/doc/stardis)
 
 rcmake_copy_runtime_libraries(stardis)

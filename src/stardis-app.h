@@ -21,6 +21,7 @@
 #include "stardis-default.h"
 #include "stardis-solid.h"
 #include "stardis-fluid.h"
+#include "stardis-prog.h"
 
 #include <star/sstl.h>
 #include <star/sg3d.h>
@@ -98,6 +99,7 @@ enum properties_conflict_t {
 enum description_type {
   DESC_MAT_SOLID,
   DESC_MAT_FLUID,
+  DESC_MAT_FLUID_PROG,
   DESC_BOUND_H_FOR_FLUID,
   DESC_BOUND_H_FOR_SOLID,
   DESC_BOUND_T_FOR_SOLID,
@@ -114,10 +116,16 @@ enum description_type {
   ((D) == DESC_BOUND_T_FOR_SOLID)
 #define DESC_IS_F(D) \
   ((D) == DESC_BOUND_F_FOR_SOLID)
+#define DESC_IS_SOLID(D) \
+  ((D) == DESC_MAT_SOLID)
+#define DESC_IS_FLUID(D) \
+  ((D) == DESC_MAT_FLUID || (D) == DESC_MAT_FLUID_PROG)
 #define DESC_IS_MEDIUM(D) \
-  ((D) == DESC_MAT_SOLID || (D) == DESC_MAT_FLUID)
+  (DESC_IS_SOLID(D) || DESC_IS_FLUID(D))
 #define DESC_IS_BOUNDARY(D) \
  (DESC_IS_H(D) || DESC_IS_T(D) || DESC_IS_F(D))
+#define DESC_IS_PROG(D) \
+  ((D) == DESC_MAT_FLUID_PROG)
 
 #define DARRAY_NAME interface_ptrs
 #define DARRAY_DATA struct sdis_interface*
@@ -198,6 +206,7 @@ error:
 /******************************************************************************/
 
 struct fluid;
+struct fluid_prog;
 struct solid;
 struct t_boundary;
 struct f_boundary;
@@ -209,6 +218,7 @@ struct description {
   enum description_type type;
   union {
     struct fluid* fluid;
+    struct fluid_prog* fluid_prog;
     struct solid* solid;
     struct t_boundary* t_boundary;
     struct f_boundary* f_boundary;
@@ -549,6 +559,9 @@ release_description
   case DESC_MAT_FLUID:
     release_fluid(desc->d.fluid, allocator);
     break;
+  case DESC_MAT_FLUID_PROG:
+    release_fluid_prog(desc->d.fluid_prog, allocator);
+    break;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:
     release_h_boundary(desc->d.h_boundary, allocator);
@@ -587,6 +600,9 @@ str_print_description
   case DESC_MAT_FLUID:
     ERR(str_print_fluid(str, desc->d.fluid));
     break;
+  case DESC_MAT_FLUID_PROG:
+    ERR(str_print_fluid_prog(str, desc->d.fluid_prog));
+    break;
   case DESC_BOUND_T_FOR_SOLID:
     ERR(str_print_t_boundary(str, desc->d.t_boundary));
     break;
@@ -622,6 +638,8 @@ get_description_name
     return &desc->d.solid->name;
   case DESC_MAT_FLUID:
     return &desc->d.fluid->name;
+  case DESC_MAT_FLUID_PROG:
+    return &desc->d.fluid_prog->name;
   case DESC_BOUND_T_FOR_SOLID:
     return &desc->d.t_boundary->name;
   case DESC_BOUND_H_FOR_SOLID:
@@ -650,6 +668,9 @@ description_get_medium_id
     return;
   case DESC_MAT_FLUID:
     *id = desc->d.fluid->fluid_id;
+    return;
+  case DESC_MAT_FLUID_PROG:
+    *id = desc->d.fluid_prog->fluid_id;
     return;
   case DESC_BOUND_H_FOR_SOLID:
   case DESC_BOUND_H_FOR_FLUID:

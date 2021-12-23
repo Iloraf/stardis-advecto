@@ -172,6 +172,13 @@ create_intface
         front_med = media[id];
         fluid_side_shader = &interface_shader.front;
         break;
+      case DESC_MAT_FLUID_PROG:
+        fluid_count++;
+        id = descriptions[fd].d.fluid_prog->fluid_id;
+        interface_props->front_medium_id = id;
+        front_med = media[id];
+        fluid_side_shader = &interface_shader.front;
+        break;
       default:
         FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
       }
@@ -187,6 +194,15 @@ create_intface
       case DESC_MAT_FLUID:
         fluid_count++;
         id = descriptions[bd].d.fluid->fluid_id;
+        interface_props->back_medium_id = id;
+        back_med = media[id];
+        /* Can overwrite fluid_side_shader. However it would imply two
+         * fluids and this case lead to an error */
+        fluid_side_shader = &interface_shader.back;
+        break;
+      case DESC_MAT_FLUID_PROG:
+        fluid_count++;
+        id = descriptions[bd].d.fluid_prog->fluid_id;
         interface_props->back_medium_id = id;
         back_med = media[id];
         /* Can overwrite fluid_side_shader. However it would imply two
@@ -216,12 +232,12 @@ create_intface
       }
       if(front_defined) {
         def_medium = front_med;
-        fluid_side_shader = (descriptions[fd].type == DESC_MAT_FLUID)
+        fluid_side_shader = DESC_IS_FLUID(descriptions[fd].type)
           ? &interface_shader.front : &interface_shader.back;
       } else {
         ASSERT(back_defined);
         def_medium = back_med;
-        fluid_side_shader = (descriptions[bd].type == DESC_MAT_FLUID)
+        fluid_side_shader = DESC_IS_FLUID(descriptions[bd].type)
           ? &interface_shader.back : &interface_shader.front;
       }
       interface_props->desc_id = cd;

@@ -24,6 +24,7 @@
 #include <rsys/double3.h>
 #include <sdis_version.h>
 #include <rsys/logger.h>
+#include <rsys/library.h>
 
 #include <getopt.h>
 #include <stdlib.h>
@@ -140,7 +141,7 @@ read_sides_and_files
       add_geom_ctx.properties[SG3D_INTFACE] = description_id;
     } else {
       tk = strtok_r(NULL, " \t", tok_ctx);
-      if(!tk) {
+      if(!tk || 0 == strcasecmp(tk, "PROG_PARAMS")) {
         if(file_count == 0) {
           /* At least 1 side */
           logger_print(stardis->logger, LOG_ERROR,
@@ -171,9 +172,9 @@ read_sides_and_files
       }
     }
     tk = strtok_r(NULL, " \t", tok_ctx);
-    if(!tk) {
-      if(!descr_is_intface /* Has read a side */
-        || !file_count) /* Need at least 1 file */
+    if(!tk || 0 == strcasecmp(tk, "PROG_PARAMS")) {
+      if(!descr_is_intface /* Has read a side specifier */
+        || !file_count) /* Need at least 1 file name */
       {
         logger_print(stardis->logger, LOG_ERROR,
           "Invalid data (missing token 'file name')\n");
@@ -257,7 +258,7 @@ description_set_name
   res_T res = RES_OK;
   double foo;
   const char* keywords[] = {
-    "AUTO", "BACK", "BOTH", "FLUID", "FRONT", "F_BOUNDARY_FOR_SOLID",
+    "AUTO", "BACK", "BOTH", "FLUID", "FLUID_PROG", "FRONT", "F_BOUNDARY_FOR_SOLID",
     "H_BOUNDARY_FOR_FLUID", "H_BOUNDARY_FOR_SOLID", "SCALE", "SOLID",
     "SOLID_FLUID_CONNECTION", "SOLID_SOLID_CONNECTION", "TRAD",
     "T_BOUNDARY_FOR_SOLID", "UNKNOWN" };
@@ -405,8 +406,7 @@ process_h
     h_boundary->possible_external_fluid = fluid;
     ASSERT(sz <= UINT_MAX);
     fluid->desc_id = (unsigned)sz;
-    fluid->imposed_temperature
-      = h_boundary->imposed_temperature;
+    fluid->imposed_temperature = h_boundary->imposed_temperature;
     fluid->is_outside = 1;
     fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
     ERR(create_solver_fluid(stardis, fluid));
@@ -790,7 +790,6 @@ process_solid
   ERR(init_solid(stardis->allocator, &desc->d.solid));
   solid = desc->d.solid;
   desc->type = DESC_MAT_SOLID;
-
   solid->solid_id = allocate_stardis_medium_id(stardis);
   solid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   solid->is_outside = 0;
@@ -879,7 +878,6 @@ process_solid
   /* Actual solid creation is defered until geometry is read to allow
    * enclosure shape VS delta analysis (and auto delta computation) */
 
-  ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
 
 end:
@@ -910,9 +908,7 @@ process_fluid
   ERR(init_fluid(stardis->allocator, &desc->d.fluid));
   fluid = desc->d.fluid;
   desc->type = DESC_MAT_FLUID;
-
   fluid->fluid_id = allocate_stardis_medium_id(stardis);
-  fluid->is_outside = 0;
   fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   ASSERT(sz <= UINT_MAX);
   fluid->desc_id = (unsigned)sz;
@@ -973,8 +969,135 @@ process_fluid
 
   ERR(create_solver_fluid(stardis, fluid));
 
-  ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
+
+end:
+  return res;
+error:
+  goto end;
+}
+
+/* FLUID_PROG Name Prog_filename STL_filenames [PROG_PARAMS ...] */
+static res_T
+process_fluid_prog
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  const char* lib_name;
+  struct str tmp;
+  size_t sz;
+  struct fluid_prog* fluid_prog;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  stardis->counts.fmed_count++;
+
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_fluid_prog(stardis->allocator, &desc->d.fluid_prog));
+  fluid_prog = desc->d.fluid_prog;
+  desc->type = DESC_MAT_FLUID_PROG;
+  fluid_prog->fluid_id = allocate_stardis_medium_id(stardis);
+  ASSERT(sz <= UINT_MAX);
+  fluid_prog->desc_id = (unsigned)sz;
+  
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "fluid name");
+  ERR(description_set_name(stardis, &fluid_prog->name, tk));
+  if(find_description_by_name(stardis, &fluid_prog->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
+  ERR(str_set(&fluid_prog->prog_name, tk));
+  lib_name = tk;
+
+  ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
+
+  /* store the end of line as args for custom init */
+  if(tok_ctx) {
+    ERR(str_set(&fluid_prog->args, *tok_ctx));
+  }
+
+  fluid_prog->lib = library_open(lib_name);
+  if(!fluid_prog->lib) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot open library: %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  *(void**)&fluid_prog->create
+    = library_get_symbol(fluid_prog->lib, "create_fluid_data");
+  if(!fluid_prog->create) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot find function 'create_fluid_data' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  fluid_prog->prog_data = fluid_prog->create();
+  if(!fluid_prog->prog_data) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot create fluid data %s\n", str_cget(&fluid_prog->name));
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  *(void**)&fluid_prog->init
+    = library_get_symbol(fluid_prog->lib, "init_fluid_data");
+  if(!fluid_prog->init) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot find function 'init_fluid_data' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  /* duplicate args to allow init() to modify them */
+  str_init(stardis->allocator, &tmp);
+  ERR(str_copy(&tmp, &fluid_prog->args));
+  if(fluid_prog->init(fluid_prog->prog_data, str_get(&tmp))) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot init fluid_prog data %s\n", str_cget(&fluid_prog->name));
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  *(void**)&fluid_prog->release
+    = library_get_symbol(fluid_prog->lib, "release_fluid_data");
+  if(!fluid_prog->release) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot find function 'release_fluid_data' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  *(void**)&fluid_prog->cp
+    = library_get_symbol(fluid_prog->lib, "calorific_capacity");
+  if(!fluid_prog->cp) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot find function 'calorific_capacity()' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  *(void**)&fluid_prog->rho
+    = library_get_symbol(fluid_prog->lib, "volumic_mass");
+  if(!fluid_prog->rho) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot find function 'volumic_mass()' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  *(void**)&fluid_prog->temp
+    = library_get_symbol(fluid_prog->lib, "temperature");
+  if(!fluid_prog->temp) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot find function 'temperature()' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  ERR(create_solver_fluid_prog(stardis, fluid_prog));
 
 end:
   return res;
@@ -1106,6 +1229,8 @@ process_model_line
     ERR(process_solid(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "FLUID"))
     ERR(process_fluid(stardis, &tok_ctx));
+  else if(0 == strcasecmp(tk, "FLUID_PROG"))
+    ERR(process_fluid_prog(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "SCALE"))
     ERR(process_scale(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "TRAD"))

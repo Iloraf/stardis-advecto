@@ -245,7 +245,7 @@ check_probe_conform_to_type
         logger_print(stardis->logger, LOG_WARNING,
           "Could not determine the medium probe is in.\n");
     } else {
-      if(filter_ctx.desc->type == DESC_MAT_SOLID) {
+      if(DESC_IS_SOLID(filter_ctx.desc->type)) {
         struct solid* solid = filter_ctx.desc->d.solid;
         ASSERT(solid->delta < INF);
         logger_print(stardis->logger, LOG_OUTPUT,
@@ -272,9 +272,18 @@ check_probe_conform_to_type
               filter_ctx.dist / solid->delta);
         }
       } else {
+        ASSERT(DESC_IS_FLUID(filter_ctx.desc->type));
         /* TODO: check move length wrt local geometry? */
-        logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe was in fluid '%s'.\n", str_cget(&filter_ctx.desc->d.fluid->name));
+        if(filter_ctx.desc->type == DESC_MAT_FLUID) {
+          logger_print(stardis->logger, LOG_OUTPUT,
+          "Probe was in fluid '%s'.\n",
+          str_cget(&filter_ctx.desc->d.fluid->name));
+        } else {
+          ASSERT(filter_ctx.desc->type == DESC_MAT_FLUID_PROG);
+          logger_print(stardis->logger, LOG_OUTPUT,
+            "Probe was in programmed fluid '%s'.\n",
+            str_cget(&filter_ctx.desc->d.fluid_prog->name));
+        }
         logger_print(stardis->logger, LOG_OUTPUT,
           "Probe distance from closest boundary was %g.\n", filter_ctx.dist);
       }
@@ -328,9 +337,7 @@ check_probe_conform_to_type
       res = RES_BAD_ARG;
       goto error;
     }
-    logger_print(stardis->logger, LOG_OUTPUT,
-      "Probe is in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid->name));
-    if(filter_ctx.desc->type == DESC_MAT_SOLID) {
+    if(DESC_IS_SOLID(filter_ctx.desc->type)) {
       struct solid* solid = filter_ctx.desc->d.solid;
       if(filter_ctx.dist < 0.25 * solid->delta) {
         logger_print(stardis->logger, LOG_ERROR,
@@ -353,11 +360,20 @@ check_probe_conform_to_type
           filter_ctx.dist / solid->delta);
       }
     } else {
-      logger_print(stardis->logger, LOG_WARNING,
-        "Probe is in fluid '%s': computing fluid temperature, "
-        "not using a specific position.\n",
-        str_cget(&filter_ctx.desc->d.fluid->name));
+      ASSERT(DESC_IS_FLUID(filter_ctx.desc->type));
       /* In fluid; TODO: check distance wrt local geometry (use 4V/S?) */
+      if(filter_ctx.desc->type == DESC_MAT_FLUID) {
+        logger_print(stardis->logger, LOG_WARNING,
+          "Probe is in fluid '%s': computing fluid temperature, "
+          "not using a specific position.\n",
+          str_cget(&filter_ctx.desc->d.fluid->name));
+      } else {
+        ASSERT(filter_ctx.desc->type == DESC_MAT_FLUID_PROG);
+        logger_print(stardis->logger, LOG_WARNING,
+          "Probe is in fluid '%s': computing fluid temperature, "
+          "not using a specific position.\n",
+          str_cget(&filter_ctx.desc->d.fluid_prog->name));
+      }
     }
   }
 

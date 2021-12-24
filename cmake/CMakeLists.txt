@@ -126,11 +126,11 @@ set(SDIS_FILES_SRC
   stardis-main.c
   stardis-output.c
   stardis-parsing.c
-  stardis-prog.c
+  stardis-fluid-prog.c
   stardis-solid.c)
 
 set(SDIS_FILES_INC_API
-  stardis-prog-common.h)
+  stardis-prog.h)
 
 set(SDIS_FILES_INC
   stardis-app.h
@@ -141,7 +141,7 @@ set(SDIS_FILES_INC
   stardis-intface.h
   stardis-output.h
   stardis-parsing.h
-  stardis-prog.h
+  stardis-fluid-prog.h
   stardis-solid.h
   stardis-version.h.in)
 

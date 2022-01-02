@@ -13,22 +13,22 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#ifndef SDIS_PROG_H
-#define SDIS_PROG_H
-
-#include <sdis.h>
+#ifndef SDIS_FLUID_PROG_H
+#define SDIS_FLUID_PROG_H
 
 #include <rsys/rsys.h>
 #include <rsys/str.h>
 
+#include "stardis-prog.h"
+
 struct stardis;
+struct mem_allocator;
+struct sdis_rwalk_vertex;
 
 /*******************************************************************************
  * Fluid prog data
  ******************************************************************************/
 struct fluid_prog {
-  /* This field must come first as a struct fluid_prog* must be usable as 
-   * an struct custom_data** */
   void* prog_data; /* result of the init_fluid() call */
   struct str name;
   struct str prog_name;
@@ -38,12 +38,13 @@ struct fluid_prog {
   unsigned fluid_id;
   /* lib handle and function ptrs */
   void* lib;
-  double (*cp)(const struct sdis_rwalk_vertex*, struct sdis_data*);
-  double (*rho)(const struct sdis_rwalk_vertex*, struct sdis_data*);
-  double (*temp)(const struct sdis_rwalk_vertex*, struct sdis_data*);
   void* (*create)();
-  int (*init)(void*, const char*);
+  enum stardis_return_code (*init)(void*, const char*);
   void (*release)(void*);
+  double (*rho)(const struct sdis_rwalk_vertex*, void*);
+  double (*cp)(const struct sdis_rwalk_vertex*, void*);
+  double (*temp)(const struct sdis_rwalk_vertex*, void*);
+  double* (*t_range)(void*, double trange[2]);
 };
 
 res_T
@@ -51,15 +52,24 @@ create_solver_fluid_prog
   (struct stardis* stardis,
    const struct fluid_prog* fluid_props);
 
-LOCAL_SYM res_T
-init_fluid_prog(struct mem_allocator* allocator, struct fluid_prog** dst);
+res_T
+create_solver_external_fluid_prog
+  (struct stardis* stardis,
+   const struct fluid_prog* fluid_props);
 
-LOCAL_SYM void
+res_T
+init_fluid_prog
+  (struct mem_allocator* allocator,
+   struct fluid_prog** dst);
+
+void
 release_fluid_prog
   (struct fluid_prog* fluid,
    struct mem_allocator* allocator);
 
-LOCAL_SYM res_T
-str_print_fluid_prog(struct str* str, const struct fluid_prog* s);
+res_T
+str_print_fluid_prog
+  (struct str* str,
+   const struct fluid_prog* s);
 
 #endif

@@ -21,12 +21,21 @@
 #include <limits.h>
 
 struct stardis;
-struct dummies;
+struct sdis_interface_fragment;
 
 /*******************************************************************************
  * Interface data
  ******************************************************************************/
 struct intface {
+  /* programmed interfaces */
+  double (*get_temp)(const struct sdis_interface_fragment*, void*); 
+  double (*get_flux)(const struct sdis_interface_fragment*, void*); 
+  double (*get_hc)(const struct sdis_interface_fragment*, void*); 
+  double (*get_emissivity)(const struct sdis_interface_fragment*, void*); 
+  double (*get_alpha)(const struct sdis_interface_fragment*, void*); 
+  double (*get_ref_temp)(const struct sdis_interface_fragment*, void*); 
+  double (*get_tcr)(const struct sdis_interface_fragment*, void*); 
+  void* prog_data;
   /* fluid - solid */
   double hc;
   double ref_temperature;
@@ -62,7 +71,7 @@ eq_desc(const struct int_descs* a, const struct int_descs* b)
 #define HTABLE_KEY_FUNCTOR_EQ eq_desc
 #include <rsys/hash_table.h>
 
-extern res_T
+res_T
 create_intface
   (struct stardis* stardis,
    unsigned tr_idx,

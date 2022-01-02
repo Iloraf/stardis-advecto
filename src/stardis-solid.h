@@ -41,18 +41,18 @@ struct solid {
   unsigned solid_id;
 };
 
-LOCAL_SYM res_T
+res_T
 init_solid(struct mem_allocator* allocator, struct solid** dst);
 
-LOCAL_SYM void
+void
 release_solid
   (struct solid* desc,
    struct mem_allocator* allocator);
 
-LOCAL_SYM res_T
+res_T
 str_print_solid(struct str* str, const struct solid* solid);
 
-LOCAL_SYM res_T
+res_T
 create_solver_solid
   (struct stardis* stardis,
    const struct solid* solid_props);

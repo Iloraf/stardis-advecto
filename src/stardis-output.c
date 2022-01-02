@@ -463,7 +463,7 @@ dump_sample_end
         pos = pt.data.itfrag.fragment.P;
         d__ = sdis_data_get(data);
         id = d__->desc_id;
-        CHK(DESC_IS_T(descs[id].type) || DESC_IS_H(descs[id].type));
+        CHK(DESC_IS_T(descs+id) || DESC_IS_H(descs+id));
         break;
       }
       case SDIS_VERTEX:
@@ -546,7 +546,7 @@ dump_sample
         data = sdis_interface_get_data(pt.data.itfrag.intface);
         d__ = sdis_data_get(data);
         desc_id = d__->desc_id;
-        CHK(DESC_IS_T(descs[desc_id].type) || DESC_IS_H(descs[desc_id].type));
+        CHK(DESC_IS_T(descs+desc_id) || DESC_IS_H(descs+desc_id));
         header.id = desc_id;
         header.at_initial = 0;
         break;
@@ -1066,7 +1066,7 @@ dump_boundaries_at_the_end_of_vtk
     ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d, t,
       descr));
     if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
-      && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+      && DESC_IS_BOUNDARY(descriptions+descr[SG3D_INTFACE]))
       /* Descriptions are numbered from 1 in the log (so the 1+ below) */
       fprintf(stream, "%u\n", 1 + descr[SG3D_INTFACE]);
     else fprintf(stream, "%u\n", SG3D_UNSPECIFIED_PROPERTY);
@@ -1271,7 +1271,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         if(descr[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY)
           description_get_medium_id(descriptions + descr[SG3D_FRONT], &fmid);
         else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
-          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+          && DESC_IS_BOUNDARY(descriptions+descr[SG3D_INTFACE]))
         {
           description_get_medium_id(descriptions + descr[SG3D_INTFACE], &fmid);
         }
@@ -1279,7 +1279,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         if(descr[SENC3D_BACK] != SG3D_UNSPECIFIED_PROPERTY)
           description_get_medium_id(descriptions + descr[SENC3D_BACK], &bmid);
         else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
-          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+          && DESC_IS_BOUNDARY(descriptions+descr[SG3D_INTFACE]))
         {
           description_get_medium_id(descriptions + descr[SG3D_INTFACE], &bmid);
         }
@@ -1291,7 +1291,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         if(descr[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY)
           description_get_medium_id(descriptions + descr[SG3D_FRONT], &mid);
         else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
-          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+          && DESC_IS_BOUNDARY(descriptions+descr[SG3D_INTFACE]))
         {
           description_get_medium_id(descriptions + descr[SG3D_INTFACE], &mid);
         }
@@ -1302,7 +1302,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         if(descr[SENC3D_BACK] != SG3D_UNSPECIFIED_PROPERTY)
           description_get_medium_id(descriptions + descr[SENC3D_BACK], &mid);
         else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
-          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+          && DESC_IS_BOUNDARY(descriptions+descr[SG3D_INTFACE]))
         {
           description_get_medium_id(descriptions + descr[SG3D_INTFACE], &mid);
         }

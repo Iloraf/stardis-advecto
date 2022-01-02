@@ -14,6 +14,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "stardis-app.h"
+#include "stardis-description.h"
 #include "stardis-output.h"
 #include "stardis-compute.h"
 #include "stardis-intface.h"
@@ -494,9 +495,9 @@ error:
   if(properties[(Rank)] == SG3D_UNSPECIFIED_PROPERTY) undef_count++;\
   else {\
     ASSERT(properties[(Rank)] < darray_descriptions_size_get(&stardis->descriptions));\
-    ASSERT(DESC_IS_MEDIUM(descs[properties[(Rank)]].type));\
-    if(descs[properties[(Rank)]].type == DESC_MAT_SOLID) solid_count++;\
-    else fluid_count++;\
+    ASSERT(DESC_IS_MEDIUM(descs+properties[(Rank)]));\
+    if(DESC_IS_SOLID(descs+properties[(Rank)])) { solid_count++; }\
+    else { ASSERT(DESC_IS_FLUID(descs+properties[(Rank)])); fluid_count++; }\
   }\
 }
 
@@ -533,6 +534,7 @@ validate_properties
     intface = descs + properties[SG3D_INTFACE];
     switch (intface->type) {
     case DESC_BOUND_H_FOR_FLUID:
+    case DESC_BOUND_H_FOR_FLUID_PROG:
       if(!(solid_count == 0 && fluid_count == 1)) {
         if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_DEFS;
@@ -545,6 +547,7 @@ validate_properties
       }
       break;
     case DESC_BOUND_H_FOR_SOLID:
+    case DESC_BOUND_H_FOR_SOLID_PROG:
       if(!(solid_count == 1 && fluid_count == 0)) {
         if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_H_FOR_SOLID_BETWEEN_2_DEFS;
@@ -557,6 +560,7 @@ validate_properties
       }
       break;
     case DESC_BOUND_T_FOR_SOLID:
+    case DESC_BOUND_T_FOR_SOLID_PROG:
       if(!(solid_count == 1 && fluid_count == 0)) {
         if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_DEFS;
@@ -569,6 +573,7 @@ validate_properties
       }
       break;
     case DESC_BOUND_F_FOR_SOLID:
+    case DESC_BOUND_F_FOR_SOLID_PROG:
       if(!(solid_count == 1 && fluid_count == 0)) {
         if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_F_FOR_SOLID_BETWEEN_2_DEFS;
@@ -581,6 +586,7 @@ validate_properties
       }
       break;
     case DESC_SOLID_FLUID_CONNECT:
+    case DESC_SOLID_FLUID_CONNECT_PROG:
       if(solid_count != 1 || fluid_count != 1) {
         if(solid_count == 2)
           *properties_conflict_status = SFCONNECT_BETWEEN_2_SOLIDS;
@@ -595,6 +601,7 @@ validate_properties
       }
       break;
     case DESC_SOLID_SOLID_CONNECT:
+    case DESC_SOLID_SOLID_CONNECT_PROG:
       if(solid_count != 2) {
         /*if(soli_count == 1 && fluid_count == 1)*/
           /**properties_conflict_status = SSCONNECT_BETWEEN_SOLID_AND_FLUID;*/

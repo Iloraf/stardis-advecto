@@ -106,33 +106,33 @@ struct args {
   int verbose;
 };
 
-extern LOCAL_SYM res_T
+res_T
 init_args
   (struct logger* logger,
    struct mem_allocator* mem,
    struct args** args);
 
-extern LOCAL_SYM void
+void
 release_args
   (struct args* args);
 
-extern void
+void
 print_version
   (FILE* stream);
 
-extern void
+void
 short_help
   (FILE* stream,
    const char* prog);
 
-extern res_T
+res_T
 parse_args
   (const int argc,
    char** argv,
    struct args* args,
    struct mem_allocator* allocator);
 
-extern res_T
+res_T
 parse_camera
   (struct logger* logger, 
    char* cam_param,

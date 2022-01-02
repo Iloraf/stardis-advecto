@@ -121,13 +121,20 @@ set(SDIS_FILES_SRC
   stardis-app.c
   stardis-args.c
   stardis-compute.c
+  stardis-description.c
   stardis-fluid.c
+  stardis-fluid-prog.c
+  stardis-fbound-prog.c
+  stardis-hbound-prog.c
   stardis-intface.c
   stardis-main.c
   stardis-output.c
   stardis-parsing.c
-  stardis-fluid-prog.c
-  stardis-solid.c)
+  stardis-sfconnect-prog.c
+  stardis-ssconnect-prog.c
+  stardis-solid.c
+  stardis-solid-prog.c
+  stardis-tbound-prog.c)
 
 set(SDIS_FILES_INC_API
   stardis-prog.h)
@@ -136,13 +143,20 @@ set(SDIS_FILES_INC
   stardis-app.h
   stardis-args.h
   stardis-compute.h
+  stardis-description.h
   stardis-default.h.in
   stardis-fluid.h
+  stardis-fluid-prog.h
+  stardis-fbound-prog.h
+  stardis-hbound-prog.h
   stardis-intface.h
   stardis-output.h
   stardis-parsing.h
-  stardis-fluid-prog.h
+  stardis-sfconnect-prog.h
+  stardis-ssconnect-prog.h
   stardis-solid.h
+  stardis-solid-prog.h
+  stardis-tbound-prog.h
   stardis-version.h.in)
 
 set(SDIS_FILES_DOC COPYING README.md)

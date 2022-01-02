@@ -13,21 +13,22 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#include "stardis-fluid-prog.h"
+#include "stardis-app.h"
 #include "stardis-prog.h"
 #include "stardis-compute.h"
 #include "stardis-app.h"
 
-#include <rsys/library.h>
-#include <rsys/logger.h>
+#include <rsys/mem_allocator.h>
 
 #include <sdis.h>
 
 #include <limits.h>
 
+
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
-
 static double
 fluid_prog_get_calorific_capacity
   (const struct sdis_rwalk_vertex* vtx,
@@ -58,7 +59,6 @@ fluid_prog_get_temperature
 /*******************************************************************************
  * Public Functions
  ******************************************************************************/
-
 res_T
 create_solver_fluid_prog
   (struct stardis* stardis,
@@ -93,12 +93,46 @@ error:
 }
 
 res_T
+create_solver_external_fluid_prog
+  (struct stardis* stardis,
+   const struct fluid_prog* fluid_props)
+{
+  res_T res = RES_OK;
+  struct sdis_fluid_shader fluid_shader = SDIS_FLUID_SHADER_NULL;
+  struct sdis_data* data = NULL;
+  const struct fluid_prog** props;
+
+  ASSERT(stardis && fluid_props);
+  fluid_shader.calorific_capacity = fluid_prog_get_calorific_capacity;
+  fluid_shader.volumic_mass = fluid_prog_get_volumic_mass;
+  fluid_shader.temperature = fluid_prog_get_temperature;
+  /* temperature has to be provided by h_boundary_prog */
+  ERR(sdis_data_create(stardis->dev, sizeof(struct fluid_prog*),
+    ALIGNOF(struct fluid_prog*), NULL, &data));
+
+  props = sdis_data_get(data); /* Fetch the allocated memory space */
+  *props = fluid_props;
+  if(fluid_props->fluid_id >= darray_media_ptr_size_get(&stardis->media)) {
+    ERR(darray_media_ptr_resize(&stardis->media, fluid_props->fluid_id + 1));
+  }
+  ASSERT(!darray_media_ptr_data_get(&stardis->media)[fluid_props->fluid_id]);
+  ERR(sdis_fluid_create(stardis->dev, &fluid_shader, data,
+    darray_media_ptr_data_get(&stardis->media) + fluid_props->fluid_id));
+
+end:
+  if(data) SDIS(data_ref_put(data));
+  return res;
+error:
+  goto end;
+}
+
+res_T
 init_fluid_prog(struct mem_allocator* allocator, struct fluid_prog** dst)
 {
   res_T res = RES_OK;
   int str_initialized = 0;
   ASSERT(allocator && dst && *dst == NULL);
-  *dst = MEM_ALLOC(allocator, sizeof(struct fluid_prog));
+  *dst = MEM_CALLOC(allocator, 1, sizeof(**dst));
   if(! *dst) {
     res = RES_MEM_ERR;
     goto error;
@@ -107,17 +141,8 @@ init_fluid_prog(struct mem_allocator* allocator, struct fluid_prog** dst)
   str_init(allocator, &(*dst)->prog_name);
   str_init(allocator, &(*dst)->args);
   str_initialized = 1;
-  (*dst)->prog_data = NULL;
-  (*dst)->is_outside = 0;
   (*dst)->desc_id = UINT_MAX;
   (*dst)->fluid_id = UINT_MAX;
-  (*dst)->lib = NULL;
-  (*dst)->cp = NULL;
-  (*dst)->rho = NULL;
-  (*dst)->temp = NULL;
-  (*dst)->create = NULL;
-  (*dst)->release = NULL;
-  (*dst)->init = NULL;
 end:
   return res;
 error:
@@ -140,9 +165,10 @@ release_fluid_prog
   str_release(&fluid->prog_name);
   str_release(&fluid->args);
 
-  if(fluid->prog_data) {
+  if(fluid->prog_data
+    && fluid->release) /* can be NULL if external fluid */
+  {
     fluid->release(fluid->prog_data);
-    fluid->prog_data = NULL;
   }
   MEM_RM(allocator, fluid);
 }

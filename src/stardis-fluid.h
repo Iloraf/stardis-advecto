@@ -36,7 +36,7 @@ struct fluid {
   double t0; /* End time of tinit */
   int is_outside; /* the fluid is used for a boundary */
   int is_green; /* green computation (nothing to do with fluid itself) */
-  unsigned desc_id; /* id of the boundary; meaningful if is_outside */
+  unsigned desc_id;
   unsigned fluid_id;
 };
 

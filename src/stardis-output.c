@@ -67,6 +67,71 @@ enum enclosure_errors_t {
   ENCLOSURE_WITH_UNDEF_MEDIUM = BIT(2)
 };
 
+/******************************************************************************
+ * Local Type used to write binary Green the way sgreen expects it
+ * (its mainly a matter of record size and layout)
+ *****************************************************************************/
+struct green_description {
+  enum description_type type;
+  union {
+    struct fluid fluid;
+    struct solid solid;
+    struct t_boundary t_boundary;
+    struct f_boundary f_boundary;
+    struct h_boundary h_boundary;
+    struct solid_fluid_connect sf_connect;
+    struct solid_solid_connect ss_connect;
+  } d;
+};
+
+static res_T
+copy_desc_to_green_desc
+  (struct green_description* gdesc,
+   const struct darray_descriptions* descriptions,
+   const size_t idx)
+{
+  size_t sz;
+  const struct description* desc;
+  ASSERT(gdesc && descriptions);
+  sz = darray_descriptions_size_get(descriptions);
+  CHK(idx < sz);
+  desc = darray_descriptions_cdata_get(descriptions) + idx;
+  gdesc->type = desc->type;
+  switch(desc->type) {
+    case DESC_MAT_FLUID:
+      gdesc->d.fluid = *desc->d.fluid;
+      CHK(desc->d.fluid->desc_id < sz);
+      break;
+    case DESC_MAT_SOLID:
+      gdesc->d.solid = *desc->d.solid;
+      CHK(desc->d.solid->desc_id < sz);
+      break;
+    case DESC_BOUND_H_FOR_FLUID:
+    case DESC_BOUND_H_FOR_SOLID:
+      gdesc->d.h_boundary = *desc->d.h_boundary;
+      CHK(desc->d.h_boundary->mat_id < sz);
+      break;
+    case DESC_BOUND_T_FOR_SOLID:
+      gdesc->d.t_boundary = *desc->d.t_boundary;
+      CHK(desc->d.t_boundary->mat_id < sz);
+      break;
+    case DESC_BOUND_F_FOR_SOLID:
+      gdesc->d.f_boundary = *desc->d.f_boundary;
+      CHK(desc->d.f_boundary->mat_id < sz);
+      break;
+    case DESC_SOLID_FLUID_CONNECT:
+      gdesc->d.sf_connect = *desc->d.sf_connect;
+      CHK(desc->d.sf_connect->connection_id < sz);
+      break;
+    case DESC_SOLID_SOLID_CONNECT:
+      gdesc->d.ss_connect = *desc->d.ss_connect;
+      CHK(desc->d.ss_connect->connection_id < sz);
+      break;
+    default: return RES_BAD_ARG;
+  }
+  return RES_OK;
+}
+
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
@@ -91,6 +156,7 @@ merge_flux_terms
   data = sdis_interface_get_data(interf);
   d__ = sdis_data_get(data);
   desc_id = d__->desc_id;
+  CHK(desc_id < darray_descriptions_size_get(w_ctx->desc));
   descs = darray_descriptions_cdata_get(w_ctx->desc);
 
   switch (descs[desc_id].type) {
@@ -123,9 +189,11 @@ merge_power_terms
   struct sdis_data* data = NULL;
   enum sdis_medium_type type;
   struct w_ctx* w_ctx = ctx;
+  size_t sz;
 
   ASSERT(mdm && w_ctx);
 
+  sz = darray_descriptions_size_get(w_ctx->desc);
   data = sdis_medium_get_data(mdm);
   type = sdis_medium_get_type(mdm);
 
@@ -135,9 +203,10 @@ merge_power_terms
     FATAL("Unexpected power term in fluid");
   }
   case SDIS_SOLID: {
-    struct solid* d__ = sdis_data_get(data);
+    struct solid** psolid = sdis_data_get(data);
     double* w;
-    unsigned id = d__->desc_id;
+    unsigned id = (*psolid)->desc_id;
+    CHK(id < sz);
     w = htable_weigth_find(&w_ctx->pw, &id);
     if(w) *w += power_term;
     else ERR(htable_weigth_set(&w_ctx->pw, &id, &power_term));
@@ -399,7 +468,7 @@ error:
   }
 
 struct path_header {
-  unsigned id;
+  unsigned end_id;
   unsigned pcount, fcount;
   char at_initial;
 };
@@ -433,18 +502,20 @@ dump_sample_end
   enum sdis_green_path_end_type end_type;
   FILE* stream;
   double elapsed;
+  size_t sz;
+  unsigned trad_id;
 
   CHK(path && ctx);
 
   stream = e_ctx->stream;
   ERR(sdis_green_path_get_elapsed_time(path, &elapsed));
   ERR(sdis_green_path_get_end_type(path, &end_type));
+  sz = darray_descriptions_size_get(e_ctx->desc);
+  ASSERT(sz <= UINT_MAX);
+  trad_id = (unsigned)sz;
   if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
-    size_t trad_id = darray_descriptions_size_get(e_ctx->desc);
-    ASSERT(trad_id <= UINT_MAX);
     /* End, End ID, X, Y, Z, Elapsed time */
-    fprintf(stream, "TRAD, %u, 0, 0, 0, %g\n",
-      (unsigned)trad_id, elapsed);
+    fprintf(stream, "TRAD, %u, 0, 0, 0, %g\n", trad_id, elapsed);
   } else {
     struct sdis_point pt = SDIS_POINT_NULL;
     struct sdis_data* data = NULL;
@@ -472,18 +543,16 @@ dump_sample_end
         pos = pt.data.mdmvert.vertex.P;
         if(pt.data.mdmvert.vertex.P[0] == INF) {
           /* Radiative output (Trad) */
-          size_t sz = darray_descriptions_size_get(e_ctx->desc);
-          ASSERT(sz <= UINT_MAX);
-          id = (unsigned)sz; /* Trad ID */
+          id = trad_id;
         }
         else if(type == SDIS_FLUID) {
-          struct fluid* d__ = sdis_data_get(data);
-          id = d__->desc_id;
+          struct fluid** pfluid = sdis_data_get(data);
+          id = (*pfluid )->desc_id;
         } else {
-          struct solid* d__ = sdis_data_get(data);
+          struct solid** psolid = sdis_data_get(data);
           ASSERT(type == SDIS_SOLID);
-          ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
-          id = d__->desc_id;
+          ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
+          id = (*psolid)->desc_id;
         }
         break;
       default: FATAL("Unreachable code.\n"); break;
@@ -513,16 +582,17 @@ dump_sample
   unsigned* ids = NULL;
   double* weights = NULL;
   size_t sz, i;
-
+  unsigned trad_id;
   CHK(path && ctx);
 
   stream = w_ctx->stream;
   ERR(sdis_green_path_get_end_type(path, &end_type));
+  sz = darray_descriptions_size_get(w_ctx->desc);
+  ASSERT(sz <= UINT_MAX);
+  trad_id = (unsigned)sz;
   if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
-    size_t trad_id = darray_descriptions_size_get(w_ctx->desc);
-    ASSERT(trad_id <= UINT_MAX);
     header.at_initial = 0;
-    header.id = (unsigned)trad_id;
+    header.end_id = trad_id;
   } else {
     struct sdis_point pt = SDIS_POINT_NULL;
     struct sdis_data* data = NULL;
@@ -547,7 +617,7 @@ dump_sample
         d__ = sdis_data_get(data);
         desc_id = d__->desc_id;
         CHK(DESC_IS_T(descs+desc_id) || DESC_IS_H(descs+desc_id));
-        header.id = desc_id;
+        header.end_id = desc_id;
         header.at_initial = 0;
         break;
       }
@@ -558,18 +628,16 @@ dump_sample
         header.at_initial = (pt.data.mdmvert.vertex.time <= t0);
         if(pt.data.mdmvert.vertex.P[0] == INF) {
           /* Radiative output (Trad) */
-          sz = darray_descriptions_size_get(w_ctx->desc);
-          ASSERT(sz <= UINT_MAX);
-          header.id = (unsigned)sz; /* Trad ID */
+          header.end_id = trad_id;
         }
         else if(type == SDIS_FLUID) {
-          struct fluid* d__ = sdis_data_get(data);
-          header.id = d__->desc_id;
+          struct fluid** pfluid = sdis_data_get(data);
+          header.end_id = (*pfluid)->desc_id;
         } else {
-          struct solid* d__ = sdis_data_get(data);
+          struct solid** psolid = sdis_data_get(data);
           ASSERT(type == SDIS_SOLID);
-          ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
-          header.id = d__->desc_id;
+          ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
+          header.end_id = (*psolid)->desc_id;
         }
         break;
       default: FATAL("Unreachable code.\n"); break;
@@ -607,6 +675,7 @@ dump_sample
   while(!htable_weigth_iterator_eq(&it, &end)) {
     double* w = htable_weigth_iterator_data_get(&it);
     unsigned* k = htable_weigth_iterator_key_get(&it);
+    CHK(*k <= trad_id);
     ids[i] = *k;
     weights[i] = *w;
     htable_weigth_iterator_next(&it);
@@ -619,6 +688,7 @@ dump_sample
   while (!htable_weigth_iterator_eq(&it, &end)) {
     double* w = htable_weigth_iterator_data_get(&it);
     unsigned* k = htable_weigth_iterator_key_get(&it);
+    CHK(*k <= trad_id);
     ids[i] = *k;
     weights[i] = *w;
     htable_weigth_iterator_next(&it);
@@ -716,7 +786,11 @@ dump_green_bin
   FW(&file_counts, 1);
 
   /* Write descriptions*/
-  FW(descs, szd);
+  for(i = 0; i < szd; i++) {
+    struct green_description desc;
+    ERR(copy_desc_to_green_desc(&desc, &stardis->descriptions, i));
+    FW(&desc, 1);
+  }
 
   /* Write names */
   if(name_pool_sz)
@@ -731,8 +805,8 @@ dump_green_bin
 
   w_ctx.alloc = stardis->allocator;
   w_ctx.desc = &stardis->descriptions;
-  htable_weigth_init(NULL, &w_ctx.pw);
-  htable_weigth_init(NULL, &w_ctx.flux);
+  htable_weigth_init(stardis->allocator, &w_ctx.pw);
+  htable_weigth_init(stardis->allocator, &w_ctx.flux);
   w_ctx.stream = stream;
   table_initialized = 1;
 
@@ -829,19 +903,19 @@ print_sample
       fprintf(w_ctx->stream, "R\t%u", (unsigned)sz);
     }
     else if(type == SDIS_FLUID) {
-      struct fluid* d__ = sdis_data_get(data);
-      desc_id = d__->desc_id;
-      if(d__->is_outside)
+      struct fluid** pfluid = sdis_data_get(data);
+      desc_id = (*pfluid)->desc_id;
+      if((*pfluid)->is_outside)
         /* If outside the model and in a fluid with known temperature,
          * its a fluid attached to a H boundary */
         fprintf(w_ctx->stream, "H\t%u", desc_id);
       /* In a standard fluid with known temperature */
       else fprintf(w_ctx->stream, "F\t%u", desc_id);
     } else {
-      struct solid* d__ = sdis_data_get(data);
+      struct solid** psolid = sdis_data_get(data);
       ASSERT(type == SDIS_SOLID);
-      ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
-      desc_id = d__->desc_id;
+      ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
+      desc_id = (*psolid)->desc_id;
       fprintf(w_ctx->stream, "S\t%u", desc_id);
     }
     break;
@@ -1029,8 +1103,8 @@ dump_green_ascii
 
   w_ctx.alloc = stardis->allocator;
   w_ctx.desc = &stardis->descriptions;
-  htable_weigth_init(NULL, &w_ctx.pw);
-  htable_weigth_init(NULL, &w_ctx.flux);
+  htable_weigth_init(stardis->allocator, &w_ctx.pw);
+  htable_weigth_init(stardis->allocator, &w_ctx.flux);
   w_ctx.stream = stream;
   table_initialized = 1;
 

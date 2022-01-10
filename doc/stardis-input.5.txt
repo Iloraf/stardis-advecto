@@ -221,10 +221,12 @@ the file cube.stl and the solid medium properties are lambda=0.1, rho=25, cp=2.
 The numerical parameter delta, that is used for solid conductive walks, is
 0.05. The initial temperature of the cube is 0°K and its volumic power is 0.
 The boundary properties are emisivity=0, specular-fraction=0, h=10 and
-external-temperature = 100°K.
+external-temperature = 100°K, while the reference temperature for radiative
+transfer linearization in the Picard algorithm is set to 300°K.
+.
 .......
 SOLID Cube 0.1 25 2 0.05 0 0 FRONT cube.stl
-H_BOUNDARY_FOR_SOLID HdT 0 0 10 100 cube.stl
+H_BOUNDARY_FOR_SOLID HdT 300 0 0 10 100 cube.stl
 .......
 
 SEE ALSO

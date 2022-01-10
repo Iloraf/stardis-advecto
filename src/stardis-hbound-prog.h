@@ -21,7 +21,6 @@
 
 #include "stardis-prog.h"
 
-struct stardis;
 struct mem_allocator;
 struct fluid_prog;
 struct description;
@@ -53,24 +52,19 @@ struct h_boundary_prog {
 };
 
 res_T
-create_solver_h_boundary_prog
-  (struct stardis* stardis,
-   const struct h_boundary_prog* h_boundary_props);
-
-res_T
 init_h_boundary_prog
   (struct mem_allocator* allocator,
    struct h_boundary_prog** dst);
 
 void
 release_h_boundary_prog
-  (struct h_boundary_prog* fluid,
+  (struct h_boundary_prog* bound,
    struct mem_allocator* allocator);
 
 res_T
 str_print_h_boundary_prog
   (struct str* str,
-   const struct description* s);
+   const struct description* bound);
 
 double
 h_bound_prog_get_hmax

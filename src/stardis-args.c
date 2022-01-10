@@ -14,6 +14,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #define _POSIX_C_SOURCE 200809L /* strdup */
+#include "stardis-args.h"
 #include "stardis-parsing.h"
 #include "stardis-app.h"
 #include "stardis-default.h"

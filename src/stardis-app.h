@@ -16,54 +16,37 @@
 #ifndef STARDIS_APP_H
 #define STARDIS_APP_H
 
-#include "stardis-args.h"
 #include "stardis-description.h"
-#include "stardis-parsing.h"
-#include "stardis-default.h"
-#include "stardis-solid.h"
-#include "stardis-fluid.h"
-#include "stardis-prog.h"
 
-#include <star/sstl.h>
 #include <star/sg3d.h>
 
 #include <rsys/rsys.h>
-#include <rsys/float3.h>
 #include <rsys/double2.h>
 #include <rsys/double3.h>
 #include <rsys/dynamic_array_size_t.h>
+#include <rsys/dynamic_array_uint.h>
 #include <rsys/dynamic_array.h>
 #include <rsys/str.h>
 
 #include <sdis.h>
-
-#include <limits.h>
-#include <stdarg.h>
 
 /* Forward declarations */
 struct logger;
 struct mem_allocator;
 struct sdis_medium;
 
+struct args;
+struct solid;
+struct fluid;
+
 /* Utility macros */
 #define ERR(Expr) if((res = (Expr)) != RES_OK) goto error; else (void)0
 
-#define STR_APPEND_PRINTF(Accum, Fmt, Args) \
-{ \
-  struct str tmp; \
-  str_init((Accum)->allocator, &tmp); \
-  res = str_printf(&tmp, Fmt COMMA_##Args LIST_##Args); \
-  if(res == RES_OK) res = str_append((Accum), str_cget(&tmp)); \
-  str_release(&tmp); \
-  if(res != RES_OK) goto error; \
-} (void)0
-
-
-#define VFATAL(Fmt, Args)                                                      \
-  {                                                                            \
-    fprintf(stderr, Fmt COMMA_##Args LIST_##Args);                             \
-    ASSERT(0);                                                                 \
-    abort();                                                                   \
+#define VFATAL(Fmt, Args) \
+  { \
+    fprintf(stderr, Fmt COMMA_##Args LIST_##Args); \
+    ASSERT(0); \
+    abort(); \
   } (void)0
 
 
@@ -133,44 +116,16 @@ struct geometry {
   struct darray_interface_ptrs interfaces;
 };
 
-static INLINE void
-release_geometry(struct geometry* geom)
-{
-  size_t i;
-  struct sdis_interface
-    ** intf = darray_interface_ptrs_data_get(&geom->interfaces);
-  if(geom->sg3d) SG3D(geometry_ref_put(geom->sg3d));
-  for(i = 0; i < darray_interface_ptrs_size_get(&geom->interfaces); ++i)
-    SDIS(interface_ref_put(intf[i]));
-  darray_interface_ptrs_release(&geom->interfaces);
-  darray_interface_ptrs_release(&geom->interf_bytrg);
-}
+void
+release_geometry
+  (struct geometry* geom);
 
-static INLINE res_T
+res_T
 init_geometry
   (struct logger* logger,
    struct mem_allocator* allocator,
    const int verbose,
-   struct geometry* geom)
-{
-  res_T res = RES_OK;
-  struct sg3d_device* sg3d_dev = NULL;
-
-  ASSERT(allocator && geom);
-  
-  geom->sg3d = NULL;
-  darray_interface_ptrs_init(allocator, &geom->interfaces);
-  darray_interface_ptrs_init(allocator, &geom->interf_bytrg);
-  ERR(sg3d_device_create(logger, allocator, verbose, &sg3d_dev));
-  ERR(sg3d_geometry_create(sg3d_dev, &geom->sg3d));
-
-exit:
-  if(sg3d_dev) SG3D(device_ref_put(sg3d_dev));
-  return res;
-error:
-  release_geometry(geom);
-  goto exit;
-}
+   struct geometry* geom);
 
 /******************************************************************************/
 enum stardis_output_fmt {
@@ -191,63 +146,21 @@ struct camera {
   struct str file_name;
 };
 
-static INLINE void
-init_camera(struct mem_allocator* alloc, struct camera* cam) {
-  ASSERT(alloc && cam);
-  d3(cam->pos, STARDIS_DEFAULT_RENDERING_POS);
-  d3(cam->tgt, STARDIS_DEFAULT_RENDERING_TGT);
-  d3(cam->up, STARDIS_DEFAULT_RENDERING_UP);
-  cam->fmt = STARDIS_DEFAULT_RENDERING_OUTPUT_FILE_FMT;
-  cam->fov = STARDIS_DEFAULT_RENDERING_FOV;
-  cam->spp = STARDIS_DEFAULT_RENDERING_SPP;
-  cam->img_width = STARDIS_DEFAULT_RENDERING_IMG_WIDTH;
-  cam->img_height = STARDIS_DEFAULT_RENDERING_IMG_HEIGHT;
-  d2(cam->time_range, STARDIS_DEFAULT_RENDERING_TIME);
-  cam->auto_look_at = 1;
-  str_init(alloc, &cam->file_name);
-}
+void
+init_camera
+  (struct mem_allocator* alloc, struct camera* cam);
 
-static INLINE void
-release_camera(struct camera* cam) {
-  ASSERT(cam);
-  str_release(&cam->file_name);
-}
+void
+release_camera(struct camera* cam);
 
-static INLINE void
-log_err_fn(const char* msg, void* ctx)
-{
-  ASSERT(msg);
-  (void)ctx;
-#ifdef OS_WINDOWS
-  fprintf(stderr, "error: %s", msg);
-#else
-  fprintf(stderr, "\x1b[31merror:\x1b[0m %s", msg);
-#endif
-}
+void
+log_err_fn(const char* msg, void* ctx);
 
-static INLINE void
-log_warn_fn(const char* msg, void* ctx)
-{
-  ASSERT(msg);
-  (void)ctx;
-#ifdef OS_WINDOWS
-  fprintf(stderr, "warning: %s", msg);
-#else
-  fprintf(stderr, "\x1b[33mwarning:\x1b[0m %s", msg);
-#endif
-}
+void
+log_warn_fn(const char* msg, void* ctx);
 
-static INLINE void
-log_prt_fn(const char* msg, void* ctx)
-{
-  ASSERT(msg);
-  (void)ctx;
-#ifdef OS_WINDOWS
-  fprintf(stderr, "message: %s", msg);
-#else
-  fprintf(stderr, "\x1b[32moutput:\x1b[0m %s", msg);
-#endif
-}
+void
+log_prt_fn(const char* msg, void* ctx);
 
 struct counts {
   unsigned smed_count, fmed_count, tbound_count, hbound_count,
@@ -315,12 +228,9 @@ struct stardis {
   int verbose;
 };
 
-static INLINE unsigned
-allocate_stardis_medium_id(struct stardis* stardis)
-{
-  ASSERT(stardis);
-  return stardis->next_medium_id++;
-}
+unsigned
+allocate_stardis_medium_id
+  (struct stardis* stardis);
 
 res_T
 stardis_init

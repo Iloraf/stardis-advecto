@@ -13,16 +13,22 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#include "stardis-app.h"
 #include "stardis-description.h"
 #include "stardis-prog.h"
 #include "stardis-solid.h"
 #include "stardis-solid-prog.h"
 #include "stardis-fluid.h"
 #include "stardis-fluid-prog.h"
+#include "stardis-hbound.h"
 #include "stardis-hbound-prog.h"
+#include "stardis-tbound.h"
 #include "stardis-tbound-prog.h"
+#include "stardis-fbound.h"
 #include "stardis-fbound-prog.h"
+#include "stardis-sfconnect.h"
 #include "stardis-sfconnect-prog.h"
+#include "stardis-ssconnect.h"
 #include "stardis-ssconnect-prog.h"
 
 #include <rsys/rsys.h>
@@ -32,271 +38,6 @@
 #include <sdis.h>
 
 #include <limits.h>
-
-/* Utility macros */
-#define ERR(Expr) if((res = (Expr)) != RES_OK) goto error; else (void)0
-
-res_T
-init_h
-  (struct mem_allocator* allocator,
-   struct h_boundary** dst)
-{
-  res_T res = RES_OK;
-  int str_initialized = 0;
-  ASSERT(allocator && dst && *dst == NULL);
-  *dst = MEM_CALLOC(allocator, 1, sizeof(**dst));
-  if(! *dst) {
-    res = RES_MEM_ERR;
-    goto error;
-  }
-  str_init(allocator, &(*dst)->name);
-  str_initialized = 1;
-  (*dst)->imposed_temperature = -1;
-  (*dst)->mat_id = UINT_MAX;
-end:
-  return res;
-error:
-  if(str_initialized) str_release(&(*dst)->name);
-  if(*dst) MEM_RM(allocator, *dst);
-  goto end;
-}
-
-void
-release_h_boundary
-  (struct h_boundary* bound,
-   struct mem_allocator* allocator)
-{
-  ASSERT(bound && allocator);
-  str_release(&bound->name);
-  if(bound->possible_external_fluid)
-    release_fluid(bound->possible_external_fluid, allocator);
-  MEM_RM(allocator, bound);
-}
-
-res_T
-str_print_h_boundary
-  (struct str* str,
-   const struct description* desc)
-{
-  res_T res = RES_OK;
-  const struct h_boundary* b;
-  ASSERT(str && desc && DESC_IS_H(desc));
-  b = desc->d.h_boundary;
-  ERR(str_append_printf(str,
-    "H boundary for %s '%s': ref_temperature=%g emissivity=%g specular_fraction=%g "
-    "hc=%g T=%g (using medium %u as external medium)",
-    (desc->type == DESC_BOUND_H_FOR_SOLID ? "solid" : "fluid"),
-    str_cget(&b->name), b->ref_temperature, b->emissivity,
-    b->specular_fraction, b->hc, b->imposed_temperature, b->mat_id));
-end:
-  return res;
-error:
-  goto end;
-}
-
-res_T
-init_t
-  (struct mem_allocator* allocator,
-   struct t_boundary** dst)
-{
-  res_T res = RES_OK;
-  int str_initialized = 0;
-  ASSERT(allocator && dst && *dst == NULL);
-  *dst = MEM_CALLOC(allocator, 1, sizeof(**dst));
-  if(! *dst) {
-    res = RES_MEM_ERR;
-    goto error;
-  }
-  str_init(allocator, &(*dst)->name);
-  str_initialized = 1;
-  (*dst)->imposed_temperature = -1;
-  (*dst)->mat_id = UINT_MAX;
-end:
-  return res;
-error:
-  if(str_initialized) str_release(&(*dst)->name);
-  if(*dst) MEM_RM(allocator, *dst);
-  goto end;
-}
-
-void
-release_t_boundary
-  (struct t_boundary* bound,
-   struct mem_allocator* allocator)
-{
-  ASSERT(bound && allocator);
-  str_release(&bound->name);
-  MEM_RM(allocator, bound);
-}
-
-res_T
-str_print_t_boundary
-  (struct str* str,
-   const struct t_boundary* b)
-{
-  res_T res = RES_OK;
-  ASSERT(str && b);
-  ERR(str_append_printf(str,
-    "T boundary for solid '%s': T=%g (using medium %u as external medium)",
-    str_cget(&b->name), b->imposed_temperature, b->mat_id));
-end:
-  return res;
-error:
-  goto end;
-}
-
-res_T
-init_f
-  (struct mem_allocator* allocator,
-   struct f_boundary** dst)
-{
-  res_T res = RES_OK;
-  int str_initialized = 0;
-  ASSERT(allocator && dst && *dst == NULL);
-  *dst = MEM_CALLOC(allocator, 1, sizeof(**dst));
-  if(! *dst) {
-    res = RES_MEM_ERR;
-    goto error;
-  }
-  str_init(allocator, &(*dst)->name);
-  str_initialized = 1;
-  (*dst)->mat_id = UINT_MAX;
-  (*dst)->imposed_flux = -1;
-end:
-  return res;
-error:
-  if(str_initialized) str_release(&(*dst)->name);
-  if(*dst) MEM_RM(allocator, *dst);
-  goto end;
-}
-
-void
-release_f_boundary
-  (struct f_boundary* bound,
-   struct mem_allocator* allocator)
-{
-  ASSERT(bound && allocator);
-  str_release(&bound->name);
-  MEM_RM(allocator, bound);
-}
-
-res_T
-str_print_f_boundary
-  (struct str* str,
-   const struct f_boundary* b)
-{
-  res_T res = RES_OK;
-  ASSERT(str && b);
-  ERR(str_append_printf(str,
-    "F boundary for SOLID '%s': flux=%g (using medium %u as external medium)",
-    str_cget(&b->name), b->imposed_flux, b->mat_id));
-end:
-  return res;
-error:
-  goto end;
-}
-
-void
-release_sf_connect
-  (struct solid_fluid_connect* connect,
-   struct mem_allocator* allocator)
-{
-  ASSERT(connect && allocator);
-  str_release(&connect->name);
-  MEM_RM(allocator, connect);
-}
-
-res_T
-init_sf
-  (struct mem_allocator* allocator,
-   struct solid_fluid_connect** dst)
-{
-  res_T res = RES_OK;
-  int str_initialized = 0;
-  ASSERT(allocator && dst && *dst == NULL);
-  *dst = MEM_CALLOC(allocator, 1, sizeof(**dst));
-  if(! *dst) {
-    res = RES_MEM_ERR;
-    goto error;
-  }
-  str_init(allocator, &(*dst)->name);
-  str_initialized = 1;
-  (*dst)->connection_id = UINT_MAX;
-end:
-  return res;
-error:
-  if(str_initialized) str_release(&(*dst)->name);
-  if(*dst) MEM_RM(allocator, *dst);
-  goto end;
-}
-
-res_T
-str_print_sf_connect
-  (struct str* str,
-   const struct solid_fluid_connect* c)
-{
-  res_T res = RES_OK;
-  ASSERT(str && c);
-  ERR(str_append_printf(str,
-    "Solid-Fluid connection '%s': "
-    "ref_temperature=%g emissivity=%g, specular_fraction=%g hc=%g",
-    str_cget(&c->name),
-    c->ref_temperature, c->emissivity, c->specular_fraction, c->hc));
-end:
-  return res;
-error:
-  goto end;
-}
-
-void
-release_ss_connect
-  (struct solid_solid_connect* connect,
-   struct mem_allocator* allocator)
-{
-  ASSERT(connect && allocator);
-  str_release(&connect->name);
-  MEM_RM(allocator, connect);
-}
-
-res_T
-init_ss
-  (struct mem_allocator* allocator,
-   struct solid_solid_connect** dst)
-{
-  res_T res = RES_OK;
-  int str_initialized = 0;
-  ASSERT(allocator && dst && *dst == NULL);
-  *dst = MEM_CALLOC(allocator, 1, sizeof(**dst));
-  if(! *dst) {
-    res = RES_MEM_ERR;
-    goto error;
-  }
-  str_init(allocator, &(*dst)->name);
-  str_initialized = 1;
-  (*dst)->connection_id = UINT_MAX;
-end:
-  return res;
-error:
-  if(str_initialized) str_release(&(*dst)->name);
-  if(*dst) MEM_RM(allocator, *dst);
-  goto end;
-}
-
-res_T
-str_print_ss_connect
-  (struct str* str,
-   const struct solid_solid_connect* c)
-{
-  res_T res = RES_OK;
-  ASSERT(str && c);
-  ERR(str_append_printf(str,
-    "Solid-Solid connection '%s': contact resistance=%g",
-    str_cget(&c->name), c->tcr));
-end:
-  return res;
-error:
-  goto end;
-}
 
 res_T
 init_description

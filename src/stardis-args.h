@@ -25,7 +25,6 @@ struct camera;
 struct logger;
 struct mem_allocator;
 struct stardis;
-struct dummies;
 
 enum stardis_mode {
   /* Ordered so that print_multiple_modes() prints in alphabetical order */

@@ -56,12 +56,6 @@ add_geom_ctx_position
    void* context);
 
 res_T
-process_model_line
-  (const char* file_name,
-   char* line,
-   struct stardis* stardis);
-
-res_T
 get_dummy_solid_id
   (struct stardis* stardis,
    unsigned* id);
@@ -70,5 +64,10 @@ res_T
 get_dummy_fluid_id
   (struct stardis* stardis,
    unsigned* id);
+
+res_T
+read_model
+  (const struct darray_str* model_files,
+   struct stardis* stardis);
 
 #endif /*ARGS_H*/

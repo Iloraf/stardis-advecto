@@ -16,11 +16,17 @@
 #define _POSIX_C_SOURCE 200809L /* strdup */
 #include "stardis-parsing.h"
 #include "stardis-app.h"
+#include "stardis-args.h"
 #include "stardis-description.h"
+#include "stardis-hbound.h"
 #include "stardis-hbound-prog.h"
+#include "stardis-tbound.h"
 #include "stardis-tbound-prog.h"
+#include "stardis-fbound.h"
 #include "stardis-fbound-prog.h"
+#include "stardis-sfconnect.h"
 #include "stardis-sfconnect-prog.h"
+#include "stardis-ssconnect.h"
 #include "stardis-ssconnect-prog.h"
 #include "stardis-fluid-prog.h"
 #include "stardis-fluid.h"
@@ -33,6 +39,7 @@
 #include <rsys/double3.h>
 #include <sdis_version.h>
 #include <rsys/logger.h>
+#include <rsys/text_reader.h>
 #include <rsys/library.h>
 
 #include <stdlib.h>
@@ -186,7 +193,7 @@ read_sides_and_files
         "File '%s' included %lu degenerated triangles (removed)\n",
         tk, (unsigned long)c);
       ERR(str_printf(&str, "Degenerated triangles IDs: %u", ids[0]));
-      FOR_EACH(n, 1, c) { STR_APPEND_PRINTF(&str, ", %u", ARG1( ids[n] ) ); }
+      FOR_EACH(n, 1, c) { ERR(str_append_printf(&str, ", %u", ids[n])); }
       logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
       darray_uint_clear(&degenerated);
     }
@@ -337,7 +344,7 @@ process_h
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz+1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  ERR(init_h(stardis->allocator, &desc->d.h_boundary));
+  ERR(init_h_boundary(stardis->allocator, &desc->d.h_boundary));
   h_boundary = desc->d.h_boundary;
   desc->type = type;
 
@@ -633,7 +640,7 @@ process_t
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  ERR(init_t(stardis->allocator, &desc->d.t_boundary));
+  ERR(init_t_boundary(stardis->allocator, &desc->d.t_boundary));
   t_boundary = desc->d.t_boundary;
   desc->type = DESC_BOUND_T_FOR_SOLID;
 
@@ -795,7 +802,7 @@ process_flx
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  ERR(init_f(stardis->allocator, &desc->d.f_boundary));
+  ERR(init_f_boundary(stardis->allocator, &desc->d.f_boundary));
   f_boundary = desc->d.f_boundary;
   desc->type = DESC_BOUND_F_FOR_SOLID;
 
@@ -953,7 +960,7 @@ process_sfc
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  ERR(init_sf(stardis->allocator, &desc->d.sf_connect));
+  ERR(init_sf_connect(stardis->allocator, &desc->d.sf_connect));
   sf_connect = desc->d.sf_connect;
   desc->type = DESC_SOLID_FLUID_CONNECT;
 
@@ -1180,7 +1187,7 @@ process_ssc
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  ERR(init_ss(stardis->allocator, &desc->d.ss_connect));
+  ERR(init_ss_connect(stardis->allocator, &desc->d.ss_connect));
   ss_connect = desc->d.ss_connect;
   desc->type = DESC_SOLID_SOLID_CONNECT;
 
@@ -1959,19 +1966,30 @@ error:
 }
 
 /* Read medium or boundary line; should be one of:
- * SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_filenames
+ * SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_sides_filenames
  * FLUID Name rho cp Tinit Timposed STL_filenames
- * H_BOUNDARY_FOR_SOLID Name ref_temperature emissivity specular_fraction hc T_env STL_filenames
+ * H_BOUNDARY_FOR_SOLID Name ref_temperature emissivity specular_fraction hc T_env STL_sides_filenames
  * H_BOUNDARY_FOR_FLUID Name ref_temperature emissivity specular_fraction hc T_env STL_filenames
  * T_BOUNDARY_FOR_SOLID Name T STL_filenames
  * F_BOUNDARY_FOR_SOLID Name F STL_filenames
  * SOLID_FLUID_CONNECTION Name ref_temperature emissivity specular_fraction hc STL_filenames
+ *
+ * SOLID_PROG Name Libray STL_sides_filenames [ PROG_PARAMS ... ]
+ * SOLID_PROG Name Libray STL_sides_filenames [ PROG_PARAMS ... ]
+ * H_BOUNDARY_FOR_SOLID_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ * H_BOUNDARY_FOR_FLUID_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ * T_BOUNDARY_FOR_SOLID_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ * F_BOUNDARY_FOR_SOLID_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ * SOLID_FLUID_CONNECTION_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ * SOLID_SOLID_CONNECTION_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ *
  * SCALE scale_factor
  * TRAD Trad Trad_ref
  *
- * STL_filenames = { { FRONT | BACK | BOTH } STL_filename }+
+ * STL_sides_filenames = { { FRONT | BACK | BOTH } STL_filename }+
+ * STL_filenames = { STL_filename }+
  */
-res_T
+static res_T
 process_model_line
   (const char* file_name,
    char* line,
@@ -2040,6 +2058,10 @@ error:
   goto end;
 }
 
+/*******************************************************************************
+ * Public Functions
+ ******************************************************************************/
+
 res_T
 get_dummy_solid_id
   (struct stardis* stardis,
@@ -2105,3 +2127,62 @@ end:
 error:
   goto end;
 }
+
+res_T
+read_model
+  (const struct darray_str* model_files,
+   struct stardis* stardis)
+{
+  res_T res = RES_OK;
+  const struct str* files = NULL;
+  size_t i;
+  FILE* f = NULL;
+  struct txtrdr* txtrdr = NULL;
+
+  ASSERT(model_files && stardis);
+  files = darray_str_cdata_get(model_files);
+  FOR_EACH(i, 0, darray_str_size_get(model_files)) {
+    const char* name = str_cget(files + i);
+    f = fopen(name, "r");
+    if(!f) {
+      logger_print(stardis->logger, LOG_ERROR,
+        "Cannot open model file '%s'\n",
+        name);
+      res = RES_IO_ERR;
+      goto error;
+    }
+    txtrdr_stream(stardis->allocator, f, name, '#', &txtrdr);
+    for(;;) {
+      char* line;
+      ERR(txtrdr_read_line(txtrdr));
+      line = txtrdr_get_line(txtrdr);
+      if(!line) break;
+      ERR(process_model_line(name, line, stardis));
+    }
+    txtrdr_ref_put(txtrdr);
+    txtrdr = NULL;
+    fclose(f);
+    f = NULL;
+  }
+  if(stardis->scale_factor <= 0)
+    stardis->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Scaling factor is %g\n", stardis->scale_factor);
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Trad is %g, Trad reference is %g\n", stardis->trad, stardis->trad_ref);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], stardis->trad_ref);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], stardis->trad_ref);
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "System T range is [%g %g]\n", SPLIT2(stardis->t_range));
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Picard order is %u\n", stardis->picard_order);
+
+  ASSERT(!f && !txtrdr);
+exit:
+  return res;
+error:
+  if(f) fclose(f);
+  if(txtrdr) txtrdr_ref_put(txtrdr);
+  goto exit;
+}
+

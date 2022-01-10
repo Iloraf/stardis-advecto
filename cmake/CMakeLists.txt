@@ -124,16 +124,21 @@ set(SDIS_FILES_SRC
   stardis-description.c
   stardis-fluid.c
   stardis-fluid-prog.c
+  stardis-fbound.c
   stardis-fbound-prog.c
+  stardis-hbound.c
   stardis-hbound-prog.c
   stardis-intface.c
   stardis-main.c
   stardis-output.c
   stardis-parsing.c
+  stardis-sfconnect.c
   stardis-sfconnect-prog.c
+  stardis-ssconnect.c
   stardis-ssconnect-prog.c
   stardis-solid.c
   stardis-solid-prog.c
+  stardis-tbound.c
   stardis-tbound-prog.c)
 
 set(SDIS_FILES_INC_API
@@ -147,15 +152,20 @@ set(SDIS_FILES_INC
   stardis-default.h.in
   stardis-fluid.h
   stardis-fluid-prog.h
+  stardis-fbound.h
   stardis-fbound-prog.h
+  stardis-hbound.h
   stardis-hbound-prog.h
   stardis-intface.h
   stardis-output.h
   stardis-parsing.h
+  stardis-sfconnect.h
   stardis-sfconnect-prog.h
+  stardis-ssconnect.h
   stardis-ssconnect-prog.h
   stardis-solid.h
   stardis-solid-prog.h
+  stardis-tbound.h
   stardis-tbound-prog.h
   stardis-version.h.in)
 

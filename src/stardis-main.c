@@ -14,6 +14,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "stardis-app.h"
+#include "stardis-args.h"
 #include "stardis-parsing.h"
 #include "stardis-output.h"
 #include "stardis-compute.h"

@@ -14,19 +14,20 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "stardis-app.h"
+#include "stardis-args.h"
 #include "stardis-description.h"
-#include "stardis-output.h"
+#include "stardis-default.h"
+#include "stardis-parsing.h"
 #include "stardis-compute.h"
 #include "stardis-intface.h"
-#include "stardis-fluid.h"
 #include "stardis-solid.h"
+#include "stardis-fluid.h"
 
 #include <star/senc3d.h>
 #include <star/sg3d_sencXd_helper.h>
 #include <star/sg3d_sdisXd_helper.h>
 
 #include <rsys/str.h>
-#include <rsys/text_reader.h>
 #include <rsys/logger.h>
 #include <rsys/double2.h>
 #include <rsys/double3.h>
@@ -39,64 +40,6 @@ static const struct counts COUNTS_NULL = COUNTS_NULL__;
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
-static res_T
-read_model
-  (const struct darray_str* model_files,
-   struct stardis* stardis)
-{
-  res_T res = RES_OK;
-  const struct str* files = NULL;
-  size_t i;
-  FILE* f = NULL;
-  struct txtrdr* txtrdr = NULL;
-
-  ASSERT(model_files && stardis);
-  files = darray_str_cdata_get(model_files);
-  FOR_EACH(i, 0, darray_str_size_get(model_files)) {
-    const char* name = str_cget(files + i);
-    f = fopen(name, "r");
-    if(!f) {
-      logger_print(stardis->logger, LOG_ERROR,
-        "Cannot open model file '%s'\n",
-        name);
-      res = RES_IO_ERR;
-      goto error;
-    }
-    txtrdr_stream(stardis->allocator, f, name, '#', &txtrdr);
-    for(;;) {
-      char* line;
-      ERR(txtrdr_read_line(txtrdr));
-      line = txtrdr_get_line(txtrdr);
-      if(!line) break;
-      ERR(process_model_line(name, line, stardis));
-    }
-    txtrdr_ref_put(txtrdr);
-    txtrdr = NULL;
-    fclose(f);
-    f = NULL;
-  }
-  if(stardis->scale_factor <= 0)
-    stardis->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
-  logger_print(stardis->logger, LOG_OUTPUT,
-    "Scaling factor is %g\n", stardis->scale_factor);
-  logger_print(stardis->logger, LOG_OUTPUT,
-    "Trad is %g, Trad reference is %g\n", stardis->trad, stardis->trad_ref);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], stardis->trad_ref);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], stardis->trad_ref);
-  logger_print(stardis->logger, LOG_OUTPUT,
-    "System T range is [%g %g]\n", SPLIT2(stardis->t_range));
-  logger_print(stardis->logger, LOG_OUTPUT,
-    "Picard order is %u\n", stardis->picard_order);
-
-  ASSERT(!f && !txtrdr);
-exit:
-  return res;
-error:
-  if(f) fclose(f);
-  if(txtrdr) txtrdr_ref_put(txtrdr);
-  goto exit;
-}
-
 static struct sdis_interface*
 geometry_get_interface
   (const size_t itri, void* ctx)
@@ -465,6 +408,14 @@ stardis_release
   }
 }
 
+unsigned
+allocate_stardis_medium_id
+  (struct stardis* stardis)
+{
+  ASSERT(stardis);
+  return stardis->next_medium_id++;
+}
+
 res_T
 init_enclosures
   (struct stardis* stardis)
@@ -642,3 +593,109 @@ end:
 }
 
 #undef COUNT_SIDE
+
+res_T
+init_geometry
+  (struct logger* logger,
+   struct mem_allocator* allocator,
+   const int verbose,
+   struct geometry* geom)
+{
+  res_T res = RES_OK;
+  struct sg3d_device* sg3d_dev = NULL;
+
+  ASSERT(allocator && geom);
+  
+  geom->sg3d = NULL;
+  darray_interface_ptrs_init(allocator, &geom->interfaces);
+  darray_interface_ptrs_init(allocator, &geom->interf_bytrg);
+  ERR(sg3d_device_create(logger, allocator, verbose, &sg3d_dev));
+  ERR(sg3d_geometry_create(sg3d_dev, &geom->sg3d));
+
+exit:
+  if(sg3d_dev) SG3D(device_ref_put(sg3d_dev));
+  return res;
+error:
+  release_geometry(geom);
+  goto exit;
+}
+
+void
+release_geometry
+  (struct geometry* geom)
+{
+  size_t i;
+  struct sdis_interface
+    ** intf = darray_interface_ptrs_data_get(&geom->interfaces);
+  if(geom->sg3d) SG3D(geometry_ref_put(geom->sg3d));
+  for(i = 0; i < darray_interface_ptrs_size_get(&geom->interfaces); ++i)
+    SDIS(interface_ref_put(intf[i]));
+  darray_interface_ptrs_release(&geom->interfaces);
+  darray_interface_ptrs_release(&geom->interf_bytrg);
+}
+
+void
+init_camera
+  (struct mem_allocator* alloc, struct camera* cam)
+{
+  ASSERT(alloc && cam);
+  d3(cam->pos, STARDIS_DEFAULT_RENDERING_POS);
+  d3(cam->tgt, STARDIS_DEFAULT_RENDERING_TGT);
+  d3(cam->up, STARDIS_DEFAULT_RENDERING_UP);
+  cam->fmt = STARDIS_DEFAULT_RENDERING_OUTPUT_FILE_FMT;
+  cam->fov = STARDIS_DEFAULT_RENDERING_FOV;
+  cam->spp = STARDIS_DEFAULT_RENDERING_SPP;
+  cam->img_width = STARDIS_DEFAULT_RENDERING_IMG_WIDTH;
+  cam->img_height = STARDIS_DEFAULT_RENDERING_IMG_HEIGHT;
+  d2(cam->time_range, STARDIS_DEFAULT_RENDERING_TIME);
+  cam->auto_look_at = 1;
+  str_init(alloc, &cam->file_name);
+}
+
+void
+release_camera
+  (struct camera* cam)
+{
+  ASSERT(cam);
+  str_release(&cam->file_name);
+}
+
+void
+log_err_fn
+  (const char* msg, void* ctx)
+{
+  ASSERT(msg);
+  (void)ctx;
+#ifdef OS_WINDOWS
+  fprintf(stderr, "error: %s", msg);
+#else
+  fprintf(stderr, "\x1b[31merror:\x1b[0m %s", msg);
+#endif
+}
+
+void
+log_warn_fn
+  (const char* msg, void* ctx)
+{
+  ASSERT(msg);
+  (void)ctx;
+#ifdef OS_WINDOWS
+  fprintf(stderr, "warning: %s", msg);
+#else
+  fprintf(stderr, "\x1b[33mwarning:\x1b[0m %s", msg);
+#endif
+}
+
+void
+log_prt_fn
+  (const char* msg, void* ctx)
+{
+  ASSERT(msg);
+  (void)ctx;
+#ifdef OS_WINDOWS
+  fprintf(stderr, "message: %s", msg);
+#else
+  fprintf(stderr, "\x1b[32moutput:\x1b[0m %s", msg);
+#endif
+}
+

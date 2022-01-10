@@ -16,7 +16,6 @@
 #include "stardis-fluid-prog.h"
 #include "stardis-app.h"
 #include "stardis-prog.h"
-#include "stardis-compute.h"
 #include "stardis-app.h"
 
 #include <rsys/mem_allocator.h>
@@ -187,9 +186,10 @@ str_print_fluid_prog(struct str* str, const struct fluid_prog* f)
 {
   res_T res = RES_OK;
   ASSERT(str && f);
-  STR_APPEND_PRINTF(str, "programmed fluid '%s': lib='%s', args=[%s]",
-    ARG3( str_cget(&f->name), str_cget(&f->prog_name), str_cget(&f->args) ) );
-  STR_APPEND_PRINTF(str, " (it is medium %u)", ARG1( f->fluid_id ) );
+  ERR(str_append_printf(str,
+     "programmed fluid '%s': lib='%s', args=[%s] (it is medium %u)",
+    str_cget(&f->name), str_cget(&f->prog_name), str_cget(&f->args),
+    f->fluid_id));
 end:
   return res;
 error:

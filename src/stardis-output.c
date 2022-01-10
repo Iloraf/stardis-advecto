@@ -15,17 +15,23 @@
 
 #define _POSIX_C_SOURCE 200112L /* snprintf */
 #include "stardis-output.h"
+#include "stardis-args.h"
 #include "stardis-compute.h"
 #include "stardis-fluid.h"
 #include "stardis-solid.h"
+#include "stardis-hbound.h"
+#include "stardis-tbound.h"
+#include "stardis-fbound.h"
+#include "stardis-ssconnect.h"
+#include "stardis-sfconnect.h"
 #include "stardis-intface.h"
 #include "stardis-app.h"
 
 #include <sdis.h>
 
+#include<star/ssp.h>
 #include<star/senc3d.h>
 #include<star/sg3d.h>
-#include<star/ssp.h>
 
 #include <rsys/math.h>
 #include <rsys/mem_allocator.h>

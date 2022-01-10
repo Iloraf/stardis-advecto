@@ -14,13 +14,18 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "stardis-app.h"
+#include "stardis-args.h"
 #include "stardis-description.h"
 #include "stardis-output.h"
 #include "stardis-compute.h"
+#include "stardis-parsing.h"
+#include "stardis-default.h"
 #include "stardis-fluid.h"
 #include "stardis-fluid-prog.h"
 #include "stardis-solid.h"
 #include "stardis-solid-prog.h"
+#include "stardis-sfconnect.h"
+#include "stardis-ssconnect.h"
 
 #include <sdis.h>
 #include <sdis_version.h>

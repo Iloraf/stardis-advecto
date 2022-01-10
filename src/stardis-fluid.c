@@ -14,7 +14,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "stardis-fluid.h"
-#include "stardis-compute.h"
 #include "stardis-app.h"
 
 #include <sdis.h>
@@ -153,15 +152,15 @@ str_print_fluid(struct str* str, const struct fluid* f)
 {
   res_T res = RES_OK;
   ASSERT(str && f);
-  STR_APPEND_PRINTF(str, "Fluid '%s': rho=%g cp=%g",
-    ARG3( str_cget(&f->name), f->rho, f->cp ) );
+  ERR(str_append_printf(str, "Fluid '%s': rho=%g cp=%g",
+    str_cget(&f->name), f->rho, f->cp));
   if(f->tinit >= 0) {
-    STR_APPEND_PRINTF(str, " Tinit=%g", ARG1( f->tinit ) );
+    ERR(str_append_printf(str, " Tinit=%g", f->tinit));
   }
   if(f->imposed_temperature >= 0) {
-    STR_APPEND_PRINTF(str, " Temp=%g", ARG1( f->imposed_temperature ) );
+    ERR(str_append_printf(str, " Temp=%g", f->imposed_temperature));
   }
-  STR_APPEND_PRINTF(str, " (it is medium %u)", ARG1( f->fluid_id ) );
+  ERR(str_append_printf(str, " (it is medium %u)", f->fluid_id));
 end:
   return res;
 error:

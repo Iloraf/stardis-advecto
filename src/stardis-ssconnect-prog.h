@@ -23,7 +23,6 @@
 
 struct stardis;
 struct mem_allocator;
-struct sdis_rwalk_vertex;
 
 /*******************************************************************************
  * Solid-Solid prog data
@@ -35,10 +34,9 @@ struct solid_solid_connect_prog {
   struct str args;
   /* lib handle and function ptrs */
   void* lib;
-  double (*tcr)(const struct sdis_interface_fragment*, void*);
-  void* (*create)();
-  enum stardis_return_code (*init)(void*, const char*);
+  void* (*create)(char*);
   void (*release)(void*);
+  double (*tcr)(const struct stardis_interface_fragment*, void*);
   unsigned connection_id;
 };
 

@@ -21,20 +21,20 @@
 #include <limits.h>
 
 struct stardis;
-struct sdis_interface_fragment;
+struct stardis_interface_fragment;
 
 /*******************************************************************************
  * Interface data
  ******************************************************************************/
 struct intface {
   /* programmed interfaces */
-  double (*get_temp)(const struct sdis_interface_fragment*, void*); 
-  double (*get_flux)(const struct sdis_interface_fragment*, void*); 
-  double (*get_hc)(const struct sdis_interface_fragment*, void*); 
-  double (*get_emissivity)(const struct sdis_interface_fragment*, void*); 
-  double (*get_alpha)(const struct sdis_interface_fragment*, void*); 
-  double (*get_ref_temp)(const struct sdis_interface_fragment*, void*); 
-  double (*get_tcr)(const struct sdis_interface_fragment*, void*); 
+  double (*get_temp)(const struct stardis_interface_fragment*, void*); 
+  double (*get_flux)(const struct stardis_interface_fragment*, void*); 
+  double (*get_hc)(const struct stardis_interface_fragment*, void*); 
+  double (*get_emissivity)(const struct stardis_interface_fragment*, void*); 
+  double (*get_alpha)(const struct stardis_interface_fragment*, void*); 
+  double (*get_ref_temp)(const struct stardis_interface_fragment*, void*); 
+  double (*get_tcr)(const struct stardis_interface_fragment*, void*); 
   void* prog_data;
   /* fluid - solid */
   double hc;

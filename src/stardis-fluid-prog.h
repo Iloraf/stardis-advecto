@@ -23,7 +23,6 @@
 
 struct stardis;
 struct mem_allocator;
-struct sdis_rwalk_vertex;
 
 /*******************************************************************************
  * Fluid prog data
@@ -38,12 +37,11 @@ struct fluid_prog {
   unsigned fluid_id;
   /* lib handle and function ptrs */
   void* lib;
-  void* (*create)();
-  enum stardis_return_code (*init)(void*, const char*);
+  void* (*create)(char*);
   void (*release)(void*);
-  double (*rho)(const struct sdis_rwalk_vertex*, void*);
-  double (*cp)(const struct sdis_rwalk_vertex*, void*);
-  double (*temp)(const struct sdis_rwalk_vertex*, void*);
+  double (*rho)(const struct stardis_vertex*, void*);
+  double (*cp)(const struct stardis_vertex*, void*);
+  double (*temp)(const struct stardis_vertex*, void*);
   double* (*t_range)(void*, double trange[2]);
 };
 

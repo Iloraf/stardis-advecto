@@ -21,14 +21,7 @@
 
 #include "stardis-prog.h"
 
-struct stardis;
 struct mem_allocator;
-struct fluid_prog;
-struct description;
-
-struct sdis_interface_fragment;
-struct sdis_rwalk_vertex;
-struct sdis_data;
 
 /*******************************************************************************
  * T boundary prog data
@@ -40,10 +33,9 @@ struct t_boundary_prog {
   struct str args;
   /* lib handle and function ptrs */
   void* lib;
-  void* (*create)();
-  enum stardis_return_code (*init)(void*, const char*);
+  void* (*create)(char*);
   void (*release)(void*);
-  double (*temperature)(const struct sdis_interface_fragment*, void*);
+  double (*temperature)(const struct stardis_interface_fragment*, void*);
   double* (*t_range)(void*, double trange[2]);
   unsigned mat_id;
 };

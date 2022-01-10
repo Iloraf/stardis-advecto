@@ -26,10 +26,6 @@ struct mem_allocator;
 struct fluid_prog;
 struct description;
 
-struct sdis_interface_fragment;
-struct sdis_rwalk_vertex;
-struct sdis_data;
-
 /*******************************************************************************
  * H boundary prog data
  ******************************************************************************/
@@ -40,19 +36,18 @@ struct h_boundary_prog {
   struct str args;
   /* lib handle and function ptrs */
   void* lib;
-  void* (*create)();
-  enum stardis_return_code (*init)(void*, const char*);
+  void* (*create)(char*);
   void (*release)(void*);
-  double (*ref_temp)(const struct sdis_interface_fragment*, void*);
-  double (*emissivity)(const struct sdis_interface_fragment*, void*);
-  double (*alpha)(const struct sdis_interface_fragment*, void*);
-  double (*hc)(const struct sdis_interface_fragment*, void*);
+  double (*ref_temp)(const struct stardis_interface_fragment*, void*);
+  double (*emissivity)(const struct stardis_interface_fragment*, void*);
+  double (*alpha)(const struct stardis_interface_fragment*, void*);
+  double (*hc)(const struct stardis_interface_fragment*, void*);
   double (*hmax)(void*);
   double* (*t_range)(void*, double trange[2]);
   /* for h for solid */
-  double (*boundary_temp)(const struct sdis_interface_fragment*, void*);
+  double (*boundary_temp)(const struct stardis_interface_fragment*, void*);
   /* for h for fluid */
-  double (*fluid_temp)(const struct sdis_rwalk_vertex*, void*);
+  double (*fluid_temp)(const struct stardis_vertex*, void*);
   unsigned mat_id;
   struct fluid_prog* possible_external_fluid; /* if H for solid */
 };

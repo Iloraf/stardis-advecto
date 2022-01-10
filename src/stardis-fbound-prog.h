@@ -26,10 +26,6 @@ struct mem_allocator;
 struct fluid_prog;
 struct description;
 
-struct sdis_interface_fragment;
-struct sdis_rwalk_vertex;
-struct sdis_data;
-
 /*******************************************************************************
  * F boundary prog data
  ******************************************************************************/
@@ -40,10 +36,9 @@ struct f_boundary_prog {
   struct str args;
   /* lib handle and function ptrs */
   void* lib;
-  void* (*create)();
-  enum stardis_return_code (*init)(void*, const char*);
+  void* (*create)(char*);
   void (*release)(void*);
-  double (*flux)(const struct sdis_interface_fragment*, void*);
+  double (*flux)(const struct stardis_interface_fragment*, void*);
   unsigned mat_id;
 };
 

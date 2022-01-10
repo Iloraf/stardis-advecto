@@ -23,6 +23,7 @@
 #include "stardis-fbound-prog.h"
 #include "stardis-ssconnect-prog.h"
 #include "stardis-sfconnect-prog.h"
+#include "stardis-prog.h"
 
 #include <sdis.h>
 
@@ -102,7 +103,7 @@ interface_get_tcr
 
 static double
 emissivity_1
-  (const struct sdis_interface_fragment* frag,
+  (const struct stardis_interface_fragment* frag,
    void* data)
 {
   (void)frag, (void)data;
@@ -115,7 +116,14 @@ intface_prog_get_temp
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  return interface_props->get_temp(frag, interface_props->prog_data);
+  struct stardis_interface_fragment f;
+  d3_set(f.P, frag->P);
+  d3_set(f.Ng, frag->Ng);
+  d3_set(f.uv, frag->uv);
+  f.time = frag->time;
+  ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
+  f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
+  return interface_props->get_temp(&f, interface_props->prog_data);
 }
 
 static double
@@ -124,7 +132,14 @@ intface_prog_get_flux
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  return interface_props->get_flux(frag, interface_props->prog_data);
+  struct stardis_interface_fragment f;
+  d3_set(f.P, frag->P);
+  d3_set(f.Ng, frag->Ng);
+  d3_set(f.uv, frag->uv);
+  f.time = frag->time;
+  ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
+  f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
+  return interface_props->get_flux(&f, interface_props->prog_data);
 }
 
 static double
@@ -133,7 +148,14 @@ intface_prog_get_hc
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  return interface_props->get_hc(frag, interface_props->prog_data);
+  struct stardis_interface_fragment f;
+  d3_set(f.P, frag->P);
+  d3_set(f.Ng, frag->Ng);
+  d3_set(f.uv, frag->uv);
+  f.time = frag->time;
+  ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
+  f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
+  return interface_props->get_hc(&f, interface_props->prog_data);
 }
 
 static double
@@ -142,7 +164,14 @@ intface_prog_get_emissivity
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  return interface_props->get_emissivity(frag, interface_props->prog_data);
+  struct stardis_interface_fragment f;
+  d3_set(f.P, frag->P);
+  d3_set(f.Ng, frag->Ng);
+  d3_set(f.uv, frag->uv);
+  f.time = frag->time;
+  ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
+  f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
+  return interface_props->get_emissivity(&f, interface_props->prog_data);
 }
 
 static double
@@ -151,7 +180,14 @@ intface_prog_get_alpha
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  return interface_props->get_alpha(frag, interface_props->prog_data);
+  struct stardis_interface_fragment f;
+  d3_set(f.P, frag->P);
+  d3_set(f.Ng, frag->Ng);
+  d3_set(f.uv, frag->uv);
+  f.time = frag->time;
+  ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
+  f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
+  return interface_props->get_alpha(&f, interface_props->prog_data);
 }
 
 static double
@@ -160,7 +196,14 @@ intface_prog_get_ref_temp
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  return interface_props->get_ref_temp(frag, interface_props->prog_data);
+  struct stardis_interface_fragment f;
+  d3_set(f.P, frag->P);
+  d3_set(f.Ng, frag->Ng);
+  d3_set(f.uv, frag->uv);
+  f.time = frag->time;
+  ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
+  f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
+  return interface_props->get_ref_temp(&f, interface_props->prog_data);
 }
 
 static double
@@ -169,7 +212,14 @@ intface_prog_get_tcr
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  return interface_props->get_tcr(frag, interface_props->prog_data);
+  struct stardis_interface_fragment f;
+  d3_set(f.P, frag->P);
+  d3_set(f.Ng, frag->Ng);
+  d3_set(f.uv, frag->uv);
+  f.time = frag->time;
+  ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
+  f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
+  return interface_props->get_tcr(&f, interface_props->prog_data);
 }
 
 /*******************************************************************************

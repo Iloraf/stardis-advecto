@@ -1,4 +1,3 @@
-
 /* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software; you can redistribute it and/or
@@ -17,12 +16,7 @@
 #ifndef STARDIS_PROG_H__
 #define STARDIS_PROG_H__
 
-enum stardis_return_code {
-  STARDIS_SUCCESS,
-  STARDIS_FAILURE
-};
-
-struct stardis_walk_vertex {
+struct stardis_vertex {
   double P[3]; /* World space position */
   double time; /* "Time" of the vertex */
 };
@@ -39,6 +33,88 @@ struct stardis_interface_fragment {
   double time; /* Current time */
   enum stardis_side side;
 };
+
+extern void*
+stardis_create_data
+  (char* args);
+
+extern void
+stardis_release_data
+  (void* data);
+
+extern double
+stardis_calorific_capacity
+  (const struct stardis_vertex* vtx,
+   void* data);
+
+extern double
+stardis_volumic_mass
+  (const struct stardis_vertex* vtx,
+   void* data);
+
+extern double
+stardis_emissivity
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+extern double
+stardis_specular_fraction
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+extern double
+stardis_conductivity
+  (const struct stardis_vertex* vtx,
+   void* data);
+
+extern double
+stardis_delta_solid
+  (const struct stardis_vertex* vtx,
+   void* data);
+
+extern double
+stardis_volumic_power
+  (const struct stardis_vertex* vtx,
+   void* data);
+
+extern double
+stardis_boundary_temperature
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+extern double
+stardis_boundary_flux
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+extern double
+stardis_medium_temperature
+  (const struct stardis_vertex* vtx,
+   void* data);
+
+extern double
+stardis_convection_coefficient
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+extern double
+stardis_reference_temperature
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+extern double
+stardis_thermal_contact_resistance
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+extern double
+stardis_max_convection_coefficient
+  (void* data);
+
+extern double*
+stardis_t_range
+  (void* data,
+   double range[2]);
 
 #endif
 

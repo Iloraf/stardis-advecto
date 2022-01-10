@@ -262,7 +262,7 @@ check_probe_conform_to_type
           pppp = "";
         } else {
           struct solid_prog* solid_prog = filter_ctx.desc->d.solid_prog;
-          struct sdis_rwalk_vertex vtx;
+          struct stardis_vertex vtx;
           ASSERT(filter_ctx.desc->type == DESC_MAT_SOLID_PROG);
           d3_set(vtx.P, pos);
           vtx.time = time;
@@ -367,7 +367,7 @@ check_probe_conform_to_type
         delta = solid->delta;
       } else {
         struct solid_prog* solid_prog = filter_ctx.desc->d.solid_prog;
-        struct sdis_rwalk_vertex vtx;
+        struct stardis_vertex vtx;
         ASSERT(filter_ctx.desc->type == DESC_MAT_SOLID_PROG);
         d3_set(vtx.P, pos);
         vtx.time = time;

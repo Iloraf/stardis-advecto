@@ -34,7 +34,10 @@ solid_prog_get_thermal_conductivity
    struct sdis_data* data)
 {
   const struct solid_prog* const* solid_props = sdis_data_cget(data);
-  return (*solid_props)->lambda(vtx, (*solid_props)->prog_data);
+  struct stardis_vertex v;
+  d3_set(v.P, vtx->P);
+  v.time = vtx->time;
+  return (*solid_props)->lambda(&v, (*solid_props)->prog_data);
 }
 
 static double
@@ -43,7 +46,10 @@ solid_prog_get_volumic_mass
    struct sdis_data* data)
 {
   const struct solid_prog* const* solid_props = sdis_data_cget(data);
-  return (*solid_props)->rho(vtx, (*solid_props)->prog_data);
+  struct stardis_vertex v;
+  d3_set(v.P, vtx->P);
+  v.time = vtx->time;
+  return (*solid_props)->rho(&v, (*solid_props)->prog_data);
 }
 
 static double
@@ -52,7 +58,10 @@ solid_prog_get_calorific_capacity
    struct sdis_data* data)
 {
   const struct solid_prog* const* solid_props = sdis_data_cget(data);
-  return (*solid_props)->cp(vtx, (*solid_props)->prog_data);
+  struct stardis_vertex v;
+  d3_set(v.P, vtx->P);
+  v.time = vtx->time;
+  return (*solid_props)->cp(&v, (*solid_props)->prog_data);
 }
 
 static double
@@ -61,7 +70,10 @@ solid_prog_get_delta_solid
    struct sdis_data* data)
 {
   const struct solid_prog* const* solid_props = sdis_data_cget(data);
-  return (*solid_props)->delta(vtx, (*solid_props)->prog_data);
+  struct stardis_vertex v;
+  d3_set(v.P, vtx->P);
+  v.time = vtx->time;
+  return (*solid_props)->delta(&v, (*solid_props)->prog_data);
 }
 
 static double
@@ -70,7 +82,10 @@ solid_prog_get_volumic_power
    struct sdis_data* data)
 {
   const struct solid_prog* const* solid_props = sdis_data_cget(data);
-  return (*solid_props)->vpower(vtx, (*solid_props)->prog_data);
+  struct stardis_vertex v;
+  d3_set(v.P, vtx->P);
+  v.time = vtx->time;
+  return (*solid_props)->vpower(&v, (*solid_props)->prog_data);
 }
 
 static double
@@ -79,7 +94,10 @@ solid_prog_get_temperature
    struct sdis_data* data)
 {
   const struct solid_prog* const* solid_props = sdis_data_cget(data);
-  return (*solid_props)->temp(vtx, (*solid_props)->prog_data);
+  struct stardis_vertex v;
+  d3_set(v.P, vtx->P);
+  v.time = vtx->time;
+  return (*solid_props)->temp(&v, (*solid_props)->prog_data);
 }
 
 /*******************************************************************************

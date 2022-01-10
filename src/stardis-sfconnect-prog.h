@@ -23,7 +23,6 @@
 
 struct stardis;
 struct mem_allocator;
-struct sdis_rwalk_vertex;
 
 /*******************************************************************************
  * Solid-Fluid prog data
@@ -38,13 +37,12 @@ struct solid_fluid_connect_prog {
   unsigned connection_id;
   /* lib handle and function ptrs */
   void* lib;
-  void* (*create)();
-  enum stardis_return_code (*init)(void*, const char*);
+  void* (*create)(char*);
   void (*release)(void*);
-  double (*ref_temp)(const struct sdis_interface_fragment*, void*);
-  double (*emissivity)(const struct sdis_interface_fragment*, void*);
-  double (*alpha)(const struct sdis_interface_fragment*, void*);
-  double (*hc)(const struct sdis_interface_fragment*, void*);
+  double (*ref_temp)(const struct stardis_interface_fragment*, void*);
+  double (*emissivity)(const struct stardis_interface_fragment*, void*);
+  double (*alpha)(const struct stardis_interface_fragment*, void*);
+  double (*hc)(const struct stardis_interface_fragment*, void*);
   double (*hmax)(void*);
   double* (*t_range)(void*, double trange[2]);
 };

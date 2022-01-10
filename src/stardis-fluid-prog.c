@@ -35,7 +35,10 @@ fluid_prog_get_calorific_capacity
    struct sdis_data* data)
 {
   const struct fluid_prog* const* fluid_props = sdis_data_cget(data);
-  return (*fluid_props)->cp(vtx, (*fluid_props)->prog_data);
+  struct stardis_vertex v;
+  d3_set(v.P, vtx->P);
+  v.time = vtx->time;
+  return (*fluid_props)->cp(&v, (*fluid_props)->prog_data);
 }
 
 static double
@@ -44,7 +47,10 @@ fluid_prog_get_volumic_mass
    struct sdis_data* data)
 {
   const struct fluid_prog* const* fluid_props = sdis_data_cget(data);
-  return (*fluid_props)->rho(vtx, (*fluid_props)->prog_data);
+  struct stardis_vertex v;
+  d3_set(v.P, vtx->P);
+  v.time = vtx->time;
+  return (*fluid_props)->rho(&v, (*fluid_props)->prog_data);
 }
 
 static double
@@ -53,7 +59,10 @@ fluid_prog_get_temperature
    struct sdis_data* data)
 {
   const struct fluid_prog* const* fluid_props = sdis_data_cget(data);
-  return (*fluid_props)->temp(vtx, (*fluid_props)->prog_data);
+  struct stardis_vertex v;
+  d3_set(v.P, vtx->P);
+  v.time = vtx->time;
+  return (*fluid_props)->temp(&v, (*fluid_props)->prog_data);
 }
 
 /*******************************************************************************

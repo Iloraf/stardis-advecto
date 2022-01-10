@@ -22,7 +22,6 @@
 #include "stardis-prog.h"
 
 struct stardis;
-struct sdis_rwalk_vertex;
 struct mem_allocator;
 
 /*******************************************************************************
@@ -38,15 +37,14 @@ struct solid_prog {
   unsigned solid_id;
   /* lib handle and function ptrs */
   void* lib;
-  void* (*create)();
-  enum stardis_return_code (*init)(void*, const char*);
+  void* (*create)(char*);
   void (*release)(void*);
-  double (*lambda)(const struct sdis_rwalk_vertex*, void*);
-  double (*rho)(const struct sdis_rwalk_vertex*, void*);
-  double (*cp)(const struct sdis_rwalk_vertex*, void*);
-  double (*delta)(const struct sdis_rwalk_vertex*, void*);
-  double (*temp)(const struct sdis_rwalk_vertex*, void*);
-  double (*vpower)(const struct sdis_rwalk_vertex*, void*);
+  double (*lambda)(const struct stardis_vertex*, void*);
+  double (*rho)(const struct stardis_vertex*, void*);
+  double (*cp)(const struct stardis_vertex*, void*);
+  double (*delta)(const struct stardis_vertex*, void*);
+  double (*temp)(const struct stardis_vertex*, void*);
+  double (*vpower)(const struct stardis_vertex*, void*);
   double* (*t_range)(void*, double trange[2]);
 };
 

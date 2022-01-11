@@ -59,9 +59,9 @@ TINIT VS TIMPOSED
 -----------------
 Media's descriptions, either solids or fluids, include two possible
 temperatures: initial and imposed. If imposed temperature is set (that is not
-"UNKNOWN"), initial temperature must be defined at the same value. As a
-consequence, one cannot define a medium with an imposed temperature that
-changes at t=0.
+"UNKNOWN"), initial temperature must be defined at the same value. In other
+words, one cannot define a medium with an imposed temperature that changes at
+t=0.
 
 GRAMMAR
 -------
@@ -88,57 +88,87 @@ _______
 
 -------------------------------------
 
-<medium-frontier>     ::= <solid-frontier>
-                        | <fluid-frontier>
+<medium-frontier>           ::= <solid-frontier>
+                              | <fluid-frontier>
+                              | <prog-solid-frontier>
+                              | <prog-fluid-frontier>
 
-<medium-boundary>     ::= <t-bound-for-solid>
-                        | <h-bound-for-solid>
-                        | <h-bound-for-fluid>
-                        | <f-bound-for-solid>
+<medium-boundary>           ::= <t-bound-for-solid>
+                              | <h-bound-for-solid>
+                              | <h-bound-for-fluid>
+                              | <f-bound-for-solid>
+                              | <prog-t-bound-for-solid>
+                              | <prog-h-bound-for-solid>
+                              | <prog-h-bound-for-fluid>
+                              | <prog-f-bound-for-solid>
 
-<media-connection>    ::= <solid-fluid-connect>
-                        | <solid-solid-connect>
+<media-connection>          ::= <solid-fluid-connect>
+                              | <solid-solid-connect>
+                              | <prog-solid-fluid-connect>
+                              | <prog-solid-solid-connect>
 
-<comment>             ::= "#" Any text introduced by the # character
+<comment>                   ::= "#" Any text introduced by the # character
 
-<scaling_factor>      ::= REAL # scaling factor to apply to the geometry
-                               # in ]0 INF)
+<solid-frontier>            ::= "SOLID" <medium-name> <lambda> <rho> <cp> <delta> \
+                                <initial-temperature> <imposed-temperature> \
+                                <volumic-power> <triangle-sides>
 
-<solid-frontier>      ::= "SOLID" <medium-name> <lambda> <rho> <cp> <delta> \
-                          <initial-temperature> <imposed-temperature> \
-                          <volumic-power> <triangle-sides>
+<fluid-frontier>            ::= "FLUID" <medium-name> <rho> <cp> \
+                                <initial-temperature> <imposed-temperature> \
+                                <triangle-sides>
 
-<fluid-frontier>      ::= "FLUID" <medium-name> <rho> <cp> \
-                          <initial-temperature> <imposed-temperature> \
-                          <triangle-sides>
-
-<t-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> \
-                          <triangles>
+<t-bound-for-solid>         ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> \
+                                <triangles>
 
 
-<h-bound-for-solid>   ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <Tref> <emissivity> \
-                          <specular-fraction> <hc> <outside-temperature> \
-                          <triangles>
+<h-bound-for-solid>         ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <Tref> <emissivity> \
+                                <specular-fraction> <hc> <outside-temperature> \
+                                <triangles>
 
-<h-bound-for-fluid>   ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <Tref> <emissivity> \
-                          <specular-fraction> <hc> <outside-temperature> \
-                          <triangles>
+<h-bound-for-fluid>         ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <Tref> <emissivity> \
+                                <specular-fraction> <hc> <outside-temperature> \
+                                <triangles>
 
-<f-bound-for-solid>   ::= "F_BOUNDARY_FOR_SOLID" <bound-name> <flux> <triangles>
+<f-bound-for-solid>         ::= "F_BOUNDARY_FOR_SOLID" <bound-name> <flux> <triangles>
 
-<solid-fluid-connect> ::= "SOLID_FLUID_CONNECTION" <bound-name> <Tref> <emissivity> \
-                          <specular-fraction> <hc> <triangles>
+<solid-fluid-connect>       ::= "SOLID_FLUID_CONNECTION" <connect-name> <Tref>\
+                                <emissivity>  <specular-fraction> <hc> <triangles>
 
-<solid-solid-connect> ::= "SOLID_SOLID_CONNECTION" <bound-name> \
-                          <contact-resistance> <triangles>
+<solid-solid-connect>       ::= "SOLID_SOLID_CONNECTION" <connect-name> \
+                                <contact-resistance> <triangles>
 
-<scaling-factor>      ::= "SCALE" <scaling_factor> [ <comment> ]
+<prog-solid-frontier>       ::= "SOLID_PROG" <medium-name> <library> <triangle-sides> \
+                                [ "PROG_PARAMS" [ <lib-arguments> ] ]
 
-<radiative-temps>     ::= "TRAD" <radiative-temp> <radiative-temp-ref>
+<prog-fluid-frontier>       ::= "FLUID_PROG" <medium-name> <library> <triangle-sides> \
+                                [ "PROG_PARAMS" [ <lib-arguments> ] ]
+
+<prog-t-bound-for-solid>    ::= "T_BOUNDARY_FOR_SOLID_PROG" <bound-name> <library> \
+                                <triangle-sides> [ "PROG_PARAMS" [ <lib-arguments> ] ]
+
+
+<prog-h-bound-for-solid>    ::= "H_BOUNDARY_FOR_SOLID_PROG" <bound-name> <library> \
+                                <triangle-sides> [ "PROG_PARAMS" [ <lib-arguments> ] ]
+
+<prog-h-bound-for-fluid>    ::= "H_BOUNDARY_FOR_FLUID_PROG" <bound-name> <library> \
+                                <triangle-sides> [ "PROG_PARAMS" [ <lib-arguments> ] ]
+
+<prog-f-bound-for-solid>    ::= "F_BOUNDARY_FOR_SOLID_PROG" <bound-name> <library> \
+                                <triangle-sides> [ "PROG_PARAMS" [ <lib-arguments> ] ]
+
+<prog-solid-fluid-connect>  ::= "SOLID_FLUID_CONNECTION_PROG" <connect-name> \
+                                <library> <triangle-sides> [ "PROG_PARAMS" [ <lib-arguments> ] ]
+
+<prog-solid-solid-connect>  ::= "SOLID_SOLID_CONNECTION_PROG" <connect-name> \
+                                <library> <triangle-sides> [ "PROG_PARAMS" [ <lib-arguments> ] ]
+
+<scaling-factor>            ::= "SCALE" <scale> [ <comment> ]
+
+<radiative-temps>           ::= "TRAD" <radiative-temp> <radiative-temp-ref>
 
 -------------------------------------
 
-<medium-name>         ::= STRING # no space allowed, must not be parsable as a
+<medium-name>         ::= STRING # no space allowed, must not be a keyword nor a
                                  # number, including INF and others
 
 <lambda>              ::= REAL # conductivity in W/(m.K); in ]0, INF)
@@ -164,7 +194,11 @@ _______
 
 <triangle-sides>      ::= <side-specifier> <file-name> [ <triangle-sides> ]
 
-<bound-name>          ::= STRING # no space allowed
+<bound-name>          ::= STRING # no space allowed, must not be a keyword nor a
+                                 # number, including INF and others
+
+<connect-name>        ::= STRING # no space allowed, must not be a keyword nor a
+                                 # number, including INF and others
 
 <Tref>                ::= REAL # in [0, inf)
 
@@ -179,6 +213,16 @@ _______
 <flux>                ::= REAL # in W/m2; in (-INF , INF)
 
 <triangles>           ::= <file-name> [ <triangles> ]
+
+<scale>               ::= REAL # scaling factor to apply to the geometry
+                               # in ]0 INF)
+
+<library>             ::= FILEPATH # the path must be valid in the running directory
+
+<lib-arguments>       ::= STRING # the whole string is send to the init()
+                                 # function when the description is created
+                                 # note that the '#' character consistently ends
+                                 # arguments by starting a comment
 
 <radiative-temp>      ::= REAL # in [0, inf)
 

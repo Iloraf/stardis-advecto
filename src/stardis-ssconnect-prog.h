@@ -36,6 +36,9 @@ struct solid_solid_connect_prog {
   void* lib;
   void* (*create)(char*);
   void (*release)(void*);
+  const char* (*get_copyright_notice)(void*);
+  const char* (*get_license_short)(void*);
+  const char* (*get_license_text)(void*);
   double (*tcr)(const struct stardis_interface_fragment*, void*);
   unsigned connection_id;
 };

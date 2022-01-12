@@ -39,6 +39,9 @@ struct solid_fluid_connect_prog {
   void* lib;
   void* (*create)(char*);
   void (*release)(void*);
+  const char* (*get_copyright_notice)(void*);
+  const char* (*get_license_short)(void*);
+  const char* (*get_license_text)(void*);
   double (*ref_temp)(const struct stardis_interface_fragment*, void*);
   double (*emissivity)(const struct stardis_interface_fragment*, void*);
   double (*alpha)(const struct stardis_interface_fragment*, void*);

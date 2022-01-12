@@ -441,6 +441,72 @@ error:
   goto end;
 }
 
+static res_T
+get_prog_common
+  (const char* lib_name,
+   struct logger* logger,
+   void** lib,
+   void* (**create)(char*),
+   void (**release)(void*),
+   const char* (**get_copyright_notice)(void*),
+   const char* (**get_license_short)(void*),
+   const char* (**get_license_text)(void*))
+{
+  res_T res = RES_OK;
+
+  ASSERT(lib_name && lib && create && release
+    && get_copyright_notice && get_license_short && get_license_text);
+
+  /* get the user-defined functions from the library */
+  *lib = library_open(lib_name);
+  if(!*lib) {
+    logger_print(logger, LOG_ERROR,
+      "Cannot open library: %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  *(void**)create = library_get_symbol(*lib, "stardis_create_data");
+  if(!*create) {
+    logger_print(logger, LOG_ERROR,
+      "Cannot find function 'stardis_create_data' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  *(void**)release = library_get_symbol(*lib, "stardis_release_data");
+  if(!*release) {
+    logger_print(logger, LOG_ERROR,
+      "Cannot find function 'stardis_release_data' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  *(void**)get_copyright_notice = library_get_symbol(*lib, "get_copyright_notice");
+  if(!*get_copyright_notice) {
+    logger_print(logger, LOG_ERROR,
+      "Cannot find function 'get_copyright_notice' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  *(void**)get_license_short = library_get_symbol(*lib, "get_license_short");
+  if(!*get_license_short) {
+    logger_print(logger, LOG_ERROR,
+      "Cannot find function 'get_license_short' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  *(void**)get_license_text = library_get_symbol(*lib, "get_license_text");
+  if(!*get_license_text) {
+    logger_print(logger, LOG_ERROR,
+      "Cannot find function 'get_license_text' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+end:
+  return res;
+error:
+  goto end;
+}
+
 /* H_BOUNDARY_FOR_SOLID_PROG Name Prog_filename STL_filenames [PROG_PARAMS ...]
  * H_BOUNDARY_FOR_FLUID_PROG Name Prog_filename STL_filenames [PROG_PARAMS ...] */
 static res_T
@@ -490,29 +556,10 @@ process_h_prog
     ERR(str_set(&h_boundary_prog->args, *tok_ctx));
   }
   /* get the user-defined functions from the library */
-  h_boundary_prog->lib = library_open(lib_name);
-  if(!h_boundary_prog->lib) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot open library: %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&h_boundary_prog->create
-    = library_get_symbol(h_boundary_prog->lib, "stardis_create_data");
-  if(!h_boundary_prog->create) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_create_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&h_boundary_prog->release
-    = library_get_symbol(h_boundary_prog->lib, "stardis_release_data");
-  if(!h_boundary_prog->release) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_release_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
+  ERR(get_prog_common(lib_name, stardis->logger, &h_boundary_prog->lib,
+    &h_boundary_prog->create, &h_boundary_prog->release,
+    &h_boundary_prog->get_copyright_notice, &h_boundary_prog->get_license_short,
+    &h_boundary_prog->get_license_text));
   *(void**)&h_boundary_prog->ref_temp
     = library_get_symbol(h_boundary_prog->lib, "stardis_reference_temperature");
   if(!h_boundary_prog->ref_temp) {
@@ -725,29 +772,10 @@ process_t_prog
     ERR(str_set(&t_boundary_prog->args, *tok_ctx));
   }
   /* get the user-defined functions from the library */
-  t_boundary_prog->lib = library_open(lib_name);
-  if(!t_boundary_prog->lib) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot open library: %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&t_boundary_prog->create
-    = library_get_symbol(t_boundary_prog->lib, "stardis_create_data");
-  if(!t_boundary_prog->create) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_create_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&t_boundary_prog->release
-    = library_get_symbol(t_boundary_prog->lib, "stardis_release_data");
-  if(!t_boundary_prog->release) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_release_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
+  ERR(get_prog_common(lib_name, stardis->logger, &t_boundary_prog->lib,
+    &t_boundary_prog->create, &t_boundary_prog->release,
+    &t_boundary_prog->get_copyright_notice, &t_boundary_prog->get_license_short,
+    &t_boundary_prog->get_license_text));
   *(void**)&t_boundary_prog->temperature
     = library_get_symbol(t_boundary_prog->lib, "stardis_boundary_temperature");
   if(!t_boundary_prog->temperature) {
@@ -893,29 +921,10 @@ process_flx_prog
     ERR(str_set(&f_boundary_prog->args, *tok_ctx));
   }
   /* get the user-defined functions from the library */
-  f_boundary_prog->lib = library_open(lib_name);
-  if(!f_boundary_prog->lib) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot open library: %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&f_boundary_prog->create
-    = library_get_symbol(f_boundary_prog->lib, "stardis_create_data");
-  if(!f_boundary_prog->create) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_create_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&f_boundary_prog->release
-    = library_get_symbol(f_boundary_prog->lib, "stardis_release_data");
-  if(!f_boundary_prog->release) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_release_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
+  ERR(get_prog_common(lib_name, stardis->logger, &f_boundary_prog->lib,
+    &f_boundary_prog->create, &f_boundary_prog->release,
+    &f_boundary_prog->get_copyright_notice, &f_boundary_prog->get_license_short,
+    &f_boundary_prog->get_license_text));
   *(void**)&f_boundary_prog->flux
     = library_get_symbol(f_boundary_prog->lib, "stardis_boundary_flux");
   if(!f_boundary_prog->flux) {
@@ -1078,29 +1087,10 @@ process_sfc_prog
     ERR(str_set(&sf_connect_prog->args, *tok_ctx));
   }
   /* get the user-defined functions from the library */
-  sf_connect_prog->lib = library_open(lib_name);
-  if(!sf_connect_prog->lib) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot open library: %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&sf_connect_prog->create
-    = library_get_symbol(sf_connect_prog->lib, "stardis_create_data");
-  if(!sf_connect_prog->create) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_create_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&sf_connect_prog->release
-    = library_get_symbol(sf_connect_prog->lib, "stardis_release_data");
-  if(!sf_connect_prog->release) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_release_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
+  ERR(get_prog_common(lib_name, stardis->logger, &sf_connect_prog->lib,
+    &sf_connect_prog->create, &sf_connect_prog->release,
+    &sf_connect_prog->get_copyright_notice, &sf_connect_prog->get_license_short,
+    &sf_connect_prog->get_license_text));
   *(void**)&sf_connect_prog->ref_temp
     = library_get_symbol(sf_connect_prog->lib, "stardis_reference_temperature");
   if(!sf_connect_prog->ref_temp) {
@@ -1278,29 +1268,10 @@ process_ssc_prog
     ERR(str_set(&ss_connect_prog->args, *tok_ctx));
   }
   /* get the user-defined functions from the library */
-  ss_connect_prog->lib = library_open(lib_name);
-  if(!ss_connect_prog->lib) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot open library: %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&ss_connect_prog->create
-    = library_get_symbol(ss_connect_prog->lib, "stardis_create_data");
-  if(!ss_connect_prog->create) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_create_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&ss_connect_prog->release
-    = library_get_symbol(ss_connect_prog->lib, "stardis_release_data");
-  if(!ss_connect_prog->release) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_release_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
+  ERR(get_prog_common(lib_name, stardis->logger, &ss_connect_prog->lib,
+    &ss_connect_prog->create, &ss_connect_prog->release,
+    &ss_connect_prog->get_copyright_notice, &ss_connect_prog->get_license_short,
+    &ss_connect_prog->get_license_text));
   *(void**)&ss_connect_prog->tcr
     = library_get_symbol(ss_connect_prog->lib, "stardis_thermal_contact_resistance");
   if(!ss_connect_prog->tcr) {
@@ -1570,29 +1541,10 @@ process_solid_prog
     ERR(str_set(&solid_prog->args, *tok_ctx));
   }
   /* get the user-defined functions from the library */
-  solid_prog->lib = library_open(lib_name);
-  if(!solid_prog->lib) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot open library: %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&solid_prog->create
-    = library_get_symbol(solid_prog->lib, "stardis_create_data");
-  if(!solid_prog->create) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_create_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&solid_prog->release
-    = library_get_symbol(solid_prog->lib, "stardis_release_data");
-  if(!solid_prog->release) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_release_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
+  ERR(get_prog_common(lib_name, stardis->logger, &solid_prog->lib,
+    &solid_prog->create, &solid_prog->release,
+    &solid_prog->get_copyright_notice, &solid_prog->get_license_short,
+    &solid_prog->get_license_text));
   *(void**)&solid_prog->lambda
     = library_get_symbol(solid_prog->lib, "stardis_conductivity");
   if(!solid_prog->lambda) {
@@ -1810,29 +1762,10 @@ process_fluid_prog
     ERR(str_set(&fluid_prog->args, *tok_ctx));
   }
   /* get the user-defined functions from the library */
-  fluid_prog->lib = library_open(lib_name);
-  if(!fluid_prog->lib) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot open library: %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&fluid_prog->create
-    = library_get_symbol(fluid_prog->lib, "stardis_create_data");
-  if(!fluid_prog->create) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_create_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
-  *(void**)&fluid_prog->release
-    = library_get_symbol(fluid_prog->lib, "stardis_release_data");
-  if(!fluid_prog->release) {
-    logger_print(stardis->logger, LOG_ERROR,
-      "Cannot find function 'stardis_release_data' in lib %s\n", lib_name);
-    res = RES_BAD_ARG;
-    goto error;
-  }
+  ERR(get_prog_common(lib_name, stardis->logger, &fluid_prog->lib,
+    &fluid_prog->create, &fluid_prog->release,
+    &fluid_prog->get_copyright_notice, &fluid_prog->get_license_short,
+    &fluid_prog->get_license_text));
   *(void**)&fluid_prog->rho
     = library_get_symbol(fluid_prog->lib, "stardis_volumic_mass");
   if(!fluid_prog->rho) {

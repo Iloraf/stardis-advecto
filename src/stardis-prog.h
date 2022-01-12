@@ -68,6 +68,21 @@ extern void
 stardis_release_data
   (void* data);
 
+/* Get the copyright notice */
+const char*
+get_copyright_notice
+  (void*);
+
+/* Get short (name and link to?) version of the license */
+const char*
+get_license_short
+  (void*);
+
+/* Get full license text */
+const char*
+get_license_text
+  (void*);
+
 /**********************************************/
 /* Mandatory functions for a programmed solid */
 /**********************************************/

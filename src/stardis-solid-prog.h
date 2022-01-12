@@ -39,6 +39,9 @@ struct solid_prog {
   void* lib;
   void* (*create)(char*);
   void (*release)(void*);
+  const char* (*get_copyright_notice)(void*);
+  const char* (*get_license_short)(void*);
+  const char* (*get_license_text)(void*);
   double (*lambda)(const struct stardis_vertex*, void*);
   double (*rho)(const struct stardis_vertex*, void*);
   double (*cp)(const struct stardis_vertex*, void*);

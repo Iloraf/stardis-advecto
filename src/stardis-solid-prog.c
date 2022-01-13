@@ -180,6 +180,7 @@ release_solid_prog
 
   if(solid->prog_data)
     solid->release(solid->prog_data);
+  /* library_close call is managed at lib_data level */
   MEM_RM(allocator, solid);
 }
 

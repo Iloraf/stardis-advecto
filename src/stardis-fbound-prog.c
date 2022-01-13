@@ -71,6 +71,7 @@ release_f_boundary_prog
   str_release(&bound->args);
   if(bound->prog_data)
     bound->release(bound->prog_data);
+  /* library_close call is managed at lib_data level */
   MEM_RM(allocator, bound);
 }
 

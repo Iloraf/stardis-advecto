@@ -45,47 +45,99 @@ struct stardis_interface_fragment {
   enum stardis_side side;
 };
 
+enum stardis_return_status {
+  STARDIS_SUCCESS,
+  STARDIS_FAILURE
+};
 
+/******************************************************************************/
+/* Optional functions for any programmed library.                             */
+/* Either all 3 or none of the 3 following functions must be defined.         */
+/* If a libray doesn't need its own data, just let these functions undefined. */
+/******************************************************************************/
 
-/*****************************************************************************/
-/* Expected function declarations (sorted by description type).              */
-/* Some functions appear multiple times as they are part of more than one    */
-/* description requirement.                                                  */
-/*****************************************************************************/
+/* Create the data attached to a given libray.
+ * A NULL result is interpreted as an error and ends the program.
+ * This function is called the first time a description using this library is
+ * processed. */
+extern void*
+stardis_create_library_data
+  ();
 
-/******************************************************/
-/* Mandatory functions for any programmed description */
-/******************************************************/
+/* Finalize the data created by the successive stardis_create_data calls for
+ * the descriptions created using this library.
+ * A STARDIS_FAILURE result ends the program.
+ * This function is called after descriptions creation, before simulation
+ * starts.
+ * Data is the pointer returned by stardis_create_library_data for this
+ * library. */
+enum stardis_return_status
+stardis_finalize_library_data
+  (void* data);
+
+/* Release the data created by stardis_create_library_data.
+ * This function is called after the simulation finished and after releasing
+ * descriptions data.
+ * Data is the pointer returned by stardis_create_library_data for this
+ * library. */
+extern void
+stardis_release_library_data
+  (void* data);
+
+/******************************************************************************/
+/* Mandatory functions for any programmed description regardless of its type. */
+/******************************************************************************/
 
 /* Create the data attached to a given description.
- * A NULL result is interpreted as an error and ends the program. */
+ * A NULL result is interpreted as an error and ends the program. 
+ * This function is called every time a description using this library is
+ * processed.
+ * Data is the pointer returned by stardis_create_library_data for the library
+ * or NULL if stardis_create_library_data is not defined.
+ * Args is the end of the description line that was following the PROG_PARAM
+ * keyword. */
 extern void*
 stardis_create_data
-  (char* args);
+  (void* data,
+   char* args);
 
-/* Release the data created by stardis_create_data. */
+/* Release the data created by stardis_create_data.
+ * This function is called after the simulation finished.
+ * Data is the pointer returned by stardis_create_data for the description. */
 extern void
 stardis_release_data
   (void* data);
 
-/* Get the copyright notice */
+/* Get the copyright notice.
+ * A NULL result is interpreted as an error and ends the program.
+ * Data is the pointer returned by stardis_create_data for the description. */
 const char*
 get_copyright_notice
-  (void*);
+  (void* data);
 
-/* Get short (name and link to?) version of the license */
+/* Get single-line (name and link?) version of the license.
+ * A NULL result is interpreted as an error and ends the program.
+ * Data is the pointer returned by stardis_create_data for the description. */
 const char*
 get_license_short
-  (void*);
+  (void* data);
 
-/* Get full license text */
+/* Get full license text.
+ * A NULL result is interpreted as an error and ends the program.
+ * Data is the pointer returned by stardis_create_data for the description. */
 const char*
 get_license_text
-  (void*);
+  (void* data);
 
-/**********************************************/
-/* Mandatory functions for a programmed solid */
-/**********************************************/
+/*****************************************************************************/
+/* Additional mandatory function declarations (sorted by description type).  */
+/* Some functions appear multiple times as they are part of more than one    */
+/* description requirement.                                                  */
+/*****************************************************************************/
+
+/*********************************************************/
+/* Additional mandatory functions for a programmed solid */
+/*********************************************************/
 
 /* Returns the calorific capacity at a given vertex.
  * This functions is called at every vertex of every path of the computation
@@ -150,9 +202,9 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/**********************************************/
-/* Mandatory functions for a programmed fluid */
-/**********************************************/
+/*********************************************************/
+/* Additional mandatory functions for a programmed fluid */
+/*********************************************************/
 
 /* Returns the calorific capacity at a given vertex.
  * This functions is called at every vertex of every path of the computation
@@ -190,9 +242,9 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/***************************************************************/
-/* Mandatory functions for a programmed H boundary for a fluid */
-/***************************************************************/
+/**************************************************************************/
+/* Additional mandatory functions for a programmed H boundary for a fluid */
+/**************************************************************************/
 
 /* Returns the boundary temperature at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -256,9 +308,9 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/***************************************************************/
-/* Mandatory functions for a programmed H boundary for a solid */
-/***************************************************************/
+/**************************************************************************/
+/* Additional mandatory functions for a programmed H boundary for a solid */
+/**************************************************************************/
 
 /* Returns the emissivity at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -324,9 +376,9 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/***************************************************/
-/* Mandatory functions for a programmed T boundary */
-/***************************************************/
+/**************************************************************/
+/* Additional mandatory functions for a programmed T boundary */
+/**************************************************************/
 
 /* Returns the boundary temperature at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -345,9 +397,9 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/***************************************************/
-/* Mandatory functions for a programmed F boundary */
-/***************************************************/
+/**************************************************************/
+/* Additional mandatory functions for a programmed F boundary */
+/**************************************************************/
 
 /* Returns the flux at the boundary at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -358,9 +410,9 @@ stardis_boundary_flux
   (const struct stardis_interface_fragment* frag,
    void* data);
 
-/***************************************************************/
-/* Mandatory functions for a programmed Solid-Solid connection */
-/***************************************************************/
+/**************************************************************************/
+/* Additional mandatory functions for a programmed Solid-Solid connection */
+/**************************************************************************/
 
 /* Returns the thermal contact resistance at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -371,9 +423,9 @@ stardis_thermal_contact_resistance
   (const struct stardis_interface_fragment* frag,
    void* data);
 
-/***************************************************************/
-/* Mandatory functions for a programmed Solid-Fluid connection */
-/***************************************************************/
+/**************************************************************************/
+/* Additional mandatory functions for a programmed Solid-Fluid connection */
+/**************************************************************************/
 
 /* Returns the emissivity at a given fragment.
  * This functions is called every time a path of the computation reaches

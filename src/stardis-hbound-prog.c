@@ -73,6 +73,7 @@ release_h_boundary_prog
     bound->release(bound->prog_data);
   if(bound->possible_external_fluid)
     release_fluid_prog(bound->possible_external_fluid, allocator);
+  /* library_close call is managed at lib_data level */
   MEM_RM(allocator, bound);
 }
 

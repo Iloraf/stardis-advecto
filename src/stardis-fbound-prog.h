@@ -36,7 +36,7 @@ struct f_boundary_prog {
   struct str args;
   /* lib handle and function ptrs */
   void* lib;
-  void* (*create)(char*);
+  void* (*create)(void*, char*);
   void (*release)(void*);
   const char* (*get_copyright_notice)(void*);
   const char* (*get_license_short)(void*);

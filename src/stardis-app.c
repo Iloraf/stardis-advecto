@@ -28,6 +28,7 @@
 #include <star/sg3d_sdisXd_helper.h>
 
 #include <rsys/str.h>
+#include <rsys/library.h>
 #include <rsys/logger.h>
 #include <rsys/double2.h>
 #include <rsys/double3.h>
@@ -153,6 +154,7 @@ stardis_init
   struct htable_intface htable_interfaces;
   struct str str;
   unsigned i, vcount, tcount, ocount, count;
+  struct htable_lib_data_iterator it, end;
   int is_for_compute;
 
   ASSERT(args && logger && allocator && stardis);
@@ -200,6 +202,7 @@ stardis_init
   stardis->undefined_medium_behind_boundary_id = SENC3D_UNSPECIFIED_MEDIUM;
   stardis->verbose = args->verbose;
   darray_media_ptr_init(stardis->allocator, &stardis->media);
+  htable_lib_data_init(stardis->allocator, &stardis->lib_data);
 
   /* If a dump is expected, we won't process any computation */
   is_for_compute =
@@ -305,6 +308,19 @@ stardis_init
     logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
   }
 
+  /* finalize library data */
+  htable_lib_data_begin(&stardis->lib_data, &it);
+  htable_lib_data_end(&stardis->lib_data, &end);
+  while(!htable_lib_data_iterator_eq(&it, &end)) {
+    struct lib_data* data
+     = htable_lib_data_iterator_data_get(&it);
+    htable_lib_data_iterator_next(&it);
+    if(data->data)  {
+      ASSERT(data->finalize);
+      data->finalize(data->data);
+    }
+  }
+
   if(is_for_compute) {
     for(i = 0; i < tcount; ++i) {
       ERR(create_intface(stardis, i, &htable_interfaces));
@@ -374,6 +390,7 @@ stardis_release
   (struct stardis* stardis)
 {
   size_t i;
+  struct htable_lib_data_iterator it, end;
 
   ASSERT(stardis);
 
@@ -385,11 +402,28 @@ stardis_release
   str_release(&stardis->bin_green_filename);
   str_release(&stardis->end_paths_filename);
   str_release(&stardis->chunks_prefix);
+  /* release descritions */
   FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
     struct description* d = darray_descriptions_data_get(&stardis->descriptions) +i;
     release_description(d, stardis->allocator);
   }
   darray_descriptions_release(&stardis->descriptions);
+  /* release library data */
+  htable_lib_data_begin(&stardis->lib_data, &it);
+  htable_lib_data_end(&stardis->lib_data, &end);
+  while(!htable_lib_data_iterator_eq(&it, &end)) {
+    size_t n;
+    struct lib_data* data
+     = htable_lib_data_iterator_data_get(&it);
+    void** lib = htable_lib_data_iterator_key_get(&it);
+    htable_lib_data_iterator_next(&it);
+    if(data->data)  {
+      ASSERT(data->release);
+      data->release(data->data);
+    }
+    FOR_EACH(n, 0, data->count) library_close(*lib);
+  }
+  htable_lib_data_release(&stardis->lib_data);
   release_geometry(&stardis->geometry);
   darray_size_t_release(&stardis->compute_surface.primitives);
   darray_sides_release(&stardis->compute_surface.sides);

@@ -70,6 +70,7 @@ release_sf_connect_prog
   str_release(&connect->args);
   if(connect->prog_data)
     connect->release(connect->prog_data);
+  /* library_close call is managed at lib_data level */
   MEM_RM(allocator, connect);
 }
 

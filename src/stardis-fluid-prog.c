@@ -178,6 +178,7 @@ release_fluid_prog
   {
     fluid->release(fluid->prog_data);
   }
+  /* library_close call is managed at lib_data level */
   MEM_RM(allocator, fluid);
 }
 

@@ -30,6 +30,7 @@
 #include "stardis-sfconnect-prog.h"
 #include "stardis-ssconnect.h"
 #include "stardis-ssconnect-prog.h"
+#include "stardis-program.h"
 
 #include <rsys/rsys.h>
 #include <rsys/mem_allocator.h>
@@ -102,6 +103,9 @@ release_description
   case DESC_SOLID_SOLID_CONNECT_PROG:
     release_ss_connect_prog(desc->d.ss_connect_prog, allocator);
     break;
+  case DESC_PROGRAM:
+   release_program(desc->d.program, allocator);
+   break;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
@@ -162,6 +166,9 @@ str_print_description
   case DESC_SOLID_SOLID_CONNECT_PROG:
     ERR(str_print_ss_connect_prog(str, desc->d.ss_connect_prog));
     break;
+  case DESC_PROGRAM:
+    ERR(str_print_program(str, desc->d.program));
+    break;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
@@ -207,6 +214,8 @@ get_description_name
     return &desc->d.ss_connect->name;
   case DESC_SOLID_SOLID_CONNECT_PROG:
     return &desc->d.ss_connect_prog->name;
+  case DESC_PROGRAM:
+    return &desc->d.program->name;
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }
@@ -255,6 +264,7 @@ description_get_medium_id
   case DESC_SOLID_SOLID_CONNECT: /* No medium linked to SS */
   case DESC_SOLID_FLUID_CONNECT_PROG: /* No medium linked to SF */
   case DESC_SOLID_SOLID_CONNECT_PROG: /* No medium linked to SS */
+  case DESC_PROGRAM: /* No medium linked to PRORGRAM */
   default:
     FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
   }

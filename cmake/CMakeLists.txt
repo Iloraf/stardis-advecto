@@ -132,6 +132,7 @@ set(SDIS_FILES_SRC
   stardis-main.c
   stardis-output.c
   stardis-parsing.c
+  stardis-program.c
   stardis-sfconnect.c
   stardis-sfconnect-prog.c
   stardis-ssconnect.c
@@ -159,6 +160,7 @@ set(SDIS_FILES_INC
   stardis-intface.h
   stardis-output.h
   stardis-parsing.h
+  stardis-program.h
   stardis-sfconnect.h
   stardis-sfconnect-prog.h
   stardis-ssconnect.h

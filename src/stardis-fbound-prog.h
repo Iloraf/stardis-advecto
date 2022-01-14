@@ -25,22 +25,20 @@ struct stardis;
 struct mem_allocator;
 struct fluid_prog;
 struct description;
+struct program;
 
 /*******************************************************************************
  * F boundary prog data
  ******************************************************************************/
 struct f_boundary_prog {
-  void* prog_data; /* result of the init_f_prog() call */
+  void* prog_data; /* result of the create() call */
   struct str name;
   struct str prog_name;
   struct str args;
   /* lib handle and function ptrs */
-  void* lib;
+  struct program* program;
   void* (*create)(void*, char*);
   void (*release)(void*);
-  const char* (*get_copyright_notice)(void*);
-  const char* (*get_license_short)(void*);
-  const char* (*get_license_text)(void*);
   double (*flux)(const struct stardis_interface_fragment*, void*);
   unsigned mat_id;
 };

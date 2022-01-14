@@ -23,12 +23,13 @@
 
 struct stardis;
 struct mem_allocator;
+struct program;
 
 /*******************************************************************************
  * Solid-Fluid prog data
  ******************************************************************************/
 struct solid_fluid_connect_prog {
-  void* prog_data; /* result of the init_fluid() call */
+  void* prog_data; /* result of the create() call */
   struct str name;
   struct str prog_name;
   struct str args;
@@ -36,12 +37,9 @@ struct solid_fluid_connect_prog {
   unsigned desc_id; /* id of the boundary; meaningful if is_outside */
   unsigned connection_id;
   /* lib handle and function ptrs */
-  void* lib;
+  struct program* program;
   void* (*create)(void*, char*);
   void (*release)(void*);
-  const char* (*get_copyright_notice)(void*);
-  const char* (*get_license_short)(void*);
-  const char* (*get_license_text)(void*);
   double (*ref_temp)(const struct stardis_interface_fragment*, void*);
   double (*emissivity)(const struct stardis_interface_fragment*, void*);
   double (*alpha)(const struct stardis_interface_fragment*, void*);

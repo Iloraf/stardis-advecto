@@ -47,8 +47,8 @@ enum description_type {
   DESC_BOUND_F_FOR_SOLID_PROG,
   DESC_SOLID_FLUID_CONNECT_PROG,
   DESC_SOLID_SOLID_CONNECT_PROG,
-  DESCRIPTION_TYPE_COUNT__,
-  DESC_OUTSIDE
+  DESC_PROGRAM,
+  DESCRIPTION_TYPE_COUNT__
 };
 
 #define DESC_IS_H(D) \
@@ -100,6 +100,7 @@ struct solid_fluid_connect;
 struct solid_fluid_connect_prog;
 struct solid_solid_connect;
 struct solid_solid_connect_prog;
+struct program;
 
 struct description {
   enum description_type type;
@@ -118,6 +119,7 @@ struct description {
     struct solid_fluid_connect_prog* sf_connect_prog;
     struct solid_solid_connect* ss_connect;
     struct solid_solid_connect_prog* ss_connect_prog;
+    struct program* program;
   } d;
 };
 

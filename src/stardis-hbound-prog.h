@@ -24,22 +24,20 @@
 struct mem_allocator;
 struct fluid_prog;
 struct description;
+struct program;
 
 /*******************************************************************************
  * H boundary prog data
  ******************************************************************************/
 struct h_boundary_prog {
-  void* prog_data; /* result of the init_h_prog() call */
+  void* prog_data; /* result of the create() call */
   struct str name;
   struct str prog_name;
   struct str args;
   /* lib handle and function ptrs */
-  void* lib;
+  struct program* program;
   void* (*create)(void*, char*);
   void (*release)(void*);
-  const char* (*get_copyright_notice)(void*);
-  const char* (*get_license_short)(void*);
-  const char* (*get_license_text)(void*);
   double (*ref_temp)(const struct stardis_interface_fragment*, void*);
   double (*emissivity)(const struct stardis_interface_fragment*, void*);
   double (*alpha)(const struct stardis_interface_fragment*, void*);

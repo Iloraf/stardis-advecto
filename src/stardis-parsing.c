@@ -32,6 +32,7 @@
 #include "stardis-fluid.h"
 #include "stardis-solid-prog.h"
 #include "stardis-solid.h"
+#include "stardis-program.h"
 #include "stardis-default.h"
 
 #include <rsys/cstr.h>
@@ -272,8 +273,9 @@ description_set_name
   const char* keywords[] = {
     "AUTO", "BACK", "BOTH", "FLUID", "FLUID_PROG", "FRONT", "F_BOUNDARY_FOR_SOLID",
     "F_BOUNDARY_FOR_SOLID_PROG", "H_BOUNDARY_FOR_FLUID", "H_BOUNDARY_FOR_FLUID_PROG",
-    "H_BOUNDARY_FOR_SOLID", "H_BOUNDARY_FOR_SOLID_PROG", "SCALE", "SOLID", "SOLID_PROG",
-    "SOLID_FLUID_CONNECTION", "SOLID_FLUID_CONNECTION_PROG", "SOLID_SOLID_CONNECTION",
+    "H_BOUNDARY_FOR_SOLID", "H_BOUNDARY_FOR_SOLID_PROG", "PROGRAM", "PROG_PARAMS",
+    "SCALE", "SOLID", "SOLID_PROG", "SOLID_FLUID_CONNECTION",
+    "SOLID_FLUID_CONNECTION_PROG", "SOLID_SOLID_CONNECTION",
     "SOLID_SOLID_CONNECTION_PROG", "TRAD", "T_BOUNDARY_FOR_SOLID",
     "T_BOUNDARY_FOR_SOLID_PROG", "UNKNOWN" };
   int i;
@@ -310,7 +312,7 @@ find_description_by_name
    const struct description* self)
 {
   size_t i;
-  ASSERT(stardis && name && self);
+  ASSERT(stardis && name);
 
   FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
     struct description* desc
@@ -441,56 +443,33 @@ error:
   goto end;
 }
 
-/* utility macros */
-#define GET_LIB_SYMBOL(Dest, Field, Name) \
-  GET_LIB_SYMBOL_BASE(&((Dest)->Field), (Dest)->lib, Name)
+static res_T
+set_stripped_args
+  (struct str* str,
+   const char* args)
+{
+  const char whitespace[] = " \f\n\r\t\v";
+  ASSERT(str && args);
+  return str_set(str, args + strspn(args, whitespace));
+}
 
-#define GET_LIB_SYMBOL_BASE(DestField, Lib, Name) \
-  *(void**)DestField = library_get_symbol((Lib), #Name ); \
-  if(!DestField) { \
+/* utility macros */
+#define GET_LIB_SYMBOL_BASE(DestField, LibHandle, FunName, Optional) \
+  *(void**)DestField = library_get_symbol((LibHandle), #FunName ); \
+  if(!*DestField && !(Optional)) { \
     logger_print(stardis->logger, LOG_ERROR, \
-      "Cannot find function '" #Name "()' in lib %s\n", lib_name); \
+      "Cannot find function '" #FunName "()' in lib %s\n", lib_name); \
     res = RES_BAD_ARG; \
     goto error; \
   }
 
-#define CREATE_LIB_DATA_IF_FIRST(Decl) \
-  if(first_seen) { \
-    /* first time this library is used */ \
-    const char* lic = (Decl)->get_license_short(lib_data->data); \
-    const char* _c_ = (Decl)->get_copyright_notice(lib_data->data); \
-    if(!lic) { \
-      logger_print(stardis->logger, LOG_ERROR, \
-        "Cannot get valid license information for library %s\n", lib_name); \
-      res = RES_BAD_ARG; \
-      goto error; \
-    } \
-    if(!_c_) { \
-      logger_print(stardis->logger, LOG_ERROR, \
-        "Cannot get valid copyright notice for library %s\n", lib_name); \
-      res = RES_BAD_ARG; \
-      goto error; \
-    } \
-    logger_print(stardis->logger, LOG_OUTPUT, \
-      "Loading external library '%s'\n", lib_name); \
-    logger_print(stardis->logger, LOG_OUTPUT, "  %s\n", _c_); \
-    logger_print(stardis->logger, LOG_OUTPUT, "  %s\n", lic); \
-    if(lib_data->create) { \
-      lib_data->data = lib_data->create(); \
-      if(!lib_data->data) { \
-        logger_print(stardis->logger, LOG_ERROR, \
-          "Cannot create library data for library %s\n", lib_name); \
-        res = RES_BAD_ARG; \
-        goto error; \
-      } \
-    } \
-  }
+#define GET_LIB_SYMBOL(Dest, Field, FunName) \
+  GET_LIB_SYMBOL_BASE(&((Dest)->Field), (Dest)->program->lib_handle, FunName, 0)
 
-#define CREATE_DESC_DATA(Desc) \
+#define CREATE_DESC_DATA_BASE(Desc, CreateArgs) \
   /* duplicate args to allow to modify them */ \
   ERR(str_copy(&tmp, &(Desc)->args)); \
-  (Desc)->prog_data \
-    = (Desc)->create(lib_data->data, str_get(&tmp)); \
+  (Desc)->prog_data = (Desc)->create(CreateArgs); \
   if(!(Desc)->prog_data) { \
     logger_print(stardis->logger, LOG_ERROR, \
       "Cannot create data for description %s\n", str_cget(&(Desc)->name)); \
@@ -498,53 +477,109 @@ error:
     goto error; \
   }
 
-/* The returned lib_data is NULL if no stardis_create_lib_data function is
+#define CREATE_DESC_DATA(Desc) \
+  CREATE_DESC_DATA_BASE(Desc, LIST_ARG2((Desc)->program->prog_data, str_get(&tmp)))
+
+/* The returned program is NULL if no stardis_create_program function is
  * defined in the library. */
 static res_T
 get_prog_common
   (const char* lib_name,
    struct stardis* stardis,
-   void** lib,
+   struct program** program,
    void* (**create)(void*, char*),
-   void (**release)(void*),
-   const char* (**get_copyright_notice)(void*),
-   const char* (**get_license_short)(void*),
-   const char* (**get_license_text)(void*),
-   struct lib_data** lib_data,
-   int* first_seen)
+   void (**release)(void*))
 {
   res_T res = RES_OK;
-  void* (*libcreate)(void*);
-  void (*librelease)(void*);
-  enum stardis_return_status (*libfinalize)(void*);
+  struct description* desc;
+  struct str tmp;
 
-  ASSERT(lib_name && lib && create && release
-    && get_copyright_notice && get_license_short && get_license_text
-    && lib_data && first_seen);
+  ASSERT(lib_name && program && create && release && stardis);
 
   /* get the library handler */
-  *lib = library_open(lib_name);
-  if(!*lib) {
+  str_init(stardis->allocator, &tmp);
+  ERR(str_set(&tmp, lib_name));
+  desc = find_description_by_name(stardis, &tmp, NULL);
+  CHK(desc); /* must be found */
+  *program = desc->d.program;
+  /* get the mandatory user-defined functions from the library */
+  GET_LIB_SYMBOL_BASE(create, (*program)->lib_handle, stardis_create_data, 0);
+  GET_LIB_SYMBOL_BASE(release, (*program)->lib_handle, stardis_release_data, 0);
+
+end:
+  str_release(&tmp);
+  return res;
+error:
+  goto end;
+}
+
+/* PROGRAM Name library_path [...] */
+static res_T
+process_program
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  size_t sz;
+  struct program* program;
+  const char* lib_name;
+  struct str tmp;
+  const char* lic;
+  const char* _c_;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  str_init(stardis->allocator, &tmp);
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_program(stardis->allocator, &desc->d.program));
+  program = desc->d.program;
+  desc->type = DESC_PROGRAM;
+  
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
+  ERR(description_set_name(stardis, &program->name, tk));
+  if(find_description_by_name(stardis, &program->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  lib_name = tk;
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "library path");
+  ERR(str_set(&program->lib_path, tk));
+
+  /* get the library handler */
+  program->lib_handle = library_open(str_cget(&program->lib_path));
+  if(!program->lib_handle) {
     logger_print(stardis->logger, LOG_ERROR,
       "Cannot open library: %s\n", lib_name);
     res = RES_BAD_ARG;
     goto error;
   }
+
   /* get the mandatory user-defined functions from the library */
-  GET_LIB_SYMBOL_BASE(create, *lib,  stardis_create_data);
-  GET_LIB_SYMBOL_BASE(release, *lib,  stardis_release_data);
-  GET_LIB_SYMBOL_BASE(get_copyright_notice, *lib,  get_copyright_notice);
-  GET_LIB_SYMBOL_BASE(get_license_short, *lib,  get_license_short);
-  GET_LIB_SYMBOL_BASE(get_license_text, *lib,  get_license_text);
+  GET_LIB_SYMBOL_BASE(&program->get_copyright_notice, program->lib_handle,
+    get_copyright_notice, 0);
+  GET_LIB_SYMBOL_BASE(&program->get_license_short, program->lib_handle,
+    get_license_short, 0);
+  GET_LIB_SYMBOL_BASE(&program->get_license_text, program->lib_handle,
+    get_license_text, 0);
   /* get the optional user-defined functions from the library */
-  *(void**)&libcreate = library_get_symbol(*lib, "stardis_create_library_data");
-  *(void**)&librelease = library_get_symbol(*lib, "stardis_release_library_data");
-  *(void**)&libfinalize = library_get_symbol(*lib, "stardis_finalize_library_data");
-  if(!(libcreate && librelease && libfinalize)
-    && !(!libcreate && !librelease && !libfinalize))
+  GET_LIB_SYMBOL_BASE(&program->create,
+    program->lib_handle,  stardis_create_library_data, 1);
+  GET_LIB_SYMBOL_BASE(&program->release,
+    program->lib_handle,  stardis_release_library_data, 1);
+  GET_LIB_SYMBOL_BASE(&program->finalize,
+    program->lib_handle,  stardis_finalize_library_data, 1);
+  if(!(program->create && program->release && program->finalize)
+    && !(!program->create && !program->release && !program->finalize))
   {
     logger_print(stardis->logger, LOG_ERROR,
-      "Inconsistent library data management for library '%s'\n",
+      "Inconsistent library data management for library '%s'.\n",
       lib_name);
     logger_print(stardis->logger, LOG_ERROR,
       "Please define all or none of stardis_create_library_data, "
@@ -552,30 +587,45 @@ get_prog_common
     res = RES_BAD_ARG;
     goto error;
   }
-  *lib_data = htable_lib_data_find(&stardis->lib_data, lib);
-  *first_seen = (*lib_data == NULL);
-  if(*first_seen) {
-    /* store library_information */
-    struct lib_data dta;
-    dta.create = libcreate;
-    dta.release = librelease;
-    dta.finalize = libfinalize;
-    dta.data = NULL;
-    dta.count = 1;
-    ERR(htable_lib_data_set(&stardis->lib_data, lib, &dta));
-    *lib_data = htable_lib_data_find(&stardis->lib_data, lib);
-  } else {
-    (*lib_data)->count++;
+
+  /* store the end of line as args for custom init */
+  ERR(set_stripped_args(&program->args, *tok_ctx));
+  if(program->create) {
+    /* create and init custom data */
+    CREATE_DESC_DATA_BASE(program, str_get(&tmp));
+  } else if(!str_is_empty(&program->args)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Library '%s' has no custom data management functions but has arguments.\n",
+      lib_name);
+    res = RES_BAD_ARG;
+    goto error;
   }
 
+  lic = program->get_license_short(program->prog_data);
+  _c_ = program->get_copyright_notice(program->prog_data);
+  if(!lic) {
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(!_c_) {
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Loading external library '%s': \"%s\"\n",
+    str_cget(&program->name), str_cget(&program->lib_path));
+  logger_print(stardis->logger, LOG_OUTPUT, "  %s\n", _c_);
+  logger_print(stardis->logger, LOG_OUTPUT, "  %s\n", lic);
+
 end:
+  str_release(&tmp);
   return res;
 error:
   goto end;
 }
 
-/* H_BOUNDARY_FOR_SOLID_PROG Name Prog_filename STL_filenames [PROG_PARAMS ...]
- * H_BOUNDARY_FOR_FLUID_PROG Name Prog_filename STL_filenames [PROG_PARAMS ...] */
+/* H_BOUNDARY_FOR_SOLID_PROG Name ProgName STL_filenames [PROG_PARAMS ...]
+ * H_BOUNDARY_FOR_FLUID_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
 static res_T
 process_h_prog
   (struct stardis* stardis,
@@ -588,8 +638,6 @@ process_h_prog
   struct str tmp;
   size_t sz;
   struct h_boundary_prog* h_boundary_prog;
-  struct lib_data* lib_data;
-  int first_seen;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -625,11 +673,8 @@ process_h_prog
     ERR(str_set(&h_boundary_prog->args, *tok_ctx));
   }
   /* get the user-defined functions from the library */
-  ERR(get_prog_common(lib_name, stardis, &h_boundary_prog->lib,
-    &h_boundary_prog->create, &h_boundary_prog->release,
-    &h_boundary_prog->get_copyright_notice, &h_boundary_prog->get_license_short,
-    &h_boundary_prog->get_license_text,
-    &lib_data, &first_seen));
+  ERR(get_prog_common(lib_name, stardis,  &h_boundary_prog->program,
+    &h_boundary_prog->create, &h_boundary_prog->release));
   GET_LIB_SYMBOL(h_boundary_prog, ref_temp, stardis_reference_temperature);
   GET_LIB_SYMBOL(h_boundary_prog, emissivity, stardis_emissivity);
   GET_LIB_SYMBOL(h_boundary_prog, alpha, stardis_specular_fraction);
@@ -637,8 +682,6 @@ process_h_prog
   GET_LIB_SYMBOL(h_boundary_prog, hmax, stardis_max_convection_coefficient);
   GET_LIB_SYMBOL(h_boundary_prog, boundary_temp, stardis_boundary_temperature);
   GET_LIB_SYMBOL(h_boundary_prog, t_range, stardis_t_range);
-  /* create library data if applies */
-  CREATE_LIB_DATA_IF_FIRST(h_boundary_prog);
   /* create and init custom data */
   CREATE_DESC_DATA(h_boundary_prog);
 
@@ -727,7 +770,7 @@ error:
   goto end;
 }
 
-/* T_BOUNDARY_FOR_SOLID_PROG Name Prog_filename STL_filenames [PROG_PARAMS ...] */
+/* T_BOUNDARY_FOR_SOLID_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
 static res_T
 process_t_prog
   (struct stardis* stardis,
@@ -739,8 +782,6 @@ process_t_prog
   struct str tmp;
   size_t sz;
   struct t_boundary_prog* t_boundary_prog;
-  struct lib_data* lib_data;
-  int first_seen;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -774,19 +815,12 @@ process_t_prog
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
   /* store the end of line as args for custom init */
-  if(tok_ctx) {
-    ERR(str_set(&t_boundary_prog->args, *tok_ctx));
-  }
+  ERR(set_stripped_args(&t_boundary_prog->args, *tok_ctx));
   /* get the user-defined functions from the library */
-  ERR(get_prog_common(lib_name, stardis, &t_boundary_prog->lib,
-    &t_boundary_prog->create, &t_boundary_prog->release,
-    &t_boundary_prog->get_copyright_notice, &t_boundary_prog->get_license_short,
-    &t_boundary_prog->get_license_text,
-    &lib_data, &first_seen));
+  ERR(get_prog_common(lib_name, stardis, &t_boundary_prog->program,
+    &t_boundary_prog->create, &t_boundary_prog->release));
   GET_LIB_SYMBOL(t_boundary_prog, temperature, stardis_boundary_temperature);
   GET_LIB_SYMBOL(t_boundary_prog, t_range, stardis_t_range);
-  /* create library data if applies */
-  CREATE_LIB_DATA_IF_FIRST(t_boundary_prog);
   /* create and init custom data */
   CREATE_DESC_DATA(t_boundary_prog);
 
@@ -860,7 +894,7 @@ error:
   goto end;
 }
 
-/* F_BOUNDARY_FOR_SOLID_PROG Name Prog_filename STL_filenames [PROG_PARAMS ...] */
+/* F_BOUNDARY_FOR_SOLID_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
 static res_T
 process_flx_prog
   (struct stardis* stardis,
@@ -872,8 +906,6 @@ process_flx_prog
   struct str tmp;
   size_t sz;
   struct f_boundary_prog* f_boundary_prog;
-  struct lib_data* lib_data;
-  int first_seen;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -907,18 +939,11 @@ process_flx_prog
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
   /* store the end of line as args for custom init */
-  if(tok_ctx) {
-    ERR(str_set(&f_boundary_prog->args, *tok_ctx));
-  }
+  ERR(set_stripped_args(&f_boundary_prog->args, *tok_ctx));
   /* get the user-defined functions from the library */
-  ERR(get_prog_common(lib_name, stardis, &f_boundary_prog->lib,
-    &f_boundary_prog->create, &f_boundary_prog->release,
-    &f_boundary_prog->get_copyright_notice, &f_boundary_prog->get_license_short,
-    &f_boundary_prog->get_license_text,
-    &lib_data, &first_seen));
+  ERR(get_prog_common(lib_name, stardis, &f_boundary_prog->program,
+    &f_boundary_prog->create, &f_boundary_prog->release));
   GET_LIB_SYMBOL(f_boundary_prog, flux, stardis_boundary_flux);
-  /* create library data if applies */
-  CREATE_LIB_DATA_IF_FIRST(f_boundary_prog);
   /* create and init custom data */
   CREATE_DESC_DATA(f_boundary_prog);
 
@@ -1018,7 +1043,7 @@ error:
   goto end;
 }
 
-/* SOLID_FLUID_CONNECTION_PROG Name Prog_filename STL_filenames [PROG_PARAMS ...] */
+/* SOLID_FLUID_CONNECTION_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
 static res_T
 process_sfc_prog
   (struct stardis* stardis,
@@ -1030,8 +1055,6 @@ process_sfc_prog
   struct str tmp;
   size_t sz;
   struct solid_fluid_connect_prog* sf_connect_prog;
-  struct lib_data* lib_data;
-  int first_seen;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -1064,23 +1087,16 @@ process_sfc_prog
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
   /* store the end of line as args for custom init */
-  if(tok_ctx) {
-    ERR(str_set(&sf_connect_prog->args, *tok_ctx));
-  }
+  ERR(set_stripped_args(&sf_connect_prog->args, *tok_ctx));
   /* get the user-defined functions from the library */
-  ERR(get_prog_common(lib_name, stardis, &sf_connect_prog->lib,
-    &sf_connect_prog->create, &sf_connect_prog->release,
-    &sf_connect_prog->get_copyright_notice, &sf_connect_prog->get_license_short,
-    &sf_connect_prog->get_license_text,
-    &lib_data, &first_seen));
+  ERR(get_prog_common(lib_name, stardis, &sf_connect_prog->program,
+    &sf_connect_prog->create, &sf_connect_prog->release));
   GET_LIB_SYMBOL(sf_connect_prog, ref_temp, stardis_reference_temperature);
   GET_LIB_SYMBOL(sf_connect_prog, emissivity, stardis_emissivity);
   GET_LIB_SYMBOL(sf_connect_prog, alpha, stardis_specular_fraction);
   GET_LIB_SYMBOL(sf_connect_prog, hc, stardis_convection_coefficient);
   GET_LIB_SYMBOL(sf_connect_prog, hmax, stardis_max_convection_coefficient);
   GET_LIB_SYMBOL(sf_connect_prog, t_range, stardis_t_range);
-  /* create library data if applies */
-  CREATE_LIB_DATA_IF_FIRST(sf_connect_prog);
   /* create and init custom data */
   CREATE_DESC_DATA(sf_connect_prog);
 
@@ -1155,7 +1171,7 @@ error:
   goto end;
 }
 
-/* SOLID_SOLID_CONNECTION_PROG Name Prog_filename STL_filenames [PROG_PARAMS ...] */
+/* SOLID_SOLID_CONNECTION_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
 static res_T
 process_ssc_prog
   (struct stardis* stardis,
@@ -1167,8 +1183,6 @@ process_ssc_prog
   struct str tmp;
   size_t sz;
   struct solid_solid_connect_prog* ss_connect_prog;
-  struct lib_data* lib_data;
-  int first_seen;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -1201,31 +1215,21 @@ process_ssc_prog
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
   /* store the end of line as args for custom init */
-  if(tok_ctx) {
-    ERR(str_set(&ss_connect_prog->args, *tok_ctx));
-  }
+  ERR(set_stripped_args(&ss_connect_prog->args, *tok_ctx));
   /* get the user-defined functions from the library */
-  ERR(get_prog_common(lib_name, stardis, &ss_connect_prog->lib,
-    &ss_connect_prog->create, &ss_connect_prog->release,
-    &ss_connect_prog->get_copyright_notice, &ss_connect_prog->get_license_short,
-    &ss_connect_prog->get_license_text,
-    &lib_data, &first_seen));
+  ERR(get_prog_common(lib_name, stardis, &ss_connect_prog->program,
+    &ss_connect_prog->create, &ss_connect_prog->release));
   GET_LIB_SYMBOL(ss_connect_prog, tcr, stardis_thermal_contact_resistance);
-  *(void**)&ss_connect_prog->tcr
-    = library_get_symbol(ss_connect_prog->lib, "stardis_thermal_contact_resistance");
   if(!ss_connect_prog->tcr) {
     logger_print(stardis->logger, LOG_ERROR,
       "Cannot find function 'stardis_thermal_contact_resistance()' in lib %s\n", lib_name);
     res = RES_BAD_ARG;
     goto error;
   }
-  /* create library data if applies */
-  CREATE_LIB_DATA_IF_FIRST(ss_connect_prog);
   /* create and init custom data */
   CREATE_DESC_DATA(ss_connect_prog);
 
 end:
-  str_release(&tmp);
   return res;
 error:
   goto end;
@@ -1426,7 +1430,7 @@ error:
   goto end;
 }
 
-/* SOLID_PROG Name Prog_filename STL_filenames [PROG_PARAMS ...] */
+/* SOLID_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
 static res_T
 process_solid_prog
   (struct stardis* stardis,
@@ -1438,8 +1442,6 @@ process_solid_prog
   struct str tmp;
   size_t sz;
   struct solid_prog* solid_prog;
-  struct lib_data* lib_data;
-  int first_seen;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -1473,15 +1475,10 @@ process_solid_prog
   ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
 
   /* store the end of line as args for custom init */
-  if(tok_ctx) {
-    ERR(str_set(&solid_prog->args, *tok_ctx));
-  }
+  ERR(set_stripped_args(&solid_prog->args, *tok_ctx));
   /* get the user-defined functions from the library */
-  ERR(get_prog_common(lib_name, stardis, &solid_prog->lib,
-    &solid_prog->create, &solid_prog->release,
-    &solid_prog->get_copyright_notice, &solid_prog->get_license_short,
-    &solid_prog->get_license_text,
-    &lib_data, &first_seen));
+  ERR(get_prog_common(lib_name, stardis, &solid_prog->program,
+    &solid_prog->create, &solid_prog->release));
   GET_LIB_SYMBOL(solid_prog, lambda, stardis_conductivity);
   GET_LIB_SYMBOL(solid_prog, rho, stardis_volumic_mass);
   GET_LIB_SYMBOL(solid_prog, cp, stardis_calorific_capacity);
@@ -1489,8 +1486,6 @@ process_solid_prog
   GET_LIB_SYMBOL(solid_prog, temp, stardis_medium_temperature);
   GET_LIB_SYMBOL(solid_prog, vpower, stardis_volumic_power);
   GET_LIB_SYMBOL(solid_prog, t_range, stardis_t_range);
-  /* create library data if applies */
-  CREATE_LIB_DATA_IF_FIRST(solid_prog);
   /* create and init custom data */
   CREATE_DESC_DATA(solid_prog);
 
@@ -1596,7 +1591,7 @@ error:
   goto end;
 }
 
-/* FLUID_PROG Name Prog_filename STL_filenames [PROG_PARAMS ...] */
+/* FLUID_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
 static res_T
 process_fluid_prog
   (struct stardis* stardis,
@@ -1608,8 +1603,6 @@ process_fluid_prog
   struct str tmp;
   size_t sz;
   struct fluid_prog* fluid_prog;
-  struct lib_data* lib_data;
-  int first_seen;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -1643,21 +1636,14 @@ process_fluid_prog
   ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
 
   /* store the end of line as args for custom init */
-  if(tok_ctx) {
-    ERR(str_set(&fluid_prog->args, *tok_ctx));
-  }
+  ERR(set_stripped_args(&fluid_prog->args, *tok_ctx));
   /* get the user-defined functions from the library */
-  ERR(get_prog_common(lib_name, stardis, &fluid_prog->lib,
-    &fluid_prog->create, &fluid_prog->release,
-    &fluid_prog->get_copyright_notice, &fluid_prog->get_license_short,
-    &fluid_prog->get_license_text,
-    &lib_data, &first_seen));
+  ERR(get_prog_common(lib_name, stardis, &fluid_prog->program,
+    &fluid_prog->create, &fluid_prog->release));
   GET_LIB_SYMBOL(fluid_prog, rho, stardis_volumic_mass);
   GET_LIB_SYMBOL(fluid_prog, cp, stardis_calorific_capacity);
   GET_LIB_SYMBOL(fluid_prog, temp, stardis_medium_temperature);
   GET_LIB_SYMBOL(fluid_prog, t_range, stardis_t_range);
-  /* create library data if applies */
-  CREATE_LIB_DATA_IF_FIRST(fluid_prog);
   /* create and init custom data */
   CREATE_DESC_DATA(fluid_prog);
 
@@ -1823,6 +1809,8 @@ process_model_line
     ERR(process_fluid(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "FLUID_PROG"))
     ERR(process_fluid_prog(stardis, &tok_ctx));
+  else if(0 == strcasecmp(tk, "PROGRAM"))
+    ERR(process_program(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "SCALE"))
     ERR(process_scale(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "TRAD"))

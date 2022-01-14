@@ -23,12 +23,13 @@
 
 struct stardis;
 struct mem_allocator;
+struct program;
 
 /*******************************************************************************
  * Solid prog data
  ******************************************************************************/
 struct solid_prog {
-  void* prog_data; /* result of the init_solid() call */
+  void* prog_data; /* result of the create() call */
   struct str name;
   struct str prog_name;
   struct str args;
@@ -36,12 +37,9 @@ struct solid_prog {
   unsigned desc_id; /* id of the boundary; meaningful if is_outside */
   unsigned solid_id;
   /* lib handle and function ptrs */
-  void* lib;
+  struct program* program;
   void* (*create)(void*, char*);
   void (*release)(void*);
-  const char* (*get_copyright_notice)(void*);
-  const char* (*get_license_short)(void*);
-  const char* (*get_license_text)(void*);
   double (*lambda)(const struct stardis_vertex*, void*);
   double (*rho)(const struct stardis_vertex*, void*);
   double (*cp)(const struct stardis_vertex*, void*);

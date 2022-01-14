@@ -23,12 +23,13 @@
 
 struct stardis;
 struct mem_allocator;
+struct program;
 
 /*******************************************************************************
  * Fluid prog data
  ******************************************************************************/
 struct fluid_prog {
-  void* prog_data; /* result of the init_fluid() call */
+  void* prog_data; /* result of the create() call */
   struct str name;
   struct str prog_name;
   struct str args;
@@ -36,12 +37,9 @@ struct fluid_prog {
   unsigned desc_id; /* id of the boundary; meaningful if is_outside */
   unsigned fluid_id;
   /* lib handle and function ptrs */
-  void* lib;
+  struct program* program;
   void* (*create)(void*, char*);
   void (*release)(void*);
-  const char* (*get_copyright_notice)(void*);
-  const char* (*get_license_short)(void*);
-  const char* (*get_license_text)(void*);
   double (*rho)(const struct stardis_vertex*, void*);
   double (*cp)(const struct stardis_vertex*, void*);
   double (*temp)(const struct stardis_vertex*, void*);
@@ -71,6 +69,6 @@ release_fluid_prog
 res_T
 str_print_fluid_prog
   (struct str* str,
-   const struct fluid_prog* s);
+   const struct fluid_prog* fluid);
 
 #endif

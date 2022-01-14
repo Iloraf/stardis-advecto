@@ -23,22 +23,20 @@
 
 struct stardis;
 struct mem_allocator;
+struct program;
 
 /*******************************************************************************
  * Solid-Solid prog data
  ******************************************************************************/
 struct solid_solid_connect_prog {
-  void* prog_data; /* result of the init_sf_connect() call */
+  void* prog_data; /* result of the create() call */
   struct str name;
   struct str prog_name;
   struct str args;
   /* lib handle and function ptrs */
-  void* lib;
+  struct program* program;
   void* (*create)(void*, char*);
   void (*release)(void*);
-  const char* (*get_copyright_notice)(void*);
-  const char* (*get_license_short)(void*);
-  const char* (*get_license_text)(void*);
   double (*tcr)(const struct stardis_interface_fragment*, void*);
   unsigned connection_id;
 };

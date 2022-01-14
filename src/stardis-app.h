@@ -26,7 +26,6 @@
 #include <rsys/dynamic_array_size_t.h>
 #include <rsys/dynamic_array_uint.h>
 #include <rsys/dynamic_array.h>
-#include <rsys/hash_table.h>
 #include <rsys/str.h>
 
 #include <sdis.h>
@@ -189,20 +188,6 @@ struct compute_surface {
   double area; /* in m2, regardless of scale factor */
 };
 
-/* type to store data for libraries involved in programmed descriptions */
-struct lib_data {
-  void* (*create)();
-  enum stardis_return_status (*finalize)(void*);
-  void (*release)(void*);
-  void* data;
-  size_t count; /* count descriptions references to this library */ 
-};
-
-#define HTABLE_NAME lib_data
-#define HTABLE_DATA struct lib_data
-#define HTABLE_KEY void*
-#include <rsys/hash_table.h>
-
 struct stardis {
   struct dummies dummies; /* dummy meterials for boundaries' outside */
   struct geometry geometry;
@@ -211,7 +196,6 @@ struct stardis {
   struct darray_media_ptr media;
   struct senc3d_scene* senc3d_scn;
   struct counts counts;
-  struct htable_lib_data lib_data;
 
   double probe[3]; /* x,y,z of probe when mode is PROBE_COMPUTE */
   double time_range[2]; /* compute time */

@@ -500,7 +500,12 @@ get_prog_common
   str_init(stardis->allocator, &tmp);
   ERR(str_set(&tmp, lib_name));
   desc = find_description_by_name(stardis, &tmp, NULL);
-  CHK(desc); /* must be found */
+  if(!desc) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Undefined PROGRAM: %s\n", lib_name);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
   *program = desc->d.program;
   /* get the mandatory user-defined functions from the library */
   GET_LIB_SYMBOL_BASE(create, (*program)->lib_handle, stardis_create_data, 0);
@@ -553,10 +558,10 @@ process_program
   ERR(str_set(&program->lib_path, tk));
 
   /* get the library handler */
-  program->lib_handle = library_open(str_cget(&program->lib_path));
+  program->lib_handle = library_open(tk);
   if(!program->lib_handle) {
     logger_print(stardis->logger, LOG_ERROR,
-      "Cannot open library: %s\n", lib_name);
+      "Cannot open library: %s (%s)\n", lib_name, tk);
     res = RES_BAD_ARG;
     goto error;
   }

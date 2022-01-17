@@ -16,6 +16,7 @@
 #define _POSIX_C_SOURCE 200809L /* strdup */
 #include "stardis-parsing.h"
 #include "stardis-app.h"
+#include "stardis-prog.h"
 #include "stardis-args.h"
 #include "stardis-description.h"
 #include "stardis-hbound.h"
@@ -674,9 +675,7 @@ process_h_prog
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
   /* store the end of line as args for custom init */
-  if(tok_ctx) {
-    ERR(str_set(&h_boundary_prog->args, *tok_ctx));
-  }
+  ERR(set_stripped_args(&h_boundary_prog->args, *tok_ctx));
   /* get the user-defined functions from the library */
   ERR(get_prog_common(lib_name, stardis,  &h_boundary_prog->program,
     &h_boundary_prog->create, &h_boundary_prog->release));
@@ -685,8 +684,12 @@ process_h_prog
   GET_LIB_SYMBOL(h_boundary_prog, alpha, stardis_specular_fraction);
   GET_LIB_SYMBOL(h_boundary_prog, hc, stardis_convection_coefficient);
   GET_LIB_SYMBOL(h_boundary_prog, hmax, stardis_max_convection_coefficient);
-  GET_LIB_SYMBOL(h_boundary_prog, boundary_temp, stardis_boundary_temperature);
   GET_LIB_SYMBOL(h_boundary_prog, t_range, stardis_t_range);
+  if(type == DESC_BOUND_H_FOR_FLUID_PROG) {
+    GET_LIB_SYMBOL(h_boundary_prog, boundary_temp, stardis_boundary_temperature);
+  } else {
+    GET_LIB_SYMBOL(h_boundary_prog, fluid_temp, stardis_medium_temperature);
+  }
   /* create and init custom data */
   CREATE_DESC_DATA(h_boundary_prog);
 

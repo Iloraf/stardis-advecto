@@ -470,7 +470,7 @@ set_stripped_args
 #define CREATE_DESC_DATA_BASE(Desc, CreateArgs) \
   /* duplicate args to allow to modify them */ \
   ERR(str_copy(&tmp, &(Desc)->args)); \
-  (Desc)->prog_data = (Desc)->create(CreateArgs); \
+  (Desc)->prog_data = (Desc)->create(&ctx, CreateArgs); \
   if(!(Desc)->prog_data) { \
     logger_print(stardis->logger, LOG_ERROR, \
       "Cannot create data for description %s\n", str_cget(&(Desc)->name)); \
@@ -488,7 +488,8 @@ get_prog_common
   (const char* lib_name,
    struct stardis* stardis,
    struct program** program,
-   void* (**create)(void*, char*),
+   void* (**create)
+     (const struct stardis_description_create_context*, void*, char*),
    void (**release)(void*))
 {
   res_T res = RES_OK;
@@ -598,7 +599,10 @@ process_program
   ERR(set_stripped_args(&program->args, *tok_ctx));
   if(program->create) {
     /* create and init custom data */
-    CREATE_DESC_DATA_BASE(program, str_get(&tmp));
+    struct stardis_program_context ctx;
+    ctx.name = lib_name;
+    ctx.verbosity_level = stardis->verbose;
+    CREATE_DESC_DATA_BASE(program, LIST_ARG1(str_get(&tmp)));
   } else if(!str_is_empty(&program->args)) {
     logger_print(stardis->logger, LOG_ERROR,
       "Library '%s' has no custom data management functions but has arguments.\n",
@@ -640,10 +644,11 @@ process_h_prog
 {
   char* tk = NULL;
   struct description* desc;
-  const char* lib_name;
+  const char *lib_name, *desc_name;
   struct str tmp;
   size_t sz;
   struct h_boundary_prog* h_boundary_prog;
+  struct stardis_description_create_context ctx;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -666,6 +671,7 @@ process_h_prog
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  desc_name = tk;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
   ERR(str_set(&h_boundary_prog->prog_name, tk));
@@ -691,6 +697,7 @@ process_h_prog
     GET_LIB_SYMBOL(h_boundary_prog, fluid_temp, stardis_medium_temperature);
   }
   /* create and init custom data */
+  ctx.name = desc_name;
   CREATE_DESC_DATA(h_boundary_prog);
 
   h_boundary_prog->t_range(h_boundary_prog->prog_data, stardis->t_range);
@@ -786,10 +793,11 @@ process_t_prog
 {
   char* tk = NULL;
   struct description* desc;
-  const char* lib_name;
+  const char *lib_name, *desc_name;
   struct str tmp;
   size_t sz;
   struct t_boundary_prog* t_boundary_prog;
+  struct stardis_description_create_context ctx;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -814,6 +822,7 @@ process_t_prog
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  desc_name = tk;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
   ERR(str_set(&t_boundary_prog->prog_name, tk));
@@ -830,6 +839,7 @@ process_t_prog
   GET_LIB_SYMBOL(t_boundary_prog, temperature, stardis_boundary_temperature);
   GET_LIB_SYMBOL(t_boundary_prog, t_range, stardis_t_range);
   /* create and init custom data */
+  ctx.name = desc_name;
   CREATE_DESC_DATA(t_boundary_prog);
 
   t_boundary_prog->t_range(t_boundary_prog->prog_data, stardis->t_range);
@@ -910,10 +920,11 @@ process_flx_prog
 {
   char* tk = NULL;
   struct description* desc;
-  const char* lib_name;
+  const char *lib_name, *desc_name;
   struct str tmp;
   size_t sz;
   struct f_boundary_prog* f_boundary_prog;
+  struct stardis_description_create_context ctx;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -941,6 +952,8 @@ process_flx_prog
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
   ERR(str_set(&f_boundary_prog->prog_name, tk));
+  desc_name = tk;
+  desc_name = tk;
   lib_name = tk;
 
   ASSERT(sz <= UINT_MAX);
@@ -953,6 +966,7 @@ process_flx_prog
     &f_boundary_prog->create, &f_boundary_prog->release));
   GET_LIB_SYMBOL(f_boundary_prog, flux, stardis_boundary_flux);
   /* create and init custom data */
+  ctx.name = desc_name;
   CREATE_DESC_DATA(f_boundary_prog);
 
 end:
@@ -1059,10 +1073,11 @@ process_sfc_prog
 {
   char* tk = NULL;
   struct description* desc;
-  const char* lib_name;
+  const char *lib_name, *desc_name;
   struct str tmp;
   size_t sz;
   struct solid_fluid_connect_prog* sf_connect_prog;
+  struct stardis_description_create_context ctx;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -1086,6 +1101,7 @@ process_sfc_prog
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  desc_name = tk;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
   ERR(str_set(&sf_connect_prog->prog_name, tk));
@@ -1106,6 +1122,7 @@ process_sfc_prog
   GET_LIB_SYMBOL(sf_connect_prog, hmax, stardis_max_convection_coefficient);
   GET_LIB_SYMBOL(sf_connect_prog, t_range, stardis_t_range);
   /* create and init custom data */
+  ctx.name = desc_name;
   CREATE_DESC_DATA(sf_connect_prog);
 
   sf_connect_prog->t_range(sf_connect_prog->prog_data, stardis->t_range);
@@ -1187,10 +1204,11 @@ process_ssc_prog
 {
   char* tk = NULL;
   struct description* desc;
-  const char* lib_name;
+  const char *lib_name, *desc_name;
   struct str tmp;
   size_t sz;
   struct solid_solid_connect_prog* ss_connect_prog;
+  struct stardis_description_create_context ctx;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -1214,6 +1232,7 @@ process_ssc_prog
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  desc_name = tk;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
   ERR(str_set(&ss_connect_prog->prog_name, tk));
@@ -1235,6 +1254,7 @@ process_ssc_prog
     goto error;
   }
   /* create and init custom data */
+  ctx.name = desc_name;
   CREATE_DESC_DATA(ss_connect_prog);
 
 end:
@@ -1446,10 +1466,11 @@ process_solid_prog
 {
   char* tk = NULL;
   struct description* desc;
-  const char* lib_name;
+  const char *lib_name, *desc_name;
   struct str tmp;
   size_t sz;
   struct solid_prog* solid_prog;
+  struct stardis_description_create_context ctx;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -1475,6 +1496,7 @@ process_solid_prog
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  desc_name = tk;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
   ERR(str_set(&solid_prog->prog_name, tk));
@@ -1495,6 +1517,7 @@ process_solid_prog
   GET_LIB_SYMBOL(solid_prog, vpower, stardis_volumic_power);
   GET_LIB_SYMBOL(solid_prog, t_range, stardis_t_range);
   /* create and init custom data */
+  ctx.name = desc_name;
   CREATE_DESC_DATA(solid_prog);
 
   solid_prog->t_range(solid_prog->prog_data, stardis->t_range);
@@ -1607,10 +1630,11 @@ process_fluid_prog
 {
   char* tk = NULL;
   struct description* desc;
-  const char* lib_name;
+  const char *lib_name, *desc_name;
   struct str tmp;
   size_t sz;
   struct fluid_prog* fluid_prog;
+  struct stardis_description_create_context ctx;
   res_T res = RES_OK;
 
   ASSERT(stardis && tok_ctx);
@@ -1636,6 +1660,7 @@ process_fluid_prog
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  desc_name = tk;
 
   CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
   ERR(str_set(&fluid_prog->prog_name, tk));
@@ -1653,6 +1678,7 @@ process_fluid_prog
   GET_LIB_SYMBOL(fluid_prog, temp, stardis_medium_temperature);
   GET_LIB_SYMBOL(fluid_prog, t_range, stardis_t_range);
   /* create and init custom data */
+  ctx.name = desc_name;
   CREATE_DESC_DATA(fluid_prog);
 
   fluid_prog->t_range(fluid_prog->prog_data, stardis->t_range);

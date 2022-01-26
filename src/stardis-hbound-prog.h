@@ -36,7 +36,8 @@ struct h_boundary_prog {
   struct str args;
   /* lib handle and function ptrs */
   struct program* program;
-  void* (*create)(void*, char*);
+  void* (*create)
+    (const struct stardis_description_create_context*, void*, char*);
   void (*release)(void*);
   double (*ref_temp)(const struct stardis_interface_fragment*, void*);
   double (*emissivity)(const struct stardis_interface_fragment*, void*);

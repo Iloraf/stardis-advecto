@@ -75,6 +75,8 @@ enum description_type {
 #define DESC_IS_SOLID_SOLID(D) \
   ((D)->type == DESC_SOLID_SOLID_CONNECT \
     || (D)->type == DESC_SOLID_SOLID_CONNECT_PROG)
+#define DESC_IS_CONNECTION(D) \
+  (DESC_IS_SOLID_FLUID(D) || DESC_IS_SOLID_SOLID(D))
 #define DESC_IS_PROG(D) \
   ((D)->type == DESC_MAT_SOLID_PROG || (D)->type == DESC_MAT_FLUID_PROG \
     || (D)->type == DESC_BOUND_H_FOR_FLUID_PROG \

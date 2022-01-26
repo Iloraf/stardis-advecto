@@ -37,7 +37,7 @@ struct program {
   const char* (*get_copyright_notice)(void*);
   const char* (*get_license_short)(void*);
   const char* (*get_license_text)(void*);
-  void* (*create)(char* args);
+  void* (*create)(struct stardis_program_context*, char*);
   enum stardis_return_status (*finalize)(void*);
   void (*release)(void*);
 };

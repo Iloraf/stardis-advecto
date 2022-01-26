@@ -38,7 +38,8 @@ struct solid_prog {
   unsigned solid_id;
   /* lib handle and function ptrs */
   struct program* program;
-  void* (*create)(void*, char*);
+  void* (*create)
+    (const struct stardis_description_create_context*, void*, char*);
   void (*release)(void*);
   double (*lambda)(const struct stardis_vertex*, void*);
   double (*rho)(const struct stardis_vertex*, void*);

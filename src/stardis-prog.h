@@ -50,6 +50,22 @@ enum stardis_return_status {
   STARDIS_FAILURE
 };
 
+enum stardis_verbosity_levels {
+  STARDIS_VERBOSE_NONE,
+  STARDIS_VERBOSE_ERROR,
+  STARDIS_VERBOSE_WARNING,
+  STARDIS_VERBOSE_INFO
+};
+
+struct stardis_program_context {
+  const char* name; /* Program name */
+  enum stardis_verbosity_levels verbosity_level;
+};
+
+struct stardis_description_create_context {
+  const char* name; /* Description name */
+};
+
 /******************************************************************************/
 /* Optional functions for any programmed library.                             */
 /* Either all 3 or none of the 3 following functions must be defined.         */
@@ -59,10 +75,13 @@ enum stardis_return_status {
 /* Create the data attached to a given libray.
  * A NULL result is interpreted as an error and ends the program.
  * This function is called the first time a description using this library is
- * processed. */
+ * processed.
+ * Args is the end of the description line that was following the library path
+ * (if any). */
 extern void*
 stardis_create_library_data
-  ();
+  (const struct stardis_program_context* ctx,
+   char* args);
 
 /* Finalize the data created by the successive stardis_create_data calls for
  * the descriptions created using this library.
@@ -95,10 +114,11 @@ stardis_release_library_data
  * Data is the pointer returned by stardis_create_library_data for the library
  * or NULL if stardis_create_library_data is not defined.
  * Args is the end of the description line that was following the PROG_PARAM
- * keyword. */
+ * keyword (if any). */
 extern void*
 stardis_create_data
-  (void* data,
+  (const struct stardis_description_create_context *ctx,
+   void* data,
    char* args);
 
 /* Release the data created by stardis_create_data.

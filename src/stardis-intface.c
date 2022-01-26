@@ -238,16 +238,16 @@ create_intface
    struct htable_intface* htable_interfaces)
 {
   struct int_descs int_descs = INT_DESCS_NULL;
-  struct sdis_interface** p_intface;
-  struct sdis_interface* intface;
+  struct sdis_interface** pp_intface;
+  struct sdis_interface* p_intface;
   struct sdis_medium* front_med = NULL;
   struct sdis_medium* back_med = NULL;
   struct sdis_interface_side_shader* fluid_side_shader = NULL;
   struct sdis_data* data = NULL;
-  unsigned fd, bd, cd, descr[SG3D_PROP_TYPES_COUNT__];
+  unsigned fd, bd, id, descr[SG3D_PROP_TYPES_COUNT__];
   int fluid_count = 0, solid_count = 0;
   int solid_fluid_connection_count = 0, solid_solid_connection_count = 0;
-  int connection_count = 0, boundary_count = 0, prog_count = 0;
+  int intface_count = 0, boundary_count = 0, prog_count = 0;
   const struct description* descriptions;
   struct sdis_medium** media;
   res_T res = RES_OK;
@@ -264,20 +264,20 @@ create_intface
   /* Create key */
   int_descs.front = fd = descr[SG3D_FRONT];
   int_descs.back = bd = descr[SG3D_BACK];
-  int_descs.connect = cd = descr[SG3D_INTFACE];
+  int_descs.intface = id = descr[SG3D_INTFACE];
 
   /* Search if interface already exists, or create it */
-  p_intface = htable_intface_find(htable_interfaces, &int_descs);
-  if(p_intface) {
-    intface = *p_intface;
+  pp_intface = htable_intface_find(htable_interfaces, &int_descs);
+  if(pp_intface) {
+    p_intface = *pp_intface;
   } else {
     /* create new interface and register */
     struct sdis_interface_shader interface_shader = SDIS_INTERFACE_SHADER_NULL;
     struct intface* interface_props = NULL;
-    unsigned id;
+    unsigned mid;
     int front_defined = (fd != SG3D_UNSPECIFIED_PROPERTY);
     int back_defined = (bd != SG3D_UNSPECIFIED_PROPERTY);
-    int connect_defined = (cd != SG3D_UNSPECIFIED_PROPERTY);
+    int intface_defined = (id != SG3D_UNSPECIFIED_PROPERTY);
 
     ERR(sdis_data_create(stardis->dev, sizeof(struct intface),
       ALIGNOF(struct intface), NULL, &data));
@@ -296,10 +296,14 @@ create_intface
     interface_props->get_tcr = NULL;
     interface_props->prog_data = NULL;
 
+    if(fluid_count == 2) {
+      res = RES_BAD_ARG;
+      goto error;
+    }
     if(front_defined) {
-      description_get_medium_id(&descriptions[fd], &id);
-      interface_props->front_medium_id = id;
-      front_med = media[id];
+      description_get_medium_id(&descriptions[fd], &mid);
+      interface_props->front_medium_id = mid;
+      front_med = media[mid];
       switch (descriptions[fd].type) {
       case DESC_MAT_SOLID_PROG:
         prog_count++;
@@ -319,9 +323,9 @@ create_intface
       }
     }
     if(back_defined) {
-      description_get_medium_id(&descriptions[bd], &id);
-      interface_props->back_medium_id = id;
-      back_med = media[id];
+      description_get_medium_id(&descriptions[bd], &mid);
+      interface_props->back_medium_id = mid;
+      back_med = media[mid];
       switch (descriptions[bd].type) {
       case DESC_MAT_SOLID_PROG:
         prog_count++;
@@ -334,80 +338,67 @@ create_intface
       /* fall through */
       case DESC_MAT_FLUID:
         fluid_count++;
-        /* Can overwrite fluid_side_shader. However it would imply two
-         * fluids and this case lead to an error */
+        /* cannot overwrite as the 2-fluid case is an error */
         fluid_side_shader = &interface_shader.back;
         break;
       default:
         FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
       }
     }
-    if(fluid_count == 2) {
-      res = RES_BAD_ARG;
-      goto error;
-    }
-    if(connect_defined) {
-      const struct description* connect = descriptions + cd;
+    if(intface_defined) {
+      const struct description* intface = descriptions + id;
       int for_fluid = 0;
       struct sdis_medium* def_medium = NULL;
       unsigned ext_id;
-      if(!DESC_IS_SOLID_FLUID(connect)
-          && !DESC_IS_SOLID_SOLID(connect)
-          && front_defined == back_defined)
-      {
-        /* 1 and only 1 defined */
+      if(!DESC_IS_CONNECTION(intface) && front_defined == back_defined) {
+        /* not connection implies 1 and only 1 side defined */
         res = RES_BAD_ARG;
         goto error;
       }
-      if(front_defined) {
-        def_medium = front_med;
-        fluid_side_shader = DESC_IS_FLUID(descriptions+fd)
-          ? &interface_shader.front : &interface_shader.back;
-      } else {
-        ASSERT(back_defined);
-        def_medium = back_med;
-        fluid_side_shader = DESC_IS_FLUID(descriptions+bd)
-          ? &interface_shader.back : &interface_shader.front;
-      }
-      interface_props->desc_id = cd;
-      switch(connect->type) {
+      /* meaningless if connection (but unused in this case) */
+      def_medium = front_defined ? front_med : back_med;
+      interface_props->desc_id = id;
+      switch(intface->type) {
       case DESC_BOUND_H_FOR_FLUID:
         if(sdis_medium_get_type(def_medium) != SDIS_FLUID) {
           res = RES_BAD_ARG;
           goto error;
         }
         for_fluid = 1;
-        ASSERT(connect->d.h_boundary->imposed_temperature >= 0);
+        ASSERT(intface->d.h_boundary->imposed_temperature >= 0);
         interface_props->imposed_temperature
-          = connect->d.h_boundary->imposed_temperature;
+          = intface->d.h_boundary->imposed_temperature;
         ASSERT(fluid_side_shader);
         fluid_side_shader->temperature = interface_get_temperature;
         /* fall through */
       case DESC_BOUND_H_FOR_SOLID:
-        if(!for_fluid
-          &&  sdis_medium_get_type(def_medium) != SDIS_SOLID)
-        {
-          res = RES_BAD_ARG; goto error;
+        if(!for_fluid) {
+          if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
+            res = RES_BAD_ARG;
+            goto error;
+          }
+          ASSERT(!fluid_side_shader);
+          fluid_side_shader =
+            front_defined ? &interface_shader.back : &interface_shader.front;
         }
-        ext_id = connect->d.h_boundary->mat_id; /* External material id */
+        ext_id = intface->d.h_boundary->mat_id; /* External material id */
         ASSERT(ext_id < darray_media_ptr_size_get(&stardis->media));
         ASSERT(sdis_medium_get_type(media[ext_id]) ==
           (for_fluid ? SDIS_SOLID : SDIS_FLUID));
-        connection_count++;
+        intface_count++;
         boundary_count++;
         if(front_defined) back_med = media[ext_id];
         else front_med = media[ext_id];
-        interface_shader.convection_coef_upper_bound = connect->d.h_boundary->hc;
-        interface_props->hc = connect->d.h_boundary->hc;
-        interface_props->ref_temperature = connect->d.h_boundary->ref_temperature;
-        interface_props->emissivity = connect->d.h_boundary->emissivity;
-        interface_props->alpha = connect->d.h_boundary->specular_fraction;
-        if(connect->d.h_boundary->hc > 0) {
+        interface_shader.convection_coef_upper_bound = intface->d.h_boundary->hc;
+        interface_props->hc = intface->d.h_boundary->hc;
+        interface_props->ref_temperature = intface->d.h_boundary->ref_temperature;
+        interface_props->emissivity = intface->d.h_boundary->emissivity;
+        interface_props->alpha = intface->d.h_boundary->specular_fraction;
+        if(intface->d.h_boundary->hc > 0) {
           interface_shader.convection_coef = interface_get_convection_coef;
         }
-        ASSERT(fluid_side_shader);
         fluid_side_shader->reference_temperature = interface_get_ref_temperature;
-        if(connect->d.h_boundary->emissivity > 0) {
+        if(intface->d.h_boundary->emissivity > 0) {
           fluid_side_shader->emissivity = interface_get_emissivity;
           fluid_side_shader->specular_fraction = interface_get_alpha;
         }
@@ -418,50 +409,55 @@ create_intface
           goto error;
         }
         for_fluid = 1;
+        interface_props->get_temp = intface->d.h_boundary_prog->boundary_temp;
         ASSERT(fluid_side_shader);
         fluid_side_shader->temperature = intface_prog_get_temp;
         /* fall through */
       case DESC_BOUND_H_FOR_SOLID_PROG:
-        if(!for_fluid
-          &&  sdis_medium_get_type(def_medium) != SDIS_SOLID)
-        {
-          res = RES_BAD_ARG; goto error;
+        if(!for_fluid) {
+          if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
+            res = RES_BAD_ARG;
+            goto error;
+          }
+          ASSERT(!fluid_side_shader);
+          fluid_side_shader =
+            front_defined ? &interface_shader.back : &interface_shader.front;
         }
-        ext_id = connect->d.h_boundary_prog->mat_id; /* External material id */
+        ext_id = intface->d.h_boundary_prog->mat_id; /* External material id */
         ASSERT(ext_id < darray_media_ptr_size_get(&stardis->media));
         ASSERT(sdis_medium_get_type(media[ext_id]) ==
           (for_fluid ? SDIS_SOLID : SDIS_FLUID));
         prog_count++;
-        connection_count++;
+        intface_count++;
         boundary_count++;
         if(front_defined) back_med = media[ext_id];
         else front_med = media[ext_id];
         interface_shader.convection_coef_upper_bound
-          = h_bound_prog_get_hmax(connect->d.h_boundary_prog);
+          = h_bound_prog_get_hmax(intface->d.h_boundary_prog);
         ASSERT(interface_shader.convection_coef_upper_bound >= 0);
         interface_shader.convection_coef
           = intface_prog_get_hc;
-        ASSERT(fluid_side_shader);
         fluid_side_shader->reference_temperature
           = intface_prog_get_ref_temp;
         fluid_side_shader->emissivity = intface_prog_get_emissivity;
         fluid_side_shader->specular_fraction = intface_prog_get_alpha;
-        interface_props->get_temp = connect->d.h_boundary_prog->boundary_temp;
-        interface_props->get_hc = connect->d.h_boundary_prog->hc;
-        interface_props->get_emissivity = connect->d.h_boundary_prog->emissivity;
-        interface_props->get_alpha = connect->d.h_boundary_prog->alpha;
-        interface_props->get_ref_temp = connect->d.h_boundary_prog->ref_temp;
-        interface_props->prog_data = connect->d.h_boundary_prog->prog_data;
+        interface_props->get_hc = intface->d.h_boundary_prog->hc;
+        interface_props->get_emissivity = intface->d.h_boundary_prog->emissivity;
+        interface_props->get_alpha = intface->d.h_boundary_prog->alpha;
+        interface_props->get_ref_temp = intface->d.h_boundary_prog->ref_temp;
+        interface_props->prog_data = intface->d.h_boundary_prog->prog_data;
         break;
       case DESC_BOUND_T_FOR_SOLID:
         if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
           res = RES_BAD_ARG;
           goto error;
         }
-        ext_id = connect->d.t_boundary->mat_id; /* External material id */
+        fluid_side_shader =
+          front_defined ? &interface_shader.back : &interface_shader.front;
+        ext_id = intface->d.t_boundary->mat_id; /* External material id */
         ASSERT(ext_id < darray_media_ptr_size_get(&stardis->media));
         ASSERT(sdis_medium_get_type(media[ext_id]) == SDIS_FLUID);
-        connection_count++;
+        intface_count++;
         boundary_count++;
         if(front_defined) {
           ASSERT(!back_med);
@@ -475,23 +471,24 @@ create_intface
         interface_shader.back.temperature = interface_get_temperature;
         /* Set emissivity to 1 to allow radiative paths comming from
          * a possible external fluid to 'see' the imposed T */
-        ASSERT(fluid_side_shader);
         fluid_side_shader->emissivity = interface_get_emissivity;
         interface_props->emissivity = 1;
-        ASSERT(connect->d.t_boundary->imposed_temperature >= 0);
+        ASSERT(intface->d.t_boundary->imposed_temperature >= 0);
         interface_props->imposed_temperature
-          = connect->d.t_boundary->imposed_temperature;
+          = intface->d.t_boundary->imposed_temperature;
         break;
       case DESC_BOUND_T_FOR_SOLID_PROG:
         if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
           res = RES_BAD_ARG;
           goto error;
         }
-        ext_id = connect->d.t_boundary_prog->mat_id; /* External material id */
+        fluid_side_shader =
+          front_defined ? &interface_shader.back : &interface_shader.front;
+        ext_id = intface->d.t_boundary_prog->mat_id; /* External material id */
         ASSERT(ext_id < darray_media_ptr_size_get(&stardis->media));
         ASSERT(sdis_medium_get_type(media[ext_id]) == SDIS_FLUID);
         prog_count++;
-        connection_count++;
+        intface_count++;
         boundary_count++;
         if(front_defined) {
           ASSERT(!back_med);
@@ -505,28 +502,27 @@ create_intface
         interface_shader.back.temperature = intface_prog_get_temp;
         /* Set emissivity to 1 to allow radiative paths comming from
          * a possible external fluid to 'see' the imposed T */
-        ASSERT(fluid_side_shader);
         fluid_side_shader->emissivity = interface_get_emissivity;
         interface_props->get_emissivity = emissivity_1;
-        interface_props->get_temp = connect->d.t_boundary_prog->temperature;
-        interface_props->prog_data = connect->d.t_boundary_prog->prog_data;
+        interface_props->get_temp = intface->d.t_boundary_prog->temperature;
+        interface_props->prog_data = intface->d.t_boundary_prog->prog_data;
         break;
       case DESC_BOUND_F_FOR_SOLID:
         if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
           res = RES_BAD_ARG;
           goto error;
         }
-        connection_count++;
+        intface_count++;
         boundary_count++;
         if(front_defined) {
-          back_med = media[connect->d.f_boundary->mat_id];
+          back_med = media[intface->d.f_boundary->mat_id];
           interface_shader.front.flux = interface_get_flux;
         } else {
-          front_med = media[connect->d.f_boundary->mat_id];
+          front_med = media[intface->d.f_boundary->mat_id];
           interface_shader.back.flux = interface_get_flux;
         }
-        ASSERT(connect->d.f_boundary->imposed_flux != SDIS_FLUX_NONE);
-        interface_props->imposed_flux = connect->d.f_boundary->imposed_flux;
+        ASSERT(intface->d.f_boundary->imposed_flux != SDIS_FLUX_NONE);
+        interface_props->imposed_flux = intface->d.f_boundary->imposed_flux;
         break;
       case DESC_BOUND_F_FOR_SOLID_PROG:
         if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
@@ -534,17 +530,17 @@ create_intface
           goto error;
         }
         prog_count++;
-        connection_count++;
+        intface_count++;
         boundary_count++;
         if(front_defined) {
-          back_med = media[connect->d.f_boundary_prog->mat_id];
+          back_med = media[intface->d.f_boundary_prog->mat_id];
           interface_shader.front.flux = intface_prog_get_flux;
         } else {
-          front_med = media[connect->d.f_boundary_prog->mat_id];
+          front_med = media[intface->d.f_boundary_prog->mat_id];
           interface_shader.back.flux = intface_prog_get_flux;
         }
-        interface_props->get_flux = connect->d.f_boundary_prog->flux;
-        interface_props->prog_data = connect->d.f_boundary_prog->prog_data;
+        interface_props->get_flux = intface->d.f_boundary_prog->flux;
+        interface_props->prog_data = intface->d.f_boundary_prog->prog_data;
         break;
       case DESC_SOLID_FLUID_CONNECT:
         /* Both front and back should be defined */
@@ -553,19 +549,19 @@ create_intface
           goto error;
         }
         ASSERT(front_defined && back_defined);
-        connection_count++;
+        intface_count++;
         solid_fluid_connection_count++;
-        interface_shader.convection_coef_upper_bound = connect->d.sf_connect->hc;
-        interface_props->hc = connect->d.sf_connect->hc;
-        interface_props->ref_temperature = connect->d.sf_connect->ref_temperature;
-        interface_props->emissivity = connect->d.sf_connect->emissivity;
-        interface_props->alpha = connect->d.sf_connect->specular_fraction;
-        if(connect->d.sf_connect->hc > 0) {
+        interface_shader.convection_coef_upper_bound = intface->d.sf_connect->hc;
+        interface_props->hc = intface->d.sf_connect->hc;
+        interface_props->ref_temperature = intface->d.sf_connect->ref_temperature;
+        interface_props->emissivity = intface->d.sf_connect->emissivity;
+        interface_props->alpha = intface->d.sf_connect->specular_fraction;
+        if(intface->d.sf_connect->hc > 0) {
           interface_shader.convection_coef = interface_get_convection_coef;
         }
         ASSERT(fluid_side_shader);
         fluid_side_shader->reference_temperature = interface_get_ref_temperature;
-        if(connect->d.sf_connect->emissivity > 0) {
+        if(intface->d.sf_connect->emissivity > 0) {
           fluid_side_shader->emissivity = interface_get_emissivity;
           fluid_side_shader->specular_fraction = interface_get_alpha;
         }
@@ -578,22 +574,22 @@ create_intface
         }
         ASSERT(front_defined && back_defined);
         prog_count++;
-        connection_count++;
+        intface_count++;
         solid_fluid_connection_count++;
         interface_shader.convection_coef_upper_bound
-          = sf_connect_prog_get_hmax(connect->d.sf_connect_prog);
+          = sf_connect_prog_get_hmax(intface->d.sf_connect_prog);
         ASSERT(interface_shader.convection_coef_upper_bound >= 0);
-        interface_props->get_ref_temp = connect->d.sf_connect_prog->ref_temp;
-        interface_props->get_hc = connect->d.sf_connect_prog->hc;
+        interface_props->get_ref_temp = intface->d.sf_connect_prog->ref_temp;
+        interface_props->get_hc = intface->d.sf_connect_prog->hc;
         interface_props->get_emissivity
-          = connect->d.sf_connect_prog->emissivity;
-        interface_props->get_alpha = connect->d.sf_connect_prog->alpha;
+          = intface->d.sf_connect_prog->emissivity;
+        interface_props->get_alpha = intface->d.sf_connect_prog->alpha;
         interface_shader.convection_coef = intface_prog_get_hc;
         ASSERT(fluid_side_shader);
         fluid_side_shader->emissivity = intface_prog_get_emissivity;
         fluid_side_shader->specular_fraction = intface_prog_get_alpha;
         fluid_side_shader->reference_temperature = intface_prog_get_ref_temp;
-        interface_props->prog_data = connect->d.sf_connect_prog->prog_data;
+        interface_props->prog_data = intface->d.sf_connect_prog->prog_data;
         break;
       case DESC_SOLID_SOLID_CONNECT:
         /* Both front and back should be defined */
@@ -602,10 +598,10 @@ create_intface
           goto error;
         }
         ASSERT(front_defined && back_defined);
-        connection_count++;
+        intface_count++;
         solid_solid_connection_count++;
-        interface_props->tcr = connect->d.ss_connect->tcr;
-        if(connect->d.ss_connect->tcr > 0) {
+        interface_props->tcr = intface->d.ss_connect->tcr;
+        if(intface->d.ss_connect->tcr > 0) {
           interface_shader.thermal_contact_resistance = interface_get_tcr;
         }
         break;
@@ -617,18 +613,18 @@ create_intface
         }
         ASSERT(front_defined && back_defined);
         prog_count++;
-        connection_count++;
+        intface_count++;
         solid_solid_connection_count++;
-        interface_props->get_tcr = connect->d.ss_connect_prog->tcr;
+        interface_props->get_tcr = intface->d.ss_connect_prog->tcr;
         interface_shader.thermal_contact_resistance = intface_prog_get_tcr;
-        interface_props->prog_data = connect->d.ss_connect_prog->prog_data;
+        interface_props->prog_data = intface->d.ss_connect_prog->prog_data;
         break;
       default:
         FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
       }
     }
 
-    if((fluid_count + solid_count + connection_count < 2)
+    if((fluid_count + solid_count + intface_count < 2)
       || (boundary_count && (fluid_count + solid_count != 1)))
     {
       res = RES_BAD_ARG;
@@ -636,12 +632,12 @@ create_intface
     }
 
     ERR(sdis_interface_create(stardis->dev, front_med, back_med,
-      &interface_shader, data, &intface));
+      &interface_shader, data, &p_intface));
     SDIS(data_ref_put(data)); data = NULL;
-    ERR(darray_interface_ptrs_push_back(&stardis->geometry.interfaces, &intface));
-    ERR(htable_intface_set(htable_interfaces, &int_descs, &intface));
+    ERR(darray_interface_ptrs_push_back(&stardis->geometry.interfaces, &p_intface));
+    ERR(htable_intface_set(htable_interfaces, &int_descs, &p_intface));
   }
-  ERR(darray_interface_ptrs_push_back(&stardis->geometry.interf_bytrg, &intface));
+  ERR(darray_interface_ptrs_push_back(&stardis->geometry.interf_bytrg, &p_intface));
 
 end:
   if(data) SDIS(data_ref_put(data));

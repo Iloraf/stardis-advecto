@@ -53,7 +53,7 @@ struct intface {
 
 /* Declare the hash table that map an interface to its descriptor */
 struct int_descs {
-  unsigned front, back, connect;
+  unsigned front, back, intface;
 };
 #define INT_DESCS_NULL__ { UINT_MAX, UINT_MAX, UINT_MAX }
 static const struct int_descs INT_DESCS_NULL = INT_DESCS_NULL__;
@@ -62,7 +62,7 @@ static INLINE char
 eq_desc(const struct int_descs* a, const struct int_descs* b)
 {
   return (char)(a->front == b->front && a->back == b->back
-    && a->connect == b->connect);
+    && a->intface == b->intface);
 }
 
 #define HTABLE_NAME intface

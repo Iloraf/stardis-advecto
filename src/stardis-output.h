@@ -97,7 +97,7 @@ print_single_MC_result
    struct stardis* stardis,
    FILE* stream);
 
-extern void
+extern res_T
 dump_map
   (const struct stardis* stardis,
    const struct darray_estimators* estimators,

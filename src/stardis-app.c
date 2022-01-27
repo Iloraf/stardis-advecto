@@ -210,6 +210,7 @@ stardis_init
   struct str str;
   unsigned i, vcount, tcount, ocount, count;
   int is_for_compute;
+  struct sdis_device_create_args dev_args;
 
   ASSERT(args && logger && allocator && stardis);
 
@@ -261,8 +262,12 @@ stardis_init
   is_for_compute =
     (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_VTK);
 
-  ERR(sdis_device_create(stardis->logger, stardis->allocator, stardis->nthreads,
-    args->verbose, &stardis->dev));
+  dev_args.logger = stardis->logger;
+  dev_args.allocator = stardis->allocator;
+  dev_args.nthreads_hint = stardis->nthreads;
+  dev_args.verbosity = stardis->verbose;
+  dev_args.use_mpi = 0; /* No MPI yet */
+  ERR(sdis_device_create(&dev_args, &stardis->dev));
 
   ERR(init_geometry(stardis->logger, stardis->allocator, stardis->verbose,
     &stardis->geometry));

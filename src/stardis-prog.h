@@ -214,9 +214,10 @@ stardis_medium_temperature
   (const struct stardis_vertex* vtx,
    void* data);
 
-/* Returns the expected temperature range for this fluid.
+/* Computes the expected temperature range for this solid.
  * This functions is called once when initializing the computation.
- * Data is the pointer returned by stardis_create_data for this solid. */
+ * Data is the pointer returned by stardis_create_data for this solid.
+ * Returns its modified range argument. */
 extern double*
 stardis_t_range
   (void* data,
@@ -254,9 +255,10 @@ stardis_medium_temperature
   (const struct stardis_vertex* vtx,
    void* data);
 
-/* Returns the expected temperature range for this solid.
+/* Computes the expected temperature range for this fluid.
  * This functions is called once when initializing the computation.
- * Data is the pointer returned by stardis_create_data for this fluid. */
+ * Data is the pointer returned by stardis_create_data for this fluid.
+ * Returns its modified range argument. */
 extern double*
 stardis_t_range
   (void* data,
@@ -320,9 +322,10 @@ extern double
 stardis_max_convection_coefficient
   (void* data);
 
-/* Returns the expected temperature range for this boundary.
+/* Computes the expected temperature range for this boundary.
  * This functions is called once when initializing the computation.
- * Data is the pointer returned by stardis_create_data for this boundary. */
+ * Data is the pointer returned by stardis_create_data for this boundary.
+ * Returns its modified range argument. */
 extern double*
 stardis_t_range
   (void* data,
@@ -388,9 +391,10 @@ extern double
 stardis_max_convection_coefficient
   (void* data);
 
-/* Returns the expected temperature range for this boundary.
+/* Computes the expected temperature range for this boundary.
  * This functions is called once when initializing the computation.
- * Data is the pointer returned by stardis_create_data for this boundary. */
+ * Data is the pointer returned by stardis_create_data for this boundary.
+ * Returns its modified range argument. */
 extern double*
 stardis_t_range
   (void* data,
@@ -409,9 +413,10 @@ stardis_boundary_temperature
   (const struct stardis_interface_fragment* frag,
    void* data);
 
-/* Returns the expected temperature range for this boundary.
+/* Computes the expected temperature range for this boundary.
  * This functions is called once when initializing the computation.
- * Data is the pointer returned by stardis_create_data for this boundary. */
+ * Data is the pointer returned by stardis_create_data for this boundary.
+ * Returns its modified range argument. */
 extern double*
 stardis_t_range
   (void* data,
@@ -474,17 +479,6 @@ stardis_convection_coefficient
   (const struct stardis_interface_fragment* frag,
    void* data);
 
-/* Returns the temperature at a given vertex.
- * The intent is to return the temperature in an implicit fluid enclosing this
- * solid.
- * This functions is called at every vertex of every path of the computation
- * crossing this fluid.
- * Data is the pointer returned by stardis_create_data for this connection. */
-extern double
-stardis_medium_temperature
-  (const struct stardis_vertex* vtx,
-   void* data);
-
 /* Returns the upper bound of the convection coefficient accross this connection.
  * This functions is called once when initializing the computation.
  * Data is the pointer returned by stardis_create_data for this connection. */
@@ -492,9 +486,10 @@ extern double
 stardis_max_convection_coefficient
   (void* data);
 
-/* Returns the expected temperature range for this connection.
+/* Computes the expected temperature range for this connection.
  * This functions is called once when initializing the computation.
- * Data is the pointer returned by stardis_create_data for this connection. */
+ * Data is the pointer returned by stardis_create_data for this connection.
+ * Returns its modified range argument. */
 extern double*
 stardis_t_range
   (void* data,

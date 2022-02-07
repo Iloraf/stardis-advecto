@@ -648,7 +648,7 @@ parse_args
       int nt;
       res = cstr_to_int(optarg, &nt);
       if(res != RES_OK
-        || args->nthreads <= 0)
+        || nt <= 0)
       {
         if(res == RES_OK) res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,

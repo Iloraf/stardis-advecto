@@ -808,6 +808,7 @@ struct stardis {
   unsigned undefined_medium_behind_boundary_id;
   int dump_paths;
   int verbose;
+  int geometry_initialized;
 };
 
 static INLINE unsigned

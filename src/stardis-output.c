@@ -1500,6 +1500,9 @@ print_computation_time
 
   ASSERT(stardis && start && compute_start && compute_end);
 
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
+
   time_sub(&tmp, compute_start, start);
   time_dump(&tmp, flag, NULL, buf, sizeof(buf));
   logger_print(stardis->logger, LOG_OUTPUT,
@@ -1539,6 +1542,9 @@ print_single_MC_result
   unsigned long nfailures, nsamples;
 
   ASSERT(estimator && stardis && stream);
+
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
 
   /* Fetch the estimation data */
   ERR(sdis_estimator_get_temperature(estimator, &result));
@@ -1743,6 +1749,9 @@ dump_map
 
   ASSERT(stardis && estimators && stream);
 
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
+
   est = darray_estimators_cdata_get(estimators);
   idx = darray_size_t_cdata_get(&stardis->compute_surface.primitives);
   sz = darray_size_t_size_get(&stardis->compute_surface.primitives);
@@ -1840,6 +1849,10 @@ dump_compute_region_at_the_end_of_vtk
   unsigned tsz, i;
   size_t j, psz;
   ASSERT(stardis && stream);
+
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
+
   psz = darray_size_t_size_get(&stardis->compute_surface.primitives);
   ASSERT(psz == darray_sides_size_get(&stardis->compute_surface.sides));
 
@@ -1924,6 +1937,9 @@ dump_model_as_c_chunks
   unsigned n, vcount, tcount;
 
   ASSERT(stardis && stream);
+
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
 
   prefix = str_cget(&stardis->chunks_prefix);
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));

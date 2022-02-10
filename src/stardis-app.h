@@ -38,6 +38,10 @@
 #include <limits.h>
 #include <stdarg.h>
 
+#ifdef STARDIS_ENABLE_MPI
+#include <mpi/mpi.h>
+#endif
+
 /* Forward declarations */
 struct logger;
 struct mem_allocator;
@@ -711,8 +715,20 @@ release_camera(struct camera* cam) {
 static INLINE void
 log_err_fn(const char* msg, void* ctx)
 {
+#ifdef STARDIS_ENABLE_MPI
+  int initialized, rank = 0;
+#endif
+
   ASSERT(msg);
   (void)ctx;
+
+#ifdef STARDIS_ENABLE_MPI
+  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
+  if(initialized) CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
+  /* Only master prints */
+  if(rank != 0) return;
+#endif
+
 #ifdef OS_WINDOWS
   fprintf(stderr, "error: %s", msg);
 #else
@@ -723,8 +739,20 @@ log_err_fn(const char* msg, void* ctx)
 static INLINE void
 log_warn_fn(const char* msg, void* ctx)
 {
+#ifdef STARDIS_ENABLE_MPI
+  int initialized, rank = 0;
+#endif
+
   ASSERT(msg);
   (void)ctx;
+
+#ifdef STARDIS_ENABLE_MPI
+  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
+  if(initialized) CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
+  /* Only master prints */
+  if(rank != 0) return;
+#endif
+
 #ifdef OS_WINDOWS
   fprintf(stderr, "warning: %s", msg);
 #else
@@ -735,8 +763,20 @@ log_warn_fn(const char* msg, void* ctx)
 static INLINE void
 log_prt_fn(const char* msg, void* ctx)
 {
+#ifdef STARDIS_ENABLE_MPI
+  int initialized, rank = 0;
+#endif
+
   ASSERT(msg);
   (void)ctx;
+
+#ifdef STARDIS_ENABLE_MPI
+  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
+  if(initialized) CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
+  /* Only master prints */
+  if(rank != 0) return;
+#endif
+
 #ifdef OS_WINDOWS
   fprintf(stderr, "message: %s", msg);
 #else
@@ -809,6 +849,8 @@ struct stardis {
   int dump_paths;
   int verbose;
   int geometry_initialized;
+  int mpi_initialized;
+  int mpi_rank;
 };
 
 static INLINE unsigned
@@ -817,6 +859,19 @@ allocate_stardis_medium_id(struct stardis* stardis)
   ASSERT(stardis);
   return stardis->next_medium_id++;
 }
+
+#ifdef STARDIS_ENABLE_MPI
+extern LOCAL_SYM res_T
+init_mpi
+  (int* pargc,
+   char** pargv[],
+   void (*prt_err_fn)(const char* msg, void* ctx),
+   void (*prt_warn_fn)(const char* msg, void* ctx));
+
+extern LOCAL_SYM void
+finalize_mpi
+  (struct stardis* stardis);
+#endif
 
 extern LOCAL_SYM res_T
 stardis_init

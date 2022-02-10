@@ -13,6 +13,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#ifdef STARDIS_ENABLE_MPI
+#define _POSIX_C_SOURCE 200112L
+#endif
+
 #include "stardis-app.h"
 #include "stardis-output.h"
 #include "stardis-compute.h"
@@ -31,6 +35,11 @@
 #include <rsys/double3.h>
 
 #include <string.h>
+
+#ifdef STARDIS_ENABLE_MPI
+#include <stdio.h>
+#include <mpi.h>
+#endif
 
 static const struct dummies DUMMIES_NULL = DUMMIES_NULL__;
 static const struct counts COUNTS_NULL = COUNTS_NULL__;
@@ -197,6 +206,60 @@ error:
  * Public Functions
  ******************************************************************************/
 
+#ifdef STARDIS_ENABLE_MPI
+/* To be called after logger has been initialized
+ * and before stardis is initialized */
+res_T
+init_mpi
+  (int* pargc,
+   char** pargv[],
+   void (*prt_err_fn)(const char* msg, void* ctx),
+   void (*prt_warn_fn)(const char* msg, void* ctx))
+{
+  res_T res = RES_OK;
+  char buf[64];
+  int mpi_provided;
+
+  ASSERT(pargc && pargv && prt_err_fn && prt_warn_fn);
+
+  if(MPI_Init_thread(pargc, pargv, MPI_THREAD_MULTIPLE, &mpi_provided)
+    != MPI_SUCCESS)
+  {
+    prt_err_fn("Cannot init MPI\n", NULL);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  else if(mpi_provided != MPI_THREAD_MULTIPLE) {
+    const char* lvl;
+    switch(mpi_provided) {
+      case MPI_THREAD_SINGLE: lvl = "MPI_THREAD_SINGLE"; break;
+      case MPI_THREAD_FUNNELED: lvl = "MPI_THREAD_FUNNELED"; break;
+      case MPI_THREAD_SERIALIZED: lvl = "MPI_THREAD_SERIALIZED"; break;
+      default: FATAL("Unreachable code.\n"); break;
+    }
+    snprintf(buf, sizeof(buf)-1, "MPI support restricted to %s\n", lvl);
+    prt_warn_fn(buf, NULL);
+  }
+
+end:
+  return res;
+error:
+  goto end;
+}
+
+void
+finalize_mpi
+  (struct stardis* stardis)
+{
+  int initialized;
+  ASSERT(stardis);
+
+  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
+  if(initialized)
+    CHK(MPI_Finalize() == MPI_SUCCESS);
+}
+#endif
+
 res_T
 stardis_init
   (const struct args* args,
@@ -267,7 +330,21 @@ stardis_init
   dev_args.allocator = stardis->allocator;
   dev_args.nthreads_hint = stardis->nthreads;
   dev_args.verbosity = stardis->verbose;
-  dev_args.use_mpi = 0; /* No MPI yet */
+
+#ifdef STARDIS_ENABLE_MPI
+  logger_print(stardis->logger, LOG_OUTPUT, "MPI is enabled.\n");
+  /* Open MPI accepts the C/C++ argc and argv arguments to main,
+   * but neither modifies, interprets, nor distributes them: use NULL */
+  CHK(MPI_Initialized(&stardis->mpi_initialized) == MPI_SUCCESS);
+  if(stardis->mpi_initialized)
+    CHK(MPI_Comm_rank(MPI_COMM_WORLD, &stardis->mpi_rank) == MPI_SUCCESS);
+#else
+  logger_print(stardis->logger, LOG_OUTPUT, "MPI is disabled.\n");
+  stardis->mpi_initialized = 0;
+#endif
+
+  dev_args.use_mpi = stardis->mpi_initialized;
+
   ERR(sdis_device_create(&dev_args, &stardis->dev));
 
   ERR(init_geometry(stardis->logger, stardis->allocator, stardis->verbose,

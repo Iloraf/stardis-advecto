@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -227,6 +227,7 @@ struct stardis {
   unsigned undefined_medium_behind_boundary_id;
   int dump_paths;
   int verbose;
+  int geometry_initialized;
 };
 
 unsigned

@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -906,8 +906,8 @@ compute_camera(struct stardis* stardis, struct time* start)
 
   args.cam = cam;
   d2_set(args.time_range, stardis->camera.time_range);
-  args.image_resolution[0] = width;
-  args.image_resolution[1] = height;
+  args.image_definition[0] = width;
+  args.image_definition[1] = height;
   args.spp = (size_t)stardis->camera.spp;
   args.register_paths = stardis->dump_paths;
   args.picard_order = stardis->picard_order;
@@ -1267,7 +1267,7 @@ compute_map(struct stardis* stardis, struct time* start)
     ERR(sdis_solve_boundary(stardis->sdis_scn, &args,
       darray_estimators_data_get(&estimators) + p));
   }
-  dump_map(stardis, &estimators, stdout);
+  ERR(dump_map(stardis, &estimators, stdout));
 
 end:
   if(estimators_initialized) {

@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -305,7 +305,7 @@ short_help
   fprintf(stream, "     Save the final random generator's state in a file.\n");
 
   fprintf(stream,
-"\nCopyright (C) 2018-2021 |Meso|Star> <contact@meso-star.com>.\n"
+"\nCopyright (C) 2018-2022 |Meso|Star> <contact@meso-star.com>.\n"
 "stardis is free software released under the GNU GPL license, version 3 or later.\n"
 "You are free to change or redistribute it under certain conditions\n"
 "<http://gnu.org/licenses/gpl.html>.\n");
@@ -649,7 +649,7 @@ parse_args
       int nt;
       res = cstr_to_int(optarg, &nt);
       if(res != RES_OK
-        || args->nthreads <= 0)
+        || nt <= 0)
       {
         if(res == RES_OK) res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,

@@ -903,7 +903,13 @@ computes a result, some of the heat paths (successful paths, erroneous paths,
 or both) sampled during the simulation are written to files. Each path is
 written in VTK [1] format, one VTK file per path. The path description can
 include vertices' time if it makes sense, that is if the computation time is
-not INF.
+not INF. Due to the branching nature of non-linear Monte-Carlo algorithms,
+paths are made of strips. Whith a Picard order of 1, there is only a single
+strip, with higher orders, the number of strips can be greater than 1. As a
+result, the whole path is a tree: past the first strip, each strip can start
+from any vertex of one of the previous strips. This tree, when displaying the
+*Branch_id* field, starts with id 0, then increments each time a non-linearity
+leads to the creation of a new strip (to fetch a temperature).
 
 [verse]
 _______
@@ -914,31 +920,41 @@ _______
                       "DATASET POLYDATA"
                       "POINTS" #vertices "double"
                       <path-vertices>
-                      "LINES 1" #vertices+1
-                      <heat-path>
+                      "LINES" #strips #vertices+#strips
+                      <heat-strips>
+                      "CELL_DATA" #strips
+                      "SCALAR Path_Failure unsigned_char 1"
+                      "LOOKUP_TABLE default"
+                      <path-failures>
                       "POINT_DATA" #vertices
                       "SCALARS Vertex_Type unsigned_char 1"
                       "LOOKUP_TABLE default"
                       <vertices-types>
-                      "CELL_DATA 1"
-                      "SCALAR Path_type unsigned_char 1"
-                      "LOOKUP_TABLE default"
-                      <path-type>
                       "SCALARS Weight double 1"
                       "LOOKUP_TABLE default"
-                      <weigths>
+                      <weights>
+                      "SCALARS Branch_id int 1"
+                      "LOOKUP_TABLE default"
+                      <branch_ids>
                     [ <vertices-time> ] # if not steady
 
 <path-vertices>   ::= <real3>
                       <path-vertices> # #vertices vertices
 
-<heat-path>       ::= #vertices "0" "1" ... #vertices-1
+<path-failures>   ::= <path-failure>
+                      <path-failures> # #strips failure statutes
+
+<heat-strips>     ::= <heat-strip>
+                      <heat-strips> # #strips strips
 
 <vertices-types>  ::= <vertice-type>
                       <vertices-types> # #vertices types
 
-<weigths>         ::= REAL
-                      <weigths> # #vertices weigths
+<weights>         ::= <weight>
+                      <weights> # #vertices weights
+
+<branch_ids>      ::= <branch_id>
+                      <branch_ids> # #vertices ids
 
 <vertices-time>   ::= "SCALARS Time double 1"
                       "LOOKUP_TABLE default"
@@ -948,15 +964,23 @@ _______
 
 <real3>           ::= REAL REAL REAL
 
-<durations>       ::= REAL # in [0, INF)
-                      <durations> # #vertices durations
+<path-failure>    ::= "0" # SUCCESS
+                    | "1" # FAILURE
+
+<heat-strip>      ::= #strip_vertices <vtx_idx 1> ... <vtx_idx #strip_vertices>
 
 <vertice-type>    ::= "0" # CONDUCTION
                     | "1" # CONVECTION
                     | "2" # RADIATIVE
 
-<path-type>       ::= "0" # SUCCESS
-                    | "1" # FAILURE
+<weight>          ::= REAL
+
+<branch-id>       ::= INTEGER in [0 Picard_Order]
+
+<durations>       ::= REAL # in [0, INF)
+                      <durations> # #vertices durations
+
+<vtx_idx>         ::= INTEGER # in [0 #vertices[
 
 _______
 

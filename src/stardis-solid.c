@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -130,7 +130,7 @@ create_solver_solid
   solid_shader.calorific_capacity = solid_get_calorific_capacity;
   solid_shader.thermal_conductivity = solid_get_thermal_conductivity;
   solid_shader.volumic_mass = solid_get_volumic_mass;
-  solid_shader.delta_solid = solid_get_delta;
+  solid_shader.delta = solid_get_delta;
 #if Stardis_VERSION_MINOR == 3
   solid_shader.delta_boundary = solid_get_delta_boundary;
 #endif

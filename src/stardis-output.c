@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -240,8 +240,8 @@ dump_path
   FILE* stream = NULL;
   char* name = NULL;
   enum sdis_heat_path_flag status = SDIS_HEAT_PATH_NONE;
-  size_t vcount_, name_sz;
-  unsigned long i, vcount;
+  size_t vcount_, scount_, offset, name_sz, istrip;
+  unsigned long scount, vcount;
 
   ASSERT(path && dump_ctx
     && dump_ctx->stardis
@@ -264,67 +264,121 @@ dump_path
     res = RES_IO_ERR;
     goto error;
   }
+
+  /* Get counts */
+  ERR(sdis_heat_path_get_line_strips_count(path, &scount_));
+  if(scount > ULONG_MAX) goto abort;
+  scount = (unsigned long)scount_;
+  vcount_ = 0;
+  FOR_EACH(istrip, 0, scount_) {
+    size_t n;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &n));
+    vcount_+= n;
+  }
+  if(vcount > ULONG_MAX) goto abort;
+  vcount = (unsigned long)vcount_;
   /* Header */
   fprintf(stream, "# vtk DataFile Version 2.0\n");
   fprintf(stream, "Heat path\n");
   fprintf(stream, "ASCII\n");
   fprintf(stream, "DATASET POLYDATA\n");
   /* Write path positions */
-  sdis_heat_path_get_vertices_count(path, &vcount_);
-  ASSERT(vcount_ < ULONG_MAX);
-  vcount = (unsigned long)vcount_;
   fprintf(stream, "POINTS %lu double\n", vcount);
-  FOR_EACH(i, 0, vcount) {
-    struct sdis_heat_vertex vtx;
-    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
-    fprintf(stream, "%g %g %g\n", SPLIT3(vtx.P));
+  FOR_EACH(istrip, 0, scount_) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    FOR_EACH(ivert, 0, nverts) {
+      struct sdis_heat_vertex vtx;
+      ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      fprintf(stream, "%g %g %g\n", SPLIT3(vtx.P));
+    }
   }
-  /* Write the segment of the path */
-  fprintf(stream, "LINES %d %lu\n", 1, 1 + vcount);
-  fprintf(stream, "%lu", vcount);
-  FOR_EACH(i, 0, vcount) fprintf(stream, " %lu", i);
-  fprintf(stream, "\n");
+  /* Write the strips of the path */
+  fprintf(stream, "LINES %lu %lu\n", scount, scount + vcount);
+  offset = 0;
+  FOR_EACH(istrip, 0, scount) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    if(nverts > ULONG_MAX) goto abort;
+    fprintf(stream, "%lu", (unsigned long)nverts);
+    FOR_EACH(ivert, 0, nverts) {
+      if(ivert + offset > ULONG_MAX) goto abort;
+      fprintf(stream, " %lu", (unsigned long)(ivert + offset));
+    }
+    fprintf(stream, "\n");
+    offset += nverts;
+  }
 
-  /* Write path type */
-  fprintf(stream, "CELL_DATA %d\n", 1);
-  fprintf(stream, "SCALARS Path_Type unsigned_char 1\n");
+  /* Write path status on strips */
+  fprintf(stream, "CELL_DATA %lu\n", scount);
+  fprintf(stream, "SCALARS Path_Failure unsigned_char 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
-  switch (status) {
-  case SDIS_HEAT_PATH_SUCCESS: fprintf(stream, "0\n"); break;
-  case SDIS_HEAT_PATH_FAILURE: fprintf(stream, "1\n"); break;
-  default: FATAL("Unreachable code.\n"); break;
+  FOR_EACH(istrip, 0, scount) {
+    switch (status) {
+      case SDIS_HEAT_PATH_SUCCESS: fprintf(stream, "0\n"); break;
+      case SDIS_HEAT_PATH_FAILURE: fprintf(stream, "1\n"); break;
+      default: FATAL("Unreachable code.\n"); break;
+    }
   }
-
   fprintf(stream, "POINT_DATA %lu\n", vcount);
   /* Write the type of the random walk vertices */
   fprintf(stream, "SCALARS Vertex_Type unsigned_char 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
-  FOR_EACH(i, 0, vcount) {
-    struct sdis_heat_vertex vtx;
-    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
-    ASSERT((size_t)vtx.type <= UCHAR_MAX);
-    fprintf(stream, "%d\n", vtx.type);
+  FOR_EACH(istrip, 0, scount_) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    FOR_EACH(ivert, 0, nverts) {
+      struct sdis_heat_vertex vtx;
+      ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      if((size_t)vtx.type > UCHAR_MAX) goto abort;
+      switch(vtx.type) {
+        case SDIS_HEAT_VERTEX_CONDUCTION: fprintf(stream, "%d\n", 0); break;
+        case SDIS_HEAT_VERTEX_CONVECTION: fprintf(stream, "%d\n", 1); break;
+        case SDIS_HEAT_VERTEX_RADIATIVE: fprintf(stream, "%d\n", 2); break;
+        default: FATAL("Unreachable code.\n"); break;
+      }
+    }
   }
   /* Write the weights of the random walk vertices */
   fprintf(stream, "SCALARS Weight double 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
-  FOR_EACH(i, 0, vcount) {
-    struct sdis_heat_vertex vtx;
-    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
-    fprintf(stream, "%g\n", vtx.weight);
-  }
-  /* If computation time is not INF for every vertex,
-   * write the time of the random walk vertices */
-  FOR_EACH(i, 0, vcount) {
-    struct sdis_heat_vertex vtx;
-    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
-    if(i == 0) {
-      if(IS_INF(vtx.time)) break;
-      fprintf(stream, "SCALARS Time double 1\n");
-      fprintf(stream, "LOOKUP_TABLE default\n");
+  FOR_EACH(istrip, 0, scount_) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    FOR_EACH(ivert, 0, nverts) {
+      struct sdis_heat_vertex vtx;
+      ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      fprintf(stream, "%g\n", vtx.weight);
     }
-    ASSERT(!IS_INF(vtx.time));
-    fprintf(stream, "%g\n", vtx.time);
+  }
+  /* Write the branch_id of the random walk vertices */
+  fprintf(stream, "SCALARS Branch_id int 1\n");
+  fprintf(stream, "LOOKUP_TABLE default\n");
+  FOR_EACH(istrip, 0, scount_) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    FOR_EACH(ivert, 0, nverts) {
+      struct sdis_heat_vertex vtx;
+      ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      fprintf(stream, "%d\n", vtx.branch_id);
+    }
+  }
+  /* If computation time is not INF,
+   * write the time of the random walk vertices */
+  FOR_EACH(istrip, 0, scount_) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    FOR_EACH(ivert, 0, nverts) {
+      struct sdis_heat_vertex vtx;
+      ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      if(istrip == 0 && ivert == 0) {
+        if(IS_INF(vtx.time)) break;
+        fprintf(stream, "SCALARS Time double 1\n");
+        fprintf(stream, "LOOKUP_TABLE default\n");
+      }
+      if(IS_INF(vtx.time)) goto abort;
+      fprintf(stream, "%g\n", vtx.time);
+    }
   }
 
 end:
@@ -333,6 +387,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -348,7 +405,7 @@ dump_vtk_image
 
   ASSERT(buf && stream);
   ERR(sdis_estimator_buffer_get_definition(buf, def));
-  ASSERT(def[0] != 0 && def[1] != 0 && def[0] * def[1] <= ULONG_MAX);
+  if(def[0] == 0 || def[1] == 0 || def[0] * def[1] > ULONG_MAX) goto abort;
   definition[0] = (unsigned long)def[0];
   definition[1] = (unsigned long)def[1];
 
@@ -419,7 +476,7 @@ dump_vtk_image
       size_t nfails;
       ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
       ERR(sdis_estimator_get_failure_count(estimator, &nfails));
-      ASSERT(nfails <= ULONG_MAX);
+      if(nfails > ULONG_MAX) goto abort;
       fprintf(stream, "%lu\n", (unsigned long)nfails);
     }
   }
@@ -429,6 +486,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -443,7 +503,7 @@ dump_ht_image
 
   ASSERT(buf && stream);
   ERR(sdis_estimator_buffer_get_definition(buf, def));
-  ASSERT(def[0] <= ULONG_MAX && def[1] <= ULONG_MAX);
+  if(def[0] > ULONG_MAX || def[1] > ULONG_MAX) goto abort;
   definition[0] = (unsigned long)def[0];
   definition[1] = (unsigned long)def[1];
 
@@ -465,6 +525,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 #define FW(Ptr, Count) \
@@ -517,7 +580,7 @@ dump_sample_end
   ERR(sdis_green_path_get_elapsed_time(path, &elapsed));
   ERR(sdis_green_path_get_end_type(path, &end_type));
   sz = darray_descriptions_size_get(e_ctx->desc);
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   trad_id = (unsigned)sz;
   if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
     /* End, End ID, X, Y, Z, Elapsed time */
@@ -553,7 +616,7 @@ dump_sample_end
         }
         else if(type == SDIS_FLUID) {
           struct fluid** pfluid = sdis_data_get(data);
-          id = (*pfluid )->desc_id;
+          id = (*pfluid)->desc_id;
         } else {
           struct solid** psolid = sdis_data_get(data);
           ASSERT(type == SDIS_SOLID);
@@ -572,6 +635,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 static res_T
@@ -594,7 +660,7 @@ dump_sample
   stream = w_ctx->stream;
   ERR(sdis_green_path_get_end_type(path, &end_type));
   sz = darray_descriptions_size_get(w_ctx->desc);
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   trad_id = (unsigned)sz;
   if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
     header.at_initial = 0;
@@ -656,10 +722,10 @@ dump_sample
   ERR(sdis_green_path_for_each_power_term(path, merge_power_terms, w_ctx));
   ERR(sdis_green_path_for_each_flux_term(path, merge_flux_terms, w_ctx));
   sz = htable_weigth_size_get(&w_ctx->pw);
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   header.pcount = (unsigned)sz;
   sz = htable_weigth_size_get(&w_ctx->flux);
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   header.fcount = (unsigned)sz;
 
   /* Write path's header */
@@ -711,6 +777,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -743,7 +812,7 @@ dump_green_bin
   ERR(sdis_green_function_get_paths_count(green, &ok_count));
   ERR(sdis_green_function_get_invalid_paths_count(green, &failed_count));
   sz = darray_descriptions_size_get(&stardis->descriptions);
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   szd = (unsigned)sz;
   ASSERT(szd ==
     (stardis->counts.smed_count + stardis->counts.fmed_count
@@ -757,7 +826,7 @@ dump_green_bin
     const struct description* desc = descs + i;
     const struct str* name = get_description_name(desc);
     const size_t len = str_len(name);
-    ASSERT(name_pool_sz + len + 1 <= UINT_MAX);
+    if(name_pool_sz + len + 1 > UINT_MAX) goto abort;
     name_pool_sz += (unsigned)(len + 1);
   }
   pool_ptr = name_pool = MEM_ALLOC(stardis->allocator, name_pool_sz);
@@ -826,6 +895,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -905,7 +977,7 @@ print_sample
     if(pt.data.mdmvert.vertex.P[0] == INF) {
       /* Radiative output (Trad)*/
       size_t sz = darray_descriptions_size_get(w_ctx->desc);
-      ASSERT(sz <= UINT_MAX);
+      if(sz > UINT_MAX) goto abort;
       fprintf(w_ctx->stream, "R\t%u", (unsigned)sz);
     }
     else if(type == SDIS_FLUID) {
@@ -936,7 +1008,7 @@ print_sample
   ERR(sdis_green_path_for_each_flux_term(path, merge_flux_terms, w_ctx));
   fcount = htable_weigth_size_get(&w_ctx->flux);
 
-  ASSERT(pcount <= ULONG_MAX && fcount <= ULONG_MAX);
+  if(pcount > ULONG_MAX || fcount > ULONG_MAX) goto abort;
   fprintf(w_ctx->stream, "\t%lu\t%lu",
     (unsigned long)pcount, (unsigned long)fcount);
 
@@ -963,6 +1035,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -982,13 +1057,13 @@ dump_green_ascii
   ASSERT(green && stardis && stream);
 
   ERR(sdis_green_function_get_paths_count(green, &sz));
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   ok_count = (unsigned)sz;
   ERR(sdis_green_function_get_invalid_paths_count(green, &sz));
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   failed_count = (unsigned)sz;
   sz = darray_descriptions_size_get(&stardis->descriptions);
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   szd = (unsigned)sz;
   descs = darray_descriptions_cdata_get(&stardis->descriptions);
 
@@ -1124,6 +1199,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -1470,7 +1548,7 @@ print_single_MC_result
   /* Fetch the estimation data */
   ERR(sdis_estimator_get_temperature(estimator, &result));
   ERR(sdis_estimator_get_failure_count(estimator, &nfailures_));
-  ASSERT(nfailures_ <= ULONG_MAX && stardis->samples <= ULONG_MAX);
+  if(nfailures_ > ULONG_MAX || stardis->samples > ULONG_MAX) goto abort;
   nfailures = (unsigned long)nfailures_;
   nsamples = (unsigned long)stardis->samples;
   if(nfailures == nsamples) {
@@ -1650,14 +1728,18 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
-void
+res_T
 dump_map
   (const struct stardis* stardis,
    const struct darray_estimators* estimators,
    FILE* stream)
 {
+  res_T res = RES_OK;
   unsigned i, vcount, tcount, last_v = 0;
   const size_t* idx;
   size_t sz;
@@ -1669,7 +1751,7 @@ dump_map
   est = darray_estimators_cdata_get(estimators);
   idx = darray_size_t_cdata_get(&stardis->compute_surface.primitives);
   sz = darray_size_t_size_get(&stardis->compute_surface.primitives);
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   szp = (unsigned)sz;
   SG3D(geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));
   SG3D(geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tcount));
@@ -1678,7 +1760,7 @@ dump_map
   for(i = 0; i < szp; ++i) {
     unsigned t;
     unsigned indices[3];
-    ASSERT(idx[i] <= UINT_MAX);
+    if(idx[i] > UINT_MAX) goto abort;
     t = (unsigned)idx[i];
     SG3D(geometry_get_unique_triangle_vertices(stardis->geometry.sg3d, t,
       indices));
@@ -1701,7 +1783,7 @@ dump_map
   for(i = 0; i < szp; ++i) {
     unsigned t;
     unsigned indices[3];
-    ASSERT(idx[i] <= UINT_MAX);
+    if(idx[i] > UINT_MAX) goto abort;
     t = (unsigned)idx[i];
     SG3D(geometry_get_unique_triangle_vertices(stardis->geometry.sg3d, t,
       indices));
@@ -1727,7 +1809,7 @@ dump_map
   for(i = 0; i < szp; ++i) {
     size_t nfails;
     SDIS(estimator_get_failure_count(est[i], &nfails));
-    ASSERT(nfails <= UINT_MAX);
+    if(nfails > UINT_MAX) goto abort;
     fprintf(stream, "%u\n", (unsigned)nfails);
   }
   fprintf(stream, "SCALARS computation_time_estimate float 1\n");
@@ -1744,6 +1826,13 @@ dump_map
     SDIS(estimator_get_realisation_time(est[i], &time));
     fprintf(stream, "%f\n", time.SE);
   }
+end:
+  return res;
+error:
+  goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T

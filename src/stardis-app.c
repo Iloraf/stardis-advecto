@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -156,6 +156,7 @@ stardis_init
   struct str str;
   unsigned i, vcount, tcount, ocount, count;
   int is_for_compute;
+  struct sdis_device_create_args dev_args;
 
   ASSERT(args && logger && allocator && stardis);
 
@@ -192,6 +193,7 @@ stardis_init
   stardis->trad = STARDIS_DEFAULT_TRAD;
   stardis->trad_ref = STARDIS_DEFAULT_TRAD_REFERENCE;
   stardis->trad_def = 0;
+  stardis->geometry_initialized = 0;
   d2(stardis->t_range, INF, -INF);
   stardis->dump_paths = SDIS_HEAT_PATH_NONE;
   if(args->dump_paths & DUMP_ERROR)
@@ -207,11 +209,16 @@ stardis_init
   is_for_compute =
     (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_VTK);
 
-  ERR(sdis_device_create(stardis->logger, stardis->allocator, stardis->nthreads,
-    args->verbose, &stardis->dev));
+  dev_args.logger = stardis->logger;
+  dev_args.allocator = stardis->allocator;
+  dev_args.nthreads_hint = stardis->nthreads;
+  dev_args.verbosity = stardis->verbose;
+  dev_args.use_mpi = 0; /* No MPI yet */
+  ERR(sdis_device_create(&dev_args, &stardis->dev));
 
   ERR(init_geometry(stardis->logger, stardis->allocator, stardis->verbose,
     &stardis->geometry));
+  stardis->geometry_initialized = 1;
 
   if(args->mode & MODE_IR_COMPUTE) {
     ERR(parse_camera(stardis->logger, args->camera, stardis));
@@ -402,7 +409,8 @@ stardis_release
     release_description(d, stardis->allocator);
   }
   darray_descriptions_release(&stardis->descriptions);
-  release_geometry(&stardis->geometry);
+  if(stardis->geometry_initialized)
+    release_geometry(&stardis->geometry);
   darray_size_t_release(&stardis->compute_surface.primitives);
   darray_sides_release(&stardis->compute_surface.sides);
   darray_uint_release(&stardis->compute_surface.err_triangles);

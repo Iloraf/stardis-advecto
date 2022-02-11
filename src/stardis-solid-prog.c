@@ -64,7 +64,7 @@ solid_prog_get_calorific_capacity
 }
 
 static double
-solid_prog_get_delta_solid
+solid_prog_get_delta
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
 {
@@ -117,7 +117,7 @@ create_solver_solid_prog
   solid_shader.calorific_capacity = solid_prog_get_calorific_capacity;
   solid_shader.thermal_conductivity = solid_prog_get_thermal_conductivity;
   solid_shader.volumic_mass = solid_prog_get_volumic_mass;
-  solid_shader.delta_solid = solid_prog_get_delta_solid;
+  solid_shader.delta= solid_prog_get_delta;
   solid_shader.volumic_power = solid_prog_get_volumic_power;
   solid_shader.temperature = solid_prog_get_temperature;
   ERR(sdis_data_create(stardis->dev, sizeof(struct solid_prog*),

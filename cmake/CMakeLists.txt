@@ -18,6 +18,10 @@ project(stardis C)
 
 set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 
+option(ENABLE_MPI
+  "Enable the support of distributed parallelism \
+using the Message Passing Interface specification." OFF)
+
 if(CMAKE_HOST_UNIX)
   set(STARDIS_DOC "TROFF" CACHE STRING
     "Type of documentation to generate and install.")
@@ -80,6 +84,12 @@ find_package(StarSP 0.12 REQUIRED)
 if(MSVC)
   find_package(MuslGetopt REQUIRED)
 endif()
+if(ENABLE_MPI)
+  find_package(MPI 2 REQUIRED)
+  set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+  include_directories(${MPI_INCLUDE_PATH})
+endif()
+
 
 include_directories(
   ${RSys_INCLUDE_DIR}
@@ -162,6 +172,10 @@ set_target_properties(stardis
 
 target_link_libraries(stardis
   Stardis Star3D StarGeom3D StarEnc3D StarSTL StarSP RSys ${GETOPT_LIB} ${MATH_LIB})
+
+if(ENABLE_MPI)
+  set_target_properties(stardis PROPERTIES COMPILE_DEFINITIONS "STARDIS_ENABLE_MPI")
+endif()
 
 ###############################################################################
 # Define output & install directories

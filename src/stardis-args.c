@@ -30,10 +30,15 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+
 #ifdef COMPILER_GCC
 #include <strings.h> /* strcasecmp */
 #else
 #define strcasecmp(s1, s2) _stricmp((s1), (s2))
+#endif
+
+#ifdef STARDIS_ENABLE_MPI
+#include <mpi/mpi.h>
 #endif
 
 /*******************************************************************************
@@ -157,7 +162,12 @@ print_version
 {
   ASSERT(stream);
   fprintf(stream,
-    "Stardis version %i.%i.%i built on stardis solver version %i.%i.%i\n",
+    "Stardis version %i.%i.%i built on stardis solver version %i.%i.%i; MPI is "
+#ifdef STARDIS_ENABLE_MPI
+    "enabled.\n",
+#else
+    "disabled.\n",
+#endif
     STARDIS_APP_VERSION_MAJOR, STARDIS_APP_VERSION_MINOR, STARDIS_APP_VERSION_PATCH,
     Stardis_VERSION_MAJOR, Stardis_VERSION_MINOR, Stardis_VERSION_PATCH);
 }
@@ -212,7 +222,16 @@ short_help
    const char* prog)
 {
   const char* name;
+#ifdef STARDIS_ENABLE_MPI
+  int rank;
+#endif
   ASSERT(stream && prog);
+
+#ifdef STARDIS_ENABLE_MPI
+  CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
+  /* Only master prints */
+  if(rank != 0) return;
+#endif
 
 #ifdef COMPILER_GCC
   name = strrchr(prog, '/');

@@ -375,40 +375,44 @@ error:
 }
 
 #define READ_RANDOM_STATE(Name) \
-  if(!str_is_empty(Name)) { \
-    const char* name = str_cget(Name); \
-    stream = fopen(name, "r"); \
-    if(!stream) { \
-      res = RES_IO_ERR; \
-      logger_print(stardis->logger, LOG_ERROR, \
-        "Could not open generator's state file ('%s').\n", \
-        name); \
-      goto error; \
+  if(!stardis->mpi_initialized || stardis->mpi_rank == 0) { \
+    if(!str_is_empty(Name)) { \
+      const char* name = str_cget(Name); \
+      stream = fopen(name, "r"); \
+      if(!stream) { \
+        res = RES_IO_ERR; \
+        logger_print(stardis->logger, LOG_ERROR, \
+          "Could not open generator's state file ('%s').\n", \
+          name); \
+        goto error; \
+      } \
+      ERR(ssp_rng_create(stardis->allocator, SSP_RNG_MT19937_64, &args.rng_state)); \
+      res =  read_random_generator_state(args.rng_state, stream); \
+      if(res != RES_OK) { \
+        logger_print(stardis->logger, LOG_ERROR, \
+          "Could not read random generator's state ('%s').\n", \
+          name); \
+        goto error; \
+      } \
+      fclose(stream); stream = NULL; \
     } \
-    ERR(ssp_rng_create(stardis->allocator, SSP_RNG_MT19937_64, &args.rng_state)); \
-    res =  read_random_generator_state(args.rng_state, stream); \
-    if(res != RES_OK) { \
-      logger_print(stardis->logger, LOG_ERROR, \
-        "Could not read random generator's state ('%s').\n", \
-        name); \
-      goto error; \
-    } \
-    fclose(stream); stream = NULL; \
   }
 
 #define WRITE_RANDOM_STATE(Name) \
-  if(!str_is_empty(Name)) { \
-    const char* name = str_cget(Name); \
-    stream = fopen(name, "wb"); \
-    if(!stream) { \
-      res = RES_IO_ERR; \
-      logger_print(stardis->logger, LOG_ERROR, \
-        "Could not write random generator's state ('%s').\n", \
-        name); \
-      goto error; \
+  if(!stardis->mpi_initialized || stardis->mpi_rank == 0) { \
+    if(!str_is_empty(Name)) { \
+      const char* name = str_cget(Name); \
+      stream = fopen(name, "wb"); \
+      if(!stream) { \
+        res = RES_IO_ERR; \
+        logger_print(stardis->logger, LOG_ERROR, \
+          "Could not write random generator's state ('%s').\n", \
+          name); \
+        goto error; \
+      } \
+      ERR(write_random_generator_state(estimator, stream)); \
+      fclose(stream); stream = NULL; \
     } \
-    ERR(write_random_generator_state(estimator, stream)); \
-    fclose(stream); stream = NULL; \
   }
 
 static res_T
@@ -436,51 +440,59 @@ compute_probe(struct stardis* stardis, struct time* start)
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
-    time_current(&compute_start);
-    ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
-    time_current(&compute_end);
-    if(stardis->mode & MODE_BIN_GREEN) {
-      struct time output_end;
-      ASSERT(!str_is_empty(&stardis->bin_green_filename));
-      stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
-      if(!stream) {
-        res = RES_IO_ERR;
-        goto error;
-      }
-      ERR(dump_green_bin(green, stardis, stream));
-      fclose(stream); stream = NULL;
-      if(str_cget(&stardis->end_paths_filename)
-        && strlen(str_cget(&stardis->end_paths_filename)))
-      {
-        stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+    if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+      ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
+    } else {
+      time_current(&compute_start);
+      ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
+      time_current(&compute_end);
+      if(stardis->mode & MODE_BIN_GREEN) {
+        struct time output_end;
+        ASSERT(!str_is_empty(&stardis->bin_green_filename));
+        stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream) {
           res = RES_IO_ERR;
           goto error;
         }
-        ERR(dump_paths_end(green, stardis, stream));
+        ERR(dump_green_bin(green, stardis, stream));
         fclose(stream); stream = NULL;
+        if(str_cget(&stardis->end_paths_filename)
+          && strlen(str_cget(&stardis->end_paths_filename)))
+        {
+          stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+          if(!stream) {
+            res = RES_IO_ERR;
+            goto error;
+          }
+          ERR(dump_paths_end(green, stardis, stream));
+          fclose(stream); stream = NULL;
+        }
+        time_current(&output_end);
+        ERR(print_computation_time(NULL, stardis,
+          start, &compute_start, &compute_end, &output_end));
       }
-      time_current(&output_end);
-      ERR(print_computation_time(NULL, stardis,
-        start, &compute_start, &compute_end, &output_end));
-    }
-    if(stardis->mode & MODE_GREEN) {
-      ERR(dump_green_ascii(green, stardis, stdout));
+      if(stardis->mode & MODE_GREEN) {
+        ERR(dump_green_ascii(green, stardis, stdout));
+      }
     }
   } else {
     args.register_paths = stardis->dump_paths;
     args.picard_order = stardis->picard_order;
-    time_current(&compute_start);
-    ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
-    time_current(&compute_end);
-    ERR(print_computation_time(estimator, stardis,
-      start, &compute_start, &compute_end, NULL));
-    ERR(print_single_MC_result(estimator, stardis, stdout));
-    
-    /* Dump recorded paths according to user settings */
-    dump_ctx.stardis = stardis;
-    dump_ctx.rank = 0;
-    ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+    if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+      ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
+    } else {
+      time_current(&compute_start);
+      ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
+      time_current(&compute_end);
+      ERR(print_computation_time(estimator, stardis,
+        start, &compute_start, &compute_end, NULL));
+      ERR(print_single_MC_result(estimator, stardis, stdout));
+
+      /* Dump recorded paths according to user settings */
+      dump_ctx.stardis = stardis;
+      dump_ctx.rank = 0;
+      ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+    }
   }
 
   /* Output random state? */
@@ -670,52 +682,61 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
-    time_current(&compute_start);
-    ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
-      &green));
-    time_current(&compute_end);
-    if(stardis->mode & MODE_BIN_GREEN) {
-      struct time output_end;
-      ASSERT(!str_is_empty(&stardis->bin_green_filename));
-      stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
-      if(!stream) {
-        res = RES_IO_ERR;
-        goto error;
-      }
-      ERR(dump_green_bin(green, stardis, stream));
-      fclose(stream); stream = NULL;
-      if(str_cget(&stardis->end_paths_filename)
-        && strlen(str_cget(&stardis->end_paths_filename)))
-      {
-        stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+    if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+      ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
+        &green));
+    } else {
+      time_current(&compute_start);
+      ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
+        &green));
+      time_current(&compute_end);
+      if(stardis->mode & MODE_BIN_GREEN) {
+        struct time output_end;
+        ASSERT(!str_is_empty(&stardis->bin_green_filename));
+        stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream) {
           res = RES_IO_ERR;
           goto error;
         }
-        ERR(dump_paths_end(green, stardis, stream));
+        ERR(dump_green_bin(green, stardis, stream));
         fclose(stream); stream = NULL;
+        if(str_cget(&stardis->end_paths_filename)
+          && strlen(str_cget(&stardis->end_paths_filename)))
+        {
+          stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+          if(!stream) {
+            res = RES_IO_ERR;
+            goto error;
+          }
+          ERR(dump_paths_end(green, stardis, stream));
+          fclose(stream); stream = NULL;
+        }
+        time_current(&output_end);
+        ERR(print_computation_time(NULL, stardis,
+          start, &compute_start, &compute_end, &output_end));
       }
-      time_current(&output_end);
-      ERR(print_computation_time(NULL, stardis,
-        start, &compute_start, &compute_end, &output_end));
-    }
-    if(stardis->mode & MODE_GREEN) {
-      ERR(dump_green_ascii(green, stardis, stdout));
+      if(stardis->mode & MODE_GREEN) {
+        ERR(dump_green_ascii(green, stardis, stdout));
+      }
     }
   } else {
     args.register_paths = stardis->dump_paths;
     args.picard_order = stardis->picard_order;
-    time_current(&compute_start);
-    ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
-    time_current(&compute_end);
-    ERR(print_computation_time(estimator, stardis,
-      start, &compute_start, &compute_end, NULL));
-    ERR(print_single_MC_result(estimator, stardis, stdout));
+    if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+      ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
+    } else {
+      time_current(&compute_start);
+      ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
+      time_current(&compute_end);
+      ERR(print_computation_time(estimator, stardis,
+        start, &compute_start, &compute_end, NULL));
+      ERR(print_single_MC_result(estimator, stardis, stdout));
     
-    /* Dump recorded paths according to user settings */
-    dump_ctx.stardis = stardis;
-    dump_ctx.rank = 0;
-    ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+      /* Dump recorded paths according to user settings */
+      dump_ctx.stardis = stardis;
+      dump_ctx.rank = 0;
+      ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+    }
   }
 
   /* Output random state? */
@@ -856,42 +877,46 @@ compute_camera(struct stardis* stardis, struct time* start)
   args.picard_order = stardis->picard_order;
 
   /* Launch the simulation */
-  time_current(&compute_start);
-  ERR(sdis_solve_camera(stardis->sdis_scn, &args, &buf));
-  time_current(&compute_end);
+  if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+    ERR(sdis_solve_camera(stardis->sdis_scn, &args, &buf));
+  } else {
+    time_current(&compute_start);
+    ERR(sdis_solve_camera(stardis->sdis_scn, &args, &buf));
+    time_current(&compute_end);
 
-  /* Write the image */
-  if(str_is_empty(&stardis->camera.file_name))
-    stream = stdout;
-  else {
-    stream = fopen(str_cget(&stardis->camera.file_name), "w");
-    if(!stream) {
-      res = RES_IO_ERR;
-      goto error;
+    /* Write the image */
+    if(str_is_empty(&stardis->camera.file_name))
+      stream = stdout;
+    else {
+      stream = fopen(str_cget(&stardis->camera.file_name), "w");
+      if(!stream) {
+        res = RES_IO_ERR;
+        goto error;
+      }
     }
-  }
-  ASSERT(stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK
-  || stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_HT);
-  if(stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK)
-    ERR(dump_vtk_image(buf, stream));
-  else ERR(dump_ht_image(buf, stream));
-  if(!str_is_empty(&stardis->camera.file_name))
-    fclose(stream);
+    ASSERT(stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK
+    || stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_HT);
+    if(stardis->camera.fmt == STARDIS_RENDERING_OUTPUT_FILE_FMT_VTK)
+      ERR(dump_vtk_image(buf, stream));
+    else ERR(dump_ht_image(buf, stream));
+    if(!str_is_empty(&stardis->camera.file_name))
+      fclose(stream);
 
-  /* Dump recorded paths according to user settings */
-  dump_ctx.stardis = stardis;
-  dump_ctx.rank = 0;
-  ERR(sdis_estimator_buffer_get_definition(buf, definition));
-  FOR_EACH(iy, 0, definition[1]) {
-    FOR_EACH(ix, 0, definition[0]) {
-      const struct sdis_estimator* estimator;
-      ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
-      ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+    /* Dump recorded paths according to user settings */
+    dump_ctx.stardis = stardis;
+    dump_ctx.rank = 0;
+    ERR(sdis_estimator_buffer_get_definition(buf, definition));
+    FOR_EACH(iy, 0, definition[1]) {
+      FOR_EACH(ix, 0, definition[0]) {
+        const struct sdis_estimator* estimator;
+        ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
+        ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+      }
     }
+    time_current(&output_end);
+    ERR(print_computation_time(NULL, stardis,
+      start, &compute_start, &compute_end, NULL));
   }
-  time_current(&output_end);
-  ERR(print_computation_time(NULL, stardis,
-    start, &compute_start, &compute_end, NULL));
 
 end:
   if(cam) SDIS(camera_ref_put(cam));
@@ -933,50 +958,58 @@ compute_medium(struct stardis* stardis, struct time* start)
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
-    time_current(&compute_start);
-    ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
-    time_current(&compute_end);
-    if(stardis->mode & MODE_BIN_GREEN) {
-      struct time output_end;
-      ASSERT(!str_is_empty(&stardis->bin_green_filename));
-      stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
-      if(!stream) {
-        res = RES_IO_ERR;
-        goto error;
-      }
-      ERR(dump_green_bin(green, stardis, stream));
-      fclose(stream); stream = NULL;
-      if(str_cget(&stardis->end_paths_filename)
-        && strlen(str_cget(&stardis->end_paths_filename)))
-      {
-        stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+    if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+      ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
+    } else {
+      time_current(&compute_start);
+      ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
+      time_current(&compute_end);
+      if(stardis->mode & MODE_BIN_GREEN) {
+        struct time output_end;
+        ASSERT(!str_is_empty(&stardis->bin_green_filename));
+        stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream) {
           res = RES_IO_ERR;
           goto error;
         }
-        ERR(dump_paths_end(green, stardis, stream));
+        ERR(dump_green_bin(green, stardis, stream));
         fclose(stream); stream = NULL;
+        if(str_cget(&stardis->end_paths_filename)
+          && strlen(str_cget(&stardis->end_paths_filename)))
+        {
+          stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+          if(!stream) {
+            res = RES_IO_ERR;
+            goto error;
+          }
+          ERR(dump_paths_end(green, stardis, stream));
+          fclose(stream); stream = NULL;
+        }
+        time_current(&output_end);
+        ERR(print_computation_time(NULL, stardis,
+          start, &compute_start, &compute_end, &output_end));
       }
-      time_current(&output_end);
-      ERR(print_computation_time(NULL, stardis,
-        start, &compute_start, &compute_end, &output_end));
-    }
-    if(stardis->mode & MODE_GREEN) {
-      ERR(dump_green_ascii(green, stardis, stdout));
+      if(stardis->mode & MODE_GREEN) {
+        ERR(dump_green_ascii(green, stardis, stdout));
+      }
     }
   } else {
     args.register_paths = stardis->dump_paths;
     args.picard_order = stardis->picard_order;
-    time_current(&compute_start);
-    ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
-    time_current(&compute_end);
-    ERR(print_computation_time(estimator, stardis,
-      start, &compute_start, &compute_end, NULL));
-    ERR(print_single_MC_result(estimator, stardis, stdout));
-    /* Dump recorded paths according to user settings */
-    dump_ctx.stardis = stardis;
-    dump_ctx.rank = 0;
-    ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+    if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+      ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
+    } else {
+      time_current(&compute_start);
+      ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
+      time_current(&compute_end);
+      ERR(print_computation_time(estimator, stardis,
+        start, &compute_start, &compute_end, NULL));
+      ERR(print_single_MC_result(estimator, stardis, stdout));
+      /* Dump recorded paths according to user settings */
+      dump_ctx.stardis = stardis;
+      dump_ctx.rank = 0;
+      ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+    }
   }
 
   /* Output random state? */
@@ -1065,50 +1098,58 @@ compute_boundary(struct stardis* stardis, struct time* start)
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
 
   if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
-    time_current(&compute_start);
-    ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
-    time_current(&compute_end);
-    if(stardis->mode & MODE_BIN_GREEN) {
-      struct time output_end;
-      ASSERT(!str_is_empty(&stardis->bin_green_filename));
-      stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
-      if(!stream) {
-        res = RES_IO_ERR;
-        goto error;
-      }
-      ERR(dump_green_bin(green, stardis, stream));
-      fclose(stream); stream = NULL;
-      if(str_cget(&stardis->end_paths_filename)
-        && strlen(str_cget(&stardis->end_paths_filename)))
-      {
-        stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+    if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+      ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
+    } else {
+      time_current(&compute_start);
+      ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
+      time_current(&compute_end);
+      if(stardis->mode & MODE_BIN_GREEN) {
+        struct time output_end;
+        ASSERT(!str_is_empty(&stardis->bin_green_filename));
+        stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream) {
           res = RES_IO_ERR;
           goto error;
         }
-        ERR(dump_paths_end(green, stardis, stream));
+        ERR(dump_green_bin(green, stardis, stream));
         fclose(stream); stream = NULL;
+        if(str_cget(&stardis->end_paths_filename)
+          && strlen(str_cget(&stardis->end_paths_filename)))
+        {
+          stream = fopen(str_cget(&stardis->end_paths_filename), "w");
+          if(!stream) {
+            res = RES_IO_ERR;
+            goto error;
+          }
+          ERR(dump_paths_end(green, stardis, stream));
+          fclose(stream); stream = NULL;
+        }
+        time_current(&output_end);
+        ERR(print_computation_time(NULL, stardis,
+          start, &compute_start, &compute_end, &output_end));
       }
-      time_current(&output_end);
-      ERR(print_computation_time(NULL, stardis,
-        start, &compute_start, &compute_end, &output_end));
-    }
-    if(stardis->mode & MODE_GREEN) {
-      ERR(dump_green_ascii(green, stardis, stdout));
+      if(stardis->mode & MODE_GREEN) {
+        ERR(dump_green_ascii(green, stardis, stdout));
+      }
     }
   } else {
     args.register_paths = stardis->dump_paths;
     args.picard_order = stardis->picard_order;
-    time_current(&compute_start);
-    ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
-    time_current(&compute_end);
-    ERR(print_computation_time(estimator, stardis,
-      start, &compute_start, &compute_end, NULL));
-    ERR(print_single_MC_result(estimator, stardis, stdout));
-    /* Dump recorded paths according to user settings */
-    dump_ctx.stardis = stardis;
-    dump_ctx.rank = 0;
-    ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+    if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+      ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
+    } else {
+      time_current(&compute_start);
+      ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
+      time_current(&compute_end);
+      ERR(print_computation_time(estimator, stardis,
+        start, &compute_start, &compute_end, NULL));
+      ERR(print_single_MC_result(estimator, stardis, stdout));
+      /* Dump recorded paths according to user settings */
+      dump_ctx.stardis = stardis;
+      dump_ctx.rank = 0;
+      ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+    }
   }
 
   /* Output random state? */
@@ -1149,17 +1190,21 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
 
-  time_current(&compute_start);
-  ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
-  time_current(&compute_end);
-  ERR(print_computation_time(estimator, stardis,
-    start, &compute_start, &compute_end, NULL));
-  ERR(print_single_MC_result(estimator, stardis, stdout));
+  if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+    ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
+  } else {
+    time_current(&compute_start);
+    ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
+    time_current(&compute_end);
+    ERR(print_computation_time(estimator, stardis,
+      start, &compute_start, &compute_end, NULL));
+    ERR(print_single_MC_result(estimator, stardis, stdout));
 
-  /* Dump recorded paths according to user settings */
-  dump_ctx.stardis = stardis;
-  dump_ctx.rank = 0;
-  ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+    /* Dump recorded paths according to user settings */
+    dump_ctx.stardis = stardis;
+    dump_ctx.rank = 0;
+    ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+  }
 
   /* Output random state? */
   WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
@@ -1210,7 +1255,9 @@ compute_map(struct stardis* stardis, struct time* start)
     ERR(sdis_solve_boundary(stardis->sdis_scn, &args,
       darray_estimators_data_get(&estimators) + p));
   }
-  ERR(dump_map(stardis, &estimators, stdout));
+  if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+    ERR(dump_map(stardis, &estimators, stdout));
+  }
 
 end:
   if(estimators_initialized) {

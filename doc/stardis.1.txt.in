@@ -82,6 +82,11 @@ A main property of this approach is that the resulting algorithms do
 not rely on a volumic mesh of the system: only the representation
 of interfaces is necessary.
 
+*stardis* supports shared memory parallelism and relies on the Message
+Passing Interface specification [4] to parallelise its computations in a
+distributed memory environment; it can thus be run either directly or through
+a MPI process launcher like *mpirun(1)*.
+
 [1] Delatorre et al., Monte Carlo advances and concentrated solar applications,
 Solar Energy, 2014
 
@@ -90,6 +95,8 @@ Mathematical Statistics, 1949.
 
 [3] Muller, Some continuous Monte-Carlo Methods for the Dirichlet Problem,
 Transactions of the American Mathematical Society, 1956.
+
+[4] MPI specifications - https://www.mpi-forum.org/docs/
 
 MANDATORY OPTIONS
 -----------------
@@ -317,9 +324,11 @@ Compute 3 probe temperatures, ensuring statistical independence:
     $ stardis -M model.txt -p 1,2.5,0,50,5000 -xstate1 -Xstate2
     $ stardis -M model.txt -p 1,3.5,0,50,5000 -xstate2
 
+
+Use mpirun(1) to launch stardis on several hosts defined in the my_hosts file.
 Render the system as described in *scene.txt* with default settings:
 
-    $ stardis -M scene.txt -R :
+    $ mpirun --hostfile my_hosts stardis -M scene.txt -R :
 
 Render the system as described in *scn.txt* at *t=100*, *spp=2*,
 *img=800x600*, with output format *fmt=ht* and all other settings set to their
@@ -353,3 +362,4 @@ SEE ALSO
 *sgreen*(1),
 *htpp*(1)
 *htrdr-image*(5)
+*mpirun(1)*

@@ -128,7 +128,7 @@ exit:
     mem_shutdown_proxy_allocator(&allocator);
   }
 #ifdef STARDIS_ENABLE_MPI
-  finalize_mpi(&stardis);
+  finalize_mpi();
 #endif
 
   return err;

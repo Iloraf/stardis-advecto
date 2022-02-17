@@ -869,8 +869,7 @@ init_mpi
    void (*prt_warn_fn)(const char* msg, void* ctx));
 
 extern LOCAL_SYM void
-finalize_mpi
-  (struct stardis* stardis);
+finalize_mpi(void);
 #endif
 
 extern LOCAL_SYM res_T

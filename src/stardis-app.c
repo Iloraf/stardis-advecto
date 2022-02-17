@@ -248,11 +248,9 @@ error:
 }
 
 void
-finalize_mpi
-  (struct stardis* stardis)
+finalize_mpi(void)
 {
   int initialized;
-  ASSERT(stardis);
 
   CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
   if(initialized)

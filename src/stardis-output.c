@@ -20,6 +20,7 @@
 #include "stardis-solid.h"
 #include "stardis-intface.h"
 #include "stardis-app.h"
+#include "stardis-green-types.h"
 
 #include <sdis.h>
 
@@ -68,23 +69,6 @@ enum enclosure_errors_t {
 };
 
 
-/******************************************************************************
- * Local Type used to write binary Green the way sgreen expects it
- * (its mainly a matter of record size and layout)
- *****************************************************************************/
-struct green_description {
-  enum description_type type;
-  union {
-    struct fluid fluid;
-    struct solid solid;
-    struct t_boundary t_boundary;
-    struct f_boundary f_boundary;
-    struct h_boundary h_boundary;
-    struct solid_fluid_connect sf_connect;
-    struct solid_solid_connect ss_connect;
-  } d;
-};
-
 static res_T
 copy_desc_to_green_desc
   (struct green_description* gdesc,
@@ -97,36 +81,64 @@ copy_desc_to_green_desc
   sz = darray_descriptions_size_get(descriptions);
   CHK(idx < sz);
   desc = darray_descriptions_cdata_get(descriptions) + idx;
-  gdesc->type = desc->type;
   switch(desc->type) {
-    case DESC_MAT_FLUID:
-      gdesc->d.fluid = *desc->d.fluid;
-      CHK(desc->d.fluid->desc_id < sz);
-      break;
     case DESC_MAT_SOLID:
-      gdesc->d.solid = *desc->d.solid;
-      CHK(desc->d.solid->desc_id < sz);
+      gdesc->type = GREEN_MAT_SOLID;
+      strcpy(gdesc->d.solid.name, str_cget(&desc->d.solid->name));
+      gdesc->d.solid.conductivity = desc->d.solid->lambda;
+      gdesc->d.solid.volumic_mass = desc->d.solid->rho;
+      gdesc->d.solid.calorific_capacity = desc->d.solid->cp;
+      gdesc->d.solid.volumic_power = desc->d.solid->vpower;
+      gdesc->d.solid.initial_temperature = desc->d.solid->tinit;
+      gdesc->d.solid.imposed_temperature = desc->d.solid->imposed_temperature;
+      break;
+    case DESC_MAT_FLUID:
+      gdesc->type = GREEN_MAT_FLUID;
+      strcpy(gdesc->d.fluid.name, str_cget(&desc->d.fluid->name));
+      gdesc->d.fluid.volumic_mass = desc->d.fluid->rho;
+      gdesc->d.fluid.calorific_capacity = desc->d.fluid->cp;
+      gdesc->d.fluid.initial_temperature = desc->d.fluid->tinit;
+      gdesc->d.fluid.imposed_temperature = desc->d.fluid->imposed_temperature;
       break;
     case DESC_BOUND_H_FOR_FLUID:
     case DESC_BOUND_H_FOR_SOLID:
-      gdesc->d.h_boundary = *desc->d.h_boundary;
-      CHK(desc->d.h_boundary->mat_id < sz);
+      gdesc->type = GREEN_BOUND_H;
+      strcpy(gdesc->d.h_boundary.name, str_cget(&desc->d.h_boundary->name));
+      gdesc->d.h_boundary.reference_temperature
+	= desc->d.h_boundary->ref_temperature;
+      gdesc->d.h_boundary.emissivity = desc->d.h_boundary->emissivity;
+      gdesc->d.h_boundary.specular_fraction
+	= desc->d.h_boundary->specular_fraction;
+      gdesc->d.h_boundary.convection_coefficient = desc->d.h_boundary->hc;
+      gdesc->d.h_boundary.imposed_temperature
+	= desc->d.h_boundary->imposed_temperature;
       break;
     case DESC_BOUND_T_FOR_SOLID:
-      gdesc->d.t_boundary = *desc->d.t_boundary;
-      CHK(desc->d.t_boundary->mat_id < sz);
+      gdesc->type = GREEN_BOUND_T;
+      strcpy(gdesc->d.t_boundary.name, str_cget(&desc->d.t_boundary->name));
+      gdesc->d.t_boundary.imposed_temperature
+	= desc->d.t_boundary->imposed_temperature;
       break;
     case DESC_BOUND_F_FOR_SOLID:
-      gdesc->d.f_boundary = *desc->d.f_boundary;
-      CHK(desc->d.f_boundary->mat_id < sz);
+      gdesc->type = GREEN_BOUND_F;
+      strcpy(gdesc->d.f_boundary.name, str_cget(&desc->d.f_boundary->name));
+      gdesc->d.f_boundary.imposed_flux
+	= desc->d.f_boundary->imposed_flux;
       break;
     case DESC_SOLID_FLUID_CONNECT:
-      gdesc->d.sf_connect = *desc->d.sf_connect;
-      CHK(desc->d.sf_connect->connection_id < sz);
+      gdesc->type = GREEN_SOLID_FLUID_CONNECT;
+      strcpy(gdesc->d.sf_connect.name, str_cget(&desc->d.sf_connect->name));
+      gdesc->d.sf_connect.reference_temperature
+	= desc->d.sf_connect->ref_temperature;
+      gdesc->d.sf_connect.emissivity = desc->d.sf_connect->emissivity;
+      gdesc->d.sf_connect.specular_fraction
+	= desc->d.sf_connect->specular_fraction;
+      gdesc->d.sf_connect.convection_coefficient = desc->d.sf_connect->hc;
       break;
     case DESC_SOLID_SOLID_CONNECT:
-      gdesc->d.ss_connect = *desc->d.ss_connect;
-      CHK(desc->d.ss_connect->connection_id < sz);
+      gdesc->type = GREEN_SOLID_SOLID_CONNECT;
+      strcpy(gdesc->d.ss_connect.name, str_cget(&desc->d.ss_connect->name));
+      gdesc->d.ss_connect.thermal_contact_resistance = desc->d.ss_connect->tcr;
       break;
     default: return RES_BAD_ARG;
   }
@@ -531,12 +543,6 @@ abort:
     goto error; \
   }
 
-struct path_header {
-  unsigned end_id;
-  unsigned pcount, fcount;
-  char at_initial;
-};
-
 static FINLINE double
 medium_get_t0
   (struct sdis_medium* medium)
@@ -642,7 +648,7 @@ dump_sample
 {
   res_T res = RES_OK;
   struct htable_weigth_iterator it, end;
-  struct path_header header;
+  struct green_sample_header header;
   struct w_ctx* w_ctx = ctx;
   enum sdis_green_path_end_type end_type;
   FILE* stream;
@@ -659,7 +665,7 @@ dump_sample
   trad_id = (unsigned)sz;
   if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
     header.at_initial = 0;
-    header.end_id = trad_id;
+    header.sample_end_description_id = trad_id;
   } else {
     struct sdis_point pt = SDIS_POINT_NULL;
     struct sdis_data* data = NULL;
@@ -684,7 +690,7 @@ dump_sample
         d__ = sdis_data_get(data);
         desc_id = d__->desc_id;
         CHK(DESC_IS_T(descs[desc_id].type) || DESC_IS_H(descs[desc_id].type));
-        header.end_id = desc_id;
+        header.sample_end_description_id = desc_id;
         header.at_initial = 0;
         break;
       }
@@ -695,16 +701,16 @@ dump_sample
         header.at_initial = (pt.data.mdmvert.vertex.time <= t0);
         if(pt.data.mdmvert.vertex.P[0] == INF) {
           /* Radiative output (Trad) */
-          header.end_id = trad_id;
+          header.sample_end_description_id = trad_id;
         }
         else if(type == SDIS_FLUID) {
           struct fluid** pfluid = sdis_data_get(data);
-          header.end_id = (*pfluid)->desc_id;
+          header.sample_end_description_id = (*pfluid)->desc_id;
         } else {
           struct solid** psolid = sdis_data_get(data);
           ASSERT(type == SDIS_SOLID);
           ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
-          header.end_id = (*psolid)->desc_id;
+          header.sample_end_description_id = (*psolid)->desc_id;
         }
         break;
       default: FATAL("Unreachable code.\n"); break;
@@ -718,16 +724,16 @@ dump_sample
   ERR(sdis_green_path_for_each_flux_term(path, merge_flux_terms, w_ctx));
   sz = htable_weigth_size_get(&w_ctx->pw);
   if(sz > UINT_MAX) goto abort;
-  header.pcount = (unsigned)sz;
+  header.pw_count = (unsigned)sz;
   sz = htable_weigth_size_get(&w_ctx->flux);
   if(sz > UINT_MAX) goto abort;
-  header.fcount = (unsigned)sz;
+  header.fx_count = (unsigned)sz;
 
   /* Write path's header */
   FW(&header, 1);
 
   /* Allocate buffers */
-  sz = header.pcount + header.fcount;
+  sz = header.pw_count + header.fx_count;
   ids = MEM_CALLOC(w_ctx->alloc, sz, sizeof(*ids));
   weights = MEM_CALLOC(w_ctx->alloc, sz, sizeof(*weights));
   if(!ids || !weights) {
@@ -748,7 +754,7 @@ dump_sample
     htable_weigth_iterator_next(&it);
     i++;
   }
-  CHK(i == header.pcount);
+  CHK(i == header.pw_count);
 
   htable_weigth_begin(&w_ctx->flux, &it);
   htable_weigth_end(&w_ctx->flux, &end);
@@ -761,7 +767,7 @@ dump_sample
     htable_weigth_iterator_next(&it);
     i++;
   }
-  CHK(i == header.pcount + header.fcount);
+  CHK(i == header.pw_count + header.fx_count);
 
   FW(ids, sz);
   FW(weights, sz);
@@ -784,94 +790,47 @@ dump_green_bin
    FILE* stream)
 {
   res_T res = RES_OK;
-  size_t ok_count, failed_count;
-  size_t sz;
+  size_t sz, i;
   struct w_ctx w_ctx;
   int table_initialized = 0;
-  unsigned i, szd;
-  const struct description* descs;
-  unsigned name_pool_sz = 0;
-  char* name_pool = NULL;
-  char* pool_ptr;
-  const char green_string[] = "GREEN_BIN_FILE:";
-  const unsigned file_fmt_version = 4;
   /* The following type must be identical to its stardis-green counterpart! */
-  struct bfile_green_counts {
-    unsigned desc_count, smed_count, fmed_count, tbound_count, hbound_count,
-      fbound_count, sfconnect_count, ssconnect_count, name_pool_sz;
-    size_t ok_count, failed_count;
-  } file_counts;
+  struct green_file_header header;
 
   ASSERT(green && stardis && stream);
 
-  ERR(sdis_green_function_get_paths_count(green, &ok_count));
-  ERR(sdis_green_function_get_invalid_paths_count(green, &failed_count));
+  /* Init header */
+  strcpy(header.green_string, BIN_FILE_IDENT_STRING);
+  header.file_format_version = GREEN_FILE_FORMAT_VERSION;
+  header.solid_count = stardis->counts.smed_count;
+  header.fluid_count = stardis->counts.fmed_count;
+  header.tbound_count = stardis->counts.tbound_count;
+  header.hbound_count = stardis->counts.hbound_count;
+  header.fbound_count = stardis->counts.fbound_count;
+  header.sfconnect_count = stardis->counts.sfconnect_count;
+  header.ssconnect_count = stardis->counts.ssconnect_count;
+  ERR(sdis_green_function_get_paths_count(green, &header.ok_count));
+  ERR(sdis_green_function_get_invalid_paths_count(green, &header.failed_count));
   sz = darray_descriptions_size_get(&stardis->descriptions);
   if(sz > UINT_MAX) goto abort;
-  szd = (unsigned)sz;
-  ASSERT(szd ==
+  ASSERT(sz ==
     (stardis->counts.smed_count + stardis->counts.fmed_count
       + stardis->counts.tbound_count + stardis->counts.hbound_count
       + stardis->counts.fbound_count + stardis->counts.sfconnect_count
       + stardis->counts.ssconnect_count));
-  descs = darray_descriptions_cdata_get(&stardis->descriptions);
+  header.description_count = (unsigned)sz;
+  header.ambient_radiative_temperature = stardis->trad;
+  header.ambient_radiative_temperature_reference = stardis->trad_ref;
+  d2_set(header.time_range, stardis->time_range);
 
-  /* Save names that do not fit inplace */
-  FOR_EACH(i, 0, szd) {
-    const struct description* desc = descs + i;
-    const struct str* name = get_description_name(desc);
-    const size_t len = str_len(name);
-    if(name_pool_sz + len + 1 > UINT_MAX) goto abort;
-    name_pool_sz += (unsigned)(len + 1);
-  }
-  pool_ptr = name_pool = MEM_ALLOC(stardis->allocator, name_pool_sz);
-  if(!name_pool) {
-    res = RES_MEM_ERR;
-    goto error;
-  }
-  FOR_EACH(i, 0, szd) {
-    const struct description* desc = descs + i;
-    const struct str* name = get_description_name(desc);
-    const size_t len = str_len(name);
-    strcpy(pool_ptr, name->cstr);
-    pool_ptr += len + 1;
-  }
-  ASSERT(pool_ptr == name_pool + name_pool_sz);
-  /* Write Green string and file format version */
-  FW(green_string, sizeof(green_string));
-  FW(&file_fmt_version, 1);
-
-  /* Write counts */
-  file_counts.desc_count = szd;
-  file_counts.smed_count = stardis->counts.smed_count;
-  file_counts.fmed_count = stardis->counts.fmed_count;
-  file_counts.tbound_count = stardis->counts.tbound_count;
-  file_counts.hbound_count = stardis->counts.hbound_count;
-  file_counts.fbound_count = stardis->counts.fbound_count;
-  file_counts.sfconnect_count = stardis->counts.sfconnect_count;
-  file_counts.ssconnect_count = stardis->counts.ssconnect_count;
-  file_counts.name_pool_sz = name_pool_sz;
-  file_counts.ok_count = ok_count;
-  file_counts.failed_count = failed_count;
-  FW(&file_counts, 1);
+  /* Write header */
+  FW(&header, 1);
 
   /* Write descriptions*/
-  for(i = 0; i < szd; i++) {
+  for(i = 0; i < sz; i++) {
     struct green_description desc;
     ERR(copy_desc_to_green_desc(&desc, &stardis->descriptions, i));
     FW(&desc, 1);
   }
-
-  /* Write names */
-  if(name_pool_sz)
-    FW(name_pool, name_pool_sz);
-
-  /* Write radiative temperatures */
-  FW(&stardis->trad, 1);
-  FW(&stardis->trad_ref, 1);
-
-  /* Write time range */
-  FW(&stardis->time_range, 2);
 
   w_ctx.alloc = stardis->allocator;
   w_ctx.desc = &stardis->descriptions;
@@ -884,7 +843,6 @@ dump_green_bin
   ERR(sdis_green_function_for_each_path(green, dump_sample, &w_ctx));
 
 end:
-  MEM_RM(stardis->allocator, name_pool);
   if(table_initialized) htable_weigth_release(&w_ctx.pw);
   if(table_initialized) htable_weigth_release(&w_ctx.flux);
   return res;
@@ -929,7 +887,7 @@ print_sample
   enum sdis_medium_type type;
   struct htable_weigth_iterator it, end;
   unsigned desc_id;
-  size_t pcount, fcount;
+  size_t pw_count, fx_count;
   struct w_ctx* w_ctx = ctx;
   const struct description* descs;
   CHK(path && ctx);
@@ -995,17 +953,17 @@ print_sample
   default: FATAL("Unreachable code.\n"); break;
   }
 
-  ERR(sdis_green_function_get_power_terms_count(path, &pcount));
+  ERR(sdis_green_function_get_power_terms_count(path, &pw_count));
 
   htable_weigth_clear(&w_ctx->pw);
   htable_weigth_clear(&w_ctx->flux);
   ERR(sdis_green_path_for_each_power_term(path, merge_power_terms, w_ctx));
   ERR(sdis_green_path_for_each_flux_term(path, merge_flux_terms, w_ctx));
-  fcount = htable_weigth_size_get(&w_ctx->flux);
+  fx_count = htable_weigth_size_get(&w_ctx->flux);
 
-  if(pcount > ULONG_MAX || fcount > ULONG_MAX) goto abort;
+  if(pw_count > ULONG_MAX || fx_count > ULONG_MAX) goto abort;
   fprintf(w_ctx->stream, "\t%lu\t%lu",
-    (unsigned long)pcount, (unsigned long)fcount);
+    (unsigned long)pw_count, (unsigned long)fx_count);
 
   htable_weigth_begin(&w_ctx->pw, &it);
   htable_weigth_end(&w_ctx->pw, &end);

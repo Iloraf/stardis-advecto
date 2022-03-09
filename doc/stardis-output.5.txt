@@ -228,32 +228,34 @@ follows:
 
 === BINARY GREEN
 
-Thereafter is the format of binary Green outputs. This output is produced by
-fwrite calls and does not take care of endianness. Comments include the C type
-of the written data.
+Binary Green outputs are formated according to the various C types from the
+*stardis-green.h* header file. The output begins with a header (of type struct
+green_file_header) that includes counts, followed by descriptions (of type
+struct green_description) and samples. Thereafter is the format of binary
+Green outputs. This output is produced by fwrite calls and does not take care
+of endianness. Comments include the C type of the written data.
 
 [verse]
 _______
-<binary-green> ::= "BINGREEN" # char[8]
+<binary-green> ::= "GREEN_BIN_FILE:" # char[16]
+                   <file_format_version> # unsigned
                    #descriptions # unsigned
                    #solids # unsigned
                    #fluids # unsigned
-                   #t-boundaries # unsigned
                    #h-boundaries # unsigned
-                   #flux-boundaries # unsigned
+                   #t-boundaries # unsigned
+                   #f-boundaries # unsigned
                    #solid-fluid-connections # unsigned
-                   names-pool-size # size of concatenated description names
-                                   # unsigned
+                   #solid-solid-connections # unsigned
                    #ok-samples # size_t
                    #failed-samples # size_t
-                   <descriptions>
-                   <concatenated-names> # char[names-pool-size]
                    Trad # double
                    Trad-reference # double
                    time-range # double[2]
+                   <descriptions>
                    <samples>
 
-<descriptions> ::= description # struct description
+<descriptions> ::= description # struct green_description
                    <descriptions> # #descriptions descriptions
 
 <samples>      ::= <sample>
@@ -261,113 +263,11 @@ _______
 
 ---------------------
 
-<sample>       ::= <sample-header> # struct path_header
-                   <ids> # unsigned[header.pcount + header.fcount]
-                   <weights> # double[header.pcount + header.fcount]
+<sample>       ::= <sample-header> # struct green_sample_header
+                   <ids> # unsigned[header.pw_count then header.fx_count]
+                   <weights> # double[header.pw_count then header.fx_count]
 _______
 
-[literal]
- /* The content of stuct str name members in descriptions is meaningless.
-  * The name of the ith description is the ith nul-terminated string in
-  * <concatenated-names>.
-  * As a convenience, one could use char* baz to store a pointer to the
-  * description's name into <concatenated-names>. */
- struct str {
-   void* foo;
-   size_t bar;
-   char* baz;
-   char qux[16];
- };
-
- struct mat_fluid {
-   struct str name;
-   double rho;
-   double cp;
-   double tinit;
-   double imposed_temperature;
-   double t0;
-   int is_outside;
-   int is_green;
-   unsigned desc_id;
-   unsigned fluid_id;
- };
-
- struct mat_solid {
-   struct str name;
-   double lambda;
-   double rho;
-   double cp;
-   double delta;
-   double tinit;
-   double imposed_temperature;
-   double vpower;
-   double t0;
-   int is_outside;
-   int is_green;
-   unsigned desc_id;
-   unsigned solid_id;
- };
-
- struct t_boundary {
-   struct str name;
-   double imposed_temperature;
-   unsigned mat_id;
- };
-
- struct h_boundary {
-   struct str name;
-   double ref_temperature;
-   double emissivity;
-   double specular_fraction;
-   double hc;
-   double imposed_temperature;
-   unsigned mat_id;
- };
-
- struct solid_fluid_connect {
-   struct str name;
-   double ref_temperature;
-   double emissivity;
-   double specular_fraction;
-   double hc;
-   unsigned connection_id;
- };
-
- enum description_type {
-   DESC_MAT_SOLID,
-   DESC_MAT_FLUID,
-   DESC_BOUND_H_FOR_FLUID,
-   DESC_BOUND_H_FOR_SOLID,
-   DESC_BOUND_T_FOR_SOLID,
-   DESC_BOUND_F_FOR_SOLID,
-   DESC_SOLID_FLUID_CONNECT,
-   DESCRIPTION_TYPE_COUNT__,
-   DESC_OUTSIDE
- };
-
- struct f_boundary {
-   struct str name;
-   double imposed_flux;
-   unsigned mat_id;
- };
-
- struct description {
-   enum description_type type;
-   union {
-     struct mat_fluid fluid;
-     struct mat_solid solid;
-     struct t_boundary t_boundary;
-     struct f_boundary f_boundary;
-     struct h_boundary h_boundary;
-     struct solid_fluid_connect sf_connect;
-   } d;
- };
-
- struct path_header {
-   unsigned id;
-   unsigned pcount, fcount;
-   char at_initial;
- };
 
 === ASCII GREEN
 

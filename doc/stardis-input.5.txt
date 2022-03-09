@@ -208,11 +208,12 @@ one or ore ASCII characters, including numbers and special characters like
 spacing* either escaped or not. Names are case-sensitive and two different
 description lines, either in the same description file or from different
 description files, cannot use the same name. Additionaly, medium and boundary
-names cannot be parsable as a number, nor be one of the few keywords defined
+names cannot be parsable as a number, nor be one of the keywords defined
 by the present grammar (AUTO, BACK, BOTH, FLUID, FRONT, F_BOUNDARY_FOR_SOLID,
 H_BOUNDARY_FOR_FLUID, H_BOUNDARY_FOR_SOLID, SCALE, SOLID,
 SOLID_FLUID_CONNECTION, T_BOUNDARY_FOR_FLUID, T_BOUNDARY_FOR_SOLID, UNKNOWN) or
-their lowercase counterparts.
+their lowercase counterparts. Finally, description names cannot be longer than
+63 characters.
 
 EXAMPLES
 --------

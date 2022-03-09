@@ -17,6 +17,8 @@ cmake_minimum_required(VERSION 3.0)
 project(stardis C)
 
 set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
+set(SDIS_SGT_DIR ${PROJECT_SOURCE_DIR}/../stardis-green-types)
+
 
 option(ENABLE_MPI
   "Enable the support of distributed parallelism \
@@ -70,6 +72,14 @@ configure_file(${SDIS_SOURCE_DIR}/stardis-default.h.in
 configure_file(${SDIS_SOURCE_DIR}/stardis-version.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-version.h @ONLY)
 
+set(STARDIS_GREEN_TYPES_VERSION "4")
+
+configure_file(${SDIS_SOURCE_DIR}/stardis-green-types.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-green-types/stardis-green-types.h @ONLY)
+
+configure_file(${SDIS_SGT_DIR}/stardis-green-types-config-version.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-green-types/stardis-green-types-config-version.cmake @ONLY)
+
 ###############################################################################
 # Check dependencies
 ###############################################################################
@@ -99,7 +109,8 @@ include_directories(
   ${Stardis_INCLUDE_DIR}
   ${StarSTL_INCLUDE_DIR}
   ${StarSP_INCLUDE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR})
+  ${CMAKE_CURRENT_BINARY_DIR}
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-green-types)
 if(MSVC)
   include_directories(${MuslGetopt_INCLUDE_DIR})
 endif()
@@ -124,6 +135,8 @@ if(NOT STARDIS_DOC STREQUAL "NONE")
   add_subdirectory(doc)
 endif()
 
+add_subdirectory(stardis-green-types)
+
 ###############################################################################
 # Configure and define targets
 ###############################################################################
@@ -144,6 +157,7 @@ set(SDIS_FILES_INC
   stardis-compute.h
   stardis-default.h.in
   stardis-fluid.h
+  stardis-green-types.h.in
   stardis-intface.h
   stardis-output.h
   stardis-parsing.h
@@ -186,5 +200,7 @@ install(TARGETS stardis
   RUNTIME DESTINATION bin)
 
 install(FILES ${SDIS_FILES_DOC} DESTINATION share/doc/stardis)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stardis-version.h
+	DESTINATION include/stardis)
 
 rcmake_copy_runtime_libraries(stardis)

@@ -17,12 +17,11 @@
 #include "stardis-parsing.h"
 #include "stardis-app.h"
 #include "stardis-default.h"
-#include "stardis-version.h"
+#include "stardis-green-types.h"
 
 #include <rsys/cstr.h>
 #include <rsys/double2.h>
 #include <rsys/double3.h>
-#include <sdis_version.h>
 #include <rsys/logger.h>
 
 #include <getopt.h>
@@ -261,6 +260,7 @@ description_set_name
     "H_BOUNDARY_FOR_FLUID", "H_BOUNDARY_FOR_SOLID", "SCALE", "SOLID",
     "SOLID_FLUID_CONNECTION", "SOLID_SOLID_CONNECTION", "TRAD",
     "T_BOUNDARY_FOR_SOLID", "UNKNOWN" };
+  const char* reason = NULL;
   int i;
   ASSERT(name && tk);
 
@@ -270,21 +270,31 @@ description_set_name
   if(RES_OK == cstr_to_double(tk, &foo)) {
     /* A number is not a sensible choice for a name! */
     res = RES_BAD_ARG;
+    reason = "number";
     goto error;
   }
   FOR_EACH(i, 0, sizeof(keywords) / sizeof(*keywords)) {
     if(0 == strcasecmp(tk, keywords[i])) {
       /* A keyword is not a sensible choice for a name! */
       res = RES_BAD_ARG;
+      reason = "reserved keyword";
       goto error;
     }
+  }
+  if(str_len(name) > DESC_NAME_MAX_LEN) {
+    /* Due to Green export limitations, names are limited in length */
+    res = RES_BAD_ARG;
+    reason = "too long";
+    goto error;
   }
   /* Name is OK */
 
 end:
   return res;
 error:
-  logger_print(stardis->logger, LOG_ERROR, "Invalid name: %s\n", tk);
+  ASSERT(reason != NULL);
+  logger_print(stardis->logger, LOG_ERROR, "Invalid name (%s): %s\n",
+    reason, tk);
   goto end;
 }
 

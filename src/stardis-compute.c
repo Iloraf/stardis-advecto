@@ -376,7 +376,10 @@ error:
 
 #define READ_RANDOM_STATE(Name) \
   if(!stardis->mpi_initialized || stardis->mpi_rank == 0) { \
-    if(!str_is_empty(Name)) { \
+    if(str_is_empty(Name)) { \
+      /* Force using threefry independently of the default RNG type */ \
+      args.rng_type = SSP_RNG_THREEFRY; \
+    } else { \
       const char* name = str_cget(Name); \
       stream = fopen(name, "r"); \
       if(!stream) { \
@@ -386,7 +389,7 @@ error:
           name); \
         goto error; \
       } \
-      ERR(ssp_rng_create(stardis->allocator, SSP_RNG_MT19937_64, &args.rng_state)); \
+      ERR(ssp_rng_create(stardis->allocator, SSP_RNG_THREEFRY, &args.rng_state)); \
       res =  read_random_generator_state(args.rng_state, stream); \
       if(res != RES_OK) { \
         logger_print(stardis->logger, LOG_ERROR, \

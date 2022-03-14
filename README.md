@@ -22,7 +22,10 @@ It also depends on the
 [star-stl](https://gitlab.com/meso-star/star-stl) and
 [stardis-solver](https://gitlab.com/meso-star/stardis-solver) libraries
 as well as on the [OpenMP](http://www.openmp.org) 2.0 specification to
-parallelize its computations.
+parallelize its computations.  It may depend on
+[OpenMPI](https://www.open-mpi.org/) 2.0 if distributed memory parallelism
+is enabled via the `ENABLE_MPI` variable of the CMake file.
+
 
 
 First ensure that CMake and a C compiler are installed on your system.
@@ -32,6 +35,18 @@ the `cmake/CMakeLists.txt` file by appending to the `CMAKE_PREFIX_PATH`
 variable the install directories of its dependencies.
 
 ## Release notes
+
+## Version 0.8
+
+- Add a new option to support non-linear radiative transfer computations.
+- Changes in input file's format to support non-linear radiative transfer by
+  adding reference temperatures on interfaces.
+- Add optional support for MPI (must be enabled at compile time, default is OFF).
+- Change random number generator type to use Threefry.
+- Change the format of binary Green files. A new public header file is now
+  installed that describes all types involved in binary Green files.
+- Fix a crash on an exit-on-error execution path.
+- Fix parsing of command-line options.
 
 ### Version 0.7.2
 

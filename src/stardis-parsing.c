@@ -16,6 +16,24 @@
 #define _POSIX_C_SOURCE 200809L /* strdup */
 #include "stardis-parsing.h"
 #include "stardis-app.h"
+#include "stardis-prog-properties.h"
+#include "stardis-args.h"
+#include "stardis-description.h"
+#include "stardis-hbound.h"
+#include "stardis-hbound-prog.h"
+#include "stardis-tbound.h"
+#include "stardis-tbound-prog.h"
+#include "stardis-fbound.h"
+#include "stardis-fbound-prog.h"
+#include "stardis-sfconnect.h"
+#include "stardis-sfconnect-prog.h"
+#include "stardis-ssconnect.h"
+#include "stardis-ssconnect-prog.h"
+#include "stardis-fluid-prog.h"
+#include "stardis-fluid.h"
+#include "stardis-solid-prog.h"
+#include "stardis-solid.h"
+#include "stardis-program.h"
 #include "stardis-default.h"
 #include "stardis-green-types.h"
 
@@ -23,8 +41,9 @@
 #include <rsys/double2.h>
 #include <rsys/double3.h>
 #include <rsys/logger.h>
+#include <rsys/text_reader.h>
+#include <rsys/library.h>
 
-#include <getopt.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -40,23 +59,7 @@
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
-
-void
-add_geom_ctx_indices
-  (const unsigned itri,
-   unsigned ids[3],
-   void* context)
-{
-  const struct add_geom_ctx* ctx = context;
-  const unsigned* trg;
-  int i;
-  ASSERT(ids && ctx);
-  ASSERT(itri < ctx->stl_desc.triangles_count);
-  trg = ctx->stl_desc.indices + 3 * itri;
-  for(i = 0; i < 3; i++) ids[i] = trg[i];
-}
-
-void
+static void
 add_geom_ctx_properties
   (const unsigned itri,
    unsigned prop[3],
@@ -70,20 +73,6 @@ add_geom_ctx_properties
   for(i = 0; i < SG3D_PROP_TYPES_COUNT__; i++) prop[i] = ctx->properties[i];
 }
 
-void
-add_geom_ctx_position
-  (const unsigned ivert,
-   double pos[3],
-   void* context)
-{
-  const struct add_geom_ctx* ctx = context;
-  const float* v;
-  ASSERT(pos && ctx);
-  ASSERT(ivert < ctx->stl_desc.vertices_count);
-  v = ctx->stl_desc.vertices + 3 * ivert;
-  d3_set_f3(pos, v);
-}
-
 static res_T
 add_geom_keep_degenerated
   (const unsigned itri,
@@ -92,7 +81,6 @@ add_geom_keep_degenerated
 {
   const struct add_geom_ctx* ctx = context;
   struct darray_uint* degenerated;
-
   ASSERT(abort && ctx && ctx->custom); (void)abort;
   ASSERT(itri < ctx->stl_desc.triangles_count);
   degenerated = ctx->custom;
@@ -139,7 +127,7 @@ read_sides_and_files
       add_geom_ctx.properties[SG3D_INTFACE] = description_id;
     } else {
       tk = strtok_r(NULL, " \t", tok_ctx);
-      if(!tk) {
+      if(!tk || 0 == strcasecmp(tk, "PROG_PARAMS")) {
         if(file_count == 0) {
           /* At least 1 side */
           logger_print(stardis->logger, LOG_ERROR,
@@ -170,9 +158,9 @@ read_sides_and_files
       }
     }
     tk = strtok_r(NULL, " \t", tok_ctx);
-    if(!tk) {
-      if(!descr_is_intface /* Has read a side */
-        || !file_count) /* Need at least 1 file */
+    if(!tk || 0 == strcasecmp(tk, "PROG_PARAMS")) {
+      if(!descr_is_intface /* Has read a side specifier */
+        || !file_count) /* Need at least 1 file name */
       {
         logger_print(stardis->logger, LOG_ERROR,
           "Invalid data (missing token 'file name')\n");
@@ -207,7 +195,7 @@ read_sides_and_files
         "File '%s' included %lu degenerated triangles (removed)\n",
         tk, (unsigned long)c);
       ERR(str_printf(&str, "Degenerated triangles IDs: %u", ids[0]));
-      FOR_EACH(n, 1, c) { STR_APPEND_PRINTF(&str, ", %u", ARG1( ids[n] ) ); }
+      FOR_EACH(n, 1, c) { ERR(str_append_printf(&str, ", %u", ids[n])); }
       logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
       darray_uint_clear(&degenerated);
     }
@@ -246,6 +234,34 @@ error:
 /*******************************************************************************
  * Public Functions
  ******************************************************************************/
+void
+add_geom_ctx_position
+  (const unsigned ivert,
+   double pos[3],
+   void* context)
+{
+  const struct add_geom_ctx* ctx = context;
+  const float* v;
+  ASSERT(pos && ctx);
+  ASSERT(ivert < ctx->stl_desc.vertices_count);
+  v = ctx->stl_desc.vertices + 3 * ivert;
+  d3_set_f3(pos, v);
+}
+
+void
+add_geom_ctx_indices
+  (const unsigned itri,
+   unsigned ids[3],
+   void* context)
+{
+  const struct add_geom_ctx* ctx = context;
+  const unsigned* trg;
+  int i;
+  ASSERT(ids && ctx);
+  ASSERT(itri < ctx->stl_desc.triangles_count);
+  trg = ctx->stl_desc.indices + 3 * itri;
+  for(i = 0; i < 3; i++) ids[i] = trg[i];
+}
 
 static res_T
 description_set_name
@@ -256,10 +272,13 @@ description_set_name
   res_T res = RES_OK;
   double foo;
   const char* keywords[] = {
-    "AUTO", "BACK", "BOTH", "FLUID", "FRONT", "F_BOUNDARY_FOR_SOLID",
-    "H_BOUNDARY_FOR_FLUID", "H_BOUNDARY_FOR_SOLID", "SCALE", "SOLID",
-    "SOLID_FLUID_CONNECTION", "SOLID_SOLID_CONNECTION", "TRAD",
-    "T_BOUNDARY_FOR_SOLID", "UNKNOWN" };
+    "AUTO", "BACK", "BOTH", "FLUID", "FLUID_PROG", "FRONT", "F_BOUNDARY_FOR_SOLID",
+    "F_BOUNDARY_FOR_SOLID_PROG", "H_BOUNDARY_FOR_FLUID", "H_BOUNDARY_FOR_FLUID_PROG",
+    "H_BOUNDARY_FOR_SOLID", "H_BOUNDARY_FOR_SOLID_PROG", "PROGRAM", "PROG_PARAMS",
+    "SCALE", "SOLID", "SOLID_PROG", "SOLID_FLUID_CONNECTION",
+    "SOLID_FLUID_CONNECTION_PROG", "SOLID_SOLID_CONNECTION",
+    "SOLID_SOLID_CONNECTION_PROG", "TRAD", "T_BOUNDARY_FOR_SOLID",
+    "T_BOUNDARY_FOR_SOLID_PROG", "UNKNOWN" };
   const char* reason = NULL;
   int i;
   ASSERT(name && tk);
@@ -305,7 +324,7 @@ find_description_by_name
    const struct description* self)
 {
   size_t i;
-  ASSERT(stardis && name && self);
+  ASSERT(stardis && name);
 
   FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
     struct description* desc
@@ -339,7 +358,7 @@ process_h
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz+1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  ERR(init_h(stardis->allocator, &desc->d.h_boundary));
+  ERR(init_h_boundary(stardis->allocator, &desc->d.h_boundary));
   h_boundary = desc->d.h_boundary;
   desc->type = type;
 
@@ -384,12 +403,13 @@ process_h
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "hc");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "Convection coefficient");
   res = cstr_to_double(tk, &h_boundary->hc);
   if(res != RES_OK
     || h_boundary->hc < 0)
   {
-    logger_print(stardis->logger, LOG_ERROR, "Invalid hc: %s\n", tk);
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid Convection coefficient: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
@@ -409,14 +429,14 @@ process_h
     ERR(get_dummy_solid_id(stardis, &h_boundary->mat_id));
   else {
     struct fluid* fluid = NULL;
+    ASSERT(type == DESC_BOUND_H_FOR_SOLID);
     ERR(init_fluid(stardis->allocator, &fluid));
     fluid->fluid_id = allocate_stardis_medium_id(stardis);
     h_boundary->mat_id = fluid->fluid_id;
     h_boundary->possible_external_fluid = fluid;
     ASSERT(sz <= UINT_MAX);
     fluid->desc_id = (unsigned)sz;
-    fluid->imposed_temperature
-      = h_boundary->imposed_temperature;
+    fluid->imposed_temperature = h_boundary->imposed_temperature;
     fluid->is_outside = 1;
     fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
     ERR(create_solver_fluid(stardis, fluid));
@@ -430,6 +450,292 @@ process_h
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
 end:
+  return res;
+error:
+  goto end;
+}
+
+static res_T
+set_stripped_args
+  (struct str* str,
+   const char* args)
+{
+  const char whitespace[] = " \f\n\r\t\v";
+  ASSERT(str && args);
+  return str_set(str, args + strspn(args, whitespace));
+}
+
+/* utility macros */
+#define GET_LIB_SYMBOL_BASE(DestField, LibHandle, FunName, Optional) \
+  *(void**)DestField = library_get_symbol((LibHandle), #FunName ); \
+  if(!*DestField && !(Optional)) { \
+    logger_print(stardis->logger, LOG_ERROR, \
+      "Cannot find function '" #FunName "()' in lib %s\n", lib_name); \
+    res = RES_BAD_ARG; \
+    goto error; \
+  }
+
+#define GET_LIB_SYMBOL(Dest, Field, FunName) \
+  GET_LIB_SYMBOL_BASE(&((Dest)->Field), (Dest)->program->lib_handle, FunName, 0)
+
+#define CREATE_DESC_DATA_BASE(Desc, CreateArgs) \
+  /* duplicate args to allow to modify them */ \
+  ERR(str_copy(&tmp, &(Desc)->args)); \
+  (Desc)->prog_data = (Desc)->create(&ctx, CreateArgs); \
+  if(!(Desc)->prog_data) { \
+    logger_print(stardis->logger, LOG_ERROR, \
+      "Cannot create data for description %s\n", str_cget(&(Desc)->name)); \
+    res = RES_BAD_ARG; \
+    goto error; \
+  }
+
+#define CREATE_DESC_DATA(Desc) \
+  CREATE_DESC_DATA_BASE(Desc, LIST_ARG2((Desc)->program->prog_data, str_get(&tmp)))
+
+/* The returned program is NULL if no stardis_create_program function is
+ * defined in the library. */
+static res_T
+get_prog_common
+  (const char* lib_name,
+   struct stardis* stardis,
+   struct program** program,
+   void* (**create)
+     (const struct stardis_description_create_context*, void*, char*),
+   void (**release)(void*))
+{
+  res_T res = RES_OK;
+  struct description* desc;
+  struct str tmp;
+
+  ASSERT(lib_name && program && create && release && stardis);
+
+  /* get the library handler */
+  str_init(stardis->allocator, &tmp);
+  ERR(str_set(&tmp, lib_name));
+  desc = find_description_by_name(stardis, &tmp, NULL);
+  if(!desc) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Undefined PROGRAM: %s\n", lib_name);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  *program = desc->d.program;
+  /* get the mandatory user-defined functions from the library */
+  GET_LIB_SYMBOL_BASE(create, (*program)->lib_handle, stardis_create_data, 0);
+  GET_LIB_SYMBOL_BASE(release, (*program)->lib_handle, stardis_release_data, 0);
+
+end:
+  str_release(&tmp);
+  return res;
+error:
+  goto end;
+}
+
+/* PROGRAM Name library_path [...] */
+static res_T
+process_program
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  size_t sz;
+  struct program* program;
+  const char* lib_name;
+  struct str tmp;
+  const char* lic;
+  const char* _c_;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  str_init(stardis->allocator, &tmp);
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_program(stardis->allocator, &desc->d.program));
+  program = desc->d.program;
+  desc->type = DESC_PROGRAM;
+  
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
+  ERR(description_set_name(stardis, &program->name, tk));
+  if(find_description_by_name(stardis, &program->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  lib_name = tk;
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "library path");
+  ERR(str_set(&program->lib_path, tk));
+
+  /* get the library handler */
+  program->lib_handle = library_open(tk);
+  if(!program->lib_handle) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot open library: %s (%s)\n", lib_name, tk);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  /* get the mandatory user-defined functions from the library */
+  GET_LIB_SYMBOL_BASE(&program->get_copyright_notice, program->lib_handle,
+    get_copyright_notice, 0);
+  GET_LIB_SYMBOL_BASE(&program->get_license_short, program->lib_handle,
+    get_license_short, 0);
+  GET_LIB_SYMBOL_BASE(&program->get_license_text, program->lib_handle,
+    get_license_text, 0);
+  /* get the optional user-defined functions from the library */
+  GET_LIB_SYMBOL_BASE(&program->create,
+    program->lib_handle,  stardis_create_library_data, 1);
+  GET_LIB_SYMBOL_BASE(&program->release,
+    program->lib_handle,  stardis_release_library_data, 1);
+  GET_LIB_SYMBOL_BASE(&program->finalize,
+    program->lib_handle,  stardis_finalize_library_data, 1);
+  if(!(program->create && program->release && program->finalize)
+    && !(!program->create && !program->release && !program->finalize))
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Inconsistent library data management for library '%s'.\n",
+      lib_name);
+    logger_print(stardis->logger, LOG_ERROR,
+      "Please define all or none of stardis_create_library_data, "
+      "stardis_finalize_library_data and stardis_release_library_data funcions.\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  /* store the end of line as args for custom init */
+  ERR(set_stripped_args(&program->args, *tok_ctx));
+  if(program->create) {
+    /* create and init custom data */
+    struct stardis_program_context ctx;
+    ctx.name = lib_name;
+    ctx.verbosity_level = stardis->verbose;
+    CREATE_DESC_DATA_BASE(program, LIST_ARG1(str_get(&tmp)));
+  } else if(!str_is_empty(&program->args)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Library '%s' has no custom data management functions but has arguments.\n",
+      lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  lic = program->get_license_short(program->prog_data);
+  _c_ = program->get_copyright_notice(program->prog_data);
+  if(!lic) {
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(!_c_) {
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Loading external library '%s': \"%s\"\n",
+    str_cget(&program->name), str_cget(&program->lib_path));
+  logger_print(stardis->logger, LOG_OUTPUT, "  %s\n", _c_);
+  logger_print(stardis->logger, LOG_OUTPUT, "  %s\n", lic);
+
+end:
+  str_release(&tmp);
+  return res;
+error:
+  goto end;
+}
+
+/* H_BOUNDARY_FOR_SOLID_PROG Name ProgName STL_filenames [PROG_PARAMS ...]
+ * H_BOUNDARY_FOR_FLUID_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
+static res_T
+process_h_prog
+  (struct stardis* stardis,
+   const enum description_type type,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  const char *lib_name, *desc_name;
+  struct str tmp;
+  size_t sz;
+  struct h_boundary_prog* h_boundary_prog;
+  struct stardis_description_create_context ctx;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  stardis->counts.fmed_count++;
+
+  str_init(stardis->allocator, &tmp);
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_h_boundary_prog(stardis->allocator, &desc->d.h_boundary_prog));
+  h_boundary_prog = desc->d.h_boundary_prog;
+  desc->type = type;
+  
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "programmed h boundary name");
+  ERR(description_set_name(stardis, &h_boundary_prog->name, tk));
+  if(find_description_by_name(stardis, &h_boundary_prog->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  desc_name = tk;
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
+  ERR(str_set(&h_boundary_prog->prog_name, tk));
+  lib_name = tk;
+
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
+
+  /* store the end of line as args for custom init */
+  ERR(set_stripped_args(&h_boundary_prog->args, *tok_ctx));
+  /* get the user-defined functions from the library */
+  ERR(get_prog_common(lib_name, stardis,  &h_boundary_prog->program,
+    &h_boundary_prog->create, &h_boundary_prog->release));
+  GET_LIB_SYMBOL(h_boundary_prog, ref_temp, stardis_reference_temperature);
+  GET_LIB_SYMBOL(h_boundary_prog, emissivity, stardis_emissivity);
+  GET_LIB_SYMBOL(h_boundary_prog, alpha, stardis_specular_fraction);
+  GET_LIB_SYMBOL(h_boundary_prog, hc, stardis_convection_coefficient);
+  GET_LIB_SYMBOL(h_boundary_prog, hmax, stardis_max_convection_coefficient);
+  GET_LIB_SYMBOL(h_boundary_prog, t_range, stardis_t_range);
+  if(type == DESC_BOUND_H_FOR_FLUID_PROG) {
+    GET_LIB_SYMBOL(h_boundary_prog, boundary_temp, stardis_boundary_temperature);
+  } else {
+    GET_LIB_SYMBOL(h_boundary_prog, fluid_temp, stardis_medium_temperature);
+  }
+  /* create and init custom data */
+  ctx.name = desc_name;
+  CREATE_DESC_DATA(h_boundary_prog);
+
+  h_boundary_prog->t_range(h_boundary_prog->prog_data, stardis->t_range);
+
+  /* create the media behind the interface */
+  if(type == DESC_BOUND_H_FOR_FLUID_PROG) {
+    ERR(get_dummy_solid_id(stardis, &h_boundary_prog->mat_id));
+  } else {
+    struct fluid_prog* fluid_prog = NULL;
+    ASSERT(type == DESC_BOUND_H_FOR_SOLID_PROG);
+    ERR(init_fluid_prog(stardis->allocator, &fluid_prog));
+    fluid_prog->fluid_id = allocate_stardis_medium_id(stardis);
+    h_boundary_prog->mat_id = fluid_prog->fluid_id;
+    h_boundary_prog->possible_external_fluid = fluid_prog;
+    fluid_prog->desc_id = (unsigned)sz;
+    fluid_prog->temp = h_boundary_prog->fluid_temp;
+    fluid_prog->is_outside = 1;
+    fluid_prog->prog_data = h_boundary_prog->prog_data;
+    /* fluid_prog->release is NULL to avoid deleting shared prog_data */
+    ERR(create_solver_external_fluid_prog(stardis, fluid_prog));
+    logger_print(stardis->logger, LOG_OUTPUT,
+      "External programmed fluid created (it is medium %u)\n",
+      fluid_prog->fluid_id);
+  }
+
+end:
+  str_release(&tmp);
   return res;
 error:
   goto end;
@@ -454,7 +760,7 @@ process_t
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  ERR(init_t(stardis->allocator, &desc->d.t_boundary));
+  ERR(init_t_boundary(stardis->allocator, &desc->d.t_boundary));
   t_boundary = desc->d.t_boundary;
   desc->type = DESC_BOUND_T_FOR_SOLID;
 
@@ -490,6 +796,72 @@ error:
   goto end;
 }
 
+/* T_BOUNDARY_FOR_SOLID_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
+static res_T
+process_t_prog
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  const char *lib_name, *desc_name;
+  struct str tmp;
+  size_t sz;
+  struct t_boundary_prog* t_boundary_prog;
+  struct stardis_description_create_context ctx;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  stardis->counts.fmed_count++;
+
+  str_init(stardis->allocator, &tmp);
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_t_boundary_prog(stardis->allocator, &desc->d.t_boundary_prog));
+  t_boundary_prog = desc->d.t_boundary_prog;
+  desc->type = DESC_BOUND_T_FOR_SOLID_PROG;
+
+  ERR(get_dummy_fluid_id(stardis, &t_boundary_prog->mat_id));
+  
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "programmed t boundary name");
+  ERR(description_set_name(stardis, &t_boundary_prog->name, tk));
+  if(find_description_by_name(stardis, &t_boundary_prog->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  desc_name = tk;
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
+  ERR(str_set(&t_boundary_prog->prog_name, tk));
+  lib_name = tk;
+
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
+
+  /* store the end of line as args for custom init */
+  ERR(set_stripped_args(&t_boundary_prog->args, *tok_ctx));
+  /* get the user-defined functions from the library */
+  ERR(get_prog_common(lib_name, stardis, &t_boundary_prog->program,
+    &t_boundary_prog->create, &t_boundary_prog->release));
+  GET_LIB_SYMBOL(t_boundary_prog, temperature, stardis_boundary_temperature);
+  GET_LIB_SYMBOL(t_boundary_prog, t_range, stardis_t_range);
+  /* create and init custom data */
+  ctx.name = desc_name;
+  CREATE_DESC_DATA(t_boundary_prog);
+
+  t_boundary_prog->t_range(t_boundary_prog->prog_data, stardis->t_range);
+
+end:
+  str_release(&tmp);
+  return res;
+error:
+  goto end;
+}
+
 /* F_BOUNDARY_FOR_SOLID Name F STL_filenames */
 static res_T
 process_flx
@@ -509,7 +881,7 @@ process_flx
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  ERR(init_f(stardis->allocator, &desc->d.f_boundary));
+  ERR(init_f_boundary(stardis->allocator, &desc->d.f_boundary));
   f_boundary = desc->d.f_boundary;
   desc->type = DESC_BOUND_F_FOR_SOLID;
 
@@ -551,6 +923,70 @@ error:
   goto end;
 }
 
+/* F_BOUNDARY_FOR_SOLID_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
+static res_T
+process_flx_prog
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  const char *lib_name, *desc_name;
+  struct str tmp;
+  size_t sz;
+  struct f_boundary_prog* f_boundary_prog;
+  struct stardis_description_create_context ctx;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  stardis->counts.fmed_count++;
+
+  str_init(stardis->allocator, &tmp);
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_f_boundary_prog(stardis->allocator, &desc->d.f_boundary_prog));
+  f_boundary_prog = desc->d.f_boundary_prog;
+  desc->type = DESC_BOUND_F_FOR_SOLID_PROG;
+
+  ERR(get_dummy_fluid_id(stardis, &f_boundary_prog->mat_id));
+  
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "programmed t boundary name");
+  ERR(description_set_name(stardis, &f_boundary_prog->name, tk));
+  if(find_description_by_name(stardis, &f_boundary_prog->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
+  ERR(str_set(&f_boundary_prog->prog_name, tk));
+  desc_name = tk;
+  desc_name = tk;
+  lib_name = tk;
+
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
+
+  /* store the end of line as args for custom init */
+  ERR(set_stripped_args(&f_boundary_prog->args, *tok_ctx));
+  /* get the user-defined functions from the library */
+  ERR(get_prog_common(lib_name, stardis, &f_boundary_prog->program,
+    &f_boundary_prog->create, &f_boundary_prog->release));
+  GET_LIB_SYMBOL(f_boundary_prog, flux, stardis_boundary_flux);
+  /* create and init custom data */
+  ctx.name = desc_name;
+  CREATE_DESC_DATA(f_boundary_prog);
+
+end:
+  str_release(&tmp);
+  return res;
+error:
+  goto end;
+}
+
 /* SOLID_FLUID_CONNECTION Name ref_temperature emissivity specular_fraction hc STL_filenames */
 static res_T
 process_sfc
@@ -570,7 +1006,7 @@ process_sfc
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  ERR(init_sf(stardis->allocator, &desc->d.sf_connect));
+  ERR(init_sf_connect(stardis->allocator, &desc->d.sf_connect));
   sf_connect = desc->d.sf_connect;
   desc->type = DESC_SOLID_FLUID_CONNECT;
 
@@ -579,7 +1015,7 @@ process_sfc
    * we continue the trend to ensure connection ID is OK */
   sf_connect->connection_id = allocate_stardis_medium_id(stardis);
 
-  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid fluid connection name");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid-fluid connection name");
   ERR(description_set_name(stardis, &sf_connect->name, tk));
   if(find_description_by_name(stardis, &sf_connect->name, desc)) {
     logger_print(stardis->logger, LOG_ERROR,
@@ -620,12 +1056,13 @@ process_sfc
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "hc");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "Convection coefficient");
   res = cstr_to_double(tk, &sf_connect->hc);
   if(res != RES_OK
     || sf_connect->hc < 0)
   {
-    logger_print(stardis->logger, LOG_ERROR, "Invalid hc: %s\n", tk);
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid Convection coefficient: %s\n", tk);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
@@ -634,6 +1071,75 @@ process_sfc
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
 
 end:
+  return res;
+error:
+  goto end;
+}
+
+/* SOLID_FLUID_CONNECTION_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
+static res_T
+process_sfc_prog
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  const char *lib_name, *desc_name;
+  struct str tmp;
+  size_t sz;
+  struct solid_fluid_connect_prog* sf_connect_prog;
+  struct stardis_description_create_context ctx;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  stardis->counts.sfconnect_count++;
+
+  str_init(stardis->allocator, &tmp);
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_sf_connect_prog(stardis->allocator, &desc->d.sf_connect_prog));
+  sf_connect_prog = desc->d.sf_connect_prog;
+  desc->type = DESC_SOLID_FLUID_CONNECT_PROG;
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx),
+    "programmed solid-fluid connection name");
+  ERR(description_set_name(stardis, &sf_connect_prog->name, tk));
+  if(find_description_by_name(stardis, &sf_connect_prog->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  desc_name = tk;
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
+  ERR(str_set(&sf_connect_prog->prog_name, tk));
+  lib_name = tk;
+
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
+
+  /* store the end of line as args for custom init */
+  ERR(set_stripped_args(&sf_connect_prog->args, *tok_ctx));
+  /* get the user-defined functions from the library */
+  ERR(get_prog_common(lib_name, stardis, &sf_connect_prog->program,
+    &sf_connect_prog->create, &sf_connect_prog->release));
+  GET_LIB_SYMBOL(sf_connect_prog, ref_temp, stardis_reference_temperature);
+  GET_LIB_SYMBOL(sf_connect_prog, emissivity, stardis_emissivity);
+  GET_LIB_SYMBOL(sf_connect_prog, alpha, stardis_specular_fraction);
+  GET_LIB_SYMBOL(sf_connect_prog, hc, stardis_convection_coefficient);
+  GET_LIB_SYMBOL(sf_connect_prog, hmax, stardis_max_convection_coefficient);
+  GET_LIB_SYMBOL(sf_connect_prog, t_range, stardis_t_range);
+  /* create and init custom data */
+  ctx.name = desc_name;
+  CREATE_DESC_DATA(sf_connect_prog);
+
+  sf_connect_prog->t_range(sf_connect_prog->prog_data, stardis->t_range);
+
+end:
+  str_release(&tmp);
   return res;
 error:
   goto end;
@@ -658,7 +1164,7 @@ process_ssc
   sz = darray_descriptions_size_get(&stardis->descriptions);
   ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
   desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
-  ERR(init_ss(stardis->allocator, &desc->d.ss_connect));
+  ERR(init_ss_connect(stardis->allocator, &desc->d.ss_connect));
   ss_connect = desc->d.ss_connect;
   desc->type = DESC_SOLID_SOLID_CONNECT;
 
@@ -667,7 +1173,7 @@ process_ssc
    * we continue the trend to ensure connection ID is OK */
   ss_connect->connection_id = allocate_stardis_medium_id(stardis);
 
-  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid solid connection name");
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "solid-solid connection name");
   ERR(description_set_name(stardis, &ss_connect->name, tk));
   if(find_description_by_name(stardis, &ss_connect->name, desc)) {
     logger_print(stardis->logger, LOG_ERROR,
@@ -694,6 +1200,73 @@ process_ssc
 
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
+
+end:
+  return res;
+error:
+  goto end;
+}
+
+/* SOLID_SOLID_CONNECTION_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
+static res_T
+process_ssc_prog
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  const char *lib_name, *desc_name;
+  struct str tmp;
+  size_t sz;
+  struct solid_solid_connect_prog* ss_connect_prog;
+  struct stardis_description_create_context ctx;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  stardis->counts.sfconnect_count++;
+
+  str_init(stardis->allocator, &tmp);
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_ss_connect_prog(stardis->allocator, &desc->d.ss_connect_prog));
+  ss_connect_prog = desc->d.ss_connect_prog;
+  desc->type = DESC_SOLID_SOLID_CONNECT_PROG;
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx),
+    "programmed solid-solid connection name");
+  ERR(description_set_name(stardis, &ss_connect_prog->name, tk));
+  if(find_description_by_name(stardis, &ss_connect_prog->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  desc_name = tk;
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
+  ERR(str_set(&ss_connect_prog->prog_name, tk));
+  lib_name = tk;
+
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, tok_ctx));
+
+  /* store the end of line as args for custom init */
+  ERR(set_stripped_args(&ss_connect_prog->args, *tok_ctx));
+  /* get the user-defined functions from the library */
+  ERR(get_prog_common(lib_name, stardis, &ss_connect_prog->program,
+    &ss_connect_prog->create, &ss_connect_prog->release));
+  GET_LIB_SYMBOL(ss_connect_prog, tcr, stardis_thermal_contact_resistance);
+  if(!ss_connect_prog->tcr) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot find function 'stardis_thermal_contact_resistance()' in lib %s\n", lib_name);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  /* create and init custom data */
+  ctx.name = desc_name;
+  CREATE_DESC_DATA(ss_connect_prog);
 
 end:
   return res;
@@ -800,7 +1373,6 @@ process_solid
   ERR(init_solid(stardis->allocator, &desc->d.solid));
   solid = desc->d.solid;
   desc->type = DESC_MAT_SOLID;
-
   solid->solid_id = allocate_stardis_medium_id(stardis);
   solid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   solid->is_outside = 0;
@@ -889,10 +1461,82 @@ process_solid
   /* Actual solid creation is defered until geometry is read to allow
    * enclosure shape VS delta analysis (and auto delta computation) */
 
-  ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
 
 end:
+  return res;
+error:
+  goto end;
+}
+
+/* SOLID_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
+static res_T
+process_solid_prog
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  const char *lib_name, *desc_name;
+  struct str tmp;
+  size_t sz;
+  struct solid_prog* solid_prog;
+  struct stardis_description_create_context ctx;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  stardis->counts.fmed_count++;
+
+  str_init(stardis->allocator, &tmp);
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_solid_prog(stardis->allocator, &desc->d.solid_prog));
+  solid_prog = desc->d.solid_prog;
+  desc->type = DESC_MAT_SOLID_PROG;
+  solid_prog->solid_id = allocate_stardis_medium_id(stardis);
+  ASSERT(sz <= UINT_MAX);
+  solid_prog->desc_id = (unsigned)sz;
+  
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "programmed solid name");
+  ERR(description_set_name(stardis, &solid_prog->name, tk));
+  if(find_description_by_name(stardis, &solid_prog->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  desc_name = tk;
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
+  ERR(str_set(&solid_prog->prog_name, tk));
+  lib_name = tk;
+
+  ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
+
+  /* store the end of line as args for custom init */
+  ERR(set_stripped_args(&solid_prog->args, *tok_ctx));
+  /* get the user-defined functions from the library */
+  ERR(get_prog_common(lib_name, stardis, &solid_prog->program,
+    &solid_prog->create, &solid_prog->release));
+  GET_LIB_SYMBOL(solid_prog, lambda, stardis_conductivity);
+  GET_LIB_SYMBOL(solid_prog, rho, stardis_volumic_mass);
+  GET_LIB_SYMBOL(solid_prog, cp, stardis_calorific_capacity);
+  GET_LIB_SYMBOL(solid_prog, delta, stardis_delta_solid);
+  GET_LIB_SYMBOL(solid_prog, temp, stardis_medium_temperature);
+  GET_LIB_SYMBOL(solid_prog, vpower, stardis_volumic_power);
+  GET_LIB_SYMBOL(solid_prog, t_range, stardis_t_range);
+  /* create and init custom data */
+  ctx.name = desc_name;
+  CREATE_DESC_DATA(solid_prog);
+
+  solid_prog->t_range(solid_prog->prog_data, stardis->t_range);
+
+  ERR(create_solver_solid_prog(stardis, solid_prog));
+
+end:
+  str_release(&tmp);
   return res;
 error:
   goto end;
@@ -920,9 +1564,7 @@ process_fluid
   ERR(init_fluid(stardis->allocator, &desc->d.fluid));
   fluid = desc->d.fluid;
   desc->type = DESC_MAT_FLUID;
-
   fluid->fluid_id = allocate_stardis_medium_id(stardis);
-  fluid->is_outside = 0;
   fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   ASSERT(sz <= UINT_MAX);
   fluid->desc_id = (unsigned)sz;
@@ -983,10 +1625,79 @@ process_fluid
 
   ERR(create_solver_fluid(stardis, fluid));
 
-  ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
 
 end:
+  return res;
+error:
+  goto end;
+}
+
+/* FLUID_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
+static res_T
+process_fluid_prog
+  (struct stardis* stardis,
+   char** tok_ctx)
+{
+  char* tk = NULL;
+  struct description* desc;
+  const char *lib_name, *desc_name;
+  struct str tmp;
+  size_t sz;
+  struct fluid_prog* fluid_prog;
+  struct stardis_description_create_context ctx;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && tok_ctx);
+
+  stardis->counts.fmed_count++;
+
+  str_init(stardis->allocator, &tmp);
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_fluid_prog(stardis->allocator, &desc->d.fluid_prog));
+  fluid_prog = desc->d.fluid_prog;
+  desc->type = DESC_MAT_FLUID_PROG;
+  fluid_prog->fluid_id = allocate_stardis_medium_id(stardis);
+  ASSERT(sz <= UINT_MAX);
+  fluid_prog->desc_id = (unsigned)sz;
+  
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "programmed fluid name");
+  ERR(description_set_name(stardis, &fluid_prog->name, tk));
+  if(find_description_by_name(stardis, &fluid_prog->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", tk);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  desc_name = tk;
+
+  CHK_TOK(strtok_r(NULL, " \t", tok_ctx), "program name");
+  ERR(str_set(&fluid_prog->prog_name, tk));
+  lib_name = tk;
+
+  ERR(read_sides_and_files(stardis, 0, (unsigned)sz, tok_ctx));
+
+  /* store the end of line as args for custom init */
+  ERR(set_stripped_args(&fluid_prog->args, *tok_ctx));
+  /* get the user-defined functions from the library */
+  ERR(get_prog_common(lib_name, stardis, &fluid_prog->program,
+    &fluid_prog->create, &fluid_prog->release));
+  GET_LIB_SYMBOL(fluid_prog, rho, stardis_volumic_mass);
+  GET_LIB_SYMBOL(fluid_prog, cp, stardis_calorific_capacity);
+  GET_LIB_SYMBOL(fluid_prog, temp, stardis_medium_temperature);
+  GET_LIB_SYMBOL(fluid_prog, t_range, stardis_t_range);
+  /* create and init custom data */
+  ctx.name = desc_name;
+  CREATE_DESC_DATA(fluid_prog);
+
+  fluid_prog->t_range(fluid_prog->prog_data, stardis->t_range);
+
+  ERR(create_solver_fluid_prog(stardis, fluid_prog));
+
+end:
+  str_release(&tmp);
   return res;
 error:
   goto end;
@@ -1072,19 +1783,30 @@ error:
 }
 
 /* Read medium or boundary line; should be one of:
- * SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_filenames
+ * SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_sides_filenames
  * FLUID Name rho cp Tinit Timposed STL_filenames
- * H_BOUNDARY_FOR_SOLID Name ref_temperature emissivity specular_fraction hc T_env STL_filenames
+ * H_BOUNDARY_FOR_SOLID Name ref_temperature emissivity specular_fraction hc T_env STL_sides_filenames
  * H_BOUNDARY_FOR_FLUID Name ref_temperature emissivity specular_fraction hc T_env STL_filenames
  * T_BOUNDARY_FOR_SOLID Name T STL_filenames
  * F_BOUNDARY_FOR_SOLID Name F STL_filenames
  * SOLID_FLUID_CONNECTION Name ref_temperature emissivity specular_fraction hc STL_filenames
+ *
+ * SOLID_PROG Name Libray STL_sides_filenames [ PROG_PARAMS ... ]
+ * SOLID_PROG Name Libray STL_sides_filenames [ PROG_PARAMS ... ]
+ * H_BOUNDARY_FOR_SOLID_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ * H_BOUNDARY_FOR_FLUID_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ * T_BOUNDARY_FOR_SOLID_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ * F_BOUNDARY_FOR_SOLID_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ * SOLID_FLUID_CONNECTION_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ * SOLID_SOLID_CONNECTION_PROG Name Libray STL_filenames [ PROG_PARAMS ... ]
+ *
  * SCALE scale_factor
  * TRAD Trad Trad_ref
  *
- * STL_filenames = { { FRONT | BACK | BOTH } STL_filename }+
+ * STL_sides_filenames = { { FRONT | BACK | BOTH } STL_filename }+
+ * STL_filenames = { STL_filename }+
  */
-res_T
+static res_T
 process_model_line
   (const char* file_name,
    char* line,
@@ -1102,20 +1824,38 @@ process_model_line
   
   if(0 == strcasecmp(tk, "H_BOUNDARY_FOR_SOLID"))
     ERR(process_h(stardis, DESC_BOUND_H_FOR_SOLID, &tok_ctx));
+  else if(0 == strcasecmp(tk, "H_BOUNDARY_FOR_SOLID_PROG"))
+    ERR(process_h_prog(stardis, DESC_BOUND_H_FOR_SOLID_PROG, &tok_ctx));
   else if(0 == strcasecmp(tk, "H_BOUNDARY_FOR_FLUID"))
     ERR(process_h(stardis, DESC_BOUND_H_FOR_FLUID, &tok_ctx));
+  else if(0 == strcasecmp(tk, "H_BOUNDARY_FOR_FLUID_PROG"))
+    ERR(process_h_prog(stardis, DESC_BOUND_H_FOR_FLUID_PROG, &tok_ctx));
   else if(0 == strcasecmp(tk, "T_BOUNDARY_FOR_SOLID"))
     ERR(process_t(stardis, &tok_ctx));
+  else if(0 == strcasecmp(tk, "T_BOUNDARY_FOR_SOLID_PROG"))
+    ERR(process_t_prog(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "F_BOUNDARY_FOR_SOLID"))
     ERR(process_flx(stardis, &tok_ctx));
+  else if(0 == strcasecmp(tk, "F_BOUNDARY_FOR_SOLID_PROG"))
+    ERR(process_flx_prog(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "SOLID_FLUID_CONNECTION"))
     ERR(process_sfc(stardis, &tok_ctx));
+  else if(0 == strcasecmp(tk, "SOLID_FLUID_CONNECTION_PROG"))
+    ERR(process_sfc_prog(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "SOLID_SOLID_CONNECTION"))
     ERR(process_ssc(stardis, &tok_ctx));
+  else if(0 == strcasecmp(tk, "SOLID_SOLID_CONNECTION_PROG"))
+    ERR(process_ssc_prog(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "SOLID"))
     ERR(process_solid(stardis, &tok_ctx));
+  else if(0 == strcasecmp(tk, "SOLID_PROG"))
+    ERR(process_solid_prog(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "FLUID"))
     ERR(process_fluid(stardis, &tok_ctx));
+  else if(0 == strcasecmp(tk, "FLUID_PROG"))
+    ERR(process_fluid_prog(stardis, &tok_ctx));
+  else if(0 == strcasecmp(tk, "PROGRAM"))
+    ERR(process_program(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "SCALE"))
     ERR(process_scale(stardis, &tok_ctx));
   else if(0 == strcasecmp(tk, "TRAD"))
@@ -1136,6 +1876,10 @@ error:
   logger_print(stardis->logger, LOG_ERROR, "%s\n", str_cget(&keep));
   goto end;
 }
+
+/*******************************************************************************
+ * Public Functions
+ ******************************************************************************/
 
 res_T
 get_dummy_solid_id
@@ -1202,3 +1946,62 @@ end:
 error:
   goto end;
 }
+
+res_T
+read_model
+  (const struct darray_str* model_files,
+   struct stardis* stardis)
+{
+  res_T res = RES_OK;
+  const struct str* files = NULL;
+  size_t i;
+  FILE* f = NULL;
+  struct txtrdr* txtrdr = NULL;
+
+  ASSERT(model_files && stardis);
+  files = darray_str_cdata_get(model_files);
+  FOR_EACH(i, 0, darray_str_size_get(model_files)) {
+    const char* name = str_cget(files + i);
+    f = fopen(name, "r");
+    if(!f) {
+      logger_print(stardis->logger, LOG_ERROR,
+        "Cannot open model file '%s'\n",
+        name);
+      res = RES_IO_ERR;
+      goto error;
+    }
+    txtrdr_stream(stardis->allocator, f, name, '#', &txtrdr);
+    for(;;) {
+      char* line;
+      ERR(txtrdr_read_line(txtrdr));
+      line = txtrdr_get_line(txtrdr);
+      if(!line) break;
+      ERR(process_model_line(name, line, stardis));
+    }
+    txtrdr_ref_put(txtrdr);
+    txtrdr = NULL;
+    fclose(f);
+    f = NULL;
+  }
+  if(stardis->scale_factor <= 0)
+    stardis->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Scaling factor is %g\n", stardis->scale_factor);
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Trad is %g, Trad reference is %g\n", stardis->trad, stardis->trad_ref);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], stardis->trad_ref);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], stardis->trad_ref);
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "System T range is [%g %g]\n", SPLIT2(stardis->t_range));
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Picard order is %u\n", stardis->picard_order);
+
+  ASSERT(!f && !txtrdr);
+exit:
+  return res;
+error:
+  if(f) fclose(f);
+  if(txtrdr) txtrdr_ref_put(txtrdr);
+  goto exit;
+}
+

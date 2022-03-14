@@ -37,22 +37,22 @@ struct solid {
   double t0; /* End time of tinit */
   int is_outside; /* the solid is used for a boundary */
   int is_green; /* green computation (nothing to do with solid itself) */
-  unsigned desc_id; /* id of the boundary; meaningful if is_outside */
+  unsigned desc_id;
   unsigned solid_id;
 };
 
-LOCAL_SYM res_T
+res_T
 init_solid(struct mem_allocator* allocator, struct solid** dst);
 
-LOCAL_SYM void
+void
 release_solid
   (struct solid* desc,
    struct mem_allocator* allocator);
 
-LOCAL_SYM res_T
+res_T
 str_print_solid(struct str* str, const struct solid* solid);
 
-LOCAL_SYM res_T
+res_T
 create_solver_solid
   (struct stardis* stardis,
    const struct solid* solid_props);

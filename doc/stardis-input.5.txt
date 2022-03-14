@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+:sharp: #
+
 :toc:
 
 stardis-input(5)
@@ -28,23 +30,222 @@ DESCRIPTION
 thermal system. It relies on a line-based ad-hoc syntax.
 
 A thermal system is composed of lines of text, each one describing either a
+program (an user-provided shared object), a
 medium (solid or fluid) frontier, a boundary (limit condition or connection
-between two media), or the scale of the geometry. In the medium or boundary
+between two media), the scale of the whole geometry, or the radiative
+temperature around the system. In the medium or boundary
 cases, description lines include a list of file names that constitute the
-limit or boundary. The current version of *stardis* only accepts triangle
-mesh geometry files in *STL* format. If a scale is  specified, it defines the
+limit or boundary. The current version of *stardis(1)* only accepts triangle
+mesh geometry files in *STL* format. If a scale is specified, it defines the
 scaling factor to apply to the geometry to have it expressed in meters (e.g.
 1e-3 if the geometry is in mm).
 
-A medium limit or a boundary description can be split accross files and a
+A medium limit or a boundary description can be split across files and a
 single file or description line can describe more than one frontier (more than
 one connex region). The main semantic constraint on descriptions is that any
 enclosure must be defined by a single description line, to ensure that any
 part in the system is made from a single medium.
 
 Finally, description lines can be submitted to the *stardis*(1) program in
-any order and can be split accross more than one file, through multiple use
+any order, with the exception of programs that must be defined before use,
+and can be split across more than one file, through multiple use
 of option *-M*.
+
+GRAMMAR
+-------
+In what follows, some lines end in *\*. This is used as a convenience to
+continue a description next line. However, this trick cannot be used in
+actual description files and actual description lines must be kept single-line.
+Also, text appearing between quote marks has to be used verbatim in the input,
+except the quote characters. Finally, text introduced by the *{sharp}* character
+in descriptions, when not verbatim, is a comment and is not part of the
+description.
+
+[verse]
+_______
+<thermal-system>      ::= <description-lines>
+
+<description-lines>   ::= <description-line>
+                        [ <description-lines> ]
+
+<description-line>    ::= [ <program> ] [ <comment> ]
+                        | [ <medium-frontier> ] [ <comment> ]
+                        | [ <medium-boundary> ] [ <comment> ]
+                        | [ <media-connection> ] [ <comment> ]
+                        | [ <scaling-factor> ] [ <comment> ] {sharp} at most once
+                        | [ <radiative-temps> ] [ <comment > ] {sharp} at most once
+
+-------------------------------------
+
+<program>                   ::= "PROGRAM" <prog-name> <library-path> [ <lib-arguments> ]
+
+<medium-frontier>           ::= <solid-frontier>
+                              | <fluid-frontier>
+                              | <prog-solid-frontier>
+                              | <prog-fluid-frontier>
+
+<medium-boundary>           ::= <t-bound-for-solid>
+                              | <h-bound-for-solid>
+                              | <h-bound-for-fluid>
+                              | <f-bound-for-solid>
+                              | <prog-t-bound-for-solid>
+                              | <prog-h-bound-for-solid>
+                              | <prog-h-bound-for-fluid>
+                              | <prog-f-bound-for-solid>
+
+<media-connection>          ::= <solid-fluid-connect>
+                              | <solid-solid-connect>
+                              | <prog-solid-fluid-connect>
+                              | <prog-solid-solid-connect>
+
+<comment>                   ::= "{sharp}" Any text introduced by the {sharp} character
+
+<solid-frontier>            ::= "SOLID" <medium-name> <lambda> <rho> <cp> <delta> \
+                                <initial-temperature> <imposed-temperature> \
+                                <volumic-power> <triangle-sides>
+
+<fluid-frontier>            ::= "FLUID" <medium-name> <rho> <cp> \
+                                <initial-temperature> <imposed-temperature> \
+                                <triangle-sides>
+
+<t-bound-for-solid>         ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> \
+                                <triangles>
+
+
+<h-bound-for-solid>         ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <Tref> <emissivity> \
+                                <specular-fraction> <hc> <outside-temperature> \
+                                <triangles>
+
+<h-bound-for-fluid>         ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <Tref> <emissivity> \
+                                <specular-fraction> <hc> <outside-temperature> \
+                                <triangles>
+
+<f-bound-for-solid>         ::= "F_BOUNDARY_FOR_SOLID" <bound-name> <flux> <triangles>
+
+<solid-fluid-connect>       ::= "SOLID_FLUID_CONNECTION" <connect-name> <Tref>\
+                                <emissivity>  <specular-fraction> <hc> <triangles>
+
+<solid-solid-connect>       ::= "SOLID_SOLID_CONNECTION" <connect-name> \
+                                <contact-resistance> <triangles>
+
+<prog-solid-frontier>       ::= "SOLID_PROG" <medium-name> <prog-name> <triangle-sides> \
+                                [ "PROG_PARAMS" [ <desc-arguments> ] ]
+
+<prog-fluid-frontier>       ::= "FLUID_PROG" <medium-name> <prog-name> <triangle-sides> \
+                                [ "PROG_PARAMS" [ <desc-arguments> ] ]
+
+<prog-t-bound-for-solid>    ::= "T_BOUNDARY_FOR_SOLID_PROG" <bound-name> <prog-name> \
+                                <triangle-sides> [ "PROG_PARAMS" [ <desc-arguments> ] ]
+
+
+<prog-h-bound-for-solid>    ::= "H_BOUNDARY_FOR_SOLID_PROG" <bound-name> <prog-name> \
+                                <triangle-sides> [ "PROG_PARAMS" [ <desc-arguments> ] ]
+
+<prog-h-bound-for-fluid>    ::= "H_BOUNDARY_FOR_FLUID_PROG" <bound-name> <prog-name> \
+                                <triangle-sides> [ "PROG_PARAMS" [ <desc-arguments> ] ]
+
+<prog-f-bound-for-solid>    ::= "F_BOUNDARY_FOR_SOLID_PROG" <bound-name> <prog-name> \
+                                <triangle-sides> [ "PROG_PARAMS" [ <desc-arguments> ] ]
+
+<prog-solid-fluid-connect>  ::= "SOLID_FLUID_CONNECTION_PROG" <connect-name> \
+                                <prog-name> <triangle-sides> [ "PROG_PARAMS" [ <desc-arguments> ] ]
+
+<prog-solid-solid-connect>  ::= "SOLID_SOLID_CONNECTION_PROG" <connect-name> \
+                                <prog-name> <triangle-sides> [ "PROG_PARAMS" [ <desc-arguments> ] ]
+
+<scaling-factor>            ::= "SCALE" <scale> [ <comment> ]
+
+<radiative-temps>           ::= "TRAD" <radiative-temp> <radiative-temp-ref>
+
+-------------------------------------
+
+<prog-name>           ::= STRING {sharp} no space allowed, must not be a keyword nor a
+                                 {sharp} number, including INF and others
+
+<library-path>        ::= FILEPATH {sharp} the path can be absolute
+                                   {sharp} or relative to the running directory and must be valid
+
+<lib-arguments>       ::= STRING {sharp} if not empty, the whole string is send to the
+                                 {sharp} stardis_create_library_data() optional function
+                                 {sharp} it is an error to provide arguments to a program if
+                                 {sharp} the associated library doesn't define this function
+                                 {sharp} note that the {sharp} character consistently ends
+                                 {sharp} arguments by starting a comment
+
+<medium-name>         ::= STRING {sharp} no space allowed, must not be a keyword nor a
+                                 {sharp} number, including INF and others
+
+<lambda>              ::= REAL {sharp} conductivity in W/(m.K); in ]0, INF)
+
+<rho>                 ::= REAL {sharp} volumic mass,in kg/m3; in ]0, INF)
+
+<cp>                  ::= REAL {sharp} capacity, in J/(kg.K) or kg.m2/(s2.K)
+                               {sharp} in ]0, INF)
+
+<delta>               ::= "AUTO" {sharp} delta is automatically set to V/6A (V and A
+                                 {sharp} being respectively the solid volume and its
+                                 {sharp} boundary area)
+                        | REAL {sharp} delta*scaling_factor in m; in [0, INF)
+
+<initial-temperature> ::= REAL {sharp} in K; in [0, INF)
+
+<imposed-temperature> ::= "UNKNOWN" {sharp} temperature has to be solved
+                        | REAL {sharp} in K; in [0, INF)
+
+<outside-temperature> ::= REAL {sharp} in K; in [0, INF)
+
+<volumic-power>       ::= REAL {sharp} in W/m3; in (-INF , INF)
+
+<triangle-sides>      ::= <side-specifier> <file-name> [ <triangle-sides> ]
+
+<bound-name>          ::= STRING {sharp} no space allowed, must not be a keyword nor a
+                                 {sharp} number, including INF and others
+
+<connect-name>        ::= STRING {sharp} no space allowed, must not be a keyword nor a
+                                 {sharp} number, including INF and others
+
+<Tref>                ::= REAL {sharp} in [0, inf)
+
+<emissivity>          ::= REAL {sharp} in [0, 1]
+
+<specular-fraction>   ::= REAL {sharp} in [0, 1]
+
+<hc>                  ::= REAL {sharp} in W/(m2.K); in [0, INF)
+
+<contact-resistance>  ::= REAL {sharp} in m2.K/W in [0, INF)
+
+<flux>                ::= REAL {sharp} in W/m2; in (-INF , INF)
+
+<triangles>           ::= <file-name> [ <triangles> ]
+
+<scale>               ::= REAL {sharp} scaling factor to apply to the geometry
+                               {sharp} in ]0 INF)
+
+<desc-arguments>       ::= STRING {sharp} the whole string is send to the stardis_create_data()
+                                  {sharp} function when the description is created
+                                  {sharp} note that the '{sharp}' character consistently ends
+                                  {sharp} arguments by starting a comment
+
+<radiative-temp>      ::= REAL {sharp} in [0, inf)
+
+<radiative-temp-ref>  ::= REAL {sharp} in [0, inf)
+
+-------------------------------------
+
+<side-specifier>      ::= "FRONT" | "BACK" | "BOTH"
+
+<file-name>           ::= STRING {sharp} no space allowed
+
+______________
+
+PROGRAMS
+--------
+Programs are user-provided shared objects (compiled libraries). They allow to
+provide *stardis(1)* with user defined properties. Depending on the type of
+description they are used with, programs must export a given list of
+mandatory functions. They can also export some other optional functions.
+The exact list with names and types can be found in the stardis-prog.h public
+header file that is installed at the same time as the *stardis(1)* binary.
 
 UNITS
 -----
@@ -59,138 +260,9 @@ TINIT VS TIMPOSED
 -----------------
 Media's descriptions, either solids or fluids, include two possible
 temperatures: initial and imposed. If imposed temperature is set (that is not
-"UNKNOWN"), initial temperature must be defined at the same value. As a
-consequence, one cannot define a medium with an imposed temperature that
-changes at t=0.
-
-GRAMMAR
--------
-In what follows, some lines end in *\*. This is used as a convenience to
-continue a description next line. However, this trick cannot be used in
-actual description files and actual description lines must be kept single-line.
-Also, text appearing between quote marks has to be used verbatim in the input,
-except the quote characters. Finally, text introduced by the *#* character in
-descriptions, when not verbatim, is a comment and is not part of the
-description.
-
-[verse]
-_______
-<thermal-system>      ::= <description-lines>
-
-<description-lines>   ::= <description-line>
-                        [ <description-lines> ]
-
-<description-line>    ::= [ <medium-frontier> ] [ <comment> ]
-                        | [ <medium-boundary> ] [ <comment> ]
-                        | [ <media-connection> ] [ <comment> ]
-                        | [ <scaling-factor> ] [ <comment> ] # at most once
-                        | [ <radiative-temps> ] [ <comment > ] # at most once
-
--------------------------------------
-
-<medium-frontier>     ::= <solid-frontier>
-                        | <fluid-frontier>
-
-<medium-boundary>     ::= <t-bound-for-solid>
-                        | <h-bound-for-solid>
-                        | <h-bound-for-fluid>
-                        | <f-bound-for-solid>
-
-<media-connection>    ::= <solid-fluid-connect>
-                        | <solid-solid-connect>
-
-<comment>             ::= "#" Any text introduced by the # character
-
-<scaling_factor>      ::= REAL # scaling factor to apply to the geometry
-                               # in ]0 INF)
-
-<solid-frontier>      ::= "SOLID" <medium-name> <lambda> <rho> <cp> <delta> \
-                          <initial-temperature> <imposed-temperature> \
-                          <volumic-power> <triangle-sides>
-
-<fluid-frontier>      ::= "FLUID" <medium-name> <rho> <cp> \
-                          <initial-temperature> <imposed-temperature> \
-                          <triangle-sides>
-
-<t-bound-for-solid>   ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> \
-                          <triangles>
-
-
-<h-bound-for-solid>   ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <Tref> <emissivity> \
-                          <specular-fraction> <hc> <outside-temperature> \
-                          <triangles>
-
-<h-bound-for-fluid>   ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <Tref> <emissivity> \
-                          <specular-fraction> <hc> <outside-temperature> \
-                          <triangles>
-
-<f-bound-for-solid>   ::= "F_BOUNDARY_FOR_SOLID" <bound-name> <flux> <triangles>
-
-<solid-fluid-connect> ::= "SOLID_FLUID_CONNECTION" <bound-name> <Tref> <emissivity> \
-                          <specular-fraction> <hc> <triangles>
-
-<solid-solid-connect> ::= "SOLID_SOLID_CONNECTION" <bound-name> \
-                          <contact-resistance> <triangles>
-
-<scaling-factor>      ::= "SCALE" <scaling_factor> [ <comment> ]
-
-<radiative-temps>     ::= "TRAD" <radiative-temp> <radiative-temp-ref>
-
--------------------------------------
-
-<medium-name>         ::= STRING # no space allowed, must not be parsable as a
-                                 # number, including INF and others
-
-<lambda>              ::= REAL # conductivity in W/(m.K); in ]0, INF)
-
-<rho>                 ::= REAL # volumic mass,in kg/m3; in ]0, INF)
-
-<cp>                  ::= REAL # capacity, in J/(kg.K) or kg.m2/(s2.K)
-                               # in ]0, INF)
-
-<delta>               ::= "AUTO" # delta is automatically set to V/6A (V and A
-                                 # being respectively the solid volume and its
-                                 # boundary area)
-                        | REAL # delta*scaling_factor in m; in [0, INF)
-
-<initial-temperature> ::= REAL # in K; in [0, INF)
-
-<imposed-temperature> ::= "UNKNOWN" # temperature has to be solved
-                        | REAL # in K; in [0, INF)
-
-<outside-temperature> ::= REAL # in K; in [0, INF)
-
-<volumic-power>       ::= REAL # in W/m3; in (-INF , INF)
-
-<triangle-sides>      ::= <side-specifier> <file-name> [ <triangle-sides> ]
-
-<bound-name>          ::= STRING # no space allowed
-
-<Tref>                ::= REAL # in [0, inf)
-
-<emissivity>          ::= REAL # in [0, 1]
-
-<specular-fraction>   ::= REAL # in [0, 1]
-
-<hc>                  ::= REAL # in W/(m2.K); in [0, INF)
-
-<contact-resistance>  ::= REAL # in m2.K/W in [0, INF)
-
-<flux>                ::= REAL # in W/m2; in (-INF , INF)
-
-<triangles>           ::= <file-name> [ <triangles> ]
-
-<radiative-temp>      ::= REAL # in [0, inf)
-
-<radiative-temp-ref>  ::= REAL # in [0, inf)
-
--------------------------------------
-
-<side-specifier>      ::= "FRONT" | "BACK" | "BOTH"
-
-<file-name>           ::= STRING # no space allowed
-
-______________
+"UNKNOWN"), initial temperature must be defined at the same value. In other
+words, one cannot define a medium with an imposed temperature that changes at
+t=0.
 
 TRIANGLE SIDES
 --------------
@@ -202,32 +274,40 @@ used with the FRONT side specifier to describe inside medium.
 
 NAMES
 -----
-Names, either file names, medium names or boundary names, are a sequence of
-one or ore ASCII characters, including numbers and special characters like
-*.* *_* *-* as one may consider using in standard file names, *without any
-spacing* either escaped or not. Names are case-sensitive and two different
-description lines, either in the same description file or from different
-description files, cannot use the same name. Additionaly, medium and boundary
-names cannot be parsable as a number, nor be one of the keywords defined
-by the present grammar (AUTO, BACK, BOTH, FLUID, FRONT, F_BOUNDARY_FOR_SOLID,
-H_BOUNDARY_FOR_FLUID, H_BOUNDARY_FOR_SOLID, SCALE, SOLID,
-SOLID_FLUID_CONNECTION, T_BOUNDARY_FOR_FLUID, T_BOUNDARY_FOR_SOLID, UNKNOWN) or
-their lowercase counterparts. Finally, description names cannot be longer than
-63 characters.
+Names, either file names or description names (program names, medium names or
+boundary names), are a sequence of one or ore ASCII characters, including
+numbers and special characters like *.* *_* *-* as one may consider using in
+standard file names, *without any spacing* either escaped or not. Description
+names are case-sensitive and two different description lines, either in the
+same description file or from different description files, cannot use the same
+name. Additionally, description names cannot be parsable as a number, nor be one
+of the keywords defined by the present grammar (AUTO, BACK, BOTH, FLUID,
+FLUID_PROG, FRONT, F_BOUNDARY_FOR_SOLID, F_BOUNDARY_FOR_SOLID_PROG,
+H_BOUNDARY_FOR_FLUID, H_BOUNDARY_FOR_FLUID_PROG, H_BOUNDARY_FOR_SOLID,
+H_BOUNDARY_FOR_SOLID_PROG, PROGRAM, PROG_PARAMS, SCALE, SOLID, SOLID_PROG,
+SOLID_FLUID_CONNECTION, SOLID_FLUID_CONNECTION_PROG, SOLID_SOLID_CONNECTION,
+SOLID_SOLID_CONNECTION_PROG, TRAD, T_BOUNDARY_FOR_SOLID,
+T_BOUNDARY_FOR_SOLID_PROG, UNKNOWN) or their lowercase counterparts.
+Finally, description names cannot be longer than 63 characters.
 
 EXAMPLES
 --------
-Define a solid named Cube with a h boundary. The cube geometry is read from
+Define a solid named Cube, a h boundary, and their radiative environment.
+The cube geometry is read from
 the file cube.stl and the solid medium properties are lambda=0.1, rho=25, cp=2.
 The numerical parameter delta, that is used for solid conductive walks, is
-0.05. The initial temperature of the cube is 0°K and its volumic power is 0.
-The boundary properties are emisivity=0, specular-fraction=0, h=10 and
-external-temperature = 100°K, while the reference temperature for radiative
-transfer linearization in the Picard algorithm is set to 300°K.
-.
+0.05. The initial temperature of the cube is 0°K, its temperature is unknown
+(*stardis(1)* needs to solve it), and its volumic power is 2.5 W/m3.
+The boundary properties are emissivity=0, specular-fraction=0, h=10 and
+external-temperature = 100°K.
+The cube radiative environment is at 300°K.
+Finally, when the Picard method linearises radiative transfer involving the HdT
+boundary, the reference temperature is set to 310°K, while it is set to 330°K
+when linearisation involves the radiative environment.
 .......
-SOLID Cube 0.1 25 2 0.05 0 0 FRONT cube.stl
-H_BOUNDARY_FOR_SOLID HdT 300 0 0 10 100 cube.stl
+SOLID Cube 0.1 25 2 0.05 0 UNKNOWN 2.5 FRONT cube.stl
+H_BOUNDARY_FOR_SOLID HdT 310 0 0 10 100 cube.stl
+TRAD 300 330
 .......
 
 SEE ALSO

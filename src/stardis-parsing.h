@@ -23,11 +23,8 @@
 
 #include <star/sstl.h>
 
-struct camera;
 struct logger;
-struct mem_allocator;
 struct stardis;
-struct dummies;
 
 /* Utility macros */
 #define CHK_TOK(x, Name) if((tk = (x)) == NULL) {\
@@ -46,38 +43,31 @@ struct add_geom_ctx {
 
 /* Possible callbacks for sg3d_geometry_add calls
  * when void* context is a struct add_geom_ctx */
-extern LOCAL_SYM void
+void
 add_geom_ctx_indices
   (const unsigned itri,
    unsigned ids[3],
    void* context);
 
-extern LOCAL_SYM void
-add_geom_ctx_properties
-  (const unsigned itri,
-   unsigned prop[3],
-   void* context);
-
-extern LOCAL_SYM void
+void
 add_geom_ctx_position
   (const unsigned ivert,
    double pos[3],
    void* context);
 
-extern LOCAL_SYM res_T
-process_model_line
-  (const char* file_name,
-   char* line,
-   struct stardis* stardis);
-
-extern LOCAL_SYM res_T
+res_T
 get_dummy_solid_id
   (struct stardis* stardis,
    unsigned* id);
 
-extern LOCAL_SYM res_T
+res_T
 get_dummy_fluid_id
   (struct stardis* stardis,
    unsigned* id);
+
+res_T
+read_model
+  (const struct darray_str* model_files,
+   struct stardis* stardis);
 
 #endif /*ARGS_H*/

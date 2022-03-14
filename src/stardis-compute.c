@@ -14,10 +14,18 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "stardis-app.h"
+#include "stardis-args.h"
+#include "stardis-description.h"
 #include "stardis-output.h"
 #include "stardis-compute.h"
+#include "stardis-parsing.h"
+#include "stardis-default.h"
 #include "stardis-fluid.h"
+#include "stardis-fluid-prog.h"
 #include "stardis-solid.h"
+#include "stardis-solid-prog.h"
+#include "stardis-sfconnect.h"
+#include "stardis-ssconnect.h"
 
 #include <sdis.h>
 #include <sdis_version.h>
@@ -40,7 +48,7 @@
 #endif
 
 /*******************************************************************************
- * Local Functions
+ * Local type; custom data for raytracing callbacks
  ******************************************************************************/
 struct filter_ctx {
   const struct stardis* stardis;
@@ -54,6 +62,10 @@ struct filter_ctx {
 
 #define FILTER_CTX_DEFAULT__ \
  { NULL, S3D_INVALID_ID, NULL, { 0, 0, 0 }, FLT_MAX, 0, 0 }
+
+/*******************************************************************************
+ * Local Functions
+ ******************************************************************************/
 
 /* Filter used from a point query to determine not only one of the closest
  * point, but the better one if there are more than one. In some circumstances
@@ -182,6 +194,7 @@ check_probe_conform_to_type
   (const struct stardis* stardis,
    const int move2boundary,
    double pos[3],
+   double time,
    unsigned* iprim,
    double uv[2])
 {
@@ -245,36 +258,60 @@ check_probe_conform_to_type
         logger_print(stardis->logger, LOG_WARNING,
           "Could not determine the medium probe is in.\n");
     } else {
-      if(filter_ctx.desc->type == DESC_MAT_SOLID) {
-        struct solid* solid = filter_ctx.desc->d.solid;
-        ASSERT(solid->delta < INF);
+      if(DESC_IS_SOLID(filter_ctx.desc)) {
+        double delta;
+        const char* pppp;
+        if(filter_ctx.desc->type == DESC_MAT_SOLID) {
+          struct solid* solid = filter_ctx.desc->d.solid;
+          delta = solid->delta;
+          pppp = "";
+        } else {
+          struct solid_prog* solid_prog = filter_ctx.desc->d.solid_prog;
+          struct stardis_vertex vtx;
+          ASSERT(filter_ctx.desc->type == DESC_MAT_SOLID_PROG);
+          d3_set(vtx.P, pos);
+          vtx.time = time;
+          delta = solid_prog->delta(&vtx, solid_prog->prog_data);
+          pppp = "programmed ";
+        }
+        ASSERT(delta < INF);
         logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe was in solid '%s'.\n", str_cget(&solid->name));
-        if(filter_ctx.dist > 2 * solid->delta) {
+          "Probe was in %ssolid '%s'.\n",
+          pppp, str_cget(get_description_name(filter_ctx.desc)));
+        if(filter_ctx.dist > 2 * delta) {
           logger_print(stardis->logger, LOG_ERROR,
             "Probe moved to (%g, %g, %g), primitive %u, uv = (%g, %g).\n",
             SPLIT3(filter_ctx.pos), hit.prim.prim_id, SPLIT2(hit.uv));
           logger_print(stardis->logger, LOG_ERROR,
             "Move is %g delta long. Use -p instead of -P.\n",
-            filter_ctx.dist / solid->delta);
+            filter_ctx.dist / delta);
           res = RES_BAD_ARG;
           goto error;
         }
-        if(filter_ctx.dist > 0.5 * solid->delta) {
+        if(filter_ctx.dist > 0.5 * delta) {
           logger_print(stardis->logger, LOG_WARNING,
             "Probe was %g delta from closest boundary. "
             "Consider using -p instead of -P.\n",
-            filter_ctx.dist / solid->delta);
+            filter_ctx.dist / delta);
         } else {
           if(filter_ctx.dist != 0)
             logger_print(stardis->logger, LOG_OUTPUT,
               "Probe was %g delta from closest boundary.\n",
-              filter_ctx.dist / solid->delta);
+              filter_ctx.dist / delta);
         }
       } else {
+        const char* pppp;
+        ASSERT(DESC_IS_FLUID(filter_ctx.desc));
         /* TODO: check move length wrt local geometry? */
+        if(filter_ctx.desc->type == DESC_MAT_FLUID) {
+          pppp = "";
+        } else {
+          ASSERT(filter_ctx.desc->type == DESC_MAT_FLUID_PROG);
+          pppp = "programmed ";
+        }
         logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe was in fluid '%s'.\n", str_cget(&filter_ctx.desc->d.fluid->name));
+          "Probe was in %sfluid '%s'.\n",
+          pppp, str_cget(get_description_name(filter_ctx.desc)));
         logger_print(stardis->logger, LOG_OUTPUT,
           "Probe distance from closest boundary was %g.\n", filter_ctx.dist);
       }
@@ -328,36 +365,54 @@ check_probe_conform_to_type
       res = RES_BAD_ARG;
       goto error;
     }
-    logger_print(stardis->logger, LOG_OUTPUT,
-      "Probe is in solid '%s'.\n", str_cget(&filter_ctx.desc->d.solid->name));
-    if(filter_ctx.desc->type == DESC_MAT_SOLID) {
-      struct solid* solid = filter_ctx.desc->d.solid;
-      if(filter_ctx.dist < 0.25 * solid->delta) {
+    if(DESC_IS_SOLID(filter_ctx.desc)) {
+      double delta;
+      if(filter_ctx.desc->type == DESC_MAT_SOLID) {
+        struct solid* solid = filter_ctx.desc->d.solid;
+        delta = solid->delta;
+      } else {
+        struct solid_prog* solid_prog = filter_ctx.desc->d.solid_prog;
+        struct stardis_vertex vtx;
+        ASSERT(filter_ctx.desc->type == DESC_MAT_SOLID_PROG);
+        d3_set(vtx.P, pos);
+        vtx.time = time;
+        delta = solid_prog->delta(&vtx, solid_prog->prog_data);
+      }
+      if(filter_ctx.dist < 0.25 * delta) {
         logger_print(stardis->logger, LOG_ERROR,
           "Probe is %g delta from closest boundary. Use -P instead of -p.\n",
-          filter_ctx.dist / solid->delta);
+          filter_ctx.dist / delta);
         logger_print(stardis->logger, LOG_ERROR,
           "Closest geometry is primitive %u, uv = (%g, %g).\n",
           hit.prim.prim_id, SPLIT2(hit.uv));
         res = RES_BAD_ARG;
         goto error;
       }
-      if(filter_ctx.dist < 0.5 * solid->delta) {
+      if(filter_ctx.dist < 0.5 * delta) {
         logger_print(stardis->logger, LOG_WARNING,
           "Probe is %g delta from closest boundary. "
           "Consider using -P instead of -p.\n",
-          filter_ctx.dist / solid->delta);
+          filter_ctx.dist / delta);
       } else {
         logger_print(stardis->logger, LOG_OUTPUT,
           "Probe is %g delta from closest boundary.\n",
-          filter_ctx.dist / solid->delta);
+          filter_ctx.dist / delta);
       }
     } else {
-      logger_print(stardis->logger, LOG_WARNING,
-        "Probe is in fluid '%s': computing fluid temperature, "
-        "not using a specific position.\n",
-        str_cget(&filter_ctx.desc->d.fluid->name));
+      ASSERT(DESC_IS_FLUID(filter_ctx.desc));
       /* In fluid; TODO: check distance wrt local geometry (use 4V/S?) */
+      if(filter_ctx.desc->type == DESC_MAT_FLUID) {
+        logger_print(stardis->logger, LOG_WARNING,
+          "Probe is in fluid '%s': computing fluid temperature, "
+          "not using a specific position.\n",
+          str_cget(&filter_ctx.desc->d.fluid->name));
+      } else {
+        ASSERT(filter_ctx.desc->type == DESC_MAT_FLUID_PROG);
+        logger_print(stardis->logger, LOG_WARNING,
+          "Probe is in fluid_prog '%s': computing fluid temperature, "
+          "not using a specific position.\n",
+          str_cget(&filter_ctx.desc->d.fluid_prog->name));
+      }
     }
   }
 
@@ -433,7 +488,8 @@ compute_probe(struct stardis* stardis, struct time* start)
 
   ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE));
 
-  ERR(check_probe_conform_to_type(stardis, 0, stardis->probe, &iprim, uv));
+  ERR(check_probe_conform_to_type(stardis, 0, stardis->probe,
+    stardis->time_range[0], &iprim, uv));
 
   args.nrealisations = stardis->samples;
   d3_set(args.position, stardis->probe);
@@ -538,7 +594,8 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
 #endif
 
   ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
-  ERR(check_probe_conform_to_type(stardis, 1, stardis->probe, &iprim, uv));
+  ERR(check_probe_conform_to_type(stardis, 1, stardis->probe,
+    stardis->time_range[0], &iprim, uv));
   ASSERT(iprim != UINT_MAX);
 
   ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
@@ -560,7 +617,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
       const struct description* d;
       ASSERT(prop[SG3D_FRONT] < dcount);
       d = descriptions + prop[SG3D_FRONT];
-      ASSERT(DESC_IS_MEDIUM(d->type));
+      ASSERT(DESC_IS_MEDIUM(d));
       medium_name = str_cget(get_description_name(d));
       compute_side = SDIS_FRONT;
       compute_side_name = "FRONT";
@@ -569,7 +626,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
       const struct description* d;
       ASSERT(prop[SG3D_BACK] < dcount);
       d = descriptions + prop[SG3D_BACK];
-      ASSERT(DESC_IS_MEDIUM(d->type));
+      ASSERT(DESC_IS_MEDIUM(d));
       medium_name = str_cget(get_description_name(d));
       compute_side = SDIS_BACK;
       compute_side_name = "BACK";
@@ -589,8 +646,8 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
 
       fd = descriptions + prop[SG3D_FRONT];
       bd = descriptions + prop[SG3D_BACK];
-      ASSERT(DESC_IS_MEDIUM(fd->type));
-      ASSERT(DESC_IS_MEDIUM(bd->type));
+      ASSERT(DESC_IS_MEDIUM(fd));
+      ASSERT(DESC_IS_MEDIUM(bd));
       description_get_medium_id(fd, &fmat_id);
       description_get_medium_id(bd, &bmat_id);
 

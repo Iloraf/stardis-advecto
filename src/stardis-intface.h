@@ -21,12 +21,21 @@
 #include <limits.h>
 
 struct stardis;
-struct dummies;
+struct stardis_interface_fragment;
 
 /*******************************************************************************
  * Interface data
  ******************************************************************************/
 struct intface {
+  /* programmed interfaces */
+  double (*get_temp)(const struct stardis_interface_fragment*, void*); 
+  double (*get_flux)(const struct stardis_interface_fragment*, void*); 
+  double (*get_hc)(const struct stardis_interface_fragment*, void*); 
+  double (*get_emissivity)(const struct stardis_interface_fragment*, void*); 
+  double (*get_alpha)(const struct stardis_interface_fragment*, void*); 
+  double (*get_ref_temp)(const struct stardis_interface_fragment*, void*); 
+  double (*get_tcr)(const struct stardis_interface_fragment*, void*); 
+  void* prog_data;
   /* fluid - solid */
   double hc;
   double ref_temperature;
@@ -44,7 +53,7 @@ struct intface {
 
 /* Declare the hash table that map an interface to its descriptor */
 struct int_descs {
-  unsigned front, back, connect;
+  unsigned front, back, intface;
 };
 #define INT_DESCS_NULL__ { UINT_MAX, UINT_MAX, UINT_MAX }
 static const struct int_descs INT_DESCS_NULL = INT_DESCS_NULL__;
@@ -53,7 +62,7 @@ static INLINE char
 eq_desc(const struct int_descs* a, const struct int_descs* b)
 {
   return (char)(a->front == b->front && a->back == b->back
-    && a->connect == b->connect);
+    && a->intface == b->intface);
 }
 
 #define HTABLE_NAME intface
@@ -62,7 +71,7 @@ eq_desc(const struct int_descs* a, const struct int_descs* b)
 #define HTABLE_KEY_FUNCTOR_EQ eq_desc
 #include <rsys/hash_table.h>
 
-extern res_T
+res_T
 create_intface
   (struct stardis* stardis,
    unsigned tr_idx,

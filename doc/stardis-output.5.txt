@@ -210,7 +210,7 @@ Note that to be able to explore different values of volumic power when
 applying the Green function, it must have been generated with these values
 being non-zero. On the other hand, any temperature or flux value in boundary
 descriptions can be modified when applying the Green function, as well as the
-ambient temperature.
+ambient radiative temperature (Trad).
 
 The output in green mode is made of tables containing the different media and
 boundaries and their imposed temperature, flux and volumic power values,
@@ -222,38 +222,40 @@ be computed as the mean and standard deviation of the samples of the *Green
 function* computed using these settings. Each sample can be computed as
 follows:
 
-* Get the temperature of the ending boundary, medium or ambient;
+* Get the temperature of the ending boundary, medium or Trad;
 * Add the temperature gain of each power term;
 * Add the temperature gain of each flux term.
 
 === BINARY GREEN
 
-Thereafter is the format of binary Green outputs. This output is produced by
-fwrite calls and does not take care of endianness. Comments include the C type
-of the written data.
+Binary Green outputs are formated according to the various C types from the
+*stardis-green.h* header file. The output begins with a header (of type struct
+green_file_header) that includes counts, followed by descriptions (of type
+struct green_description) and samples. Thereafter is the format of binary
+Green outputs. This output is produced by fwrite calls and does not take care
+of endianness. Comments include the C type of the written data.
 
 [verse]
 _______
-<binary-green> ::= "BINGREEN" # char[8]
+<binary-green> ::= "GREEN_BIN_FILE:" # char[16]
+                   <file_format_version> # unsigned
                    #descriptions # unsigned
                    #solids # unsigned
                    #fluids # unsigned
-                   #t-boundaries # unsigned
                    #h-boundaries # unsigned
-                   #flux-boundaries # unsigned
+                   #t-boundaries # unsigned
+                   #f-boundaries # unsigned
                    #solid-fluid-connections # unsigned
-                   names-pool-size # size of concatenated description names
-                                   # unsigned
+                   #solid-solid-connections # unsigned
                    #ok-samples # size_t
                    #failed-samples # size_t
-                   <descriptions>
-                   <concatenated-names> # char[names-pool-size]
-                   ambient-temperature # double
-                   reference-temperature # double
+                   Trad # double
+                   Trad-reference # double
                    time-range # double[2]
+                   <descriptions>
                    <samples>
 
-<descriptions> ::= description # struct description
+<descriptions> ::= description # struct green_description
                    <descriptions> # #descriptions descriptions
 
 <samples>      ::= <sample>
@@ -261,111 +263,11 @@ _______
 
 ---------------------
 
-<sample>       ::= <sample-header> # struct path_header
-                   <ids> # unsigned[header.pcount + header.fcount]
-                   <weights> # double[header.pcount + header.fcount]
+<sample>       ::= <sample-header> # struct green_sample_header
+                   <ids> # unsigned[header.pw_count then header.fx_count]
+                   <weights> # double[header.pw_count then header.fx_count]
 _______
 
-[literal]
- /* The content of stuct str name members in descriptions is meaningless.
-  * The name of the ith description is the ith nul-terminated string in
-  * <concatenated-names>.
-  * As a convenience, one could use char* baz to store a pointer to the
-  * description's name into <concatenated-names>. */
- struct str {
-   void* foo;
-   size_t bar;
-   char* baz;
-   char qux[16];
- };
-
- struct mat_fluid {
-   struct str name;
-   double rho;
-   double cp;
-   double tinit;
-   double imposed_temperature;
-   double t0;
-   int is_outside;
-   int is_green;
-   unsigned desc_id;
-   unsigned fluid_id;
- };
-
- struct mat_solid {
-   struct str name;
-   double lambda;
-   double rho;
-   double cp;
-   double delta;
-   double tinit;
-   double imposed_temperature;
-   double vpower;
-   double t0;
-   int is_outside;
-   int is_green;
-   unsigned desc_id;
-   unsigned solid_id;
- };
-
- struct t_boundary {
-   struct str name;
-   double imposed_temperature;
-   unsigned mat_id;
- };
-
- struct h_boundary {
-   struct str name;
-   double emissivity;
-   double specular_fraction;
-   double hc;
-   double imposed_temperature;
-   unsigned mat_id;
- };
-
- struct solid_fluid_connect {
-   struct str name;
-   double emissivity;
-   double specular_fraction;
-   double hc;
-   unsigned connection_id;
- };
-
- enum description_type {
-   DESC_MAT_SOLID,
-   DESC_MAT_FLUID,
-   DESC_BOUND_H_FOR_FLUID,
-   DESC_BOUND_H_FOR_SOLID,
-   DESC_BOUND_T_FOR_SOLID,
-   DESC_BOUND_F_FOR_SOLID,
-   DESC_SOLID_FLUID_CONNECT,
-   DESCRIPTION_TYPE_COUNT__,
-   DESC_OUTSIDE
- };
-
- struct f_boundary {
-   struct str name;
-   double imposed_flux;
-   unsigned mat_id;
- };
-
- struct description {
-   enum description_type type;
-   union {
-     struct mat_fluid fluid;
-     struct mat_solid solid;
-     struct t_boundary t_boundary;
-     struct f_boundary f_boundary;
-     struct h_boundary h_boundary;
-     struct solid_fluid_connect sf_connect;
-   } d;
- };
-
- struct path_header {
-   unsigned id;
-   unsigned pcount, fcount;
-   char at_initial;
- };
 
 === ASCII GREEN
 
@@ -390,13 +292,13 @@ _______
                         "# ID Name temperature"
                         <t-bounds>
                         "# H Boundaries"
-                        "# ID Name emissivity specular_fraction hc T_env"
+                        "# ID Name ref_temperature emissivity specular_fraction hc T_env"
                         <h-bounds>
                         "# F Boundaries"
                         "# ID Name flux"
                         <f-bounds>
-                        "# Radiative Temperatures"
-                        "# ID Rad_Temp Lin_Temp"
+                        "# Radiative Temperature"
+                        "# ID Rad_Temp"
                         <rad-temps>
                         "# Samples"
                         "# end #power_terms #flux_terms power_term_1 ... \
@@ -425,7 +327,7 @@ _______
 <f-bounds>          ::= <f-bound>
                         <f-bounds> # #f-bounds f-bound descriptions
 
-<rad-temps>         ::= <green-id> <rad-temp> <lin-temp>
+<rad-temps>         ::= <green-id> <Trad> <Trad-ref>
 
 <samples>           ::= <sample>
                         <samples> # #samples sample descriptions
@@ -443,12 +345,11 @@ _______
 
 <t-bound>           ::= <green-id> <name> <temperature>
 
-<h-bound>           ::= <green-id> <name> <emissivity> <specular_fraction> \
-                        <hc> <temperature>
+<h-bound>           ::= <green-id> <name> <ref_temperature> <emissivity> \
+                        <specular_fraction> <hc> <temperature>
 
 <f-bound>           ::= <green-id> <name> <flux>
 
-<rad-temps>         ::= <green-id> <ambient-temp> <lin-temp>
 
 <name>              ::= STRING # no space allowed
 
@@ -468,6 +369,8 @@ _______
 
 <temperature>       ::= REAL # in [0, INF)
 
+<ref-temperature>   ::= REAL # in [0, INF)
+
 <emissivity>        ::= REAL # in [0, 1]
 
 <specular-fraction> ::= REAL # in [0, 1]
@@ -476,9 +379,9 @@ _______
 
 <flux>              ::= REAL # in (-INF, INF)
 
-<ambient-temp>      ::= REAL # in [0, INF)
+<Trad>              ::= REAL # in [0, INF)
 
-<lin-temp>          ::= REAL # in [0, INF)
+<Trad-ref>          ::= REAL # in [0, INF)
 
 <green-id>          ::= INTEGER # in [0 #green-sources[
 
@@ -488,7 +391,7 @@ _______
 <end-type>          ::= "T" # sample ends at an t-bound
                       | "H" # sample ends at an h-bound
                             # a sample cannot end at an f-bound
-                      | "A" # sample ends with ambient temperature
+                      | "R" # sample ends with Trad
                       | "F" # sample ends in a fluid with known temperature
                       | "S" # sample ends in a solid with known temperature
 
@@ -540,11 +443,11 @@ _______
 -------------------------------------
 
 <end-name>           ::= STRING # the name of the boundary at the end of the
-                                # heat path, or AMBIENT for radiative ending
+                                # heat path, or TRAD for radiative ending
 
 <end-id>             ::= INTEGER # in [0 #boundaries]
                                  # order is the order in the description file,
-                                 # AMBIENT's id being #boundaries
+                                 # TRAD's id being #boundaries
 
 <x>                  ::= REAL
 
@@ -900,7 +803,13 @@ computes a result, some of the heat paths (successful paths, erroneous paths,
 or both) sampled during the simulation are written to files. Each path is
 written in VTK [1] format, one VTK file per path. The path description can
 include vertices' time if it makes sense, that is if the computation time is
-not INF.
+not INF. Due to the branching nature of non-linear Monte-Carlo algorithms,
+paths are made of strips. Whith a Picard order of 1, there is only a single
+strip, with higher orders, the number of strips can be greater than 1. As a
+result, the whole path is a tree: past the first strip, each strip can start
+from any vertex of one of the previous strips. This tree, when displaying the
+*Branch_id* field, starts with id 0, then increments each time a non-linearity
+leads to the creation of a new strip (to fetch a temperature).
 
 [verse]
 _______
@@ -911,31 +820,41 @@ _______
                       "DATASET POLYDATA"
                       "POINTS" #vertices "double"
                       <path-vertices>
-                      "LINES 1" #vertices+1
-                      <heat-path>
+                      "LINES" #strips #vertices+#strips
+                      <heat-strips>
+                      "CELL_DATA" #strips
+                      "SCALAR Path_Failure unsigned_char 1"
+                      "LOOKUP_TABLE default"
+                      <path-failures>
                       "POINT_DATA" #vertices
                       "SCALARS Vertex_Type unsigned_char 1"
                       "LOOKUP_TABLE default"
                       <vertices-types>
-                      "CELL_DATA 1"
-                      "SCALAR Path_type unsigned_char 1"
-                      "LOOKUP_TABLE default"
-                      <path-type>
                       "SCALARS Weight double 1"
                       "LOOKUP_TABLE default"
-                      <weigths>
+                      <weights>
+                      "SCALARS Branch_id int 1"
+                      "LOOKUP_TABLE default"
+                      <branch_ids>
                     [ <vertices-time> ] # if not steady
 
 <path-vertices>   ::= <real3>
                       <path-vertices> # #vertices vertices
 
-<heat-path>       ::= #vertices "0" "1" ... #vertices-1
+<path-failures>   ::= <path-failure>
+                      <path-failures> # #strips failure statutes
+
+<heat-strips>     ::= <heat-strip>
+                      <heat-strips> # #strips strips
 
 <vertices-types>  ::= <vertice-type>
                       <vertices-types> # #vertices types
 
-<weigths>         ::= REAL
-                      <weigths> # #vertices weigths
+<weights>         ::= <weight>
+                      <weights> # #vertices weights
+
+<branch_ids>      ::= <branch_id>
+                      <branch_ids> # #vertices ids
 
 <vertices-time>   ::= "SCALARS Time double 1"
                       "LOOKUP_TABLE default"
@@ -945,15 +864,23 @@ _______
 
 <real3>           ::= REAL REAL REAL
 
-<durations>       ::= REAL # in [0, INF)
-                      <durations> # #vertices durations
+<path-failure>    ::= "0" # SUCCESS
+                    | "1" # FAILURE
+
+<heat-strip>      ::= #strip_vertices <vtx_idx 1> ... <vtx_idx #strip_vertices>
 
 <vertice-type>    ::= "0" # CONDUCTION
                     | "1" # CONVECTION
                     | "2" # RADIATIVE
 
-<path-type>       ::= "0" # SUCCESS
-                    | "1" # FAILURE
+<weight>          ::= REAL
+
+<branch-id>       ::= INTEGER in [0 Picard_Order]
+
+<durations>       ::= REAL # in [0, INF)
+                      <durations> # #vertices durations
+
+<vtx_idx>         ::= INTEGER # in [0 #vertices[
 
 _______
 

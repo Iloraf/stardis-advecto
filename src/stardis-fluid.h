@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 #include <rsys/str.h>
 
 struct stardis;
+struct mem_allocator;
 
 /*******************************************************************************
  * Fluid data
@@ -44,16 +45,15 @@ create_solver_fluid
   (struct stardis* stardis,
    const struct fluid* fluid_props);
 
-LOCAL_SYM void
-init_fluid(struct mem_allocator* allocator, struct fluid* dst);
+LOCAL_SYM res_T
+init_fluid(struct mem_allocator* allocator, struct fluid** dst);
 
 LOCAL_SYM void
-release_fluid(struct fluid* fluid);
+release_fluid
+  (struct fluid* desc,
+   struct mem_allocator* allocator);
 
 LOCAL_SYM res_T
 str_print_fluid(struct str* str, const struct fluid* s);
-
-LOCAL_SYM res_T
-cp_fluid(struct fluid* dst, const struct fluid* src);
 
 #endif

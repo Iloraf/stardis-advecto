@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 #include "stardis-solid.h"
 #include "stardis-intface.h"
 #include "stardis-app.h"
+#include "stardis-green-types.h"
 
 #include <sdis.h>
 
@@ -67,6 +68,83 @@ enum enclosure_errors_t {
   ENCLOSURE_WITH_UNDEF_MEDIUM = BIT(2)
 };
 
+
+static res_T
+copy_desc_to_green_desc
+  (struct green_description* gdesc,
+   const struct darray_descriptions* descriptions,
+   const size_t idx)
+{
+  size_t sz;
+  const struct description* desc;
+  ASSERT(gdesc && descriptions);
+  sz = darray_descriptions_size_get(descriptions);
+  CHK(idx < sz);
+  desc = darray_descriptions_cdata_get(descriptions) + idx;
+  switch(desc->type) {
+    case DESC_MAT_SOLID:
+      gdesc->type = GREEN_MAT_SOLID;
+      strcpy(gdesc->d.solid.name, str_cget(&desc->d.solid->name));
+      gdesc->d.solid.conductivity = desc->d.solid->lambda;
+      gdesc->d.solid.volumic_mass = desc->d.solid->rho;
+      gdesc->d.solid.calorific_capacity = desc->d.solid->cp;
+      gdesc->d.solid.volumic_power = desc->d.solid->vpower;
+      gdesc->d.solid.initial_temperature = desc->d.solid->tinit;
+      gdesc->d.solid.imposed_temperature = desc->d.solid->imposed_temperature;
+      break;
+    case DESC_MAT_FLUID:
+      gdesc->type = GREEN_MAT_FLUID;
+      strcpy(gdesc->d.fluid.name, str_cget(&desc->d.fluid->name));
+      gdesc->d.fluid.volumic_mass = desc->d.fluid->rho;
+      gdesc->d.fluid.calorific_capacity = desc->d.fluid->cp;
+      gdesc->d.fluid.initial_temperature = desc->d.fluid->tinit;
+      gdesc->d.fluid.imposed_temperature = desc->d.fluid->imposed_temperature;
+      break;
+    case DESC_BOUND_H_FOR_FLUID:
+    case DESC_BOUND_H_FOR_SOLID:
+      gdesc->type = GREEN_BOUND_H;
+      strcpy(gdesc->d.h_boundary.name, str_cget(&desc->d.h_boundary->name));
+      gdesc->d.h_boundary.reference_temperature
+	= desc->d.h_boundary->ref_temperature;
+      gdesc->d.h_boundary.emissivity = desc->d.h_boundary->emissivity;
+      gdesc->d.h_boundary.specular_fraction
+	= desc->d.h_boundary->specular_fraction;
+      gdesc->d.h_boundary.convection_coefficient = desc->d.h_boundary->hc;
+      gdesc->d.h_boundary.imposed_temperature
+	= desc->d.h_boundary->imposed_temperature;
+      break;
+    case DESC_BOUND_T_FOR_SOLID:
+      gdesc->type = GREEN_BOUND_T;
+      strcpy(gdesc->d.t_boundary.name, str_cget(&desc->d.t_boundary->name));
+      gdesc->d.t_boundary.imposed_temperature
+	= desc->d.t_boundary->imposed_temperature;
+      break;
+    case DESC_BOUND_F_FOR_SOLID:
+      gdesc->type = GREEN_BOUND_F;
+      strcpy(gdesc->d.f_boundary.name, str_cget(&desc->d.f_boundary->name));
+      gdesc->d.f_boundary.imposed_flux
+	= desc->d.f_boundary->imposed_flux;
+      break;
+    case DESC_SOLID_FLUID_CONNECT:
+      gdesc->type = GREEN_SOLID_FLUID_CONNECT;
+      strcpy(gdesc->d.sf_connect.name, str_cget(&desc->d.sf_connect->name));
+      gdesc->d.sf_connect.reference_temperature
+	= desc->d.sf_connect->ref_temperature;
+      gdesc->d.sf_connect.emissivity = desc->d.sf_connect->emissivity;
+      gdesc->d.sf_connect.specular_fraction
+	= desc->d.sf_connect->specular_fraction;
+      gdesc->d.sf_connect.convection_coefficient = desc->d.sf_connect->hc;
+      break;
+    case DESC_SOLID_SOLID_CONNECT:
+      gdesc->type = GREEN_SOLID_SOLID_CONNECT;
+      strcpy(gdesc->d.ss_connect.name, str_cget(&desc->d.ss_connect->name));
+      gdesc->d.ss_connect.thermal_contact_resistance = desc->d.ss_connect->tcr;
+      break;
+    default: return RES_BAD_ARG;
+  }
+  return RES_OK;
+}
+
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
@@ -91,6 +169,7 @@ merge_flux_terms
   data = sdis_interface_get_data(interf);
   d__ = sdis_data_get(data);
   desc_id = d__->desc_id;
+  CHK(desc_id < darray_descriptions_size_get(w_ctx->desc));
   descs = darray_descriptions_cdata_get(w_ctx->desc);
 
   switch (descs[desc_id].type) {
@@ -123,9 +202,11 @@ merge_power_terms
   struct sdis_data* data = NULL;
   enum sdis_medium_type type;
   struct w_ctx* w_ctx = ctx;
+  size_t sz;
 
   ASSERT(mdm && w_ctx);
 
+  sz = darray_descriptions_size_get(w_ctx->desc);
   data = sdis_medium_get_data(mdm);
   type = sdis_medium_get_type(mdm);
 
@@ -135,9 +216,10 @@ merge_power_terms
     FATAL("Unexpected power term in fluid");
   }
   case SDIS_SOLID: {
-    struct solid* d__ = sdis_data_get(data);
+    struct solid** psolid = sdis_data_get(data);
     double* w;
-    unsigned id = d__->desc_id;
+    unsigned id = (*psolid)->desc_id;
+    CHK(id < sz);
     w = htable_weigth_find(&w_ctx->pw, &id);
     if(w) *w += power_term;
     else ERR(htable_weigth_set(&w_ctx->pw, &id, &power_term));
@@ -165,8 +247,8 @@ dump_path
   FILE* stream = NULL;
   char* name = NULL;
   enum sdis_heat_path_flag status = SDIS_HEAT_PATH_NONE;
-  size_t vcount_, name_sz;
-  unsigned long i, vcount;
+  size_t vcount_, scount_, offset, name_sz, istrip;
+  unsigned long scount, vcount;
 
   ASSERT(path && dump_ctx
     && dump_ctx->stardis
@@ -189,67 +271,121 @@ dump_path
     res = RES_IO_ERR;
     goto error;
   }
+
+  /* Get counts */
+  ERR(sdis_heat_path_get_line_strips_count(path, &scount_));
+  if(scount > ULONG_MAX) goto abort;
+  scount = (unsigned long)scount_;
+  vcount_ = 0;
+  FOR_EACH(istrip, 0, scount_) {
+    size_t n;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &n));
+    vcount_+= n;
+  }
+  if(vcount > ULONG_MAX) goto abort;
+  vcount = (unsigned long)vcount_;
   /* Header */
   fprintf(stream, "# vtk DataFile Version 2.0\n");
   fprintf(stream, "Heat path\n");
   fprintf(stream, "ASCII\n");
   fprintf(stream, "DATASET POLYDATA\n");
   /* Write path positions */
-  sdis_heat_path_get_vertices_count(path, &vcount_);
-  ASSERT(vcount_ < ULONG_MAX);
-  vcount = (unsigned long)vcount_;
   fprintf(stream, "POINTS %lu double\n", vcount);
-  FOR_EACH(i, 0, vcount) {
-    struct sdis_heat_vertex vtx;
-    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
-    fprintf(stream, "%g %g %g\n", SPLIT3(vtx.P));
+  FOR_EACH(istrip, 0, scount_) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    FOR_EACH(ivert, 0, nverts) {
+      struct sdis_heat_vertex vtx;
+      ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      fprintf(stream, "%g %g %g\n", SPLIT3(vtx.P));
+    }
   }
-  /* Write the segment of the path */
-  fprintf(stream, "LINES %d %lu\n", 1, 1 + vcount);
-  fprintf(stream, "%lu", vcount);
-  FOR_EACH(i, 0, vcount) fprintf(stream, " %lu", i);
-  fprintf(stream, "\n");
+  /* Write the strips of the path */
+  fprintf(stream, "LINES %lu %lu\n", scount, scount + vcount);
+  offset = 0;
+  FOR_EACH(istrip, 0, scount) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    if(nverts > ULONG_MAX) goto abort;
+    fprintf(stream, "%lu", (unsigned long)nverts);
+    FOR_EACH(ivert, 0, nverts) {
+      if(ivert + offset > ULONG_MAX) goto abort;
+      fprintf(stream, " %lu", (unsigned long)(ivert + offset));
+    }
+    fprintf(stream, "\n");
+    offset += nverts;
+  }
 
-  /* Write path type */
-  fprintf(stream, "CELL_DATA %d\n", 1);
-  fprintf(stream, "SCALARS Path_Type unsigned_char 1\n");
+  /* Write path status on strips */
+  fprintf(stream, "CELL_DATA %lu\n", scount);
+  fprintf(stream, "SCALARS Path_Failure unsigned_char 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
-  switch (status) {
-  case SDIS_HEAT_PATH_SUCCESS: fprintf(stream, "0\n"); break;
-  case SDIS_HEAT_PATH_FAILURE: fprintf(stream, "1\n"); break;
-  default: FATAL("Unreachable code.\n"); break;
+  FOR_EACH(istrip, 0, scount) {
+    switch (status) {
+      case SDIS_HEAT_PATH_SUCCESS: fprintf(stream, "0\n"); break;
+      case SDIS_HEAT_PATH_FAILURE: fprintf(stream, "1\n"); break;
+      default: FATAL("Unreachable code.\n"); break;
+    }
   }
-
   fprintf(stream, "POINT_DATA %lu\n", vcount);
   /* Write the type of the random walk vertices */
   fprintf(stream, "SCALARS Vertex_Type unsigned_char 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
-  FOR_EACH(i, 0, vcount) {
-    struct sdis_heat_vertex vtx;
-    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
-    ASSERT((size_t)vtx.type <= UCHAR_MAX);
-    fprintf(stream, "%d\n", vtx.type);
+  FOR_EACH(istrip, 0, scount_) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    FOR_EACH(ivert, 0, nverts) {
+      struct sdis_heat_vertex vtx;
+      ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      if((size_t)vtx.type > UCHAR_MAX) goto abort;
+      switch(vtx.type) {
+        case SDIS_HEAT_VERTEX_CONDUCTION: fprintf(stream, "%d\n", 0); break;
+        case SDIS_HEAT_VERTEX_CONVECTION: fprintf(stream, "%d\n", 1); break;
+        case SDIS_HEAT_VERTEX_RADIATIVE: fprintf(stream, "%d\n", 2); break;
+        default: FATAL("Unreachable code.\n"); break;
+      }
+    }
   }
   /* Write the weights of the random walk vertices */
   fprintf(stream, "SCALARS Weight double 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
-  FOR_EACH(i, 0, vcount) {
-    struct sdis_heat_vertex vtx;
-    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
-    fprintf(stream, "%g\n", vtx.weight);
-  }
-  /* If computation time is not INF for every vertex,
-   * write the time of the random walk vertices */
-  FOR_EACH(i, 0, vcount) {
-    struct sdis_heat_vertex vtx;
-    ERR(sdis_heat_path_get_vertex(path, i, &vtx));
-    if(i == 0) {
-      if(IS_INF(vtx.time)) break;
-      fprintf(stream, "SCALARS Time double 1\n");
-      fprintf(stream, "LOOKUP_TABLE default\n");
+  FOR_EACH(istrip, 0, scount_) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    FOR_EACH(ivert, 0, nverts) {
+      struct sdis_heat_vertex vtx;
+      ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      fprintf(stream, "%g\n", vtx.weight);
     }
-    ASSERT(!IS_INF(vtx.time));
-    fprintf(stream, "%g\n", vtx.time);
+  }
+  /* Write the branch_id of the random walk vertices */
+  fprintf(stream, "SCALARS Branch_id int 1\n");
+  fprintf(stream, "LOOKUP_TABLE default\n");
+  FOR_EACH(istrip, 0, scount_) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    FOR_EACH(ivert, 0, nverts) {
+      struct sdis_heat_vertex vtx;
+      ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      fprintf(stream, "%d\n", vtx.branch_id);
+    }
+  }
+  /* If computation time is not INF,
+   * write the time of the random walk vertices */
+  FOR_EACH(istrip, 0, scount_) {
+    size_t ivert, nverts;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    FOR_EACH(ivert, 0, nverts) {
+      struct sdis_heat_vertex vtx;
+      ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      if(istrip == 0 && ivert == 0) {
+        if(IS_INF(vtx.time)) break;
+        fprintf(stream, "SCALARS Time double 1\n");
+        fprintf(stream, "LOOKUP_TABLE default\n");
+      }
+      if(IS_INF(vtx.time)) goto abort;
+      fprintf(stream, "%g\n", vtx.time);
+    }
   }
 
 end:
@@ -258,6 +394,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -273,7 +412,7 @@ dump_vtk_image
 
   ASSERT(buf && stream);
   ERR(sdis_estimator_buffer_get_definition(buf, def));
-  ASSERT(def[0] != 0 && def[1] != 0 && def[0] * def[1] <= ULONG_MAX);
+  if(def[0] == 0 || def[1] == 0 || def[0] * def[1] > ULONG_MAX) goto abort;
   definition[0] = (unsigned long)def[0];
   definition[1] = (unsigned long)def[1];
 
@@ -344,7 +483,7 @@ dump_vtk_image
       size_t nfails;
       ERR(sdis_estimator_buffer_at(buf, ix, iy, &estimator));
       ERR(sdis_estimator_get_failure_count(estimator, &nfails));
-      ASSERT(nfails <= ULONG_MAX);
+      if(nfails > ULONG_MAX) goto abort;
       fprintf(stream, "%lu\n", (unsigned long)nfails);
     }
   }
@@ -354,6 +493,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -368,7 +510,7 @@ dump_ht_image
 
   ASSERT(buf && stream);
   ERR(sdis_estimator_buffer_get_definition(buf, def));
-  ASSERT(def[0] <= ULONG_MAX && def[1] <= ULONG_MAX);
+  if(def[0] > ULONG_MAX || def[1] > ULONG_MAX) goto abort;
   definition[0] = (unsigned long)def[0];
   definition[1] = (unsigned long)def[1];
 
@@ -390,6 +532,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 #define FW(Ptr, Count) \
@@ -397,12 +542,6 @@ error:
     res = RES_IO_ERR; \
     goto error; \
   }
-
-struct path_header {
-  unsigned id;
-  unsigned pcount, fcount;
-  char at_initial;
-};
 
 static FINLINE double
 medium_get_t0
@@ -433,18 +572,20 @@ dump_sample_end
   enum sdis_green_path_end_type end_type;
   FILE* stream;
   double elapsed;
+  size_t sz;
+  unsigned trad_id;
 
   CHK(path && ctx);
 
   stream = e_ctx->stream;
   ERR(sdis_green_path_get_elapsed_time(path, &elapsed));
   ERR(sdis_green_path_get_end_type(path, &end_type));
+  sz = darray_descriptions_size_get(e_ctx->desc);
+  if(sz > UINT_MAX) goto abort;
+  trad_id = (unsigned)sz;
   if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
-    size_t ambient_id = darray_descriptions_size_get(e_ctx->desc);
-    ASSERT(ambient_id <= UINT_MAX);
     /* End, End ID, X, Y, Z, Elapsed time */
-    fprintf(stream, "AMBIENT, %u, 0, 0, 0, %g\n",
-      (unsigned)ambient_id, elapsed);
+    fprintf(stream, "TRAD, %u, 0, 0, 0, %g\n", trad_id, elapsed);
   } else {
     struct sdis_point pt = SDIS_POINT_NULL;
     struct sdis_data* data = NULL;
@@ -471,19 +612,17 @@ dump_sample_end
         data = sdis_medium_get_data(pt.data.mdmvert.medium);
         pos = pt.data.mdmvert.vertex.P;
         if(pt.data.mdmvert.vertex.P[0] == INF) {
-          /* Radiative output (ambient temperature) */
-          size_t sz = darray_descriptions_size_get(e_ctx->desc);
-          ASSERT(sz <= UINT_MAX);
-          id = (unsigned)sz; /* Ambient ID */
+          /* Radiative output (Trad) */
+          id = trad_id;
         }
         else if(type == SDIS_FLUID) {
-          struct fluid* d__ = sdis_data_get(data);
-          id = d__->desc_id;
+          struct fluid** pfluid = sdis_data_get(data);
+          id = (*pfluid)->desc_id;
         } else {
-          struct solid* d__ = sdis_data_get(data);
+          struct solid** psolid = sdis_data_get(data);
           ASSERT(type == SDIS_SOLID);
-          ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
-          id = d__->desc_id;
+          ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
+          id = (*psolid)->desc_id;
         }
         break;
       default: FATAL("Unreachable code.\n"); break;
@@ -497,6 +636,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 static res_T
@@ -506,23 +648,24 @@ dump_sample
 {
   res_T res = RES_OK;
   struct htable_weigth_iterator it, end;
-  struct path_header header;
+  struct green_sample_header header;
   struct w_ctx* w_ctx = ctx;
   enum sdis_green_path_end_type end_type;
   FILE* stream;
   unsigned* ids = NULL;
   double* weights = NULL;
   size_t sz, i;
-
+  unsigned trad_id;
   CHK(path && ctx);
 
   stream = w_ctx->stream;
   ERR(sdis_green_path_get_end_type(path, &end_type));
+  sz = darray_descriptions_size_get(w_ctx->desc);
+  if(sz > UINT_MAX) goto abort;
+  trad_id = (unsigned)sz;
   if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
-    size_t ambient_id = darray_descriptions_size_get(w_ctx->desc);
-    ASSERT(ambient_id <= UINT_MAX);
     header.at_initial = 0;
-    header.id = (unsigned)ambient_id;
+    header.sample_end_description_id = trad_id;
   } else {
     struct sdis_point pt = SDIS_POINT_NULL;
     struct sdis_data* data = NULL;
@@ -547,7 +690,7 @@ dump_sample
         d__ = sdis_data_get(data);
         desc_id = d__->desc_id;
         CHK(DESC_IS_T(descs[desc_id].type) || DESC_IS_H(descs[desc_id].type));
-        header.id = desc_id;
+        header.sample_end_description_id = desc_id;
         header.at_initial = 0;
         break;
       }
@@ -557,19 +700,17 @@ dump_sample
         t0 = medium_get_t0(pt.data.mdmvert.medium);
         header.at_initial = (pt.data.mdmvert.vertex.time <= t0);
         if(pt.data.mdmvert.vertex.P[0] == INF) {
-          /* Radiative output (ambient temperature) */
-          sz = darray_descriptions_size_get(w_ctx->desc);
-          ASSERT(sz <= UINT_MAX);
-          header.id = (unsigned)sz; /* Ambient ID */
+          /* Radiative output (Trad) */
+          header.sample_end_description_id = trad_id;
         }
         else if(type == SDIS_FLUID) {
-          struct fluid* d__ = sdis_data_get(data);
-          header.id = d__->desc_id;
+          struct fluid** pfluid = sdis_data_get(data);
+          header.sample_end_description_id = (*pfluid)->desc_id;
         } else {
-          struct solid* d__ = sdis_data_get(data);
+          struct solid** psolid = sdis_data_get(data);
           ASSERT(type == SDIS_SOLID);
-          ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
-          header.id = d__->desc_id;
+          ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
+          header.sample_end_description_id = (*psolid)->desc_id;
         }
         break;
       default: FATAL("Unreachable code.\n"); break;
@@ -582,17 +723,17 @@ dump_sample
   ERR(sdis_green_path_for_each_power_term(path, merge_power_terms, w_ctx));
   ERR(sdis_green_path_for_each_flux_term(path, merge_flux_terms, w_ctx));
   sz = htable_weigth_size_get(&w_ctx->pw);
-  ASSERT(sz <= UINT_MAX);
-  header.pcount = (unsigned)sz;
+  if(sz > UINT_MAX) goto abort;
+  header.pw_count = (unsigned)sz;
   sz = htable_weigth_size_get(&w_ctx->flux);
-  ASSERT(sz <= UINT_MAX);
-  header.fcount = (unsigned)sz;
+  if(sz > UINT_MAX) goto abort;
+  header.fx_count = (unsigned)sz;
 
   /* Write path's header */
   FW(&header, 1);
 
   /* Allocate buffers */
-  sz = header.pcount + header.fcount;
+  sz = header.pw_count + header.fx_count;
   ids = MEM_CALLOC(w_ctx->alloc, sz, sizeof(*ids));
   weights = MEM_CALLOC(w_ctx->alloc, sz, sizeof(*weights));
   if(!ids || !weights) {
@@ -607,24 +748,26 @@ dump_sample
   while(!htable_weigth_iterator_eq(&it, &end)) {
     double* w = htable_weigth_iterator_data_get(&it);
     unsigned* k = htable_weigth_iterator_key_get(&it);
+    CHK(*k <= trad_id);
     ids[i] = *k;
     weights[i] = *w;
     htable_weigth_iterator_next(&it);
     i++;
   }
-  CHK(i == header.pcount);
+  CHK(i == header.pw_count);
 
   htable_weigth_begin(&w_ctx->flux, &it);
   htable_weigth_end(&w_ctx->flux, &end);
   while (!htable_weigth_iterator_eq(&it, &end)) {
     double* w = htable_weigth_iterator_data_get(&it);
     unsigned* k = htable_weigth_iterator_key_get(&it);
+    CHK(*k <= trad_id);
     ids[i] = *k;
     weights[i] = *w;
     htable_weigth_iterator_next(&it);
     i++;
   }
-  CHK(i == header.pcount + header.fcount);
+  CHK(i == header.pw_count + header.fx_count);
 
   FW(ids, sz);
   FW(weights, sz);
@@ -635,6 +778,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -644,95 +790,52 @@ dump_green_bin
    FILE* stream)
 {
   res_T res = RES_OK;
-  size_t ok_count, failed_count;
-  size_t sz;
+  size_t sz, i;
   struct w_ctx w_ctx;
   int table_initialized = 0;
-  unsigned i, szd;
-  const struct description* descs;
-  unsigned name_pool_sz = 0;
-  char* name_pool = NULL;
-  char* pool_ptr;
-  const char green_string[] = "GREEN_BIN_FILE:";
-  const unsigned file_fmt_version = 3;
   /* The following type must be identical to its stardis-green counterpart! */
-  struct bfile_green_counts {
-    unsigned desc_count, smed_count, fmed_count, tbound_count, hbound_count,
-      fbound_count, sfconnect_count, ssconnect_count, name_pool_sz;
-    size_t ok_count, failed_count;
-  } file_counts;
+  struct green_file_header header;
 
   ASSERT(green && stardis && stream);
 
-  ERR(sdis_green_function_get_paths_count(green, &ok_count));
-  ERR(sdis_green_function_get_invalid_paths_count(green, &failed_count));
+  /* Init header */
+  strcpy(header.green_string, BIN_FILE_IDENT_STRING);
+  header.file_format_version = GREEN_FILE_FORMAT_VERSION;
+  header.solid_count = stardis->counts.smed_count;
+  header.fluid_count = stardis->counts.fmed_count;
+  header.tbound_count = stardis->counts.tbound_count;
+  header.hbound_count = stardis->counts.hbound_count;
+  header.fbound_count = stardis->counts.fbound_count;
+  header.sfconnect_count = stardis->counts.sfconnect_count;
+  header.ssconnect_count = stardis->counts.ssconnect_count;
+  ERR(sdis_green_function_get_paths_count(green, &header.ok_count));
+  ERR(sdis_green_function_get_invalid_paths_count(green, &header.failed_count));
   sz = darray_descriptions_size_get(&stardis->descriptions);
-  ASSERT(sz <= UINT_MAX);
-  szd = (unsigned)sz;
-  ASSERT(szd ==
+  if(sz > UINT_MAX) goto abort;
+  ASSERT(sz ==
     (stardis->counts.smed_count + stardis->counts.fmed_count
       + stardis->counts.tbound_count + stardis->counts.hbound_count
       + stardis->counts.fbound_count + stardis->counts.sfconnect_count
       + stardis->counts.ssconnect_count));
-  descs = darray_descriptions_cdata_get(&stardis->descriptions);
+  header.description_count = (unsigned)sz;
+  header.ambient_radiative_temperature = stardis->trad;
+  header.ambient_radiative_temperature_reference = stardis->trad_ref;
+  d2_set(header.time_range, stardis->time_range);
 
-  /* Save names that do not fit inplace */
-  FOR_EACH(i, 0, szd) {
-    const struct description* desc = descs + i;
-    const struct str* name = get_description_name(desc);
-    const size_t len = str_len(name);
-    ASSERT(name_pool_sz + len + 1 <= UINT_MAX);
-    name_pool_sz += (unsigned)(len + 1);
-  }
-  pool_ptr = name_pool = MEM_ALLOC(stardis->allocator, name_pool_sz);
-  if(!name_pool) {
-    res = RES_MEM_ERR;
-    goto error;
-  }
-  FOR_EACH(i, 0, szd) {
-    const struct description* desc = descs + i;
-    const struct str* name = get_description_name(desc);
-    const size_t len = str_len(name);
-    strcpy(pool_ptr, name->cstr);
-    pool_ptr += len + 1;
-  }
-  ASSERT(pool_ptr == name_pool + name_pool_sz);
-  /* Write Green string and file format version */
-  FW(green_string, sizeof(green_string));
-  FW(&file_fmt_version, 1);
-
-  /* Write counts */
-  file_counts.desc_count = szd;
-  file_counts.smed_count = stardis->counts.smed_count;
-  file_counts.fmed_count = stardis->counts.fmed_count;
-  file_counts.tbound_count = stardis->counts.tbound_count;
-  file_counts.hbound_count = stardis->counts.hbound_count;
-  file_counts.fbound_count = stardis->counts.fbound_count;
-  file_counts.sfconnect_count = stardis->counts.sfconnect_count;
-  file_counts.ssconnect_count = stardis->counts.ssconnect_count;
-  file_counts.name_pool_sz = name_pool_sz;
-  file_counts.ok_count = ok_count;
-  file_counts.failed_count = failed_count;
-  FW(&file_counts, 1);
+  /* Write header */
+  FW(&header, 1);
 
   /* Write descriptions*/
-  FW(descs, szd);
-
-  /* Write names */
-  if(name_pool_sz)
-    FW(name_pool, name_pool_sz);
-
-  /* Write radiative temperatures */
-  FW(&stardis->ambient_temp, 1);
-  FW(&stardis->ref_temp, 1);
-
-  /* Write time range */
-  FW(&stardis->time_range, 2);
+  for(i = 0; i < sz; i++) {
+    struct green_description desc;
+    ERR(copy_desc_to_green_desc(&desc, &stardis->descriptions, i));
+    FW(&desc, 1);
+  }
 
   w_ctx.alloc = stardis->allocator;
   w_ctx.desc = &stardis->descriptions;
-  htable_weigth_init(NULL, &w_ctx.pw);
-  htable_weigth_init(NULL, &w_ctx.flux);
+  htable_weigth_init(stardis->allocator, &w_ctx.pw);
+  htable_weigth_init(stardis->allocator, &w_ctx.flux);
   w_ctx.stream = stream;
   table_initialized = 1;
 
@@ -740,12 +843,14 @@ dump_green_bin
   ERR(sdis_green_function_for_each_path(green, dump_sample, &w_ctx));
 
 end:
-  MEM_RM(stardis->allocator, name_pool);
   if(table_initialized) htable_weigth_release(&w_ctx.pw);
   if(table_initialized) htable_weigth_release(&w_ctx.flux);
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -782,7 +887,7 @@ print_sample
   enum sdis_medium_type type;
   struct htable_weigth_iterator it, end;
   unsigned desc_id;
-  size_t pcount, fcount;
+  size_t pw_count, fx_count;
   struct w_ctx* w_ctx = ctx;
   const struct description* descs;
   CHK(path && ctx);
@@ -792,7 +897,7 @@ print_sample
   /* For each path, prints:
    * # end #power_terms #flux_terms power_term_1  ... power_term_n flux_term_1 ... flux_term_n
    * with:
-   * - end = end_type end_id; end_type = T | H | A | F | S
+   * - end = end_type end_id; end_type = T | H | R | F | S
    * - power_term_i = power_type_i power_id_i factor_i
    * - flux_term_i = flux_id_i factor_i
    */
@@ -823,42 +928,42 @@ print_sample
     type = sdis_medium_get_type(pt.data.mdmvert.medium);
     data = sdis_medium_get_data(pt.data.mdmvert.medium);
     if(pt.data.mdmvert.vertex.P[0] == INF) {
-      /* Radiative output (ambient temperature)*/
+      /* Radiative output (Trad)*/
       size_t sz = darray_descriptions_size_get(w_ctx->desc);
-      ASSERT(sz <= UINT_MAX);
-      fprintf(w_ctx->stream, "A\t%u", (unsigned)sz);
+      if(sz > UINT_MAX) goto abort;
+      fprintf(w_ctx->stream, "R\t%u", (unsigned)sz);
     }
     else if(type == SDIS_FLUID) {
-      struct fluid* d__ = sdis_data_get(data);
-      desc_id = d__->desc_id;
-      if(d__->is_outside)
+      struct fluid** pfluid = sdis_data_get(data);
+      desc_id = (*pfluid)->desc_id;
+      if((*pfluid)->is_outside)
         /* If outside the model and in a fluid with known temperature,
          * its a fluid attached to a H boundary */
         fprintf(w_ctx->stream, "H\t%u", desc_id);
       /* In a standard fluid with known temperature */
       else fprintf(w_ctx->stream, "F\t%u", desc_id);
     } else {
-      struct solid* d__ = sdis_data_get(data);
+      struct solid** psolid = sdis_data_get(data);
       ASSERT(type == SDIS_SOLID);
-      ASSERT(!d__->is_outside); /* FIXME: what if in external solid? */
-      desc_id = d__->desc_id;
+      ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
+      desc_id = (*psolid)->desc_id;
       fprintf(w_ctx->stream, "S\t%u", desc_id);
     }
     break;
   default: FATAL("Unreachable code.\n"); break;
   }
 
-  ERR(sdis_green_function_get_power_terms_count(path, &pcount));
+  ERR(sdis_green_function_get_power_terms_count(path, &pw_count));
 
   htable_weigth_clear(&w_ctx->pw);
   htable_weigth_clear(&w_ctx->flux);
   ERR(sdis_green_path_for_each_power_term(path, merge_power_terms, w_ctx));
   ERR(sdis_green_path_for_each_flux_term(path, merge_flux_terms, w_ctx));
-  fcount = htable_weigth_size_get(&w_ctx->flux);
+  fx_count = htable_weigth_size_get(&w_ctx->flux);
 
-  ASSERT(pcount <= ULONG_MAX && fcount <= ULONG_MAX);
+  if(pw_count > ULONG_MAX || fx_count > ULONG_MAX) goto abort;
   fprintf(w_ctx->stream, "\t%lu\t%lu",
-    (unsigned long)pcount, (unsigned long)fcount);
+    (unsigned long)pw_count, (unsigned long)fx_count);
 
   htable_weigth_begin(&w_ctx->pw, &it);
   htable_weigth_end(&w_ctx->pw, &end);
@@ -883,6 +988,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -902,13 +1010,13 @@ dump_green_ascii
   ASSERT(green && stardis && stream);
 
   ERR(sdis_green_function_get_paths_count(green, &sz));
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   ok_count = (unsigned)sz;
   ERR(sdis_green_function_get_invalid_paths_count(green, &sz));
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   failed_count = (unsigned)sz;
   sz = darray_descriptions_size_get(&stardis->descriptions);
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   szd = (unsigned)sz;
   descs = darray_descriptions_cdata_get(&stardis->descriptions);
 
@@ -932,7 +1040,7 @@ dump_green_ascii
       const struct description* desc = descs + i;
       const struct solid* sl;
       if(desc->type != DESC_MAT_SOLID) continue;
-      sl = &desc->d.solid;
+      sl = desc->d.solid;
       fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g",
         i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower);
       if(sl->tinit >= 0) {
@@ -954,7 +1062,7 @@ dump_green_ascii
       const struct description* desc = descs + i;
       const struct fluid* fl;
       if(desc->type != DESC_MAT_FLUID) continue;
-      fl = &desc->d.fluid;
+      fl = desc->d.fluid;
       if(fl->imposed_temperature >= 0) {
         fprintf(stream, "%u\t%s\t%g\t%g",
           i, str_cget(&fl->name), fl->rho, fl->cp);
@@ -982,23 +1090,23 @@ dump_green_ascii
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct t_boundary* bd;
-      bd = &desc->d.t_boundary;
+      bd = desc->d.t_boundary;
       fprintf(stream, "%u\t%s\t%g\n",
         i, str_cget(&bd->name), bd->imposed_temperature);
     }
   }
   if(stardis->counts.hbound_count) {
     fprintf(stream, "# H Boundaries\n");
-    fprintf(stream, "# ID Name emissivity specular_fraction hc T_env\n");
+    fprintf(stream, "# ID Name ref_temperature emissivity specular_fraction hc T_env\n");
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct h_boundary* bd;
       if(desc->type != DESC_BOUND_H_FOR_SOLID
         && desc->type != DESC_BOUND_H_FOR_FLUID) continue;
-      bd = &desc->d.h_boundary;
-      fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\n",
-        i, str_cget(&bd->name), bd->emissivity, bd->specular_fraction,
-        bd->hc, bd->imposed_temperature);
+      bd = desc->d.h_boundary;
+      fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g\t%g\n",
+        i, str_cget(&bd->name), bd->ref_temperature, bd->emissivity,
+        bd->specular_fraction, bd->hc, bd->imposed_temperature);
     }
   }
   if(stardis->counts.fbound_count) {
@@ -1008,29 +1116,29 @@ dump_green_ascii
       const struct description* desc = descs + i;
       const struct f_boundary* bd;
       if(desc->type != DESC_BOUND_F_FOR_SOLID) continue;
-      bd = &desc->d.f_boundary;
+      bd = desc->d.f_boundary;
       fprintf(stream, "%u\t%s\t%g\n",
         i, str_cget(&bd->name), bd->imposed_flux);
     }
   }
 
-  /* Radiative Temperatures */
+  /* Radiative Temperature */
   fprintf(stream, "# Radiative Temperatures\n");
-  fprintf(stream, "# ID Amb_Temp Lin_Temp\n");
+  fprintf(stream, "# ID Trad Trad_Ref\n");
   fprintf(stream, "%u\t%g\t%g\n",
-    szd, stardis->ambient_temp, stardis->ref_temp);
+    szd, stardis->trad, stardis->trad_ref);
 
   fprintf(stream, "# Samples\n");
   fprintf(stream,
     "# end #power_terms #flux_terms power_term_1 ... power_term_n flux_term_1 ... flux_term_n\n");
-  fprintf(stream, "# end = end_type end_id; end_type = T | H | A | F | S\n");
+  fprintf(stream, "# end = end_type end_id; end_type = T | H | R | F | S\n");
   fprintf(stream, "# power_term_i = power_id_i factor_i\n");
   fprintf(stream, "# flux_term_i = flux_id_i factor_i\n");
 
   w_ctx.alloc = stardis->allocator;
   w_ctx.desc = &stardis->descriptions;
-  htable_weigth_init(NULL, &w_ctx.pw);
-  htable_weigth_init(NULL, &w_ctx.flux);
+  htable_weigth_init(stardis->allocator, &w_ctx.pw);
+  htable_weigth_init(stardis->allocator, &w_ctx.flux);
   w_ctx.stream = stream;
   table_initialized = 1;
 
@@ -1044,6 +1152,9 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -1347,6 +1458,9 @@ print_computation_time
 
   ASSERT(stardis && start && compute_start && compute_end);
 
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
+
   time_sub(&tmp, compute_start, start);
   time_dump(&tmp, flag, NULL, buf, sizeof(buf));
   logger_print(stardis->logger, LOG_OUTPUT,
@@ -1387,10 +1501,13 @@ print_single_MC_result
 
   ASSERT(estimator && stardis && stream);
 
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
+
   /* Fetch the estimation data */
   ERR(sdis_estimator_get_temperature(estimator, &result));
   ERR(sdis_estimator_get_failure_count(estimator, &nfailures_));
-  ASSERT(nfailures_ <= ULONG_MAX && stardis->samples <= ULONG_MAX);
+  if(nfailures_ > ULONG_MAX || stardis->samples > ULONG_MAX) goto abort;
   nfailures = (unsigned long)nfailures_;
   nsamples = (unsigned long)stardis->samples;
   if(nfailures == nsamples) {
@@ -1570,14 +1687,18 @@ end:
   return res;
 error:
   goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
-void
+res_T
 dump_map
   (const struct stardis* stardis,
    const struct darray_estimators* estimators,
    FILE* stream)
 {
+  res_T res = RES_OK;
   unsigned i, vcount, tcount, last_v = 0;
   const size_t* idx;
   size_t sz;
@@ -1586,10 +1707,13 @@ dump_map
 
   ASSERT(stardis && estimators && stream);
 
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
+
   est = darray_estimators_cdata_get(estimators);
   idx = darray_size_t_cdata_get(&stardis->compute_surface.primitives);
   sz = darray_size_t_size_get(&stardis->compute_surface.primitives);
-  ASSERT(sz <= UINT_MAX);
+  if(sz > UINT_MAX) goto abort;
   szp = (unsigned)sz;
   SG3D(geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));
   SG3D(geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tcount));
@@ -1598,7 +1722,7 @@ dump_map
   for(i = 0; i < szp; ++i) {
     unsigned t;
     unsigned indices[3];
-    ASSERT(idx[i] <= UINT_MAX);
+    if(idx[i] > UINT_MAX) goto abort;
     t = (unsigned)idx[i];
     SG3D(geometry_get_unique_triangle_vertices(stardis->geometry.sg3d, t,
       indices));
@@ -1621,7 +1745,7 @@ dump_map
   for(i = 0; i < szp; ++i) {
     unsigned t;
     unsigned indices[3];
-    ASSERT(idx[i] <= UINT_MAX);
+    if(idx[i] > UINT_MAX) goto abort;
     t = (unsigned)idx[i];
     SG3D(geometry_get_unique_triangle_vertices(stardis->geometry.sg3d, t,
       indices));
@@ -1647,7 +1771,7 @@ dump_map
   for(i = 0; i < szp; ++i) {
     size_t nfails;
     SDIS(estimator_get_failure_count(est[i], &nfails));
-    ASSERT(nfails <= UINT_MAX);
+    if(nfails > UINT_MAX) goto abort;
     fprintf(stream, "%u\n", (unsigned)nfails);
   }
   fprintf(stream, "SCALARS computation_time_estimate float 1\n");
@@ -1664,6 +1788,13 @@ dump_map
     SDIS(estimator_get_realisation_time(est[i], &time));
     fprintf(stream, "%f\n", time.SE);
   }
+end:
+  return res;
+error:
+  goto end;
+abort:
+  res = RES_BAD_ARG;
+  goto error;
 }
 
 res_T
@@ -1676,6 +1807,10 @@ dump_compute_region_at_the_end_of_vtk
   unsigned tsz, i;
   size_t j, psz;
   ASSERT(stardis && stream);
+
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
+
   psz = darray_size_t_size_get(&stardis->compute_surface.primitives);
   ASSERT(psz == darray_sides_size_get(&stardis->compute_surface.sides));
 
@@ -1760,6 +1895,9 @@ dump_model_as_c_chunks
   unsigned n, vcount, tcount;
 
   ASSERT(stardis && stream);
+
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
 
   prefix = str_cget(&stardis->chunks_prefix);
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));

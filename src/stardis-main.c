@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#ifdef STARDIS_ENABLE_MPI
+#include <mpi.h>
+#endif
+
 int
 main
   (int argc,
@@ -44,12 +48,16 @@ main
 
   time_current(&start);
 
+#ifdef STARDIS_ENABLE_MPI
+  ERR(init_mpi(&argc, &argv, log_err_fn, log_warn_fn));
+#endif
+
   ERR(mem_init_proxy_allocator(&allocator, &mem_default_allocator));
   allocator_initialized = 1;
 
   ERR(logger_init(&allocator, &logger));
   logger_initialized = 1;
-  /* Active loggin for args pasing */
+  /* Active loggin for args parsing */
   logger_set_stream(&logger, LOG_ERROR, log_err_fn, NULL);
   logger_set_stream(&logger, LOG_WARNING, log_warn_fn, NULL);
   logger_set_stream(&logger, LOG_OUTPUT, log_prt_fn, NULL);
@@ -119,6 +127,10 @@ exit:
     }
     mem_shutdown_proxy_allocator(&allocator);
   }
+#ifdef STARDIS_ENABLE_MPI
+  finalize_mpi();
+#endif
+
   return err;
 error:
   if(mode & COMPUTE_MODES)

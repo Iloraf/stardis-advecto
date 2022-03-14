@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +19,8 @@
 
 #include <sdis.h>
 
+#include <rsys/mem_allocator.h>
+
 #include <limits.h>
 
 /*******************************************************************************
@@ -30,9 +32,9 @@ fluid_get_calorific_capacity
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
 {
-  const struct fluid* fluid_props = sdis_data_cget(data);
+  const struct fluid* const* fluid_props = sdis_data_cget(data);
   (void)vtx;
-  return fluid_props->cp;
+  return (*fluid_props)->cp;
 }
 
 static double
@@ -40,9 +42,9 @@ fluid_get_volumic_mass
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
 {
-  const struct fluid* fluid_props = sdis_data_cget(data);
+  const struct fluid* const* fluid_props = sdis_data_cget(data);
   (void)vtx;
-  return fluid_props->rho;
+  return (*fluid_props)->rho;
 }
 
 static double
@@ -50,21 +52,21 @@ fluid_get_temperature
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
 {
-  const struct fluid* fluid_props = sdis_data_cget(data);
-  if(fluid_props->imposed_temperature >= 0)
+  const struct fluid* const* fluid_props = sdis_data_cget(data);
+  if((*fluid_props)->imposed_temperature >= 0)
     /* If there is an imposed temp, it is imposed regardless of time */
-    return fluid_props->imposed_temperature;
-  if(vtx->time <= fluid_props->t0) {
+    return (*fluid_props)->imposed_temperature;
+  if(vtx->time <= (*fluid_props)->t0) {
     /* If time is <= t0: use tinit */
-    if(fluid_props->tinit < 0) {
-      if(str_is_empty(&fluid_props->name)) {
+    if((*fluid_props)->tinit < 0) {
+      if(str_is_empty(&(*fluid_props)->name)) {
         FATAL("fluid_get_temperature: getting undefined Tinit\n");
       } else {
         VFATAL("fluid_get_temperature: getting undefined Tinit (fluid '%s')\n",
-          ARG1(str_cget(&fluid_props->name)));
+          ARG1(str_cget(&(*fluid_props)->name)));
       }
     }
-    return fluid_props->tinit;
+    return (*fluid_props)->tinit;
   }
   return -1; /* Unknown temperature */
 }
@@ -81,22 +83,21 @@ create_solver_fluid
   res_T res = RES_OK;
   struct sdis_fluid_shader fluid_shader = SDIS_FLUID_SHADER_NULL;
   struct sdis_data* data = NULL;
-  struct fluid* props;
+  const struct fluid** props;
 
   ASSERT(stardis && fluid_props);
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
   fluid_shader.volumic_mass = fluid_get_volumic_mass;
   fluid_shader.temperature = fluid_get_temperature;
-  ERR(sdis_data_create(stardis->dev, sizeof(struct fluid), ALIGNOF(struct fluid),
+  ERR(sdis_data_create(stardis->dev, sizeof(struct fluid*), ALIGNOF(struct fluid*),
     NULL, &data));
 
   props = sdis_data_get(data); /* Fetch the allocated memory space */
-  init_fluid(stardis->allocator, props);
-  cp_fluid(props, fluid_props);
+  *props = fluid_props;
   if(fluid_props->fluid_id >= darray_media_ptr_size_get(&stardis->media)) {
     ERR(darray_media_ptr_resize(&stardis->media, fluid_props->fluid_id + 1));
   }
-  ASSERT(darray_media_ptr_data_get(&stardis->media)[fluid_props->fluid_id] == NULL);
+  ASSERT(!darray_media_ptr_data_get(&stardis->media)[fluid_props->fluid_id]);
   ERR(sdis_fluid_create(stardis->dev, &fluid_shader, data,
     darray_media_ptr_data_get(&stardis->media) + fluid_props->fluid_id));
 
@@ -107,25 +108,44 @@ error:
   goto end;
 }
 
-void
-init_fluid(struct mem_allocator* allocator, struct fluid* dst)
+res_T
+init_fluid(struct mem_allocator* allocator, struct fluid** dst)
 {
-  str_init(allocator, &dst->name);
-  dst->rho = 1;
-  dst->cp = 1;
-  dst->tinit = -1;
-  dst->imposed_temperature = -1;
-  dst->t0 = 0;
-  dst->is_outside = 0;
-  dst->is_green = 0;
-  dst->desc_id = UINT_MAX;
-  dst->fluid_id = UINT_MAX;
+  res_T res = RES_OK;
+  int str_initialized = 0;
+  ASSERT(allocator && dst && *dst == NULL);
+  *dst = MEM_ALLOC(allocator, sizeof(struct fluid));
+  if(! *dst) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  str_init(allocator, &(*dst)->name);
+  str_initialized = 1;
+  (*dst)->rho = 1;
+  (*dst)->cp = 1;
+  (*dst)->tinit = -1;
+  (*dst)->imposed_temperature = -1;
+  (*dst)->t0 = 0;
+  (*dst)->is_outside = 0;
+  (*dst)->is_green = 0;
+  (*dst)->desc_id = UINT_MAX;
+  (*dst)->fluid_id = UINT_MAX;
+end:
+  return res;
+error:
+  if(str_initialized) str_release(&(*dst)->name);
+  if(*dst) MEM_RM(allocator, *dst);
+  goto end;
 }
 
 void
-release_fluid(struct fluid* fluid)
+release_fluid
+  (struct fluid* fluid,
+   struct mem_allocator* allocator)
 {
+  ASSERT(fluid && allocator);
   str_release(&fluid->name);
+  MEM_RM(allocator, fluid);
 }
 
 res_T
@@ -146,19 +166,4 @@ end:
   return res;
 error:
   goto end;
-}
-
-res_T
-cp_fluid(struct fluid* dst, const struct fluid* src)
-{
-  dst->rho = src->rho;
-  dst->cp = src->cp;
-  dst->tinit = src->tinit;
-  dst->imposed_temperature = src->imposed_temperature;
-  dst->t0 = src->t0;
-  dst->is_outside = src->is_outside;
-  dst->is_green = src->is_green;
-  dst->desc_id = src->desc_id;
-  dst->fluid_id = src->fluid_id;
-  return str_copy(&dst->name, &src->name);
 }

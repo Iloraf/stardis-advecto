@@ -1,4 +1,4 @@
-# Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+# Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,6 +17,12 @@ cmake_minimum_required(VERSION 3.0)
 project(stardis C)
 
 set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
+set(SDIS_SGT_DIR ${PROJECT_SOURCE_DIR}/../stardis-green-types)
+
+
+option(ENABLE_MPI
+  "Enable the support of distributed parallelism \
+using the Message Passing Interface specification." OFF)
 
 if(CMAKE_HOST_UNIX)
   set(STARDIS_DOC "TROFF" CACHE STRING
@@ -35,8 +41,10 @@ set_property(CACHE STARDIS_DOC PROPERTY STRINGS
 ###############################################################################
 # Generate files
 ###############################################################################
-set(STARDIS_ARGS_DEFAULT_AMBIENT_TEMP "300")
+set(STARDIS_ARGS_DEFAULT_TRAD "300")
+set(STARDIS_ARGS_DEFAULT_TRAD_REFERENCE "300")
 set(STARDIS_ARGS_DEFAULT_COMPUTE_TIME "INF")
+set(STARDIS_ARGS_DEFAULT_PICARD_ORDER "1")
 set(STARDIS_ARGS_DEFAULT_RENDERING_FOV "70") # degrees
 set(STARDIS_ARGS_DEFAULT_RENDERING_IMG_HEIGHT "480")
 set(STARDIS_ARGS_DEFAULT_RENDERING_IMG_WIDTH "640")
@@ -46,7 +54,6 @@ set(STARDIS_ARGS_DEFAULT_RENDERING_SPP "4")
 set(STARDIS_ARGS_DEFAULT_RENDERING_TGT "0, 0, 0")
 set(STARDIS_ARGS_DEFAULT_RENDERING_TIME "INF, INF")
 set(STARDIS_ARGS_DEFAULT_RENDERING_UP "0, 0, 1")
-set(STARDIS_ARGS_DEFAULT_REFERENCE_TEMP "300")
 set(STARDIS_ARGS_DEFAULT_SAMPLES_COUNT "10000")
 set(STARDIS_ARGS_DEFAULT_SCALE_FACTOR "1")
 set(STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL "1")
@@ -55,8 +62,8 @@ configure_file(${SDIS_SOURCE_DIR}/../doc/stardis.1.txt.in
   ${CMAKE_CURRENT_BINARY_DIR}/doc/stardis.1.txt @ONLY)
 
 set(SDIS_VERSION_MAJOR 0)
-set(SDIS_VERSION_MINOR 7)
-set(SDIS_VERSION_PATCH 2)
+set(SDIS_VERSION_MINOR 8)
+set(SDIS_VERSION_PATCH 0)
 set(SDIS_VERSION ${SDIS_VERSION_MAJOR}.${SDIS_VERSION_MINOR}.${SDIS_VERSION_PATCH})
 
 configure_file(${SDIS_SOURCE_DIR}/stardis-default.h.in
@@ -65,20 +72,34 @@ configure_file(${SDIS_SOURCE_DIR}/stardis-default.h.in
 configure_file(${SDIS_SOURCE_DIR}/stardis-version.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-version.h @ONLY)
 
+set(STARDIS_GREEN_TYPES_VERSION "4")
+
+configure_file(${SDIS_SOURCE_DIR}/stardis-green-types.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-green-types/stardis-green-types.h @ONLY)
+
+configure_file(${SDIS_SGT_DIR}/stardis-green-types-config-version.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-green-types/stardis-green-types-config-version.cmake @ONLY)
+
 ###############################################################################
 # Check dependencies
 ###############################################################################
-find_package(RCMake 0.4.1 REQUIRED)
+find_package(RCMake 0.4 REQUIRED)
 find_package(RSys 0.12 REQUIRED)
 find_package(StarGeom3D 0.1 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
-find_package(StarEnc3D 0.5.3 REQUIRED)
-find_package(Stardis 0.12 REQUIRED)
-find_package(StarSTL 0.3.3 REQUIRED)
-find_package(StarSP 0.12 REQUIRED)
+find_package(StarEnc3D 0.5 REQUIRED)
+find_package(Stardis 0.13 REQUIRED)
+find_package(StarSTL 0.3 REQUIRED)
+find_package(StarSP 0.13 REQUIRED)
 if(MSVC)
   find_package(MuslGetopt REQUIRED)
 endif()
+if(ENABLE_MPI)
+  find_package(MPI 2 REQUIRED)
+  set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+  include_directories(${MPI_INCLUDE_PATH})
+endif()
+
 
 include_directories(
   ${RSys_INCLUDE_DIR}
@@ -88,7 +109,8 @@ include_directories(
   ${Stardis_INCLUDE_DIR}
   ${StarSTL_INCLUDE_DIR}
   ${StarSP_INCLUDE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR})
+  ${CMAKE_CURRENT_BINARY_DIR}
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-green-types)
 if(MSVC)
   include_directories(${MuslGetopt_INCLUDE_DIR})
 endif()
@@ -113,11 +135,14 @@ if(NOT STARDIS_DOC STREQUAL "NONE")
   add_subdirectory(doc)
 endif()
 
+add_subdirectory(stardis-green-types)
+
 ###############################################################################
 # Configure and define targets
 ###############################################################################
 set(SDIS_FILES_SRC
   stardis-app.c
+  stardis-args.c
   stardis-compute.c
   stardis-fluid.c
   stardis-intface.c
@@ -128,9 +153,11 @@ set(SDIS_FILES_SRC
 
 set(SDIS_FILES_INC
   stardis-app.h
+  stardis-args.h
   stardis-compute.h
   stardis-default.h.in
   stardis-fluid.h
+  stardis-green-types.h.in
   stardis-intface.h
   stardis-output.h
   stardis-parsing.h
@@ -160,6 +187,10 @@ set_target_properties(stardis
 target_link_libraries(stardis
   Stardis Star3D StarGeom3D StarEnc3D StarSTL StarSP RSys ${GETOPT_LIB} ${MATH_LIB})
 
+if(ENABLE_MPI)
+  set_target_properties(stardis PROPERTIES COMPILE_DEFINITIONS "STARDIS_ENABLE_MPI")
+endif()
+
 ###############################################################################
 # Define output & install directories
 ###############################################################################
@@ -169,5 +200,7 @@ install(TARGETS stardis
   RUNTIME DESTINATION bin)
 
 install(FILES ${SDIS_FILES_DOC} DESTINATION share/doc/stardis)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/stardis-version.h
+	DESTINATION include/stardis)
 
 rcmake_copy_runtime_libraries(stardis)

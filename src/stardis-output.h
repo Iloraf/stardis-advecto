@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -97,7 +97,7 @@ print_single_MC_result
    struct stardis* stardis,
    FILE* stream);
 
-extern void
+extern res_T
 dump_map
   (const struct stardis* stardis,
    const struct darray_estimators* estimators,

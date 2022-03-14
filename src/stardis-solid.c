@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2021 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +19,8 @@
 
 #include <sdis.h>
 
+#include <rsys/mem_allocator.h>
+
 #include <limits.h>
 
 /*******************************************************************************
@@ -30,9 +32,9 @@ solid_get_calorific_capacity
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
 {
-  const struct solid* solid_props = sdis_data_cget(data);
+  const struct solid* const* solid_props = sdis_data_cget(data);
   (void)vtx;
-  return solid_props->cp;
+  return (*solid_props)->cp;
 }
 
 static double
@@ -40,9 +42,9 @@ solid_get_thermal_conductivity
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
 {
-  const struct solid* solid_props = sdis_data_cget(data);
+  const struct solid* const* solid_props = sdis_data_cget(data);
   (void)vtx;
-  return solid_props->lambda;
+  return (*solid_props)->lambda;
 }
 
 static double
@@ -50,9 +52,9 @@ solid_get_volumic_mass
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
 {
-  const struct solid* solid_props = sdis_data_cget(data);
+  const struct solid* const* solid_props = sdis_data_cget(data);
   (void)vtx;
-  return solid_props->rho;
+  return (*solid_props)->rho;
 }
 
 static double
@@ -60,9 +62,9 @@ solid_get_delta
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
 {
-  const struct solid* solid_props = sdis_data_cget(data);
+  const struct solid* const* solid_props = sdis_data_cget(data);
   (void)vtx;
-  return solid_props->delta;
+  return (*solid_props)->delta;
 }
 
 #if Stardis_VERSION_MINOR == 3
@@ -71,8 +73,8 @@ solid_get_delta_boundary
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
 {
-  const struct solid* solid_props = sdis_data_cget(data);
-  return solid_props->delta;
+  const struct solid* const* solid_props = sdis_data_cget(data);
+  return (*solid_props)->delta;
 }
 #endif
 
@@ -81,21 +83,21 @@ solid_get_temperature
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
 {
-  const struct solid* solid_props = sdis_data_cget(data);
-  if(solid_props->imposed_temperature >= 0)
+  const struct solid* const* solid_props = sdis_data_cget(data);
+  if((*solid_props)->imposed_temperature >= 0)
     /* If there is an imposed temp, it is imposed regardless of time */
-    return solid_props->imposed_temperature;
-  if(vtx->time <= solid_props->t0) {
+    return (*solid_props)->imposed_temperature;
+  if(vtx->time <= (*solid_props)->t0) {
     /* If time is <= t0: use tinit */
-    if(solid_props->tinit < 0) {
-      if(str_is_empty(&solid_props->name)) {
+    if((*solid_props)->tinit < 0) {
+      if(str_is_empty(&(*solid_props)->name)) {
         FATAL("solid_get_temperature: getting undefined Tinit\n");
       } else {
         VFATAL("solid_get_temperature: getting undefined Tinit (solid '%s')\n",
-          ARG1(str_cget(&solid_props->name)));
+          ARG1(str_cget(&(*solid_props)->name)));
       }
     }
-    return solid_props->tinit;
+    return (*solid_props)->tinit;
   }
   return -1; /* Unknown temperature */
 }
@@ -105,9 +107,9 @@ solid_get_power
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
 {
-  const struct solid* solid_props = sdis_data_cget(data);
+  const struct solid* const* solid_props = sdis_data_cget(data);
   (void)vtx;
-  return solid_props->vpower;
+  return (*solid_props)->vpower;
 }
 
 /*******************************************************************************
@@ -122,14 +124,14 @@ create_solver_solid
   res_T res = RES_OK;
   struct sdis_solid_shader solid_shader = SDIS_SOLID_SHADER_NULL;
   struct sdis_data* data = NULL;
-  struct solid* props;
+  const struct solid** props;
   /* Could be less restrictive if green output included positions/dates */
 
   ASSERT(stardis && solid_props);
   solid_shader.calorific_capacity = solid_get_calorific_capacity;
   solid_shader.thermal_conductivity = solid_get_thermal_conductivity;
   solid_shader.volumic_mass = solid_get_volumic_mass;
-  solid_shader.delta_solid = solid_get_delta;
+  solid_shader.delta = solid_get_delta;
 #if Stardis_VERSION_MINOR == 3
   solid_shader.delta_boundary = solid_get_delta_boundary;
 #endif
@@ -138,13 +140,12 @@ create_solver_solid
     NULL, &data));
 
   props = sdis_data_get(data); /* Fetch the allocated memory space */
-  init_solid(stardis->allocator, props);
-  cp_solid(props, solid_props);
+  *props = solid_props;
   if(solid_props->vpower != 0) solid_shader.volumic_power = solid_get_power;
   if(solid_props->solid_id >= darray_media_ptr_size_get(&stardis->media)) {
     ERR(darray_media_ptr_resize(&stardis->media, solid_props->solid_id + 1));
   }
-  ASSERT(darray_media_ptr_data_get(&stardis->media)[solid_props->solid_id] == NULL);
+  ASSERT(!darray_media_ptr_data_get(&stardis->media)[solid_props->solid_id]);
   ERR(sdis_solid_create(stardis->dev, &solid_shader, data,
     darray_media_ptr_data_get(&stardis->media) + solid_props->solid_id));
 
@@ -155,28 +156,46 @@ error:
   goto end;
 }
 
-void
-init_solid(struct mem_allocator* allocator, struct solid* dst)
+res_T
+init_solid(struct mem_allocator* allocator, struct solid** dst)
 {
-  str_init(allocator, &dst->name);
-  dst->lambda = 1;
-  dst->rho = 1;
-  dst->cp = 1;
-  dst->delta = 1;
-  dst->tinit = -1;
-  dst->imposed_temperature = -1;
-  dst->vpower = 0;
-  dst->t0 = 0;
-  dst->is_outside = 0;
-  dst->is_green = 0;
-  dst->desc_id = UINT_MAX;
-  dst->solid_id = UINT_MAX;
+  res_T res = RES_OK;
+  int str_initialized = 0;
+  ASSERT(allocator && dst && *dst == NULL);
+  *dst = MEM_ALLOC(allocator, sizeof(struct solid));
+  if(! *dst) {
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  str_init(allocator, &(*dst)->name);
+  (*dst)->lambda = 1;
+  (*dst)->rho = 1;
+  (*dst)->cp = 1;
+  (*dst)->delta = 1;
+  (*dst)->tinit = -1;
+  (*dst)->imposed_temperature = -1;
+  (*dst)->vpower = 0;
+  (*dst)->t0 = 0;
+  (*dst)->is_outside = 0;
+  (*dst)->is_green = 0;
+  (*dst)->desc_id = UINT_MAX;
+  (*dst)->solid_id = UINT_MAX;
+end:
+  return res;
+error:
+  if(str_initialized) str_release(&(*dst)->name);
+  if(*dst) MEM_RM(allocator, *dst);
+  goto end;
 }
 
 void
-release_solid(struct solid* solid)
+release_solid
+  (struct solid* solid,
+   struct mem_allocator* allocator)
 {
+  ASSERT(solid && allocator);
   str_release(&solid->name);
+  MEM_RM(allocator, solid);
 }
 
 res_T
@@ -200,22 +219,4 @@ end:
   return res;
 error:
   goto end;
-}
-
-res_T
-cp_solid(struct solid* dst, const struct solid* src)
-{
-  dst->lambda = src->lambda;
-  dst->rho = src->rho;
-  dst->cp = src->cp;
-  dst->delta = src->delta;
-  dst->tinit = src->tinit;
-  dst->imposed_temperature = src->imposed_temperature;
-  dst->vpower = src->vpower;
-  dst->t0 = src->t0;
-  dst->is_outside = src->is_outside;
-  dst->is_green = src->is_green;
-  dst->desc_id = src->desc_id;
-  dst->solid_id = src->solid_id;
-  return str_copy(&dst->name, &src->name);
 }

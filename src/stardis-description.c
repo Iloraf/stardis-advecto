@@ -15,7 +15,7 @@
 
 #include "stardis-app.h"
 #include "stardis-description.h"
-#include "stardis-prog.h"
+#include "stardis-prog-properties.h"
 #include "stardis-solid.h"
 #include "stardis-solid-prog.h"
 #include "stardis-fluid.h"

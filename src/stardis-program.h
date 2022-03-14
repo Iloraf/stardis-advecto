@@ -18,7 +18,7 @@
 
 #include "stardis-app.h"
 
-#include <stardis-prog.h>
+#include <stardis-prog-properties.h>
 
 #include <rsys/rsys.h>
 #include <rsys/str.h>

@@ -15,7 +15,7 @@
 
 #include "stardis-fluid-prog.h"
 #include "stardis-app.h"
-#include "stardis-prog.h"
+#include "stardis-prog-properties.h"
 #include "stardis-app.h"
 
 #include <rsys/mem_allocator.h>

@@ -16,7 +16,7 @@
 #define _POSIX_C_SOURCE 200809L /* strdup */
 #include "stardis-parsing.h"
 #include "stardis-app.h"
-#include "stardis-prog.h"
+#include "stardis-prog-properties.h"
 #include "stardis-args.h"
 #include "stardis-description.h"
 #include "stardis-hbound.h"

@@ -17,6 +17,7 @@ cmake_minimum_required(VERSION 3.0)
 project(stardis C)
 
 set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
+set(SDIS_PRG_DIR ${PROJECT_SOURCE_DIR}/../stardis-prog-properties)
 
 if(CMAKE_HOST_UNIX)
   set(STARDIS_DOC "TROFF" CACHE STRING
@@ -66,6 +67,14 @@ configure_file(${SDIS_SOURCE_DIR}/stardis-default.h.in
 configure_file(${SDIS_SOURCE_DIR}/stardis-version.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-version.h @ONLY)
 
+set(STARDIS_PROG_PROPERTIES_VERSION "1")
+
+configure_file(${SDIS_SOURCE_DIR}/stardis-prog-properties.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-prog-properties/stardis-prog-properties.h @ONLY)
+
+configure_file(${SDIS_PRG_DIR}/stardis-prog-properties-config-version.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-prog-properties/stardis-prog-properties-config-version.cmake @ONLY)
+
 ###############################################################################
 # Check dependencies
 ###############################################################################
@@ -89,7 +98,8 @@ include_directories(
   ${Stardis_INCLUDE_DIR}
   ${StarSTL_INCLUDE_DIR}
   ${StarSP_INCLUDE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR})
+  ${CMAKE_CURRENT_BINARY_DIR}
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-prog-properties)
 if(MSVC)
   include_directories(${MuslGetopt_INCLUDE_DIR})
 endif()
@@ -113,6 +123,8 @@ endif()
 if(NOT STARDIS_DOC STREQUAL "NONE")
   add_subdirectory(doc)
 endif()
+
+add_subdirectory(stardis-prog-properties)
 
 ###############################################################################
 # Configure and define targets
@@ -142,9 +154,6 @@ set(SDIS_FILES_SRC
   stardis-tbound.c
   stardis-tbound-prog.c)
 
-set(SDIS_FILES_INC_API
-  stardis-prog.h)
-
 set(SDIS_FILES_INC
   stardis-app.h
   stardis-args.h
@@ -161,6 +170,7 @@ set(SDIS_FILES_INC
   stardis-output.h
   stardis-parsing.h
   stardis-program.h
+  stardis-prog-properties.h.in
   stardis-sfconnect.h
   stardis-sfconnect-prog.h
   stardis-ssconnect.h
@@ -176,7 +186,6 @@ set(SDIS_FILES_DOC COPYING README.md)
 # Prepend each file by `SDIS_SOURCE_DIR'
 rcmake_prepend_path(SDIS_FILES_SRC ${SDIS_SOURCE_DIR})
 rcmake_prepend_path(SDIS_FILES_INC ${SDIS_SOURCE_DIR})
-rcmake_prepend_path(SDIS_FILES_INC_API ${SDIS_SOURCE_DIR})
 rcmake_prepend_path(SDIS_FILES_DOC ${PROJECT_SOURCE_DIR}/../)
 
 add_executable(stardis
@@ -203,7 +212,6 @@ install(TARGETS stardis
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
-install(FILES ${SDIS_FILES_INC_API} DESTINATION include/)
 install(FILES ${SDIS_FILES_DOC} DESTINATION share/doc/stardis)
 
 rcmake_copy_runtime_libraries(stardis)

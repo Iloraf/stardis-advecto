@@ -16,7 +16,7 @@
 #ifndef STARDIS_DESCRIPTION_H
 #define STARDIS_DESCRIPTION_H
 
-#include "stardis-prog.h"
+#include "stardis-prog-properties.h"
 
 #include <rsys/rsys.h>
 #include <rsys/dynamic_array.h>

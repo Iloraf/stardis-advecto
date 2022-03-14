@@ -16,7 +16,7 @@
 #include "stardis-app.h"
 #include "stardis-hbound-prog.h"
 #include "stardis-fluid-prog.h"
-#include "stardis-prog.h"
+#include "stardis-prog-properties.h"
 #include "stardis-intface.h"
 
 #include <rsys/rsys.h>

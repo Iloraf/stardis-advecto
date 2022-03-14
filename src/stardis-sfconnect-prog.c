@@ -15,7 +15,7 @@
 
 #include "stardis-app.h"
 #include "stardis-sfconnect-prog.h"
-#include "stardis-prog.h"
+#include "stardis-prog-properties.h"
 #include "stardis-intface.h"
 
 #include <rsys/rsys.h>

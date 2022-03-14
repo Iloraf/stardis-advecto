@@ -19,7 +19,7 @@
 #include <rsys/rsys.h>
 #include <rsys/str.h>
 
-#include "stardis-prog.h"
+#include "stardis-prog-properties.h"
 
 struct mem_allocator;
 struct fluid;

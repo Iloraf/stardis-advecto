@@ -21,6 +21,8 @@
  * Please refer to stardis(1) and stardis-input(5) man pages for additional
  * information. */
 
+#define STARDIS_PROG_PROPERTIES_VERSION @STARDIS_PROG_PROPERTIES_VERSION@
+
 /*****************************************************************************/
 /* API types.                                                                */
 /* The various functions defining programmed descriptions receive arguments  */

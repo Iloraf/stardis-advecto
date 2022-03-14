@@ -19,7 +19,7 @@ include(SelectLibraryConfigurations)
 # Try to find stardis-green-types
 
 # Look for stardis-green-types header
-find_path(SGT_INCLUDE_DIR stardis-green-types.h)
+find_path(SGT_INCLUDE_DIR stardis/stardis-green-types.h)
 
 # Check the package
 include(FindPackageHandleStandardArgs)

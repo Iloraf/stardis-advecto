@@ -83,14 +83,14 @@ configure_file(${SDIS_SGT_DIR}/stardis-green-types-config-version.cmake.in
 ###############################################################################
 # Check dependencies
 ###############################################################################
-find_package(RCMake 0.4.1 REQUIRED)
+find_package(RCMake 0.4 REQUIRED)
 find_package(RSys 0.12 REQUIRED)
 find_package(StarGeom3D 0.1 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
-find_package(StarEnc3D 0.5.3 REQUIRED)
-find_package(Stardis 0.12 REQUIRED)
-find_package(StarSTL 0.3.3 REQUIRED)
-find_package(StarSP 0.12 REQUIRED)
+find_package(StarEnc3D 0.5 REQUIRED)
+find_package(Stardis 0.13 REQUIRED)
+find_package(StarSTL 0.3 REQUIRED)
+find_package(StarSP 0.13 REQUIRED)
 if(MSVC)
   find_package(MuslGetopt REQUIRED)
 endif()

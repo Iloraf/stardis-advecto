@@ -160,48 +160,12 @@ release_camera(struct camera* cam);
 
 void
 log_err_fn(const char* msg, void* ctx);
-#ifdef STARDIS_ENABLE_MPI
-  int initialized, rank = 0;
-#endif
-
-
-#ifdef STARDIS_ENABLE_MPI
-  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
-  if(initialized) CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
-  /* Only master prints */
-  if(rank != 0) return;
-#endif
-
 
 void
 log_warn_fn(const char* msg, void* ctx);
-#ifdef STARDIS_ENABLE_MPI
-  int initialized, rank = 0;
-#endif
-
-
-#ifdef STARDIS_ENABLE_MPI
-  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
-  if(initialized) CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
-  /* Only master prints */
-  if(rank != 0) return;
-#endif
-
 
 void
 log_prt_fn(const char* msg, void* ctx);
-#ifdef STARDIS_ENABLE_MPI
-  int initialized, rank = 0;
-#endif
-
-
-#ifdef STARDIS_ENABLE_MPI
-  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
-  if(initialized) CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
-  /* Only master prints */
-  if(rank != 0) return;
-#endif
-
 
 struct counts {
   unsigned smed_count, fmed_count, tbound_count, hbound_count,

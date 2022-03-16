@@ -31,7 +31,7 @@
 #include <sdis.h>
 
 #ifdef STARDIS_ENABLE_MPI
-#include <mpi/mpi.h>
+#include <mpi.h>
 #endif
 
 /* Forward declarations */

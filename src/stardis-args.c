@@ -39,7 +39,7 @@
 #endif
 
 #ifdef STARDIS_ENABLE_MPI
-#include <mpi/mpi.h>
+#include <mpi.h>
 #endif
 
 /*******************************************************************************

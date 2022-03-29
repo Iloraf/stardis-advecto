@@ -440,7 +440,7 @@ error:
       if(!stream) { \
         res = RES_IO_ERR; \
         logger_print(stardis->logger, LOG_ERROR, \
-          "Could not open generator's state file ('%s').\n", \
+          "Cannot open generator's state file ('%s').\n", \
           name); \
         goto error; \
       } \
@@ -448,7 +448,7 @@ error:
       res =  read_random_generator_state(args.rng_state, stream); \
       if(res != RES_OK) { \
         logger_print(stardis->logger, LOG_ERROR, \
-          "Could not read random generator's state ('%s').\n", \
+          "Cannot read random generator's state ('%s').\n", \
           name); \
         goto error; \
       } \
@@ -464,7 +464,7 @@ error:
       if(!stream) { \
         res = RES_IO_ERR; \
         logger_print(stardis->logger, LOG_ERROR, \
-          "Could not write random generator's state ('%s').\n", \
+          "Cannot write random generator's state ('%s').\n", \
           name); \
         goto error; \
       } \
@@ -510,6 +510,8 @@ compute_probe(struct stardis* stardis, struct time* start)
         ASSERT(!str_is_empty(&stardis->bin_green_filename));
         stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream) {
+          logger_print(stardis->logger, LOG_ERROR,
+            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
@@ -755,6 +757,8 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
         ASSERT(!str_is_empty(&stardis->bin_green_filename));
         stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream) {
+          logger_print(stardis->logger, LOG_ERROR,
+            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
@@ -1029,6 +1033,8 @@ compute_medium(struct stardis* stardis, struct time* start)
         ASSERT(!str_is_empty(&stardis->bin_green_filename));
         stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream) {
+          logger_print(stardis->logger, LOG_ERROR,
+            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
@@ -1169,6 +1175,8 @@ compute_boundary(struct stardis* stardis, struct time* start)
         ASSERT(!str_is_empty(&stardis->bin_green_filename));
         stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream) {
+          logger_print(stardis->logger, LOG_ERROR,
+            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }

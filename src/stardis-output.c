@@ -273,13 +273,15 @@ dump_path
 
   stream = fopen(name, "w");
   if(!stream) {
+    logger_print(dump_ctx->stardis->logger, LOG_ERROR,
+      "cannot open file '%s'\n", name);
     res = RES_IO_ERR;
     goto error;
   }
 
   /* Get counts */
   ERR(sdis_heat_path_get_line_strips_count(path, &scount_));
-  if(scount > ULONG_MAX) goto abort;
+  if(scount_ > ULONG_MAX) goto abort;
   scount = (unsigned long)scount_;
   vcount_ = 0;
   FOR_EACH(istrip, 0, scount_) {
@@ -287,7 +289,7 @@ dump_path
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &n));
     vcount_+= n;
   }
-  if(vcount > ULONG_MAX) goto abort;
+  if(vcount_ > ULONG_MAX) goto abort;
   vcount = (unsigned long)vcount_;
   /* Header */
   fprintf(stream, "# vtk DataFile Version 2.0\n");
@@ -383,15 +385,18 @@ dump_path
     FOR_EACH(ivert, 0, nverts) {
       struct sdis_heat_vertex vtx;
       ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      if(IS_INF(vtx.time)) {
+       if(istrip || ivert) goto abort;
+       goto end_prt_time;
+      }
       if(istrip == 0 && ivert == 0) {
-        if(IS_INF(vtx.time)) break;
         fprintf(stream, "SCALARS Time double 1\n");
         fprintf(stream, "LOOKUP_TABLE default\n");
       }
-      if(IS_INF(vtx.time)) goto abort;
       fprintf(stream, "%g\n", vtx.time);
     }
   }
+end_prt_time:
 
 end:
   MEM_RM(dump_ctx->stardis->allocator, name);

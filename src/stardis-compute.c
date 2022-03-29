@@ -436,8 +436,8 @@ error:
       args.rng_type = SSP_RNG_THREEFRY; \
     } else { \
       const char* name = str_cget(Name); \
-      stream = fopen(name, "r"); \
-      if(!stream) { \
+      stream_r = fopen(name, "r"); \
+      if(!stream_r) { \
         res = RES_IO_ERR; \
         logger_print(stardis->logger, LOG_ERROR, \
           "Cannot open generator's state file ('%s').\n", \
@@ -445,14 +445,14 @@ error:
         goto error; \
       } \
       ERR(ssp_rng_create(stardis->allocator, SSP_RNG_THREEFRY, &args.rng_state)); \
-      res =  read_random_generator_state(args.rng_state, stream); \
+      res =  read_random_generator_state(args.rng_state, stream_r); \
       if(res != RES_OK) { \
         logger_print(stardis->logger, LOG_ERROR, \
           "Cannot read random generator's state ('%s').\n", \
           name); \
         goto error; \
       } \
-      fclose(stream); stream = NULL; \
+      fclose(stream_r); stream_r = NULL; \
     } \
   }
 
@@ -460,16 +460,16 @@ error:
   if(!stardis->mpi_initialized || stardis->mpi_rank == 0) { \
     if(!str_is_empty(Name)) { \
       const char* name = str_cget(Name); \
-      stream = fopen(name, "wb"); \
-      if(!stream) { \
+      stream_r = fopen(name, "wb"); \
+      if(!stream_r) { \
         res = RES_IO_ERR; \
         logger_print(stardis->logger, LOG_ERROR, \
           "Cannot write random generator's state ('%s').\n", \
           name); \
         goto error; \
       } \
-      ERR(write_random_generator_state(estimator, stream)); \
-      fclose(stream); stream = NULL; \
+      ERR(write_random_generator_state(estimator, stream_r)); \
+      fclose(stream_r); stream_r = NULL; \
     } \
   }
 
@@ -483,7 +483,9 @@ compute_probe(struct stardis* stardis, struct time* start)
   struct sdis_estimator* estimator = NULL;
   struct dump_path_context dump_ctx;
   struct sdis_solve_probe_args args = SDIS_SOLVE_PROBE_ARGS_DEFAULT;
-  FILE* stream = NULL;
+  FILE* stream_r = NULL;
+  FILE* stream_g = NULL;
+  FILE* stream_p = NULL;
   struct time compute_start, compute_end;
 
   ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE));
@@ -502,31 +504,37 @@ compute_probe(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
     } else {
-      time_current(&compute_start);
-      ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
-      time_current(&compute_end);
+      /* Try to open output files to detect errors early */
       if(stardis->mode & MODE_BIN_GREEN) {
-        struct time output_end;
         ASSERT(!str_is_empty(&stardis->bin_green_filename));
-        stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
-        if(!stream) {
+        stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
+        if(!stream_g) {
           logger_print(stardis->logger, LOG_ERROR,
             "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
-        ERR(dump_green_bin(green, stardis, stream));
-        fclose(stream); stream = NULL;
         if(str_cget(&stardis->end_paths_filename)
           && strlen(str_cget(&stardis->end_paths_filename)))
         {
-          stream = fopen(str_cget(&stardis->end_paths_filename), "w");
-          if(!stream) {
+          stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
+          if(!stream_p) {
+            logger_print(stardis->logger, LOG_ERROR,
+              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
             res = RES_IO_ERR;
             goto error;
           }
-          ERR(dump_paths_end(green, stardis, stream));
-          fclose(stream); stream = NULL;
+        }
+      }
+      /* Call solve() */
+      time_current(&compute_start);
+      ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
+      time_current(&compute_end);
+      if(stardis->mode & MODE_BIN_GREEN) {
+        struct time output_end;
+        ERR(dump_green_bin(green, stardis, stream_g));
+        if(stream_p) {
+          ERR(dump_paths_end(green, stardis, stream_p));
         }
         time_current(&output_end);
         ERR(print_computation_time(NULL, stardis,
@@ -560,7 +568,10 @@ compute_probe(struct stardis* stardis, struct time* start)
   WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
 
 end:
-  if(stream) fclose(stream);
+  if(stream_r) fclose(stream_r);
+  if(stream_g) fclose(stream_g);
+  if(stream_p) fclose(stream_p);
+  if(estimator) SDIS(estimator_ref_put(estimator));
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
   if(args.rng_state) SSP(rng_ref_put(args.rng_state));
@@ -580,7 +591,9 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   struct dump_path_context dump_ctx;
   struct sdis_solve_probe_boundary_args args
     = SDIS_SOLVE_PROBE_BOUNDARY_ARGS_DEFAULT;
-  FILE* stream = NULL;
+  FILE* stream_r = NULL;
+  FILE* stream_g = NULL;
+  FILE* stream_p = NULL;
   struct time compute_start, compute_end;
   enum sdis_side compute_side;
   unsigned prop[3];
@@ -748,32 +761,38 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
       ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
         &green));
     } else {
+      /* Try to open output files to detect errors early */
+      if(stardis->mode & MODE_BIN_GREEN) {
+        ASSERT(!str_is_empty(&stardis->bin_green_filename));
+        stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
+        if(!stream_g) {
+          logger_print(stardis->logger, LOG_ERROR,
+            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
+          res = RES_IO_ERR;
+          goto error;
+        }
+        if(str_cget(&stardis->end_paths_filename)
+          && strlen(str_cget(&stardis->end_paths_filename)))
+        {
+          stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
+          if(!stream_p) {
+            logger_print(stardis->logger, LOG_ERROR,
+              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
+            res = RES_IO_ERR;
+            goto error;
+          }
+        }
+      }
+      /* Call solve() */
       time_current(&compute_start);
       ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
         &green));
       time_current(&compute_end);
       if(stardis->mode & MODE_BIN_GREEN) {
         struct time output_end;
-        ASSERT(!str_is_empty(&stardis->bin_green_filename));
-        stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
-        if(!stream) {
-          logger_print(stardis->logger, LOG_ERROR,
-            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
-          res = RES_IO_ERR;
-          goto error;
-        }
-        ERR(dump_green_bin(green, stardis, stream));
-        fclose(stream); stream = NULL;
-        if(str_cget(&stardis->end_paths_filename)
-          && strlen(str_cget(&stardis->end_paths_filename)))
-        {
-          stream = fopen(str_cget(&stardis->end_paths_filename), "w");
-          if(!stream) {
-            res = RES_IO_ERR;
-            goto error;
-          }
-          ERR(dump_paths_end(green, stardis, stream));
-          fclose(stream); stream = NULL;
+        ERR(dump_green_bin(green, stardis, stream_g));
+        if(stream_p) {
+          ERR(dump_paths_end(green, stardis, stream_p));
         }
         time_current(&output_end);
         ERR(print_computation_time(NULL, stardis,
@@ -807,7 +826,9 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
 
 end:
-  if(stream) fclose(stream);
+  if(stream_r) fclose(stream_r);
+  if(stream_g) fclose(stream_g);
+  if(stream_p) fclose(stream_p);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
   if(args.rng_state) SSP(rng_ref_put(args.rng_state));
@@ -906,7 +927,7 @@ compute_camera(struct stardis* stardis, struct time* start)
   struct dump_path_context dump_ctx;
   size_t definition[2];
   size_t ix, iy;
-  FILE* stream;
+  FILE* stream = NULL;
   struct time compute_start, compute_end, output_end;
 
   ASSERT(stardis && start
@@ -999,7 +1020,9 @@ compute_medium(struct stardis* stardis, struct time* start)
   struct sdis_green_function* green = NULL;
   struct sdis_solve_medium_args args = SDIS_SOLVE_MEDIUM_ARGS_DEFAULT;
   struct dump_path_context dump_ctx;
-  FILE* stream = NULL;
+  FILE* stream_r = NULL;
+  FILE* stream_g = NULL;
+  FILE* stream_p = NULL;
   struct time compute_start, compute_end;
 
   ASSERT(stardis && start && (stardis->mode & MODE_MEDIUM_COMPUTE));
@@ -1025,31 +1048,38 @@ compute_medium(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
     } else {
+      /* Try to open output files to detect errors early */
+      if(stardis->mode & MODE_BIN_GREEN) {
+        ASSERT(!str_is_empty(&stardis->bin_green_filename));
+        stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
+        if(!stream_g) {
+          logger_print(stardis->logger, LOG_ERROR,
+            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
+          res = RES_IO_ERR;
+          goto error;
+        }
+        if(str_cget(&stardis->end_paths_filename)
+          && strlen(str_cget(&stardis->end_paths_filename)))
+        {
+          stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
+          if(!stream_p) {
+            logger_print(stardis->logger, LOG_ERROR,
+              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
+            res = RES_IO_ERR;
+            goto error;
+          }
+        }
+      }
+      /* Call solve() */
       time_current(&compute_start);
       ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
       time_current(&compute_end);
       if(stardis->mode & MODE_BIN_GREEN) {
         struct time output_end;
         ASSERT(!str_is_empty(&stardis->bin_green_filename));
-        stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
-        if(!stream) {
-          logger_print(stardis->logger, LOG_ERROR,
-            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
-          res = RES_IO_ERR;
-          goto error;
-        }
-        ERR(dump_green_bin(green, stardis, stream));
-        fclose(stream); stream = NULL;
-        if(str_cget(&stardis->end_paths_filename)
-          && strlen(str_cget(&stardis->end_paths_filename)))
-        {
-          stream = fopen(str_cget(&stardis->end_paths_filename), "w");
-          if(!stream) {
-            res = RES_IO_ERR;
-            goto error;
-          }
-          ERR(dump_paths_end(green, stardis, stream));
-          fclose(stream); stream = NULL;
+        ERR(dump_green_bin(green, stardis, stream_g));
+        if(stream_p) {
+          ERR(dump_paths_end(green, stardis, stream_p));
         }
         time_current(&output_end);
         ERR(print_computation_time(NULL, stardis,
@@ -1082,7 +1112,9 @@ compute_medium(struct stardis* stardis, struct time* start)
   WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
 
 end:
-  if(stream) fclose(stream);
+  if(stream_r) fclose(stream_r);
+  if(stream_g) fclose(stream_g);
+  if(stream_p) fclose(stream_p);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
   if(args.rng_state) SSP(rng_ref_put(args.rng_state));
@@ -1147,7 +1179,9 @@ compute_boundary(struct stardis* stardis, struct time* start)
   struct sdis_estimator* estimator = NULL;
   struct dump_path_context dump_ctx;
   struct sdis_solve_boundary_args args = SDIS_SOLVE_BOUNDARY_ARGS_DEFAULT;
-  FILE* stream = NULL;
+  FILE* stream_r = NULL;
+  FILE* stream_g = NULL;
+  FILE* stream_p = NULL;
   struct time compute_start, compute_end;
 
   ASSERT(stardis && start && (stardis->mode & MODE_BOUNDARY_COMPUTE));
@@ -1167,31 +1201,37 @@ compute_boundary(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
     } else {
-      time_current(&compute_start);
-      ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
-      time_current(&compute_end);
+      /* Try to open output files to detect errors early */
       if(stardis->mode & MODE_BIN_GREEN) {
-        struct time output_end;
         ASSERT(!str_is_empty(&stardis->bin_green_filename));
-        stream = fopen(str_cget(&stardis->bin_green_filename), "wb");
-        if(!stream) {
+        stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
+        if(!stream_g) {
           logger_print(stardis->logger, LOG_ERROR,
             "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
-        ERR(dump_green_bin(green, stardis, stream));
-        fclose(stream); stream = NULL;
         if(str_cget(&stardis->end_paths_filename)
           && strlen(str_cget(&stardis->end_paths_filename)))
         {
-          stream = fopen(str_cget(&stardis->end_paths_filename), "w");
-          if(!stream) {
+          stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
+          if(!stream_p) {
+            logger_print(stardis->logger, LOG_ERROR,
+              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
             res = RES_IO_ERR;
             goto error;
           }
-          ERR(dump_paths_end(green, stardis, stream));
-          fclose(stream); stream = NULL;
+        }
+      }
+      /* Call solve() */
+      time_current(&compute_start);
+      ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
+      time_current(&compute_end);
+      if(stardis->mode & MODE_BIN_GREEN) {
+        struct time output_end;
+        ERR(dump_green_bin(green, stardis, stream_g));
+        if(stream_p) {
+          ERR(dump_paths_end(green, stardis, stream_p));
         }
         time_current(&output_end);
         ERR(print_computation_time(NULL, stardis,
@@ -1224,7 +1264,9 @@ compute_boundary(struct stardis* stardis, struct time* start)
   WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
 
 end:
-  if(stream) fclose(stream);
+  if(stream_r) fclose(stream_r);
+  if(stream_g) fclose(stream_g);
+  if(stream_p) fclose(stream_p);
   if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
   if(args.rng_state) SSP(rng_ref_put(args.rng_state));
@@ -1242,7 +1284,7 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
   struct sdis_solve_boundary_flux_args args
     = SDIS_SOLVE_BOUNDARY_FLUX_ARGS_DEFAULT;
   struct dump_path_context dump_ctx;
-  FILE* stream = NULL;
+  FILE* stream_r = NULL;
   struct time compute_start, compute_end;
 
   ASSERT(stardis && start && (stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE));

@@ -176,7 +176,7 @@ read_sides_and_files
       ASSERT(add_geom_ctx.stl_desc.vertices_count <= UINT_MAX
         && add_geom_ctx.stl_desc.triangles_count <= UINT_MAX);
       logger_print(stardis->logger, LOG_OUTPUT,
-        "Read file '%s': %u triangle found\n",
+        "Read file '%s': %u triangles found.\n",
         tk, (unsigned)add_geom_ctx.stl_desc.triangles_count);
     } else {
       logger_print(stardis->logger, LOG_ERROR,

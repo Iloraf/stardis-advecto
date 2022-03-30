@@ -384,7 +384,14 @@ stardis_init
     if(desc->type == DESC_MAT_SOLID) {
       tmp_res = check_delta_and_create_solid(stardis, desc);
     } else if(desc->type == DESC_PROGRAM && desc->d.program->finalize) {
-      tmp_res = desc->d.program->finalize(desc->d.program->prog_data);
+      enum stardis_return_status rs;
+      rs = desc->d.program->finalize(desc->d.program->prog_data);
+      switch(rs) {
+        case STARDIS_SUCCESS: tmp_res = RES_OK; break; 
+        case STARDIS_FAILURE: tmp_res = RES_BAD_ARG; break; 
+        default:
+          FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
+      }
     }
     if(tmp_res != RES_OK && is_for_compute) {
       res = tmp_res;

@@ -855,7 +855,7 @@ auto_look_at
   double radius;
   double depth;
   res_T res;
-  ASSERT(scn && fov_x && proj_ratio && up);
+  ASSERT(scn && fov_x!=0 && proj_ratio!=0 && up);
 
   ERR(sdis_scene_get_aabb(scn, lower, upper));
 

@@ -171,14 +171,18 @@ read_sides_and_files
     }
     file_count++;
     res = sstl_load(sstl, tk);
-    if(res != RES_OK) {
+    if(res == RES_OK) {
+      ERR(sstl_get_desc(sstl, &add_geom_ctx.stl_desc));
+      ASSERT(add_geom_ctx.stl_desc.vertices_count <= UINT_MAX
+        && add_geom_ctx.stl_desc.triangles_count <= UINT_MAX);
+      logger_print(stardis->logger, LOG_OUTPUT,
+        "Read file '%s': %u triangle found\n",
+        tk, (unsigned)add_geom_ctx.stl_desc.triangles_count);
+    } else {
       logger_print(stardis->logger, LOG_ERROR,
         "Cannot read STL file: '%s'\n", tk);
       goto error;
     }
-    ERR(sstl_get_desc(sstl, &add_geom_ctx.stl_desc));
-    ASSERT(add_geom_ctx.stl_desc.vertices_count <= UINT_MAX
-      && add_geom_ctx.stl_desc.triangles_count <= UINT_MAX);
 
     res = sg3d_geometry_add(
       stardis->geometry.sg3d,

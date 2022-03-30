@@ -318,6 +318,9 @@ stardis_init
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tcount));
 
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Read %u unique triangles.\n", tcount);
+
   ERR(sg3d_geometry_validate_properties(stardis->geometry.sg3d,
      validate_properties, stardis));
   ERR(sg3d_geometry_get_unique_triangles_with_properties_conflict_count(
@@ -520,6 +523,7 @@ init_enclosures
   struct senc3d_device* senc_dev = NULL;
 
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
+
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vsz));
   ERR(senc3d_device_create(stardis->logger, stardis->allocator,
     stardis->nthreads, stardis->verbose, &senc_dev));

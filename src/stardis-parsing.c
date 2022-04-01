@@ -284,7 +284,7 @@ description_set_name
     "SOLID_SOLID_CONNECTION_PROG", "TRAD", "T_BOUNDARY_FOR_SOLID",
     "T_BOUNDARY_FOR_SOLID_PROG", "UNKNOWN" };
   const char* reason = NULL;
-  int i;
+  size_t i;
   ASSERT(name && tk);
 
   /* Use name before uppercasing it */
@@ -616,7 +616,14 @@ process_program
     /* create and init custom data */
     struct stardis_program_context ctx;
     ctx.name = lib_name;
-    ctx.verbosity_level = stardis->verbose;
+    switch(stardis->verbose) {
+      case 0: ctx.verbosity_level = STARDIS_VERBOSE_NONE; break;
+      case 1: ctx.verbosity_level = STARDIS_VERBOSE_ERROR; break;
+      case 2: ctx.verbosity_level = STARDIS_VERBOSE_WARNING; break;
+      case 3: ctx.verbosity_level = STARDIS_VERBOSE_INFO; break;
+      default:
+        FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
+    }
     CREATE_DESC_DATA_BASE(program, LIST_ARG1(str_get(&tmp)));
   } else if(!str_is_empty(&program->args)) {
     logger_print(stardis->logger, LOG_ERROR,

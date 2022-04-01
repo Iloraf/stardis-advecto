@@ -66,7 +66,7 @@ main
   ERR(init_args(&logger, &allocator, &args));
   args_initialized = 1;
   ERR(parse_args(argc, argv, args, &allocator));
-  mode = args->mode;
+  mode = (int)args->mode;
 
   if(mode & MODE_DUMP_HELP) {
     short_help(stdout, argv[0]);

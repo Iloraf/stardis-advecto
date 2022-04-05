@@ -572,7 +572,6 @@ end:
   if(stream_g) fclose(stream_g);
   if(stream_p) fclose(stream_p);
   if(estimator) SDIS(estimator_ref_put(estimator));
-  if(estimator) SDIS(estimator_ref_put(estimator));
   if(green) SDIS(green_function_ref_put(green));
   if(args.rng_state) SSP(rng_ref_put(args.rng_state));
   return res;

@@ -523,6 +523,12 @@ get_prog_common
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  else if(desc->type != DESC_PROGRAM) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Is not a PROGRAM: %s\n", lib_name);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
   *program = desc->d.program;
   /* get the mandatory user-defined functions from the library */
   GET_LIB_SYMBOL_BASE(create, (*program)->lib_handle, stardis_create_data, 0);

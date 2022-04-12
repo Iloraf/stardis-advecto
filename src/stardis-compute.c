@@ -550,17 +550,20 @@ compute_probe(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
     } else {
+      res_T tmp_res1, tmp_res2;
       time_current(&compute_start);
       ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
       time_current(&compute_end);
       ERR(print_computation_time(estimator, stardis,
         start, &compute_start, &compute_end, NULL));
-      ERR(print_single_MC_result(estimator, stardis, stdout));
+      tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
 
       /* Dump recorded paths according to user settings */
       dump_ctx.stardis = stardis;
       dump_ctx.rank = 0;
-      ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+      tmp_res2 = sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx);
+      if(tmp_res1 != RES_OK) res = tmp_res1;
+      else if(tmp_res2 != RES_OK) res = tmp_res2;
     }
   }
 
@@ -807,17 +810,20 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
     } else {
+      res_T tmp_res1, tmp_res2;
       time_current(&compute_start);
       ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
       time_current(&compute_end);
       ERR(print_computation_time(estimator, stardis,
         start, &compute_start, &compute_end, NULL));
-      ERR(print_single_MC_result(estimator, stardis, stdout));
+      tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
     
       /* Dump recorded paths according to user settings */
       dump_ctx.stardis = stardis;
       dump_ctx.rank = 0;
-      ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+      tmp_res2 = sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx);
+      if(tmp_res1 != RES_OK) res = tmp_res1;
+      else if(tmp_res2 != RES_OK) res = tmp_res2;
     }
   }
 
@@ -1094,16 +1100,19 @@ compute_medium(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
     } else {
+      res_T tmp_res1, tmp_res2;
       time_current(&compute_start);
       ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
       time_current(&compute_end);
       ERR(print_computation_time(estimator, stardis,
         start, &compute_start, &compute_end, NULL));
-      ERR(print_single_MC_result(estimator, stardis, stdout));
+      tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
       /* Dump recorded paths according to user settings */
       dump_ctx.stardis = stardis;
       dump_ctx.rank = 0;
-      ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+      tmp_res2 = sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx);
+      if(tmp_res1 != RES_OK) res = tmp_res1;
+      else if(tmp_res2 != RES_OK) res = tmp_res2;
     }
   }
 
@@ -1246,16 +1255,19 @@ compute_boundary(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
     } else {
+      res_T tmp_res1, tmp_res2;
       time_current(&compute_start);
       ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
       time_current(&compute_end);
       ERR(print_computation_time(estimator, stardis,
         start, &compute_start, &compute_end, NULL));
-      ERR(print_single_MC_result(estimator, stardis, stdout));
+      tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
       /* Dump recorded paths according to user settings */
       dump_ctx.stardis = stardis;
       dump_ctx.rank = 0;
-      ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+      tmp_res2 = sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx);
+      if(tmp_res1 != RES_OK) res = tmp_res1;
+      else if(tmp_res2 != RES_OK) res = tmp_res2;
     }
   }
 
@@ -1302,17 +1314,20 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
   if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
     ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
   } else {
+    res_T tmp_res1, tmp_res2;
     time_current(&compute_start);
     ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
     time_current(&compute_end);
     ERR(print_computation_time(estimator, stardis,
       start, &compute_start, &compute_end, NULL));
-    ERR(print_single_MC_result(estimator, stardis, stdout));
+    tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
 
     /* Dump recorded paths according to user settings */
     dump_ctx.stardis = stardis;
     dump_ctx.rank = 0;
-    ERR(sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx));
+    tmp_res2 = sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx);
+    if(tmp_res1 != RES_OK) res = tmp_res1;
+    else if(tmp_res2 != RES_OK) res = tmp_res2;
   }
 
   /* Output random state? */

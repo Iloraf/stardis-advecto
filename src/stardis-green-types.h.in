@@ -16,6 +16,8 @@
 #ifndef SDIS_GREEN_H
 #define SDIS_GREEN_H
 
+#include <stddef.h>
+
 /* The number of the file format as presented thereafter */
 #define GREEN_FILE_FORMAT_VERSION @STARDIS_GREEN_TYPES_VERSION@
 

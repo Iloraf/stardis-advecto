@@ -44,7 +44,6 @@ init_ss_connect_prog
   }
   str_init(allocator, &(*dst)->name);
   str_init(allocator, &(*dst)->prog_name);
-  str_init(allocator, &(*dst)->args);
   str_initialized = 1;
   (*dst)->connection_id = UINT_MAX;
 end:
@@ -53,7 +52,6 @@ error:
   if(str_initialized) {
     str_release(&(*dst)->name);
     str_release(&(*dst)->prog_name);
-    str_release(&(*dst)->args);
   }
   (*dst)->connection_id = UINT_MAX;
   if(*dst) MEM_RM(allocator, *dst);
@@ -65,12 +63,14 @@ release_ss_connect_prog
   (struct solid_solid_connect_prog* connect,
    struct mem_allocator* allocator)
 {
+  size_t i;
   ASSERT(connect && allocator);
   str_release(&connect->name);
   str_release(&connect->prog_name);
-  str_release(&connect->args);
   if(connect->prog_data)
     connect->release(connect->prog_data);
+  for(i = 0; i < connect->argc; i++) MEM_RM(allocator, connect->argv[i]);
+  MEM_RM(allocator, connect->argv);
   /* library_close call is managed at lib_data level */
   MEM_RM(allocator, connect);
 }
@@ -85,7 +85,7 @@ str_print_ss_connect_prog
   ERR(str_append_printf(str,
     "programmed Solid-Solid connection '%s': lib='%s', args=[%s]",
     str_cget(&connect->name), str_cget(&connect->prog_name),
-    str_cget(&connect->args)));
+    "TODO"));
 end:
   return res;
 error:

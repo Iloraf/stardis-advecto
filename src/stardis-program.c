@@ -33,7 +33,8 @@ init_program
   }
   str_init(allocator, &(*dst)->name);
   str_init(allocator, &(*dst)->lib_path);
-  str_init(allocator, &(*dst)->args);
+  (*dst)->argc = 0;
+  (*dst)->argv = NULL;
   str_initialized = 1;
 end:
   return res;
@@ -41,7 +42,6 @@ error:
   if(str_initialized) {
     str_release(&(*dst)->name);
     str_release(&(*dst)->lib_path);
-    str_release(&(*dst)->args);
   }
   if(*dst) MEM_RM(allocator, *dst);
   goto end;
@@ -52,15 +52,17 @@ release_program
   (struct program* program,
    struct mem_allocator* allocator)
 {
+  size_t i;
   ASSERT(program && allocator);
   str_release(&program->name);
   str_release(&program->lib_path);
-  str_release(&program->args);
   if(program->prog_data) {
     ASSERT(program->release);
     program->release(program->prog_data);
   }
   library_close(program->lib_handle);
+  for(i = 0; i < program->argc; i++) MEM_RM(allocator, program->argv[i]);
+  MEM_RM(allocator, program->argv);
   MEM_RM(allocator, program);
 }
 
@@ -70,7 +72,8 @@ str_print_program
    const struct program* program)
 {
   res_T res = RES_OK;
-  ERR(str_append_printf(str, "Library %s", str_cget(&program->name)));
+  ERR(str_append_printf(str, "Library %s, args=[%s]",
+       str_cget(&program->name), "TODO"));
  
 end:
   return res;

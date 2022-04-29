@@ -147,7 +147,6 @@ init_fluid_prog(struct mem_allocator* allocator, struct fluid_prog** dst)
   }
   str_init(allocator, &(*dst)->name);
   str_init(allocator, &(*dst)->prog_name);
-  str_init(allocator, &(*dst)->args);
   str_initialized = 1;
   (*dst)->desc_id = UINT_MAX;
   (*dst)->fluid_id = UINT_MAX;
@@ -157,7 +156,6 @@ error:
   if(str_initialized) {
     str_release(&(*dst)->name);
     str_release(&(*dst)->prog_name);
-    str_release(&(*dst)->args);
   }
   if(*dst) MEM_RM(allocator, *dst);
   goto end;
@@ -168,16 +166,17 @@ release_fluid_prog
   (struct fluid_prog* fluid,
    struct mem_allocator* allocator)
 {
+  size_t i;
   ASSERT(fluid && allocator);
   str_release(&fluid->name);
   str_release(&fluid->prog_name);
-  str_release(&fluid->args);
-
   if(fluid->prog_data
     && fluid->release) /* can be NULL if external fluid */
   {
     fluid->release(fluid->prog_data);
   }
+  for(i = 0; i < fluid->argc; i++) MEM_RM(allocator, fluid->argv[i]);
+  MEM_RM(allocator, fluid->argv);
   /* library_close call is managed at lib_data level */
   MEM_RM(allocator, fluid);
 }
@@ -189,7 +188,7 @@ str_print_fluid_prog(struct str* str, const struct fluid_prog* f)
   ASSERT(str && f);
   ERR(str_append_printf(str,
      "programmed fluid '%s': lib='%s', args=[%s] (it is medium %u)",
-    str_cget(&f->name), str_cget(&f->prog_name), str_cget(&f->args),
+    str_cget(&f->name), str_cget(&f->prog_name), "TODO",
     f->fluid_id));
 end:
   return res;

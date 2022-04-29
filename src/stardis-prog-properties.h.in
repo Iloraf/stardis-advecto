@@ -24,6 +24,8 @@
 /* The version of the API described thereafter */
 #define STARDIS_PROG_PROPERTIES_VERSION @STARDIS_PROG_PROPERTIES_VERSION@
 
+#include <stddef.h>
+
 /*****************************************************************************/
 /* API types.                                                                */
 /* The various functions defining programmed descriptions receive arguments  */
@@ -84,7 +86,8 @@ struct stardis_description_create_context {
 extern void*
 stardis_create_library_data
   (const struct stardis_program_context* ctx,
-   char* args);
+   size_t argc,
+   char* argv[]);
 
 /* Finalize the data created by the successive stardis_create_data calls for
  * the descriptions created using this library.
@@ -122,7 +125,8 @@ extern void*
 stardis_create_data
   (const struct stardis_description_create_context *ctx,
    void* lib_data,
-   char* args);
+   size_t argc,
+   char* argv[]);
 
 /* Release the data created by stardis_create_data.
  * This function is called after the simulation finished.

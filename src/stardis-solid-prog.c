@@ -152,7 +152,6 @@ init_solid_prog(struct mem_allocator* allocator, struct solid_prog** dst)
   }
   str_init(allocator, &(*dst)->name);
   str_init(allocator, &(*dst)->prog_name);
-  str_init(allocator, &(*dst)->args);
   str_initialized = 1;
   (*dst)->desc_id = UINT_MAX;
   (*dst)->solid_id = UINT_MAX;
@@ -162,7 +161,6 @@ error:
   if(str_initialized) {
     str_release(&(*dst)->name);
     str_release(&(*dst)->prog_name);
-    str_release(&(*dst)->args);
   }
   if(*dst) MEM_RM(allocator, *dst);
   goto end;
@@ -173,13 +171,14 @@ release_solid_prog
   (struct solid_prog* solid,
    struct mem_allocator* allocator)
 {
+  size_t i;
   ASSERT(solid && allocator);
   str_release(&solid->name);
   str_release(&solid->prog_name);
-  str_release(&solid->args);
-
   if(solid->prog_data)
     solid->release(solid->prog_data);
+  for(i = 0; i < solid->argc; i++) MEM_RM(allocator, solid->argv[i]);
+  MEM_RM(allocator, solid->argv);
   /* library_close call is managed at lib_data level */
   MEM_RM(allocator, solid);
 }
@@ -191,7 +190,7 @@ str_print_solid_prog(struct str* str, const struct solid_prog* f)
   ASSERT(str && f);
   ERR(str_append_printf(str,
     "programmed solid '%s': lib='%s', args=[%s] (it is medium %u)",
-    str_cget(&f->name), str_cget(&f->prog_name), str_cget(&f->args),
+    str_cget(&f->name), str_cget(&f->prog_name), "TODO",
     f->solid_id));
 end:
   return res;

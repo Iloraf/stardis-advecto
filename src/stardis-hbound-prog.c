@@ -45,7 +45,6 @@ init_h_boundary_prog
   }
   str_init(allocator, &(*dst)->name);
   str_init(allocator, &(*dst)->prog_name);
-  str_init(allocator, &(*dst)->args);
   str_initialized = 1;
   (*dst)->mat_id = UINT_MAX;
 end:
@@ -54,7 +53,6 @@ error:
   if(str_initialized) {
     str_release(&(*dst)->name);
     str_release(&(*dst)->prog_name);
-    str_release(&(*dst)->args);
   }
   if(*dst) MEM_RM(allocator, *dst);
   goto end;
@@ -65,14 +63,16 @@ release_h_boundary_prog
   (struct h_boundary_prog* bound,
    struct mem_allocator* allocator)
 {
+  size_t i;
   ASSERT(bound && allocator);
   str_release(&bound->name);
   str_release(&bound->prog_name);
-  str_release(&bound->args);
   if(bound->prog_data)
     bound->release(bound->prog_data);
   if(bound->possible_external_fluid)
     release_fluid_prog(bound->possible_external_fluid, allocator);
+  for(i = 0; i < bound->argc; i++) MEM_RM(allocator, bound->argv[i]);
+  MEM_RM(allocator, bound->argv);
   /* library_close call is managed at lib_data level */
   MEM_RM(allocator, bound);
 }
@@ -90,7 +90,7 @@ str_print_h_boundary_prog
     "programmed H boundary for %s '%s': lib='%s', args=[%s] "
     "(using medium %u as external medium)",
     (desc->type == DESC_BOUND_H_FOR_SOLID_PROG ? "solid" : "fluid"),
-    str_cget(&b->name), str_cget(&b->prog_name), str_cget(&b->args),
+    str_cget(&b->name), str_cget(&b->prog_name), "TODO",
     b->mat_id));
 end:
   return res;

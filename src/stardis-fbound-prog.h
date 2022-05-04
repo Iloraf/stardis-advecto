@@ -34,11 +34,12 @@ struct f_boundary_prog {
   void* prog_data; /* result of the create() call */
   struct str name;
   struct str prog_name;
-  struct str args;
+  size_t argc;
+  char** argv;
   /* lib handle and function ptrs */
   struct program* program;
   void* (*create)
-    (const struct stardis_description_create_context*, void*, char*);
+    (const struct stardis_description_create_context*, void*, size_t, char**);
   void (*release)(void*);
   double (*flux)(const struct stardis_interface_fragment*, void*);
   unsigned mat_id;

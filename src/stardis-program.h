@@ -31,13 +31,14 @@ struct program {
   void* prog_data; /* result of the create() call */
   struct str name;
   struct str lib_path;
-  struct str args;
+  size_t argc;
+  char** argv;
   /* lib handle and function ptrs */
   void* lib_handle;
   const char* (*get_copyright_notice)(void*);
   const char* (*get_license_short)(void*);
   const char* (*get_license_text)(void*);
-  void* (*create)(struct stardis_program_context*, char*);
+  void* (*create)(struct stardis_program_context*, size_t, char**);
   enum stardis_return_status (*finalize)(void*);
   void (*release)(void*);
 };

@@ -81,8 +81,8 @@ struct stardis_description_create_context {
  * A NULL result is interpreted as an error and ends the program.
  * This function is called the first time a description using this library is
  * processed.
- * Args is the end of the description line that was following the library path
- * (if any). */
+ * argc + argv describe the (possibly zero) arguments coming from the stardis
+ * input file in the main-like standard way. */
 extern void*
 stardis_create_library_data
   (const struct stardis_program_context* ctx,
@@ -119,8 +119,8 @@ stardis_release_library_data
  * processed.
  * lib_data is the pointer returned by stardis_create_library_data for the
  * library or NULL if stardis_create_library_data is not defined.
- * args is the end of the description line that was following the PROG_PARAM
- * keyword (if any). */
+ * argc + argv describe the (possibly zero) arguments coming from the stardis
+ * input file in the main-like standard way. */
 extern void*
 stardis_create_data
   (const struct stardis_description_create_context *ctx,

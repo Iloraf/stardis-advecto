@@ -42,14 +42,28 @@ scaling factor to apply to the geometry to have it expressed in meters (e.g.
 
 A medium limit or a boundary description can be split across files and a
 single file or description line can describe more than one frontier (more than
-one connex region). The main semantic constraint on descriptions is that any
-enclosure must be defined by a single description line, to ensure that any
-part in the system is made from a single medium.
+one connex region). The main semantic constraint on descriptions is that
+enclosures must be defined by a single description line, to ensure that every
+constitutive part of the system is made from a single medium.
 
 Finally, description lines can be submitted to the *stardis*(1) program in
 any order, with the exception of programs that must be defined before use,
 and can be split across more than one file, through multiple use
 of option *-M*.
+
+LINE SPLITTING
+--------------
+When a description line is parsed, the first step is to split it in different
+parts. *stardis(1)* relies on the wordexp POSIX library for this step. As a
+consequence the very rules that apply at this stage all come from the wordexp
+rules: environment variables can be used and are substituted, including inside
+arithmetic expressions, text inside quote pairs is considered a single item,
+whitespace characters can be escaped so that the current item continues past it
+(see *wordexp(3)* for details).
+
+Note however that both the use of undefined environment variables and the use
+of command substitution will be reported as an error as these features are not
+enabled in *stardis(1)*.
 
 GRAMMAR
 -------
@@ -159,8 +173,8 @@ _______
 
 -------------------------------------
 
-<prog-name>           ::= STRING {sharp} no space allowed, must not be a keyword nor a
-                                 {sharp} number, including INF and others
+<prog-name>           ::= STRING {sharp} must not be a keyword nor a number,
+                                 {sharp} including INF and others
 
 <library-path>        ::= FILEPATH {sharp} the path can be absolute
                                    {sharp} or relative to the running directory and must be valid
@@ -172,8 +186,8 @@ _______
                                  {sharp} note that the {sharp} character consistently ends
                                  {sharp} arguments by starting a comment
 
-<medium-name>         ::= STRING {sharp} no space allowed, must not be a keyword nor a
-                                 {sharp} number, including INF and others
+<medium-name>         ::= STRING {sharp} must not be a keyword nor a number,
+                                 {sharp} including INF and others
 
 <lambda>              ::= REAL {sharp} conductivity in W/(m.K); in ]0, INF)
 
@@ -198,11 +212,11 @@ _______
 
 <triangle-sides>      ::= <side-specifier> <file-name> [ <triangle-sides> ]
 
-<bound-name>          ::= STRING {sharp} no space allowed, must not be a keyword nor a
-                                 {sharp} number, including INF and others
+<bound-name>          ::= STRING {sharp} must not be a keyword nor a number,
+                                 {sharp} including INF and others
 
-<connect-name>        ::= STRING {sharp} no space allowed, must not be a keyword nor a
-                                 {sharp} number, including INF and others
+<connect-name>        ::= STRING {sharp} must not be a keyword nor a number,
+                                 {sharp} including INF and others
 
 <Tref>                ::= REAL {sharp} in [0, inf)
 
@@ -234,7 +248,7 @@ _______
 
 <side-specifier>      ::= "FRONT" | "BACK" | "BOTH"
 
-<file-name>           ::= STRING {sharp} no space allowed
+<file-name>           ::= STRING
 
 ______________
 
@@ -277,7 +291,7 @@ NAMES
 Names, either file names or description names (program names, medium names or
 boundary names), are a sequence of one or ore ASCII characters, including
 numbers and special characters like *.* *_* *-* as one may consider using in
-standard file names, *without any spacing* either escaped or not. Description
+standard file names. Description
 names are case-sensitive and two different description lines, either in the
 same description file or from different description files, cannot use the same
 name. Additionally, description names cannot be parsable as a number, nor be one
@@ -292,7 +306,7 @@ Finally, description names cannot be longer than 63 characters.
 
 EXAMPLES
 --------
-Define a solid named Cube, a h boundary, and their radiative environment.
+Define a solid named *Cube 1*, a h boundary, and their radiative environment.
 The cube geometry is read from
 the file cube.stl and the solid medium properties are lambda=0.1, rho=25, cp=2.
 The numerical parameter delta, that is used for solid conductive walks, is
@@ -305,7 +319,7 @@ Finally, when the Picard method linearises radiative transfer involving the HdT
 boundary, the reference temperature is set to 310°K, while it is set to 330°K
 when linearisation involves the radiative environment.
 .......
-SOLID Cube 0.1 25 2 0.05 0 UNKNOWN 2.5 FRONT cube.stl
+SOLID Cube\ 1 0.1 25 2 0.05 0 UNKNOWN 2.5 FRONT cube.stl
 H_BOUNDARY_FOR_SOLID HdT 310 0 0 10 100 cube.stl
 TRAD 300 330
 .......
@@ -313,3 +327,4 @@ TRAD 300 330
 SEE ALSO
 --------
 *stardis*(1)
+*wordexp*(3)

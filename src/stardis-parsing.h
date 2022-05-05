@@ -27,13 +27,21 @@ struct logger;
 struct stardis;
 
 /* Utility macros */
-#define CHK_ARG(Idx, Name) \
+#define CHK_ARG(Idx, Name) {\
   if(pwordexp->we_wordc <= (Idx)) {\
     logger_print(stardis->logger, LOG_ERROR,\
       "Invalid data (missing token '" Name "')\n");\
+    arg = "(missing)";\
     res = RES_BAD_ARG;\
     goto error;\
-  } else arg = pwordexp->we_wordv[(Idx)++]
+  } else {\
+    arg = pwordexp->we_wordv[(Idx)++];\
+    if(!arg) {\
+      arg = "(inconsistant wordexp)";\
+      goto error; /* to silent a gcc-11 */\
+    }\
+  }\
+}(void)0
 
 /* Same ctx used for both media and interface add (some unused parts) */
 struct add_geom_ctx {

@@ -83,10 +83,16 @@ str_print_f_boundary_prog
   res_T res = RES_OK;
   ASSERT(str && b);
   ERR(str_append_printf(str,
-    "programmed F boundary for SOLID '%s': lib='%s', args=[%s]"
-    " (using medium %u as external medium)",
-    str_cget(&b->name), str_cget(&b->prog_name),
-    "TODO", b->mat_id));
+    "programmed F boundary for SOLID '%s': lib='%s', "
+    "(using medium %u as external medium)",
+    str_cget(&b->name), str_cget(&b->prog_name), b->mat_id));
+  if(b->argc > 0) {
+    size_t i;
+    ERR(str_append_printf(str, ", provided arguments:\n"));
+    for(i = 0; i < b->argc; i++) {
+      ERR(str_append_printf(str, (i+1 == b->argc ? "\t%s" : "\t%s\n"), b->argv[i]));
+    }
+  }
 end:
   return res;
 error:

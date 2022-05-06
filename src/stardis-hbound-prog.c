@@ -87,11 +87,18 @@ str_print_h_boundary_prog
   ASSERT(str && desc && DESC_IS_H(desc));
   b = desc->d.h_boundary_prog;
   ERR(str_append_printf(str,
-    "programmed H boundary for %s '%s': lib='%s', args=[%s] "
+    "programmed H boundary for %s '%s': lib='%s', "
     "(using medium %u as external medium)",
     (desc->type == DESC_BOUND_H_FOR_SOLID_PROG ? "solid" : "fluid"),
-    str_cget(&b->name), str_cget(&b->prog_name), "TODO",
+    str_cget(&b->name), str_cget(&b->prog_name),
     b->mat_id));
+  if(b->argc > 0) {
+    size_t i;
+    ERR(str_append_printf(str, ", provided arguments:\n"));
+    for(i = 0; i < b->argc; i++) {
+      ERR(str_append_printf(str, (i+1 == b->argc ? "\t%s" : "\t%s\n"), b->argv[i]));
+    }
+  }
 end:
   return res;
 error:

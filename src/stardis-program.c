@@ -69,12 +69,17 @@ release_program
 res_T
 str_print_program
   (struct str* str,
-   const struct program* program)
+   const struct program* p)
 {
   res_T res = RES_OK;
-  ERR(str_append_printf(str, "Library %s, args=[%s]",
-       str_cget(&program->name), "TODO"));
- 
+  ERR(str_append_printf(str, "Library %s", str_cget(&p->name)));
+  if(p->argc > 0) {
+    size_t i;
+    ERR(str_append_printf(str, ", provided arguments:\n"));
+    for(i = 0; i < p->argc; i++) {
+      ERR(str_append_printf(str, (i+1 == p->argc ? "\t%s" : "\t%s\n"), p->argv[i]));
+    }
+  }
 end:
   return res;
 error:

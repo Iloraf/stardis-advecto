@@ -253,7 +253,7 @@ dump_path
   char* name = NULL;
   enum sdis_heat_path_flag status = SDIS_HEAT_PATH_NONE;
   size_t vcount_, scount_, offset, name_sz, istrip;
-  unsigned long scount, vcount;
+  unsigned long scount, vcount, strip_1;
 
   ASSERT(path && dump_ctx
     && dump_ctx->stardis
@@ -284,9 +284,12 @@ dump_path
   if(scount_ > ULONG_MAX) goto abort;
   scount = (unsigned long)scount_;
   vcount_ = 0;
+  strip_1 = 0;
   FOR_EACH(istrip, 0, scount_) {
     size_t n;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &n));
+    if(n == 0 || n > ULONG_MAX) goto abort;
+    if(n == 1) strip_1++;
     vcount_+= n;
   }
   if(vcount_ > ULONG_MAX) goto abort;
@@ -307,19 +310,25 @@ dump_path
       fprintf(stream, "%g %g %g\n", SPLIT3(vtx.P));
     }
   }
-  /* Write the strips of the path */
-  fprintf(stream, "LINES %lu %lu\n", scount, scount + vcount);
+  /* Write the strips of the path
+   * Workaround a Paraview crash by creating 2-vertices-long paths from
+   * single-vertex paths */
+  fprintf(stream, "LINES %lu %lu\n", scount, scount + vcount + strip_1);
   offset = 0;
   FOR_EACH(istrip, 0, scount) {
-    size_t ivert, nverts;
+    size_t nverts;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
-    if(nverts > ULONG_MAX) goto abort;
-    fprintf(stream, "%lu", (unsigned long)nverts);
-    FOR_EACH(ivert, 0, nverts) {
-      if(ivert + offset > ULONG_MAX) goto abort;
-      fprintf(stream, " %lu", (unsigned long)(ivert + offset));
+    if(nverts == 1) {
+      fprintf(stream, "2 %lu %lu\n", (unsigned long)offset, (unsigned long)offset);
+    } else {
+      size_t ivert;
+      fprintf(stream, "%lu", (unsigned long)nverts);
+      FOR_EACH(ivert, 0, nverts) {
+        if(ivert + offset > ULONG_MAX) goto abort;
+        fprintf(stream, " %lu", (unsigned long)(ivert + offset));
+      }
+      fprintf(stream, "\n");
     }
-    fprintf(stream, "\n");
     offset += nverts;
   }
 

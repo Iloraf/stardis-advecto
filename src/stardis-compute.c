@@ -751,7 +751,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
 
   args.nrealisations = stardis->samples;
   args.iprim = iprim;
-  d3_set(args.uv, uv);
+  d2_set(args.uv, uv);
   args.side = compute_side;
   d2_set(args.time_range, stardis->time_range);
 

@@ -41,6 +41,7 @@ enum description_type {
   DESC_MAT_FLUID_PROG,
   DESC_BOUND_H_FOR_FLUID_PROG,
   DESC_BOUND_H_FOR_SOLID_PROG,
+  DESC_BOUND_HF_FOR_SOLID,
   DESC_BOUND_HF_FOR_SOLID_PROG,
   DESC_BOUND_T_FOR_SOLID_PROG,
   DESC_BOUND_F_FOR_SOLID_PROG,
@@ -101,6 +102,7 @@ struct f_boundary;
 struct f_boundary_prog;
 struct h_boundary;
 struct h_boundary_prog;
+struct hf_boundary;
 struct hf_boundary_prog;
 struct solid_fluid_connect;
 struct solid_fluid_connect_prog;
@@ -121,6 +123,7 @@ struct description {
     struct f_boundary_prog* f_boundary_prog;
     struct h_boundary* h_boundary;
     struct h_boundary_prog* h_boundary_prog;
+    struct hf_boundary* hf_boundary;
     struct hf_boundary_prog* hf_boundary_prog;
     struct solid_fluid_connect* sf_connect;
     struct solid_fluid_connect_prog* sf_connect_prog;

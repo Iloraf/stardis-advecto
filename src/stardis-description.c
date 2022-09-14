@@ -21,6 +21,7 @@
 #include "stardis-fluid-prog.h"
 #include "stardis-hbound.h"
 #include "stardis-hbound-prog.h"
+#include "stardis-hfbound.h"
 #include "stardis-hfbound-prog.h"
 #include "stardis-tbound.h"
 #include "stardis-tbound-prog.h"
@@ -78,6 +79,9 @@ release_description
   case DESC_BOUND_H_FOR_SOLID_PROG:
   case DESC_BOUND_H_FOR_FLUID_PROG:
     release_h_boundary_prog(desc->d.h_boundary_prog, allocator);
+    break;
+  case DESC_BOUND_HF_FOR_SOLID:
+    release_hf_boundary(desc->d.hf_boundary, allocator);
     break;
   case DESC_BOUND_HF_FOR_SOLID_PROG:
     release_hf_boundary_prog(desc->d.hf_boundary_prog, allocator);
@@ -151,6 +155,9 @@ str_print_description
   case DESC_BOUND_H_FOR_FLUID_PROG:
     ERR(str_print_h_boundary_prog(str, desc));
     break;
+  case DESC_BOUND_HF_FOR_SOLID:
+    ERR(str_print_hf_boundary(str, desc));
+    break;
   case DESC_BOUND_HF_FOR_SOLID_PROG:
     ERR(str_print_hf_boundary_prog(str, desc));
     break;
@@ -208,6 +215,8 @@ get_description_name
   case DESC_BOUND_H_FOR_SOLID_PROG:
   case DESC_BOUND_H_FOR_FLUID_PROG:
     return &desc->d.h_boundary_prog->name;
+  case DESC_BOUND_HF_FOR_SOLID:
+    return &desc->d.hf_boundary->name;
   case DESC_BOUND_HF_FOR_SOLID_PROG:
     return &desc->d.hf_boundary_prog->name;
   case DESC_BOUND_F_FOR_SOLID:
@@ -255,6 +264,9 @@ description_get_medium_id
   case DESC_BOUND_H_FOR_SOLID_PROG:
   case DESC_BOUND_H_FOR_FLUID_PROG:
     *id = desc->d.h_boundary_prog->mat_id;
+    return;
+  case DESC_BOUND_HF_FOR_SOLID:
+    *id = desc->d.hf_boundary->mat_id;
     return;
   case DESC_BOUND_HF_FOR_SOLID_PROG:
     *id = desc->d.hf_boundary_prog->mat_id;

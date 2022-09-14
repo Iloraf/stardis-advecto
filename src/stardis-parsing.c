@@ -19,6 +19,7 @@
 #include "stardis-description.h"
 #include "stardis-hbound.h"
 #include "stardis-hbound-prog.h"
+#include "stardis-hfbound.h"
 #include "stardis-hfbound-prog.h"
 #include "stardis-tbound.h"
 #include "stardis-tbound-prog.h"
@@ -280,7 +281,7 @@ description_set_name
   const char* keywords[] = {
     "AUTO", "BACK", "BOTH", "FLUID", "FLUID_PROG", "FRONT", "F_BOUNDARY_FOR_SOLID",
     "F_BOUNDARY_FOR_SOLID_PROG", "H_BOUNDARY_FOR_FLUID", "H_BOUNDARY_FOR_FLUID_PROG",
-    "HF_BOUNDARY_FOR_SOLID_PROG",
+    "HF_BOUNDARY_FOR_SOLID", "HF_BOUNDARY_FOR_SOLID_PROG",
     "H_BOUNDARY_FOR_SOLID", "H_BOUNDARY_FOR_SOLID_PROG", "PROGRAM", "PROG_PARAMS",
     "SCALE", "SOLID", "SOLID_PROG", "SOLID_FLUID_CONNECTION",
     "SOLID_FLUID_CONNECTION_PROG", "SOLID_SOLID_CONNECTION",
@@ -454,6 +455,132 @@ process_h
       fluid->imposed_temperature,
       fluid->fluid_id);
   }
+
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
+
+end:
+  return res;
+error:
+  goto end;
+}
+
+/* HF_BOUNDARY_FOR_SOLID Name ref_temperature emissivity specular_fraction hc
+ * flux T_env STL_filenames */
+static res_T
+process_hf
+  (struct stardis* stardis,
+   const enum description_type type,
+   wordexp_t* pwordexp)
+{
+  char* arg = NULL;
+  struct description* desc;
+  size_t sz;
+  struct hf_boundary* hf_boundary;
+  size_t idx = 1;
+  struct fluid* fluid = NULL;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && pwordexp);
+
+  stardis->counts.hbound_count++;
+
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz+1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_hf_boundary(stardis->allocator, &desc->d.hf_boundary));
+  hf_boundary = desc->d.hf_boundary;
+  desc->type = type;
+
+  CHK_ARG(idx, "hf boundary name");
+  ERR(description_set_name(stardis, &hf_boundary->name, arg));
+  if(find_description_by_name(stardis, &hf_boundary->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", arg);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+
+  CHK_ARG(idx, "ref_temperature");
+  res = cstr_to_double(arg, &hf_boundary->ref_temperature);
+  if(res != RES_OK
+    || hf_boundary->ref_temperature < 0)
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+        "Invalid reference temperature: %s\n", arg);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  stardis->t_range[0] = MMIN(stardis->t_range[0], hf_boundary->ref_temperature);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], hf_boundary->ref_temperature);
+  CHK_ARG(idx, "emissivity");
+  res = cstr_to_double(arg, &hf_boundary->emissivity);
+  if(res != RES_OK
+    || hf_boundary->emissivity < 0
+    || hf_boundary->emissivity > 1)
+  {
+    logger_print(stardis->logger, LOG_ERROR, "Invalid emissivity: %s\n", arg);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  CHK_ARG(idx, "specular fraction");
+  res = cstr_to_double(arg, &hf_boundary->specular_fraction);
+  if(res != RES_OK
+    || hf_boundary->specular_fraction < 0
+    || hf_boundary->specular_fraction > 1)
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid specular fraction: %s\n", arg);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  CHK_ARG(idx, "convection coefficient");
+  res = cstr_to_double(arg, &hf_boundary->hc);
+  if(res != RES_OK
+    || hf_boundary->hc < 0)
+  {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid convection coefficient: %s\n", arg);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  CHK_ARG(idx, "flux");
+  res = cstr_to_double(arg, &hf_boundary->imposed_flux);
+  if(res != RES_OK
+    || hf_boundary->imposed_flux == SDIS_FLUX_NONE) {
+    /* Flux can be < 0 but not undefined */
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid flux: %s\n", arg);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  CHK_ARG(idx, "temperature");
+  res = cstr_to_double(arg, &hf_boundary->imposed_temperature);
+  if(res != RES_OK
+    || hf_boundary->imposed_temperature < 0)
+  {
+    logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", arg);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  stardis->t_range[0] = MMIN(stardis->t_range[0], hf_boundary->imposed_temperature);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], hf_boundary->imposed_temperature);
+
+  ASSERT(type == DESC_BOUND_HF_FOR_SOLID);
+  ERR(init_fluid(stardis->allocator, &fluid));
+  fluid->fluid_id = allocate_stardis_medium_id(stardis);
+  hf_boundary->mat_id = fluid->fluid_id;
+  hf_boundary->possible_external_fluid = fluid;
+  ASSERT(sz <= UINT_MAX);
+  fluid->desc_id = (unsigned)sz;
+  fluid->imposed_temperature = hf_boundary->imposed_temperature;
+  fluid->is_outside = 1;
+  fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  ERR(create_solver_fluid(stardis, fluid));
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "External fluid created: T=%g (it is medium %u)\n",
+    fluid->imposed_temperature,
+    fluid->fluid_id);
 
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
@@ -1201,13 +1328,13 @@ process_sfc
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  CHK_ARG(idx, "Convection coefficient");
+  CHK_ARG(idx, "convection coefficient");
   res = cstr_to_double(arg, &sf_connect->hc);
   if(res != RES_OK
     || sf_connect->hc < 0)
   {
     logger_print(stardis->logger, LOG_ERROR,
-      "Invalid Convection coefficient: %s\n", arg);
+      "Invalid convection coefficient: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
@@ -1968,6 +2095,8 @@ process_model_line
     ERR(process_h(stardis, DESC_BOUND_H_FOR_SOLID, pwordexp));
   else if(0 == strcasecmp(arg, "H_BOUNDARY_FOR_SOLID_PROG"))
     ERR(process_h_prog(stardis, DESC_BOUND_H_FOR_SOLID_PROG, pwordexp));
+  else if(0 == strcasecmp(arg, "HF_BOUNDARY_FOR_SOLID"))
+    ERR(process_hf(stardis, DESC_BOUND_HF_FOR_SOLID, pwordexp));
   else if(0 == strcasecmp(arg, "HF_BOUNDARY_FOR_SOLID_PROG"))
     ERR(process_hf_prog(stardis, DESC_BOUND_HF_FOR_SOLID_PROG, pwordexp));
   else if(0 == strcasecmp(arg, "H_BOUNDARY_FOR_FLUID"))

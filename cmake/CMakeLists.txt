@@ -159,6 +159,7 @@ set(SDIS_FILES_SRC
   stardis-fbound-prog.c
   stardis-hbound.c
   stardis-hbound-prog.c
+  stardis-hfbound.c
   stardis-hfbound-prog.c
   stardis-intface.c
   stardis-main.c
@@ -187,6 +188,7 @@ set(SDIS_FILES_INC
   stardis-green-types.h.in
   stardis-hbound.h
   stardis-hbound-prog.h
+  stardis-hfbound.h
   stardis-hfbound-prog.h
   stardis-intface.h
   stardis-output.h

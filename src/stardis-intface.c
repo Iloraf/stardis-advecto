@@ -20,6 +20,7 @@
 #include "stardis-solid.h"
 #include "stardis-hbound.h"
 #include "stardis-hbound-prog.h"
+#include "stardis-hfbound.h"
 #include "stardis-hfbound-prog.h"
 #include "stardis-tbound.h"
 #include "stardis-tbound-prog.h"
@@ -399,6 +400,38 @@ create_intface
         }
         fluid_side_shader->reference_temperature = interface_get_ref_temperature;
         if(intface->d.h_boundary->emissivity > 0) {
+          fluid_side_shader->emissivity = interface_get_emissivity;
+          fluid_side_shader->specular_fraction = interface_get_alpha;
+        }
+        break;
+      case DESC_BOUND_HF_FOR_SOLID:
+        if(!for_fluid) {
+          if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
+            res = RES_BAD_ARG;
+            goto error;
+          }
+          ASSERT(!fluid_side_shader);
+          fluid_side_shader =
+            front_defined ? &interface_shader.back : &interface_shader.front;
+        }
+        ext_id = intface->d.hf_boundary->mat_id; /* External material id */
+        ASSERT(ext_id < darray_media_ptr_size_get(&stardis->media));
+        ASSERT(sdis_medium_get_type(media[ext_id]) ==
+          (for_fluid ? SDIS_SOLID : SDIS_FLUID));
+        intface_count++;
+        boundary_count++;
+        if(front_defined) back_med = media[ext_id];
+        else front_med = media[ext_id];
+        interface_shader.convection_coef_upper_bound = intface->d.hf_boundary->hc;
+        interface_props->hc = intface->d.hf_boundary->hc;
+        interface_props->ref_temperature = intface->d.hf_boundary->ref_temperature;
+        interface_props->emissivity = intface->d.hf_boundary->emissivity;
+        interface_props->alpha = intface->d.hf_boundary->specular_fraction;
+        if(intface->d.hf_boundary->hc > 0) {
+          interface_shader.convection_coef = interface_get_convection_coef;
+        }
+        fluid_side_shader->reference_temperature = interface_get_ref_temperature;
+        if(intface->d.hf_boundary->emissivity > 0) {
           fluid_side_shader->emissivity = interface_get_emissivity;
           fluid_side_shader->specular_fraction = interface_get_alpha;
         }

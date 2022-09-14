@@ -604,6 +604,7 @@ validate_properties
       }
       break;
     case DESC_BOUND_H_FOR_SOLID:
+    case DESC_BOUND_HF_FOR_SOLID: /* FIXME: need specific error codes? */
     case DESC_BOUND_H_FOR_SOLID_PROG:
     case DESC_BOUND_HF_FOR_SOLID_PROG: /* FIXME: need specific error codes? */
       if(!(solid_count == 1 && fluid_count == 0)) {

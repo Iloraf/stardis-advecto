@@ -19,6 +19,7 @@
 #include "stardis-description.h"
 #include "stardis-hbound.h"
 #include "stardis-hbound-prog.h"
+#include "stardis-hfbound-prog.h"
 #include "stardis-tbound.h"
 #include "stardis-tbound-prog.h"
 #include "stardis-fbound.h"
@@ -279,6 +280,7 @@ description_set_name
   const char* keywords[] = {
     "AUTO", "BACK", "BOTH", "FLUID", "FLUID_PROG", "FRONT", "F_BOUNDARY_FOR_SOLID",
     "F_BOUNDARY_FOR_SOLID_PROG", "H_BOUNDARY_FOR_FLUID", "H_BOUNDARY_FOR_FLUID_PROG",
+    "HF_BOUNDARY_FOR_SOLID_PROG",
     "H_BOUNDARY_FOR_SOLID", "H_BOUNDARY_FOR_SOLID_PROG", "PROGRAM", "PROG_PARAMS",
     "SCALE", "SOLID", "SOLID_PROG", "SOLID_FLUID_CONNECTION",
     "SOLID_FLUID_CONNECTION_PROG", "SOLID_SOLID_CONNECTION",
@@ -787,6 +789,93 @@ process_h_prog
       "External programmed fluid created (it is medium %u)\n",
       fluid_prog->fluid_id);
   }
+
+end:
+  return res;
+error:
+  goto end;
+}
+
+/* HF_BOUNDARY_FOR_SOLID_PROG Name ProgName STL_filenames [PROG_PARAMS ...] */
+static res_T
+process_hf_prog
+  (struct stardis* stardis,
+   const enum description_type type,
+   wordexp_t* pwordexp)
+{
+  char* arg = NULL;
+  struct description* desc;
+  const char *lib_name, *desc_name;
+  size_t sz;
+  struct hf_boundary_prog* hf_boundary_prog;
+  struct stardis_description_create_context ctx;
+  struct fluid_prog* fluid_prog = NULL;
+  size_t idx = 1;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && pwordexp);
+  ASSERT(type == DESC_BOUND_HF_FOR_SOLID_PROG); /* No HF prog for fluids */
+
+  stardis->counts.fmed_count++;
+
+  sz = darray_descriptions_size_get(&stardis->descriptions);
+  ERR(darray_descriptions_resize(&stardis->descriptions, sz + 1));
+  desc = darray_descriptions_data_get(&stardis->descriptions) + sz;
+  ERR(init_hf_boundary_prog(stardis->allocator, &desc->d.hf_boundary_prog));
+  hf_boundary_prog = desc->d.hf_boundary_prog;
+  desc->type = type;
+  
+  CHK_ARG(idx, "programmed hf boundary name");
+  ERR(description_set_name(stardis, &hf_boundary_prog->name, arg));
+  if(find_description_by_name(stardis, &hf_boundary_prog->name, desc)) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Name already used: %s\n", arg);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
+  desc_name = arg;
+
+  CHK_ARG(idx, "program name");
+  ERR(str_set(&hf_boundary_prog->prog_name, arg));
+  lib_name = arg;
+
+  ASSERT(sz <= UINT_MAX);
+  ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
+
+  /* store the end of line as args for custom init */
+  ERR(set_argc_argv(stardis->allocator, &hf_boundary_prog->argc,
+    &hf_boundary_prog->argv, pwordexp, idx));
+  /* get the user-defined functions from the library */
+  ERR(get_prog_common(lib_name, stardis,  &hf_boundary_prog->program,
+    &hf_boundary_prog->create, &hf_boundary_prog->release));
+  GET_LIB_SYMBOL(hf_boundary_prog, ref_temp, stardis_reference_temperature);
+  GET_LIB_SYMBOL(hf_boundary_prog, emissivity, stardis_emissivity);
+  GET_LIB_SYMBOL(hf_boundary_prog, alpha, stardis_specular_fraction);
+  GET_LIB_SYMBOL(hf_boundary_prog, hc, stardis_convection_coefficient);
+  GET_LIB_SYMBOL(hf_boundary_prog, hmax, stardis_max_convection_coefficient);
+  GET_LIB_SYMBOL(hf_boundary_prog, flux, stardis_boundary_flux);
+  GET_LIB_SYMBOL(hf_boundary_prog, t_range, stardis_t_range);
+  GET_LIB_SYMBOL(hf_boundary_prog, fluid_temp, stardis_medium_temperature);
+  /* create and init custom data */
+  ctx.name = desc_name;
+  CREATE_DESC_DATA(hf_boundary_prog);
+
+  hf_boundary_prog->t_range(hf_boundary_prog->prog_data, stardis->t_range);
+
+  /* create the media behind the interface */
+  ERR(init_fluid_prog(stardis->allocator, &fluid_prog));
+  fluid_prog->fluid_id = allocate_stardis_medium_id(stardis);
+  hf_boundary_prog->mat_id = fluid_prog->fluid_id;
+  hf_boundary_prog->possible_external_fluid = fluid_prog;
+  fluid_prog->desc_id = (unsigned)sz;
+  fluid_prog->temp = hf_boundary_prog->fluid_temp;
+  fluid_prog->is_outside = 1;
+  fluid_prog->prog_data = hf_boundary_prog->prog_data;
+  /* fluid_prog->release is NULL to avoid deleting shared prog_data */
+  ERR(create_solver_external_fluid_prog(stardis, fluid_prog));
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "External programmed fluid created (it is medium %u)\n",
+    fluid_prog->fluid_id);
 
 end:
   return res;
@@ -1879,6 +1968,8 @@ process_model_line
     ERR(process_h(stardis, DESC_BOUND_H_FOR_SOLID, pwordexp));
   else if(0 == strcasecmp(arg, "H_BOUNDARY_FOR_SOLID_PROG"))
     ERR(process_h_prog(stardis, DESC_BOUND_H_FOR_SOLID_PROG, pwordexp));
+  else if(0 == strcasecmp(arg, "HF_BOUNDARY_FOR_SOLID_PROG"))
+    ERR(process_hf_prog(stardis, DESC_BOUND_HF_FOR_SOLID_PROG, pwordexp));
   else if(0 == strcasecmp(arg, "H_BOUNDARY_FOR_FLUID"))
     ERR(process_h(stardis, DESC_BOUND_H_FOR_FLUID, pwordexp));
   else if(0 == strcasecmp(arg, "H_BOUNDARY_FOR_FLUID_PROG"))

@@ -605,6 +605,7 @@ validate_properties
       break;
     case DESC_BOUND_H_FOR_SOLID:
     case DESC_BOUND_H_FOR_SOLID_PROG:
+    case DESC_BOUND_HF_FOR_SOLID_PROG: /* FIXME: need specific error codes? */
       if(!(solid_count == 1 && fluid_count == 0)) {
         if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_H_FOR_SOLID_BETWEEN_2_DEFS;

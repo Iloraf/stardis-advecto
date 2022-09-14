@@ -20,6 +20,7 @@
 #include "stardis-solid.h"
 #include "stardis-hbound.h"
 #include "stardis-hbound-prog.h"
+#include "stardis-hfbound-prog.h"
 #include "stardis-tbound.h"
 #include "stardis-tbound-prog.h"
 #include "stardis-fbound.h"
@@ -445,6 +446,39 @@ create_intface
         interface_props->get_alpha = intface->d.h_boundary_prog->alpha;
         interface_props->get_ref_temp = intface->d.h_boundary_prog->ref_temp;
         interface_props->prog_data = intface->d.h_boundary_prog->prog_data;
+        break;
+      case DESC_BOUND_HF_FOR_SOLID_PROG:
+        if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
+          res = RES_BAD_ARG;
+          goto error;
+        }
+        ASSERT(!fluid_side_shader);
+        fluid_side_shader =
+          front_defined ? &interface_shader.back : &interface_shader.front;
+        ext_id = intface->d.hf_boundary_prog->mat_id; /* External material id */
+        ASSERT(ext_id < darray_media_ptr_size_get(&stardis->media));
+        ASSERT(sdis_medium_get_type(media[ext_id]) == SDIS_FLUID);
+        prog_count++;
+        intface_count++;
+        boundary_count++;
+        if(front_defined) back_med = media[ext_id];
+        else front_med = media[ext_id];
+        interface_shader.convection_coef_upper_bound
+          = hf_bound_prog_get_hmax(intface->d.hf_boundary_prog);
+        ASSERT(interface_shader.convection_coef_upper_bound >= 0);
+        interface_shader.convection_coef
+          = intface_prog_get_hc;
+        fluid_side_shader->reference_temperature
+          = intface_prog_get_ref_temp;
+        fluid_side_shader->emissivity = intface_prog_get_emissivity;
+        fluid_side_shader->specular_fraction = intface_prog_get_alpha;
+        fluid_side_shader->flux = intface_prog_get_flux;
+        interface_props->get_hc = intface->d.hf_boundary_prog->hc;
+        interface_props->get_emissivity = intface->d.hf_boundary_prog->emissivity;
+        interface_props->get_alpha = intface->d.hf_boundary_prog->alpha;
+        interface_props->get_flux = intface->d.hf_boundary_prog->flux;
+        interface_props->get_ref_temp = intface->d.hf_boundary_prog->ref_temp;
+        interface_props->prog_data = intface->d.hf_boundary_prog->prog_data;
         break;
       case DESC_BOUND_T_FOR_SOLID:
         if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {

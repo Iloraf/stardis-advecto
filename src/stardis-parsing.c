@@ -15,7 +15,6 @@
 
 #include "stardis-parsing.h"
 #include "stardis-app.h"
-#include "stardis-prog-properties.h"
 #include "stardis-args.h"
 #include "stardis-description.h"
 #include "stardis-hbound.h"

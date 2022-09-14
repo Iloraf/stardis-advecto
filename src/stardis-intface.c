@@ -28,7 +28,6 @@
 #include "stardis-ssconnect-prog.h"
 #include "stardis-sfconnect.h"
 #include "stardis-sfconnect-prog.h"
-#include "stardis-prog-properties.h"
 
 #include <sdis.h>
 

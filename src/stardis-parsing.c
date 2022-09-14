@@ -2011,6 +2011,7 @@ read_model
   FILE* f = NULL;
   struct txtrdr* txtrdr = NULL;
   wordexp_t pwordexp;
+  int word_initialized = 0;
 
   ASSERT(model_files && stardis);
   files = darray_str_cdata_get(model_files);
@@ -2032,6 +2033,7 @@ read_model
       ERR(txtrdr_read_line(txtrdr));
       line = txtrdr_get_line(txtrdr);
       if(!line) break;
+      word_initialized = 1;
       switch(wordexp(line, &pwordexp, flags)) {
         case 0: /* No error */
           break;
@@ -2086,7 +2088,7 @@ exp_error:
 
   ASSERT(!f && !txtrdr);
 exit:
-  wordfree(&pwordexp);
+  if(word_initialized) wordfree(&pwordexp);
   return res;
 error:
   if(f) fclose(f);

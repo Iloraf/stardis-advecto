@@ -102,9 +102,11 @@ _______
                               | <h-bound-for-solid>
                               | <h-bound-for-fluid>
                               | <f-bound-for-solid>
+                              | <hf-bound-for-solid>
                               | <prog-t-bound-for-solid>
                               | <prog-h-bound-for-solid>
                               | <prog-h-bound-for-fluid>
+                              | <prog-hf-bound-for-fluid>
                               | <prog-f-bound-for-solid>
 
 <media-connection>          ::= <solid-fluid-connect>
@@ -125,9 +127,12 @@ _______
 <t-bound-for-solid>         ::= "T_BOUNDARY_FOR_SOLID" <bound-name> <temperature> \
                                 <triangles>
 
-
 <h-bound-for-solid>         ::= "H_BOUNDARY_FOR_SOLID" <bound-name> <Tref> <emissivity> \
                                 <specular-fraction> <hc> <outside-temperature> \
+                                <triangles>
+
+<hf-bound-for-solid>        ::= "HF_BOUNDARY_FOR_SOLID" <bound-name> <Tref> <emissivity> \
+                                <specular-fraction> <hc> <flux> <outside-temperature> \
                                 <triangles>
 
 <h-bound-for-fluid>         ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <Tref> <emissivity> \
@@ -151,8 +156,10 @@ _______
 <prog-t-bound-for-solid>    ::= "T_BOUNDARY_FOR_SOLID_PROG" <bound-name> <prog-name> \
                                 <triangle-sides> [ "PROG_PARAMS" [ <desc-arguments> ] ]
 
-
 <prog-h-bound-for-solid>    ::= "H_BOUNDARY_FOR_SOLID_PROG" <bound-name> <prog-name> \
+                                <triangle-sides> [ "PROG_PARAMS" [ <desc-arguments> ] ]
+
+<prog-hf-bound-for-solid>   ::= "HF_BOUNDARY_FOR_SOLID_PROG" <bound-name> <prog-name> \
                                 <triangle-sides> [ "PROG_PARAMS" [ <desc-arguments> ] ]
 
 <prog-h-bound-for-fluid>    ::= "H_BOUNDARY_FOR_FLUID_PROG" <bound-name> <prog-name> \

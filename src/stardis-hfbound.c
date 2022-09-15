@@ -73,7 +73,7 @@ str_print_hf_boundary
 {
   res_T res = RES_OK;
   const struct hf_boundary* b;
-  ASSERT(str && desc && DESC_IS_H(desc));
+  ASSERT(str && desc && DESC_IS_HF(desc));
   b = desc->d.hf_boundary;
   ERR(str_append_printf(str,
     "H boundary for %s '%s': ref_temperature=%g emissivity=%g specular_fraction=%g "

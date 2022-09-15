@@ -84,7 +84,7 @@ str_print_hf_boundary_prog
 {
   res_T res = RES_OK;
   const struct hf_boundary_prog* b;
-  ASSERT(str && desc && DESC_IS_H(desc));
+  ASSERT(str && desc && DESC_IS_HF(desc));
   b = desc->d.hf_boundary_prog;
   ERR(str_append_printf(str,
     "programmed HF boundary for %s '%s': lib='%s', "

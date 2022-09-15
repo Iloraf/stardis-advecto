@@ -76,11 +76,12 @@ str_print_hf_boundary
   ASSERT(str && desc && DESC_IS_HF(desc));
   b = desc->d.hf_boundary;
   ERR(str_append_printf(str,
-    "H boundary for %s '%s': ref_temperature=%g emissivity=%g specular_fraction=%g "
-    "hc=%g T=%g (using medium %u as external medium)",
+    "HF boundary for %s '%s': ref_temperature=%g emissivity=%g specular_fraction=%g "
+    "hc=%g flux=%g T=%g (using medium %u as external medium)",
     (desc->type == DESC_BOUND_HF_FOR_SOLID ? "solid" : "fluid"),
     str_cget(&b->name), b->ref_temperature, b->emissivity,
-    b->specular_fraction, b->hc, b->imposed_temperature, b->mat_id));
+    b->specular_fraction, b->hc, b->imposed_flux, b->imposed_temperature,
+    b->mat_id));
 end:
   return res;
 error:

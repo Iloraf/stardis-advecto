@@ -431,6 +431,11 @@ create_intface
           interface_shader.convection_coef = interface_get_convection_coef;
         }
         fluid_side_shader->reference_temperature = interface_get_ref_temperature;
+        ASSERT(intface->d.hf_boundary->imposed_flux != SDIS_FLUX_NONE);
+        if(intface->d.hf_boundary->imposed_flux) {
+          interface_props->imposed_flux = intface->d.hf_boundary->imposed_flux;
+          fluid_side_shader->flux = interface_get_flux;
+        }
         if(intface->d.hf_boundary->emissivity > 0) {
           fluid_side_shader->emissivity = interface_get_emissivity;
           fluid_side_shader->specular_fraction = interface_get_alpha;

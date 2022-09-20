@@ -827,9 +827,9 @@ _______
                       "LOOKUP_TABLE default"
                       <path-failures>
                       "POINT_DATA" #vertices
-                      "SCALARS Vertex_Type unsigned_char 1"
+                      "SCALARS Segment_Type unsigned_char 1"
                       "LOOKUP_TABLE default"
-                      <vertices-types>
+                      <segments-types>
                       "SCALARS Weight double 1"
                       "LOOKUP_TABLE default"
                       <weights>
@@ -847,8 +847,8 @@ _______
 <heat-strips>     ::= <heat-strip>
                       <heat-strips> # #strips strips
 
-<vertices-types>  ::= <vertice-type>
-                      <vertices-types> # #vertices types
+<segments-types>  ::= <segment-type>
+                      <segments-types> # #segments types
 
 <weights>         ::= <weight>
                       <weights> # #vertices weights
@@ -869,7 +869,7 @@ _______
 
 <heat-strip>      ::= #strip_vertices <vtx_idx 1> ... <vtx_idx #strip_vertices>
 
-<vertice-type>    ::= "0" # CONDUCTION
+<segment-type>    ::= "0" # CONDUCTION
                     | "1" # CONVECTION
                     | "2" # RADIATIVE
 

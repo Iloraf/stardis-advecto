@@ -434,7 +434,8 @@ create_intface
         ASSERT(intface->d.hf_boundary->imposed_flux != SDIS_FLUX_NONE);
         if(intface->d.hf_boundary->imposed_flux) {
           interface_props->imposed_flux = intface->d.hf_boundary->imposed_flux;
-          fluid_side_shader->flux = interface_get_flux;
+          interface_shader.front.flux = interface_get_flux;
+          interface_shader.back.flux = interface_get_flux;
         }
         if(intface->d.hf_boundary->emissivity > 0) {
           fluid_side_shader->emissivity = interface_get_emissivity;
@@ -504,13 +505,12 @@ create_intface
         interface_shader.convection_coef_upper_bound
           = hf_bound_prog_get_hmax(intface->d.hf_boundary_prog);
         ASSERT(interface_shader.convection_coef_upper_bound >= 0);
-        interface_shader.convection_coef
-          = intface_prog_get_hc;
-        fluid_side_shader->reference_temperature
-          = intface_prog_get_ref_temp;
+        interface_shader.convection_coef = intface_prog_get_hc;
+        fluid_side_shader->reference_temperature = intface_prog_get_ref_temp;
         fluid_side_shader->emissivity = intface_prog_get_emissivity;
         fluid_side_shader->specular_fraction = intface_prog_get_alpha;
-        fluid_side_shader->flux = intface_prog_get_flux;
+        interface_shader.front.flux = intface_prog_get_flux;
+        interface_shader.back.flux = intface_prog_get_flux;
         interface_props->get_hc = intface->d.hf_boundary_prog->hc;
         interface_props->get_emissivity = intface->d.hf_boundary_prog->emissivity;
         interface_props->get_alpha = intface->d.hf_boundary_prog->alpha;

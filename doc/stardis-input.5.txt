@@ -132,7 +132,7 @@ _______
                                 <triangles>
 
 <hf-bound-for-solid>        ::= "HF_BOUNDARY_FOR_SOLID" <bound-name> <Tref> <emissivity> \
-                                <specular-fraction> <hc> <flux> <outside-temperature> \
+                                <specular-fraction> <hc> <outside-temperature> <flux> \
                                 <triangles>
 
 <h-bound-for-fluid>         ::= "H_BOUNDARY_FOR_FLUID" <bound-name> <Tref> <emissivity> \

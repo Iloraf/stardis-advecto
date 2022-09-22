@@ -466,7 +466,7 @@ error:
 }
 
 /* HF_BOUNDARY_FOR_SOLID Name ref_temperature emissivity specular_fraction hc
- * flux T_env STL_filenames */
+ * T_env flux STL_filenames */
 static res_T
 process_hf
   (struct stardis* stardis,
@@ -544,6 +544,15 @@ process_hf
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
+  CHK_ARG(idx, "temperature");
+  res = cstr_to_double(arg, &hf_boundary->imposed_temperature);
+  if(res != RES_OK
+    || hf_boundary->imposed_temperature < 0)
+  {
+    logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", arg);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto end;
+  }
   CHK_ARG(idx, "flux");
   res = cstr_to_double(arg, &hf_boundary->imposed_flux);
   if(res != RES_OK
@@ -551,15 +560,6 @@ process_hf
     /* Flux can be < 0 but not undefined */
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid flux: %s\n", arg);
-    if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
-  }
-  CHK_ARG(idx, "temperature");
-  res = cstr_to_double(arg, &hf_boundary->imposed_temperature);
-  if(res != RES_OK
-    || hf_boundary->imposed_temperature < 0)
-  {
-    logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }

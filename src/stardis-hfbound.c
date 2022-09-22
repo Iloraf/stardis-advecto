@@ -77,10 +77,10 @@ str_print_hf_boundary
   b = desc->d.hf_boundary;
   ERR(str_append_printf(str,
     "HF boundary for %s '%s': ref_temperature=%g emissivity=%g specular_fraction=%g "
-    "hc=%g flux=%g T=%g (using medium %u as external medium)",
+    "hc=%g T=%g flux=%g (using medium %u as external medium)",
     (desc->type == DESC_BOUND_HF_FOR_SOLID ? "solid" : "fluid"),
     str_cget(&b->name), b->ref_temperature, b->emissivity,
-    b->specular_fraction, b->hc, b->imposed_flux, b->imposed_temperature,
+    b->specular_fraction, b->hc, b->imposed_temperature, b->imposed_flux,
     b->mat_id));
 end:
   return res;

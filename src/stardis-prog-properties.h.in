@@ -429,6 +429,84 @@ stardis_t_range
   (void* data,
    double range[2]);
 
+/****************************************************************/
+/* Additional mandatory functions for a programmed F+H boundary */
+/****************************************************************/
+
+/* Returns the emissivity at a given fragment.
+ * This functions is called every time a path of the computation reaches
+ * this boundary.
+ * data is the pointer returned by stardis_create_data for this boundary. */
+extern double
+stardis_emissivity
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+/* Returns the specular fraction at a given fragment.
+ * This functions is called every time a path of the computation reaches
+ * this boundary.
+ * data is the pointer returned by stardis_create_data for this boundary. */
+extern double
+stardis_specular_fraction
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+/* Returns the convection coefficient at a given fragment.
+ * This functions is called every time a path of the computation reaches
+ * this boundary.
+ * data is the pointer returned by stardis_create_data for this boundary. */
+extern double
+stardis_convection_coefficient
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+/* Returns the flux at the boundary at a given fragment.
+ * This functions is called every time a path of the computation reaches
+ * this boundary.
+ * data is the pointer returned by stardis_create_data for this boundary. */
+extern double
+stardis_boundary_flux
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+/* Returns the reference temperature at a given fragment.
+ * This temperature is used as a reference to linearize radiative transfer
+ * in Picard computations.
+ * This functions is called every time a path of the computation reaches
+ * this boundary.
+ * data is the pointer returned by stardis_create_data for this boundary. */
+extern double
+stardis_reference_temperature
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
+/* Returns the temperature at a given vertex.
+ * The intent is to return the temperature in an implicit fluid enclosing this
+ * solid.
+ * This functions is called at every vertex of every path of the computation
+ * crossing this fluid.
+ * data is the pointer returned by stardis_create_data for this boundary. */
+extern double
+stardis_medium_temperature
+  (const struct stardis_vertex* vtx,
+   void* data);
+
+/* Returns the upper bound of the convection coefficient accross this boundary.
+ * This functions is called once when initializing the computation.
+ * data is the pointer returned by stardis_create_data for this boundary. */
+extern double
+stardis_max_convection_coefficient
+  (void* data);
+
+/* Computes the expected temperature range for this boundary.
+ * This functions is called once when initializing the computation.
+ * data is the pointer returned by stardis_create_data for this boundary.
+ * Returns its modified range argument. */
+extern double*
+stardis_t_range
+  (void* data,
+   double range[2]);
+
 /**************************************************************/
 /* Additional mandatory functions for a programmed F boundary */
 /**************************************************************/

@@ -295,7 +295,7 @@ dump_path
 
   FOR_EACH(istrip, 0, scount_) {
     size_t ivert, nverts;
-    enum sdis_heat_vertex_type prev_type;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
     if(nverts == 0 || nverts > ULONG_MAX) goto abort;
     if(nverts == 1) strip_1++;
@@ -326,7 +326,7 @@ dump_path
   fprintf(stream, "POINTS %lu double\n", vcount + type_changes);
   FOR_EACH(istrip, 0, scount_) {
     size_t ivert, nverts;
-    enum sdis_heat_vertex_type prev_type;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
     FOR_EACH(ivert, 0, nverts) {
       struct sdis_heat_vertex vtx;
@@ -381,7 +381,7 @@ dump_path
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(istrip, 0, scount_) {
     size_t ivert, nverts;
-    enum sdis_heat_vertex_type prev_type;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
     FOR_EACH(ivert, 0, nverts) {
       struct sdis_heat_vertex vtx;
@@ -396,8 +396,8 @@ dump_path
       }
       fprintf(stream, "%d\n", t);
       if(ivert != 0 && vtx.type != prev_type) {
-        /* duplicate the previous vertex, but its type that is set to the type
-         * of the current vertex */
+        /* duplicate the previous vertex, except its type which is defined as
+         * the type of the current vertex */
         fprintf(stream, "%d\n", t);
       }
       prev_type = vtx.type;
@@ -408,8 +408,8 @@ dump_path
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(istrip, 0, scount_) {
     size_t ivert, nverts;
-    enum sdis_heat_vertex_type prev_type;
-    double prev_w;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
+    double prev_w = 0;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
     FOR_EACH(ivert, 0, nverts) {
       struct sdis_heat_vertex vtx;
@@ -428,8 +428,8 @@ dump_path
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(istrip, 0, scount_) {
     size_t ivert, nverts;
-    enum sdis_heat_vertex_type prev_type;
-    int prev_id;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
+    int prev_id = 0;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
     FOR_EACH(ivert, 0, nverts) {
       struct sdis_heat_vertex vtx;
@@ -447,8 +447,8 @@ dump_path
    * write the time of the random walk vertices */
   FOR_EACH(istrip, 0, scount_) {
     size_t ivert, nverts;
-    enum sdis_heat_vertex_type prev_type;
-    double prev_time;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
+    double prev_time = 0;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
     FOR_EACH(ivert, 0, nverts) {
       struct sdis_heat_vertex vtx;

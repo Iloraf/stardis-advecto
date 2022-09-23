@@ -515,11 +515,11 @@ create_intface
         boundary_count++;
         if(front_defined) {
           back_med = media[intface->d.f_boundary->mat_id];
-          interface_shader.front.flux = interface_get_flux;
         } else {
           front_med = media[intface->d.f_boundary->mat_id];
-          interface_shader.back.flux = interface_get_flux;
         }
+        interface_shader.front.flux = interface_get_flux;
+        interface_shader.back.flux = interface_get_flux;
         ASSERT(intface->d.f_boundary->imposed_flux != SDIS_FLUX_NONE);
         interface_props->imposed_flux = intface->d.f_boundary->imposed_flux;
         break;
@@ -533,11 +533,11 @@ create_intface
         boundary_count++;
         if(front_defined) {
           back_med = media[intface->d.f_boundary_prog->mat_id];
-          interface_shader.front.flux = intface_prog_get_flux;
         } else {
           front_med = media[intface->d.f_boundary_prog->mat_id];
-          interface_shader.back.flux = intface_prog_get_flux;
         }
+        interface_shader.front.flux = intface_prog_get_flux;
+        interface_shader.back.flux = intface_prog_get_flux;
         interface_props->get_flux = intface->d.f_boundary_prog->flux;
         interface_props->prog_data = intface->d.f_boundary_prog->prog_data;
         break;

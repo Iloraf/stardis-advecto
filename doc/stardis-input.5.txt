@@ -196,9 +196,9 @@ _______
 <medium-name>         ::= STRING {sharp} must not be a keyword nor a number,
                                  {sharp} including INF and others
 
-<lambda>              ::= REAL {sharp} conductivity in W/(m.K); in ]0, INF)
+<lambda>              ::= REAL {sharp} conductivity in W/(m.K), in ]0, INF)
 
-<rho>                 ::= REAL {sharp} volumic mass,in kg/m3; in ]0, INF)
+<rho>                 ::= REAL {sharp} volumic mass,in kg/m3, in ]0, INF)
 
 <cp>                  ::= REAL {sharp} capacity, in J/(kg.K) or kg.m2/(s2.K)
                                {sharp} in ]0, INF)
@@ -206,16 +206,16 @@ _______
 <delta>               ::= "AUTO" {sharp} delta is automatically set to V/6A (V and A
                                  {sharp} being respectively the solid volume and its
                                  {sharp} boundary area)
-                        | REAL {sharp} delta*scaling_factor in m; in [0, INF)
+                        | REAL {sharp} delta*scaling_factor in m, in [0, INF)
 
-<initial-temperature> ::= REAL {sharp} in K; in [0, INF)
+<initial-temperature> ::= REAL {sharp} in K, in [0, INF)
 
 <imposed-temperature> ::= "UNKNOWN" {sharp} temperature has to be solved
-                        | REAL {sharp} in K; in [0, INF)
+                        | REAL {sharp} in K, in [0, INF)
 
-<outside-temperature> ::= REAL {sharp} in K; in [0, INF)
+<outside-temperature> ::= REAL {sharp} in K, in [0, INF)
 
-<volumic-power>       ::= REAL {sharp} in W/m3; in (-INF , INF)
+<volumic-power>       ::= REAL {sharp} in W/m3, in (-INF , INF)
 
 <triangle-sides>      ::= <side-specifier> <file-name> [ <triangle-sides> ]
 
@@ -225,17 +225,17 @@ _______
 <connect-name>        ::= STRING {sharp} must not be a keyword nor a number,
                                  {sharp} including INF and others
 
-<Tref>                ::= REAL {sharp} in [0, inf)
+<Tref>                ::= REAL {sharp} in K, in [0, inf)
 
 <emissivity>          ::= REAL {sharp} in [0, 1]
 
 <specular-fraction>   ::= REAL {sharp} in [0, 1]
 
-<hc>                  ::= REAL {sharp} in W/(m2.K); in [0, INF)
+<hc>                  ::= REAL {sharp} in W/(m2.K), in [0, INF)
 
-<contact-resistance>  ::= REAL {sharp} in m2.K/W in [0, INF)
+<contact-resistance>  ::= REAL {sharp} in m2.K/W, in [0, INF)
 
-<flux>                ::= REAL {sharp} in W/m2; in (-INF , INF)
+<flux>                ::= REAL {sharp} in W/m2, in (-INF , INF)
 
 <triangles>           ::= <file-name> [ <triangles> ]
 
@@ -247,9 +247,9 @@ _______
                                   {sharp} note that the '{sharp}' character consistently ends
                                   {sharp} arguments by starting a comment
 
-<radiative-temp>      ::= REAL {sharp} in [0, inf)
+<radiative-temp>      ::= REAL {sharp} in K, in [0, inf)
 
-<radiative-temp-ref>  ::= REAL {sharp} in [0, inf)
+<radiative-temp-ref>  ::= REAL {sharp} in K, in [0, inf)
 
 -------------------------------------
 

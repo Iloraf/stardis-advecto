@@ -217,7 +217,7 @@ stardis_init
   struct str str;
   unsigned i, vcount, tcount, ocount, count;
   int is_for_compute;
-  struct sdis_device_create_args dev_args;
+  struct sdis_device_create_args dev_args = SDIS_DEVICE_CREATE_ARGS_DEFAULT;
 
   ASSERT(args && logger && allocator && stardis);
 

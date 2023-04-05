@@ -173,7 +173,7 @@ init_solid(struct mem_allocator* allocator, struct solid** dst)
   (*dst)->delta = 1;
   (*dst)->tinit = -1;
   (*dst)->imposed_temperature = -1;
-  (*dst)->vpower = 0;
+  (*dst)->vpower = SDIS_VOLUMIC_POWER_NONE;
   (*dst)->t0 = 0;
   (*dst)->is_outside = 0;
   (*dst)->is_green = 0;

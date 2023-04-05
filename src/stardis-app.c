@@ -81,6 +81,7 @@ check_delta_and_create_solid
     /* Due to previous errors, senc3d_scn can be unavailable */
     unsigned e, ecount = 0;
     const unsigned desc_id = solid->desc_id;
+    double solid_volume = 0;
 
     /* The enclosures where created using description ids */
     ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn,
@@ -96,6 +97,7 @@ check_delta_and_create_solid
         ERR(senc3d_scene_get_enclosure_by_medium(stardis->senc3d_scn, desc_id,
           e, &enc));
         ERR(senc3d_enclosure_get_header(enc, &header));
+        solid_volume += header.volume;
         if(header.is_infinite) {
           /* External solid, volume is negative and no delta walk expected */
           external = 1;
@@ -135,6 +137,12 @@ check_delta_and_create_solid
               str_cget(&solid->name), (too_big ? "big" : "small"),
               solid->delta, delta_range[0]);
           }
+        }
+        /* Print power */
+        if(solid->vpower != SDIS_VOLUMIC_POWER_NONE) {
+          logger_print(stardis->logger, LOG_OUTPUT,
+            "Power of the Solid '%s': %g W\n",
+            str_cget(&solid->name), solid_volume * solid->vpower);
         }
       }
     }

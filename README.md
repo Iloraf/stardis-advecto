@@ -9,7 +9,6 @@ and exposes some of the main features of the solver in an easy to use way.
 Using stardis is a practical way of carrying out thermal studies on CAD
 models which can be exported from Salomé or other similar software.
 
-
 ## How to build
 
 Stardis relies on the [CMake](http://www.cmake.org) and the
@@ -26,8 +25,6 @@ parallelize its computations.  It may depend on
 [OpenMPI](https://www.open-mpi.org/) 2.0 if distributed memory parallelism
 is enabled via the `ENABLE_MPI` variable of the CMake file.
 
-
-
 First ensure that CMake and a C compiler are installed on your system.
 Then install the RCMake package as well as all the aforementioned
 prerequisites. Finally generate the project from
@@ -36,7 +33,39 @@ variable the install directories of its dependencies.
 
 ## Release notes
 
-## Version 0.8
+### Version 0.9
+
+#### Programmable properties
+
+Until now, physical properties as well as boundary and connection conditions
+were constant in time and space. In this version, they can be programmed, i.e.
+they are variables returned by functions implemented in user-defined libraries
+and submitted as dynamically loaded input libraries when Stardis starts. User
+libraries must also provide create/release functions that are invoked at
+start-up to allow users to load their data and build the internal data
+structures required by their libraries at run-time.
+
+The `stardis-input` file format has been updated to provide a set of new
+`_PROG` suffixed keywords used to define these programmed properties and
+conditions (e.g. `T_BOUNDARY_FOR_SOLID_PROG` or `H_BOUNDARY_FOR_FLUID_PROG`)
+
+#### Miscellaneous
+
+- Addition of the keyword `HF_BOUNDARY_FOR_SOLID` which allows to impose a flux
+  on a boundary with another condition. For example, a net flux can be defined
+  in addition to a convective exchange and a radiative transfer.
+- Correct the definition of a net flux as a boundary condition: it might not be
+  defined on the right side of the interface.
+- Correct the "subpath type" data of the output paths: as we attach the segment
+  type to the vertices, we need to locate the type changes along the path on
+  zero length segments, otherwise the colouring will show a misleading colour
+  gradient.
+- Replace the Mersenne Twister random number generator with Threefry: the
+  former is much less efficient at rejecting random numbers than the latter,
+  which is designed for this purpose, a feature on which parallel random number
+  generations depend heavily
+
+### Version 0.8
 
 - Add a new option to support non-linear radiative transfer computations.
 - Changes in input file's format to support non-linear radiative transfer by
@@ -104,7 +133,7 @@ Fix debug build.
 
 ### Version 0.3.1
 
-Add radiative transfer computations. To achieve this, media gain 2 new parameters: 
+Add radiative transfer computations. To achieve this, media gain 2 new parameters:
 
 - emissivity;
 - `specular_fraction`.
@@ -126,7 +155,7 @@ Add radiative transfer computations. To achieve this, media gain 2 new parameter
 
 ## License
 
-Copyright (C) 2018-2022 |Meso|Star> (<contact@meso-star.com>). Stardis is free
+Copyright (C) 2018-2023 |Méso|Star> (<contact@meso-star.com>). Stardis is free
 software released under the GPL v3+ license: GNU GPL version 3 or later. You
 are welcome to redistribute it under certain conditions; refer to the COPYING
 file for details.

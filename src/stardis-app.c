@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -139,7 +139,7 @@ check_delta_and_create_solid
           }
         }
         /* Print power */
-        if(solid->vpower != SDIS_VOLUMIC_POWER_NONE) {
+        if(solid->vpower != SDIS_VOLUMIC_POWER_NONE && solid->vpower != 0) {
           logger_print(stardis->logger, LOG_OUTPUT,
             "Power of the Solid '%s': %g W\n",
             str_cget(&solid->name), solid_volume * solid->vpower);

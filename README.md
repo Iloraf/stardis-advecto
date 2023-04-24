@@ -33,7 +33,39 @@ variable the install directories of its dependencies.
 
 ## Release notes
 
-## Version 0.8
+### Version 0.9
+
+#### Programmable properties
+
+Until now, physical properties as well as boundary and connection conditions
+were constant in time and space. In this version, they can be programmed, i.e.
+they are variables returned by functions implemented in user-defined libraries
+and submitted as dynamically loaded input libraries when Stardis starts. User
+libraries must also provide create/release functions that are invoked at
+start-up to allow users to load their data and build the internal data
+structures required by their libraries at run-time.
+
+The `stardis-input` file format has been updated to provide a set of new
+`_PROG` suffixed keywords used to define these programmed properties and
+conditions (e.g. `T_BOUNDARY_FOR_SOLID_PROG` or `H_BOUNDARY_FOR_FLUID_PROG`)
+
+#### Miscellaneous
+
+- Addition of the keyword `HF_BOUNDARY_FOR_SOLID` which allows to impose a flux
+  on a boundary with another condition. For example, a net flux can be defined
+  in addition to a convective exchange and a radiative transfer.
+- Correct the definition of a net flux as a boundary condition: it might not be
+  defined on the right side of the interface.
+- Correct the "subpath type" data of the output paths: as we attach the segment
+  type to the vertices, we need to locate the type changes along the path on
+  zero length segments, otherwise the colouring will show a misleading colour
+  gradient.
+- Replace the Mersenne Twister random number generator with Threefry: the
+  former is much less efficient at rejecting random numbers than the latter,
+  which is designed for this purpose, a feature on which parallel random number
+  generations depend heavily
+
+### Version 0.8
 
 - Add a new option to support non-linear radiative transfer computations.
 - Changes in input file's format to support non-linear radiative transfer by
@@ -101,7 +133,7 @@ Fix debug build.
 
 ### Version 0.3.1
 
-Add radiative transfer computations. To achieve this, media gain 2 new parameters: 
+Add radiative transfer computations. To achieve this, media gain 2 new parameters:
 
 - emissivity;
 - `specular_fraction`.

@@ -139,7 +139,7 @@ check_delta_and_create_solid
           }
         }
         /* Print power */
-        if(solid->vpower != SDIS_VOLUMIC_POWER_NONE) {
+        if(solid->vpower != SDIS_VOLUMIC_POWER_NONE && solid->vpower != 0) {
           logger_print(stardis->logger, LOG_OUTPUT,
             "Power of the Solid '%s': %g W\n",
             str_cget(&solid->name), solid_volume * solid->vpower);

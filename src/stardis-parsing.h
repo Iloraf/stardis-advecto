@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,19 +23,25 @@
 
 #include <star/sstl.h>
 
-struct camera;
 struct logger;
-struct mem_allocator;
 struct stardis;
-struct dummies;
 
 /* Utility macros */
-#define CHK_TOK(x, Name) if((tk = (x)) == NULL) {\
-   logger_print(stardis->logger, LOG_ERROR,\
-     "Invalid data (missing token '" Name "')\n");\
-   res = RES_BAD_ARG;\
-   goto error;\
-  } (void)0
+#define CHK_ARG(Idx, Name) {\
+  if(pwordexp->we_wordc <= (Idx)) {\
+    logger_print(stardis->logger, LOG_ERROR,\
+      "Invalid data (missing token '" Name "')\n");\
+    arg = "(missing)";\
+    res = RES_BAD_ARG;\
+    goto error;\
+  } else {\
+    arg = pwordexp->we_wordv[(Idx)++];\
+    if(!arg) {\
+      arg = "(inconsistant wordexp)";\
+      goto error; /* to silent a gcc-11 */\
+    }\
+  }\
+}(void)0
 
 /* Same ctx used for both media and interface add (some unused parts) */
 struct add_geom_ctx {
@@ -46,38 +52,31 @@ struct add_geom_ctx {
 
 /* Possible callbacks for sg3d_geometry_add calls
  * when void* context is a struct add_geom_ctx */
-extern LOCAL_SYM void
+void
 add_geom_ctx_indices
   (const unsigned itri,
    unsigned ids[3],
    void* context);
 
-extern LOCAL_SYM void
-add_geom_ctx_properties
-  (const unsigned itri,
-   unsigned prop[3],
-   void* context);
-
-extern LOCAL_SYM void
+void
 add_geom_ctx_position
   (const unsigned ivert,
    double pos[3],
    void* context);
 
-extern LOCAL_SYM res_T
-process_model_line
-  (const char* file_name,
-   char* line,
-   struct stardis* stardis);
-
-extern LOCAL_SYM res_T
+res_T
 get_dummy_solid_id
   (struct stardis* stardis,
    unsigned* id);
 
-extern LOCAL_SYM res_T
+res_T
 get_dummy_fluid_id
   (struct stardis* stardis,
    unsigned* id);
+
+res_T
+read_model
+  (const struct darray_str* model_files,
+   struct stardis* stardis);
 
 #endif /*ARGS_H*/

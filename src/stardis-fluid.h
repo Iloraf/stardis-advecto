@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@ struct fluid {
   double t0; /* End time of tinit */
   int is_outside; /* the fluid is used for a boundary */
   int is_green; /* green computation (nothing to do with fluid itself) */
-  unsigned desc_id; /* id of the boundary; meaningful if is_outside */
+  unsigned desc_id;
   unsigned fluid_id;
 };
 
@@ -45,15 +45,15 @@ create_solver_fluid
   (struct stardis* stardis,
    const struct fluid* fluid_props);
 
-LOCAL_SYM res_T
+res_T
 init_fluid(struct mem_allocator* allocator, struct fluid** dst);
 
-LOCAL_SYM void
+void
 release_fluid
   (struct fluid* desc,
    struct mem_allocator* allocator);
 
-LOCAL_SYM res_T
+res_T
 str_print_fluid(struct str* str, const struct fluid* s);
 
 #endif

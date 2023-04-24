@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,18 +15,24 @@
 
 #define _POSIX_C_SOURCE 200112L /* snprintf */
 #include "stardis-output.h"
+#include "stardis-args.h"
 #include "stardis-compute.h"
 #include "stardis-fluid.h"
 #include "stardis-solid.h"
+#include "stardis-hbound.h"
+#include "stardis-tbound.h"
+#include "stardis-fbound.h"
+#include "stardis-ssconnect.h"
+#include "stardis-sfconnect.h"
 #include "stardis-intface.h"
 #include "stardis-app.h"
 #include "stardis-green-types.h"
 
 #include <sdis.h>
 
+#include<star/ssp.h>
 #include<star/senc3d.h>
 #include<star/sg3d.h>
-#include<star/ssp.h>
 
 #include <rsys/math.h>
 #include <rsys/mem_allocator.h>
@@ -67,7 +73,6 @@ enum enclosure_errors_t {
   ENCLOSURE_WITH_N_MEDIA = BIT(1),
   ENCLOSURE_WITH_UNDEF_MEDIUM = BIT(2)
 };
-
 
 static res_T
 copy_desc_to_green_desc
@@ -248,7 +253,7 @@ dump_path
   char* name = NULL;
   enum sdis_heat_path_flag status = SDIS_HEAT_PATH_NONE;
   size_t vcount_, scount_, offset, name_sz, istrip;
-  unsigned long scount, vcount;
+  unsigned long scount, vcount, strip_1, type_changes, *strip_type_changes = NULL;
 
   ASSERT(path && dump_ctx
     && dump_ctx->stardis
@@ -268,21 +273,49 @@ dump_path
 
   stream = fopen(name, "w");
   if(!stream) {
+    logger_print(dump_ctx->stardis->logger, LOG_ERROR,
+      "cannot open file '%s'\n", name);
     res = RES_IO_ERR;
     goto error;
   }
 
   /* Get counts */
   ERR(sdis_heat_path_get_line_strips_count(path, &scount_));
-  if(scount > ULONG_MAX) goto abort;
+  if(scount_ > ULONG_MAX) goto abort;
   scount = (unsigned long)scount_;
   vcount_ = 0;
-  FOR_EACH(istrip, 0, scount_) {
-    size_t n;
-    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &n));
-    vcount_+= n;
+  strip_1 = 0;
+  type_changes = 0;
+  strip_type_changes = MEM_CALLOC(dump_ctx->stardis->allocator, scount,
+      sizeof(*strip_type_changes));
+  if(!strip_type_changes) {
+    res = RES_MEM_ERR;
+    goto error;
   }
-  if(vcount > ULONG_MAX) goto abort;
+
+  FOR_EACH(istrip, 0, scount_) {
+    size_t ivert, nverts;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
+    ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
+    if(nverts == 0 || nverts > ULONG_MAX) goto abort;
+    if(nverts == 1) strip_1++;
+    FOR_EACH(ivert, 0, nverts) {
+      struct sdis_heat_vertex vtx;
+      ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      /* Count changes in vertex type along strips
+       * As we use vertex type instead of segment type, the vertices where type
+       * change are duplicated (with the only difference of their types) so that
+       * segments where type change are zero-length.
+       * This way Paraview displays segments with no misleading color gradient */
+      if(ivert != 0 && vtx.type != prev_type) {
+        type_changes++;
+        strip_type_changes[istrip]++;
+      }
+      prev_type = vtx.type;
+    }
+    vcount_+= nverts;
+  }
+  if(vcount_ > ULONG_MAX) goto abort;
   vcount = (unsigned long)vcount_;
   /* Header */
   fprintf(stream, "# vtk DataFile Version 2.0\n");
@@ -290,60 +323,84 @@ dump_path
   fprintf(stream, "ASCII\n");
   fprintf(stream, "DATASET POLYDATA\n");
   /* Write path positions */
-  fprintf(stream, "POINTS %lu double\n", vcount);
+  fprintf(stream, "POINTS %lu double\n", vcount + type_changes);
   FOR_EACH(istrip, 0, scount_) {
     size_t ivert, nverts;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
     FOR_EACH(ivert, 0, nverts) {
       struct sdis_heat_vertex vtx;
       ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      if(ivert != 0 && vtx.type != prev_type) {
+        /* duplicate the previous vertex */
+        struct sdis_heat_vertex v;
+        ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert-1, &v));
+        fprintf(stream, "%g %g %g\n", SPLIT3(v.P));
+      }
       fprintf(stream, "%g %g %g\n", SPLIT3(vtx.P));
+      prev_type = vtx.type;
     }
   }
-  /* Write the strips of the path */
-  fprintf(stream, "LINES %lu %lu\n", scount, scount + vcount);
+  /* Write the strips of the path
+   * Workaround a Paraview crash by creating 2-vertices-long paths from
+   * single-vertex paths */
+  fprintf(stream, "LINES %lu %lu\n",
+      scount, scount + vcount + strip_1 + type_changes);
   offset = 0;
-  FOR_EACH(istrip, 0, scount) {
-    size_t ivert, nverts;
+  FOR_EACH(istrip, 0, scount_) {
+    size_t nverts;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
-    if(nverts > ULONG_MAX) goto abort;
-    fprintf(stream, "%lu", (unsigned long)nverts);
-    FOR_EACH(ivert, 0, nverts) {
-      if(ivert + offset > ULONG_MAX) goto abort;
-      fprintf(stream, " %lu", (unsigned long)(ivert + offset));
+    if(nverts == 1) {
+      fprintf(stream, "2 %lu %lu\n", (unsigned long)offset, (unsigned long)offset);
+    } else {
+      size_t ivert;
+      fprintf(stream, "%lu", (unsigned long)nverts + strip_type_changes[istrip]);
+      FOR_EACH(ivert, 0, nverts + strip_type_changes[istrip]) {
+        if(ivert + offset > ULONG_MAX) goto abort;
+        fprintf(stream, " %lu", (unsigned long)(ivert + offset));
+      }
+      fprintf(stream, "\n");
     }
-    fprintf(stream, "\n");
-    offset += nverts;
+    offset += nverts + strip_type_changes[istrip];
   }
 
   /* Write path status on strips */
   fprintf(stream, "CELL_DATA %lu\n", scount);
   fprintf(stream, "SCALARS Path_Failure unsigned_char 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
-  FOR_EACH(istrip, 0, scount) {
+  FOR_EACH(istrip, 0, scount_) {
     switch (status) {
       case SDIS_HEAT_PATH_SUCCESS: fprintf(stream, "0\n"); break;
       case SDIS_HEAT_PATH_FAILURE: fprintf(stream, "1\n"); break;
       default: FATAL("Unreachable code.\n"); break;
     }
   }
-  fprintf(stream, "POINT_DATA %lu\n", vcount);
+  fprintf(stream, "POINT_DATA %lu\n", vcount + type_changes);
   /* Write the type of the random walk vertices */
-  fprintf(stream, "SCALARS Vertex_Type unsigned_char 1\n");
+  fprintf(stream, "SCALARS Segment_Type unsigned_char 1\n");
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(istrip, 0, scount_) {
     size_t ivert, nverts;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
     FOR_EACH(ivert, 0, nverts) {
       struct sdis_heat_vertex vtx;
+      int t;
       ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
       if((size_t)vtx.type > UCHAR_MAX) goto abort;
       switch(vtx.type) {
-        case SDIS_HEAT_VERTEX_CONDUCTION: fprintf(stream, "%d\n", 0); break;
-        case SDIS_HEAT_VERTEX_CONVECTION: fprintf(stream, "%d\n", 1); break;
-        case SDIS_HEAT_VERTEX_RADIATIVE: fprintf(stream, "%d\n", 2); break;
+        case SDIS_HEAT_VERTEX_CONDUCTION: t = 0; break;
+        case SDIS_HEAT_VERTEX_CONVECTION: t = 1; break;
+        case SDIS_HEAT_VERTEX_RADIATIVE: t = 2; break;
         default: FATAL("Unreachable code.\n"); break;
       }
+      fprintf(stream, "%d\n", t);
+      if(ivert != 0 && vtx.type != prev_type) {
+        /* duplicate the previous vertex, except its type which is defined as
+         * the type of the current vertex */
+        fprintf(stream, "%d\n", t);
+      }
+      prev_type = vtx.type;
     }
   }
   /* Write the weights of the random walk vertices */
@@ -351,11 +408,19 @@ dump_path
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(istrip, 0, scount_) {
     size_t ivert, nverts;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
+    double prev_w = 0;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
     FOR_EACH(ivert, 0, nverts) {
       struct sdis_heat_vertex vtx;
       ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
       fprintf(stream, "%g\n", vtx.weight);
+      if(ivert != 0 && vtx.type != prev_type) {
+        /* duplicate the previous vertex */
+        fprintf(stream, "%g\n", prev_w);
+      }
+      prev_type = vtx.type;
+      prev_w = vtx.weight;
     }
   }
   /* Write the branch_id of the random walk vertices */
@@ -363,33 +428,53 @@ dump_path
   fprintf(stream, "LOOKUP_TABLE default\n");
   FOR_EACH(istrip, 0, scount_) {
     size_t ivert, nverts;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
+    int prev_id = 0;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
     FOR_EACH(ivert, 0, nverts) {
       struct sdis_heat_vertex vtx;
       ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
       fprintf(stream, "%d\n", vtx.branch_id);
+      if(ivert != 0 && vtx.type != prev_type) {
+        /* duplicate the previous vertex */
+        fprintf(stream, "%d\n", prev_id);
+      }
+      prev_type = vtx.type;
+      prev_id = vtx.branch_id;
     }
   }
   /* If computation time is not INF,
    * write the time of the random walk vertices */
   FOR_EACH(istrip, 0, scount_) {
     size_t ivert, nverts;
+    enum sdis_heat_vertex_type prev_type = SDIS_HEAT_VERTEX_CONDUCTION;
+    double prev_time = 0;
     ERR(sdis_heat_path_line_strip_get_vertices_count(path, istrip, &nverts));
     FOR_EACH(ivert, 0, nverts) {
       struct sdis_heat_vertex vtx;
       ERR(sdis_heat_path_line_strip_get_vertex(path, istrip, ivert, &vtx));
+      if(IS_INF(vtx.time)) {
+       if(istrip || ivert) goto abort;
+       goto end_prt_time;
+      }
       if(istrip == 0 && ivert == 0) {
-        if(IS_INF(vtx.time)) break;
         fprintf(stream, "SCALARS Time double 1\n");
         fprintf(stream, "LOOKUP_TABLE default\n");
       }
-      if(IS_INF(vtx.time)) goto abort;
       fprintf(stream, "%g\n", vtx.time);
+      if(ivert != 0 && vtx.type != prev_type) {
+        /* duplicate the previous vertex */
+        fprintf(stream, "%g\n", prev_time);
+      }
+      prev_type = vtx.type;
+      prev_time = vtx.time;
     }
   }
+end_prt_time:
 
 end:
   MEM_RM(dump_ctx->stardis->allocator, name);
+  MEM_RM(dump_ctx->stardis->allocator, strip_type_changes);
   if(stream) fclose(stream);
   return res;
 error:
@@ -604,7 +689,7 @@ dump_sample_end
         pos = pt.data.itfrag.fragment.P;
         d__ = sdis_data_get(data);
         id = d__->desc_id;
-        CHK(DESC_IS_T(descs[id].type) || DESC_IS_H(descs[id].type));
+        CHK(DESC_IS_T(descs+id) || DESC_IS_H(descs+id));
         break;
       }
       case SDIS_VERTEX:
@@ -689,7 +774,7 @@ dump_sample
         data = sdis_interface_get_data(pt.data.itfrag.intface);
         d__ = sdis_data_get(data);
         desc_id = d__->desc_id;
-        CHK(DESC_IS_T(descs[desc_id].type) || DESC_IS_H(descs[desc_id].type));
+        CHK(DESC_IS_T(descs+desc_id) || DESC_IS_H(descs+desc_id));
         header.sample_end_description_id = desc_id;
         header.at_initial = 0;
         break;
@@ -1177,7 +1262,7 @@ dump_boundaries_at_the_end_of_vtk
     ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d, t,
       descr));
     if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
-      && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+      && DESC_IS_BOUNDARY(descriptions+descr[SG3D_INTFACE]))
       /* Descriptions are numbered from 1 in the log (so the 1+ below) */
       fprintf(stream, "%u\n", 1 + descr[SG3D_INTFACE]);
     else fprintf(stream, "%u\n", SG3D_UNSPECIFIED_PROPERTY);
@@ -1382,7 +1467,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         if(descr[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY)
           description_get_medium_id(descriptions + descr[SG3D_FRONT], &fmid);
         else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
-          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+          && DESC_IS_BOUNDARY(descriptions+descr[SG3D_INTFACE]))
         {
           description_get_medium_id(descriptions + descr[SG3D_INTFACE], &fmid);
         }
@@ -1390,7 +1475,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         if(descr[SENC3D_BACK] != SG3D_UNSPECIFIED_PROPERTY)
           description_get_medium_id(descriptions + descr[SENC3D_BACK], &bmid);
         else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
-          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+          && DESC_IS_BOUNDARY(descriptions+descr[SG3D_INTFACE]))
         {
           description_get_medium_id(descriptions + descr[SG3D_INTFACE], &bmid);
         }
@@ -1402,7 +1487,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         if(descr[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY)
           description_get_medium_id(descriptions + descr[SG3D_FRONT], &mid);
         else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
-          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+          && DESC_IS_BOUNDARY(descriptions+descr[SG3D_INTFACE]))
         {
           description_get_medium_id(descriptions + descr[SG3D_INTFACE], &mid);
         }
@@ -1413,7 +1498,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         if(descr[SENC3D_BACK] != SG3D_UNSPECIFIED_PROPERTY)
           description_get_medium_id(descriptions + descr[SENC3D_BACK], &mid);
         else if(descr[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY
-          && DESC_IS_BOUNDARY(descriptions[descr[SG3D_INTFACE]].type))
+          && DESC_IS_BOUNDARY(descriptions+descr[SG3D_INTFACE]))
         {
           description_get_medium_id(descriptions + descr[SG3D_INTFACE], &mid);
         }

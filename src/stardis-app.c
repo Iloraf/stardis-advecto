@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,18 +18,22 @@
 #endif
 
 #include "stardis-app.h"
-#include "stardis-output.h"
+#include "stardis-args.h"
+#include "stardis-description.h"
+#include "stardis-default.h"
+#include "stardis-parsing.h"
 #include "stardis-compute.h"
 #include "stardis-intface.h"
-#include "stardis-fluid.h"
 #include "stardis-solid.h"
+#include "stardis-fluid.h"
+#include "stardis-program.h"
 
 #include <star/senc3d.h>
 #include <star/sg3d_sencXd_helper.h>
 #include <star/sg3d_sdisXd_helper.h>
 
 #include <rsys/str.h>
-#include <rsys/text_reader.h>
+#include <rsys/library.h>
 #include <rsys/logger.h>
 #include <rsys/double2.h>
 #include <rsys/double3.h>
@@ -47,64 +51,6 @@ static const struct counts COUNTS_NULL = COUNTS_NULL__;
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
-static res_T
-read_model
-  (const struct darray_str* model_files,
-   struct stardis* stardis)
-{
-  res_T res = RES_OK;
-  const struct str* files = NULL;
-  size_t i;
-  FILE* f = NULL;
-  struct txtrdr* txtrdr = NULL;
-
-  ASSERT(model_files && stardis);
-  files = darray_str_cdata_get(model_files);
-  FOR_EACH(i, 0, darray_str_size_get(model_files)) {
-    const char* name = str_cget(files + i);
-    f = fopen(name, "r");
-    if(!f) {
-      logger_print(stardis->logger, LOG_ERROR,
-        "Cannot open model file '%s'\n",
-        name);
-      res = RES_IO_ERR;
-      goto error;
-    }
-    txtrdr_stream(stardis->allocator, f, name, '#', &txtrdr);
-    for(;;) {
-      char* line;
-      ERR(txtrdr_read_line(txtrdr));
-      line = txtrdr_get_line(txtrdr);
-      if(!line) break;
-      ERR(process_model_line(name, line, stardis));
-    }
-    txtrdr_ref_put(txtrdr);
-    txtrdr = NULL;
-    fclose(f);
-    f = NULL;
-  }
-  if(stardis->scale_factor <= 0)
-    stardis->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
-  logger_print(stardis->logger, LOG_OUTPUT,
-    "Scaling factor is %g\n", stardis->scale_factor);
-  logger_print(stardis->logger, LOG_OUTPUT,
-    "Trad is %g, Trad reference is %g\n", stardis->trad, stardis->trad_ref);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], stardis->trad_ref);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], stardis->trad_ref);
-  logger_print(stardis->logger, LOG_OUTPUT,
-    "System T range is [%g %g]\n", SPLIT2(stardis->t_range));
-  logger_print(stardis->logger, LOG_OUTPUT,
-    "Picard order is %u\n", stardis->picard_order);
-
-  ASSERT(!f && !txtrdr);
-exit:
-  return res;
-error:
-  if(f) fclose(f);
-  if(txtrdr) txtrdr_ref_put(txtrdr);
-  goto exit;
-}
-
 static struct sdis_interface*
 geometry_get_interface
   (const size_t itri, void* ctx)
@@ -135,6 +81,7 @@ check_delta_and_create_solid
     /* Due to previous errors, senc3d_scn can be unavailable */
     unsigned e, ecount = 0;
     const unsigned desc_id = solid->desc_id;
+    double solid_volume = 0;
 
     /* The enclosures where created using description ids */
     ERR(senc3d_scene_get_enclosure_count_by_medium(stardis->senc3d_scn,
@@ -150,6 +97,7 @@ check_delta_and_create_solid
         ERR(senc3d_scene_get_enclosure_by_medium(stardis->senc3d_scn, desc_id,
           e, &enc));
         ERR(senc3d_enclosure_get_header(enc, &header));
+        solid_volume += header.volume;
         if(header.is_infinite) {
           /* External solid, volume is negative and no delta walk expected */
           external = 1;
@@ -189,6 +137,12 @@ check_delta_and_create_solid
               str_cget(&solid->name), (too_big ? "big" : "small"),
               solid->delta, delta_range[0]);
           }
+        }
+        /* Print power */
+        if(solid->vpower != SDIS_VOLUMIC_POWER_NONE && solid->vpower != 0) {
+          logger_print(stardis->logger, LOG_OUTPUT,
+            "Power of the Solid '%s': %g W\n",
+            str_cget(&solid->name), solid_volume * solid->vpower);
         }
       }
     }
@@ -271,7 +225,7 @@ stardis_init
   struct str str;
   unsigned i, vcount, tcount, ocount, count;
   int is_for_compute;
-  struct sdis_device_create_args dev_args;
+  struct sdis_device_create_args dev_args = SDIS_DEVICE_CREATE_ARGS_DEFAULT;
 
   ASSERT(args && logger && allocator && stardis);
 
@@ -372,6 +326,9 @@ stardis_init
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vcount));
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tcount));
 
+  logger_print(stardis->logger, LOG_OUTPUT,
+    "Read %u unique triangles.\n", tcount);
+
   ERR(sg3d_geometry_validate_properties(stardis->geometry.sg3d,
      validate_properties, stardis));
   ERR(sg3d_geometry_get_unique_triangles_with_properties_conflict_count(
@@ -428,16 +385,25 @@ stardis_init
     }
   }
 
-  /* Create solids and log model information */
+  /* Create solids, finalize program data, and log model information */
   for(i = 0; i < darray_descriptions_size_get(&stardis->descriptions); i++) {
     struct description* desc =
       darray_descriptions_data_get(&stardis->descriptions) + i;
     if(desc->type == DESC_MAT_SOLID) {
       tmp_res = check_delta_and_create_solid(stardis, desc);
-      if(tmp_res != RES_OK && is_for_compute) {
-        res = tmp_res;
-        goto error;
+    } else if(desc->type == DESC_PROGRAM && desc->d.program->finalize) {
+      enum stardis_return_status rs;
+      rs = desc->d.program->finalize(desc->d.program->prog_data);
+      switch(rs) {
+        case STARDIS_SUCCESS: tmp_res = RES_OK; break; 
+        case STARDIS_FAILURE: tmp_res = RES_BAD_ARG; break; 
+        default:
+          FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
       }
+    }
+    if(tmp_res != RES_OK && is_for_compute) {
+      res = tmp_res;
+      goto error;
     }
     ERR(str_print_description(&str, i, desc));
     logger_print(stardis->logger, LOG_OUTPUT, "%s\n", str_cget(&str));
@@ -523,8 +489,16 @@ stardis_release
   str_release(&stardis->bin_green_filename);
   str_release(&stardis->end_paths_filename);
   str_release(&stardis->chunks_prefix);
+  /* release non-PROGRAM descritions first */
   FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
     struct description* d = darray_descriptions_data_get(&stardis->descriptions) +i;
+    if(d->type == DESC_PROGRAM) continue;
+    release_description(d, stardis->allocator);
+  }
+  /* release PROGRAM descritions */
+  FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
+    struct description* d = darray_descriptions_data_get(&stardis->descriptions) +i;
+    if(d->type != DESC_PROGRAM) continue;
     release_description(d, stardis->allocator);
   }
   darray_descriptions_release(&stardis->descriptions);
@@ -547,6 +521,14 @@ stardis_release
   }
 }
 
+unsigned
+allocate_stardis_medium_id
+  (struct stardis* stardis)
+{
+  ASSERT(stardis);
+  return stardis->next_medium_id++;
+}
+
 res_T
 init_enclosures
   (struct stardis* stardis)
@@ -556,6 +538,7 @@ init_enclosures
   struct senc3d_device* senc_dev = NULL;
 
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
+
   ERR(sg3d_geometry_get_unique_vertices_count(stardis->geometry.sg3d, &vsz));
   ERR(senc3d_device_create(stardis->logger, stardis->allocator,
     stardis->nthreads, stardis->verbose, &senc_dev));
@@ -577,9 +560,9 @@ error:
   if(properties[(Rank)] == SG3D_UNSPECIFIED_PROPERTY) undef_count++;\
   else {\
     ASSERT(properties[(Rank)] < darray_descriptions_size_get(&stardis->descriptions));\
-    ASSERT(DESC_IS_MEDIUM(descs[properties[(Rank)]].type));\
-    if(descs[properties[(Rank)]].type == DESC_MAT_SOLID) solid_count++;\
-    else fluid_count++;\
+    ASSERT(DESC_IS_MEDIUM(descs+properties[(Rank)]));\
+    if(DESC_IS_SOLID(descs+properties[(Rank)])) { solid_count++; }\
+    else { ASSERT(DESC_IS_FLUID(descs+properties[(Rank)])); fluid_count++; }\
   }\
 }
 
@@ -616,6 +599,7 @@ validate_properties
     intface = descs + properties[SG3D_INTFACE];
     switch (intface->type) {
     case DESC_BOUND_H_FOR_FLUID:
+    case DESC_BOUND_H_FOR_FLUID_PROG:
       if(!(solid_count == 0 && fluid_count == 1)) {
         if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_H_FOR_FLUID_BETWEEN_2_DEFS;
@@ -628,6 +612,7 @@ validate_properties
       }
       break;
     case DESC_BOUND_H_FOR_SOLID:
+    case DESC_BOUND_H_FOR_SOLID_PROG:
       if(!(solid_count == 1 && fluid_count == 0)) {
         if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_H_FOR_SOLID_BETWEEN_2_DEFS;
@@ -639,7 +624,21 @@ validate_properties
         goto end;
       }
       break;
+    case DESC_BOUND_HF_FOR_SOLID:
+    case DESC_BOUND_HF_FOR_SOLID_PROG:
+      if(!(solid_count == 1 && fluid_count == 0)) {
+        if(solid_count + fluid_count == 2)
+          *properties_conflict_status = BOUND_HF_FOR_SOLID_BETWEEN_2_DEFS;
+        else if(solid_count + fluid_count == 0)
+          *properties_conflict_status = BOUND_HF_FOR_SOLID_BETWEEN_2_UNDEFS;
+        else if(fluid_count == 1)
+          *properties_conflict_status = BOUND_HF_FOR_SOLID_ENCLOSING_FLUID;
+        else FATAL("error:" STR(__FILE__) ":" STR(__LINE__)"\n");
+        goto end;
+      }
+      break;
     case DESC_BOUND_T_FOR_SOLID:
+    case DESC_BOUND_T_FOR_SOLID_PROG:
       if(!(solid_count == 1 && fluid_count == 0)) {
         if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_T_FOR_SOLID_BETWEEN_2_DEFS;
@@ -652,6 +651,7 @@ validate_properties
       }
       break;
     case DESC_BOUND_F_FOR_SOLID:
+    case DESC_BOUND_F_FOR_SOLID_PROG:
       if(!(solid_count == 1 && fluid_count == 0)) {
         if(solid_count + fluid_count == 2)
           *properties_conflict_status = BOUND_F_FOR_SOLID_BETWEEN_2_DEFS;
@@ -664,6 +664,7 @@ validate_properties
       }
       break;
     case DESC_SOLID_FLUID_CONNECT:
+    case DESC_SOLID_FLUID_CONNECT_PROG:
       if(solid_count != 1 || fluid_count != 1) {
         if(solid_count == 2)
           *properties_conflict_status = SFCONNECT_BETWEEN_2_SOLIDS;
@@ -678,6 +679,7 @@ validate_properties
       }
       break;
     case DESC_SOLID_SOLID_CONNECT:
+    case DESC_SOLID_SOLID_CONNECT_PROG:
       if(solid_count != 2) {
         /*if(soli_count == 1 && fluid_count == 1)*/
           /**properties_conflict_status = SSCONNECT_BETWEEN_SOLID_AND_FLUID;*/
@@ -718,3 +720,145 @@ end:
 }
 
 #undef COUNT_SIDE
+
+res_T
+init_geometry
+  (struct logger* logger,
+   struct mem_allocator* allocator,
+   const int verbose,
+   struct geometry* geom)
+{
+  res_T res = RES_OK;
+  struct sg3d_device* sg3d_dev = NULL;
+
+  ASSERT(allocator && geom);
+  
+  geom->sg3d = NULL;
+  darray_interface_ptrs_init(allocator, &geom->interfaces);
+  darray_interface_ptrs_init(allocator, &geom->interf_bytrg);
+  ERR(sg3d_device_create(logger, allocator, verbose, &sg3d_dev));
+  ERR(sg3d_geometry_create(sg3d_dev, &geom->sg3d));
+
+exit:
+  if(sg3d_dev) SG3D(device_ref_put(sg3d_dev));
+  return res;
+error:
+  release_geometry(geom);
+  goto exit;
+}
+
+void
+release_geometry
+  (struct geometry* geom)
+{
+  size_t i;
+  struct sdis_interface
+    ** intf = darray_interface_ptrs_data_get(&geom->interfaces);
+  if(geom->sg3d) SG3D(geometry_ref_put(geom->sg3d));
+  for(i = 0; i < darray_interface_ptrs_size_get(&geom->interfaces); ++i)
+    SDIS(interface_ref_put(intf[i]));
+  darray_interface_ptrs_release(&geom->interfaces);
+  darray_interface_ptrs_release(&geom->interf_bytrg);
+}
+
+void
+init_camera
+  (struct mem_allocator* alloc, struct camera* cam)
+{
+  ASSERT(alloc && cam);
+  d3(cam->pos, STARDIS_DEFAULT_RENDERING_POS);
+  d3(cam->tgt, STARDIS_DEFAULT_RENDERING_TGT);
+  d3(cam->up, STARDIS_DEFAULT_RENDERING_UP);
+  cam->fmt = STARDIS_DEFAULT_RENDERING_OUTPUT_FILE_FMT;
+  cam->fov = STARDIS_DEFAULT_RENDERING_FOV;
+  cam->spp = STARDIS_DEFAULT_RENDERING_SPP;
+  cam->img_width = STARDIS_DEFAULT_RENDERING_IMG_WIDTH;
+  cam->img_height = STARDIS_DEFAULT_RENDERING_IMG_HEIGHT;
+  d2(cam->time_range, STARDIS_DEFAULT_RENDERING_TIME);
+  cam->auto_look_at = 1;
+  str_init(alloc, &cam->file_name);
+}
+
+void
+release_camera
+  (struct camera* cam)
+{
+  ASSERT(cam);
+  str_release(&cam->file_name);
+}
+
+void
+log_err_fn
+  (const char* msg, void* ctx)
+{
+#ifdef STARDIS_ENABLE_MPI
+  int initialized, rank = 0;
+#endif
+
+  ASSERT(msg);
+  (void)ctx;
+
+#ifdef STARDIS_ENABLE_MPI
+  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
+  if(initialized) CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
+  /* Only master prints */
+  if(rank != 0) return;
+#endif
+
+#ifdef OS_WINDOWS
+  fprintf(stderr, "error: %s", msg);
+#else
+  fprintf(stderr, "\x1b[31merror:\x1b[0m %s", msg);
+#endif
+}
+
+void
+log_warn_fn
+  (const char* msg, void* ctx)
+{
+#ifdef STARDIS_ENABLE_MPI
+  int initialized, rank = 0;
+#endif
+
+  ASSERT(msg);
+  (void)ctx;
+
+#ifdef STARDIS_ENABLE_MPI
+  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
+  if(initialized) CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
+  /* Only master prints */
+  if(rank != 0) return;
+#endif
+
+#ifdef OS_WINDOWS
+  fprintf(stderr, "warning: %s", msg);
+#else
+  fprintf(stderr, "\x1b[33mwarning:\x1b[0m %s", msg);
+#endif
+}
+
+void
+log_prt_fn
+  (const char* msg, void* ctx)
+{
+#ifdef stardis_enable_mpi
+  int initialized, rank = 0;
+#endif
+
+  ASSERT(msg);
+  (void)ctx;
+
+#ifdef stardis_enable_mpi
+  chk(mpi_initialized(&initialized) == mpi_success);
+  if(initialized) chk(mpi_comm_rank(mpi_comm_world, &rank) == mpi_success);
+  /* only master prints */
+  if(rank != 0) return;
+#endif
+
+#ifdef OS_WINDOWS
+  fprintf(stderr, "message: %s", msg);
+#else
+  fprintf(stderr, "\x1b[32moutput:\x1b[0m %s", msg);
+#endif
+}
+

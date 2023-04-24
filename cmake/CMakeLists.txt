@@ -1,4 +1,4 @@
-# Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
+# Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@ project(stardis C)
 
 set(SDIS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../src)
 set(SDIS_SGT_DIR ${PROJECT_SOURCE_DIR}/../stardis-green-types)
+set(SDIS_PRG_DIR ${PROJECT_SOURCE_DIR}/../stardis-prog-properties)
 
 
 option(ENABLE_MPI
@@ -62,7 +63,7 @@ configure_file(${SDIS_SOURCE_DIR}/../doc/stardis.1.txt.in
   ${CMAKE_CURRENT_BINARY_DIR}/doc/stardis.1.txt @ONLY)
 
 set(SDIS_VERSION_MAJOR 0)
-set(SDIS_VERSION_MINOR 8)
+set(SDIS_VERSION_MINOR 9)
 set(SDIS_VERSION_PATCH 0)
 set(SDIS_VERSION ${SDIS_VERSION_MAJOR}.${SDIS_VERSION_MINOR}.${SDIS_VERSION_PATCH})
 
@@ -73,12 +74,17 @@ configure_file(${SDIS_SOURCE_DIR}/stardis-version.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-version.h @ONLY)
 
 set(STARDIS_GREEN_TYPES_VERSION "4")
+set(STARDIS_PROG_PROPERTIES_VERSION "1")
 
 configure_file(${SDIS_SOURCE_DIR}/stardis-green-types.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-green-types/stardis-green-types.h @ONLY)
+configure_file(${SDIS_SOURCE_DIR}/stardis-prog-properties.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-prog-properties/stardis-prog-properties.h @ONLY)
 
 configure_file(${SDIS_SGT_DIR}/stardis-green-types-config-version.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-green-types/stardis-green-types-config-version.cmake @ONLY)
+configure_file(${SDIS_PRG_DIR}/stardis-prog-properties-config-version.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-prog-properties/stardis-prog-properties-config-version.cmake @ONLY)
 
 ###############################################################################
 # Check dependencies
@@ -88,7 +94,7 @@ find_package(RSys 0.12 REQUIRED)
 find_package(StarGeom3D 0.1 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
 find_package(StarEnc3D 0.5 REQUIRED)
-find_package(Stardis 0.13 REQUIRED)
+find_package(Stardis 0.14 REQUIRED)
 find_package(StarSTL 0.3 REQUIRED)
 find_package(StarSP 0.13 REQUIRED)
 if(MSVC)
@@ -110,7 +116,8 @@ include_directories(
   ${StarSTL_INCLUDE_DIR}
   ${StarSP_INCLUDE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}/stardis-green-types)
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-green-types
+  ${CMAKE_CURRENT_BINARY_DIR}/stardis-prog-properties)
 if(MSVC)
   include_directories(${MuslGetopt_INCLUDE_DIR})
 endif()
@@ -136,6 +143,7 @@ if(NOT STARDIS_DOC STREQUAL "NONE")
 endif()
 
 add_subdirectory(stardis-green-types)
+add_subdirectory(stardis-prog-properties)
 
 ###############################################################################
 # Configure and define targets
@@ -144,24 +152,57 @@ set(SDIS_FILES_SRC
   stardis-app.c
   stardis-args.c
   stardis-compute.c
+  stardis-description.c
   stardis-fluid.c
+  stardis-fluid-prog.c
+  stardis-fbound.c
+  stardis-fbound-prog.c
+  stardis-hbound.c
+  stardis-hbound-prog.c
+  stardis-hfbound.c
+  stardis-hfbound-prog.c
   stardis-intface.c
   stardis-main.c
   stardis-output.c
   stardis-parsing.c
-  stardis-solid.c)
+  stardis-program.c
+  stardis-sfconnect.c
+  stardis-sfconnect-prog.c
+  stardis-ssconnect.c
+  stardis-ssconnect-prog.c
+  stardis-solid.c
+  stardis-solid-prog.c
+  stardis-tbound.c
+  stardis-tbound-prog.c)
 
 set(SDIS_FILES_INC
   stardis-app.h
   stardis-args.h
   stardis-compute.h
+  stardis-description.h
   stardis-default.h.in
   stardis-fluid.h
+  stardis-fluid-prog.h
+  stardis-fbound.h
+  stardis-fbound-prog.h
   stardis-green-types.h.in
+  stardis-hbound.h
+  stardis-hbound-prog.h
+  stardis-hfbound.h
+  stardis-hfbound-prog.h
   stardis-intface.h
   stardis-output.h
   stardis-parsing.h
+  stardis-program.h
+  stardis-prog-properties.h.in
+  stardis-sfconnect.h
+  stardis-sfconnect-prog.h
+  stardis-ssconnect.h
+  stardis-ssconnect-prog.h
   stardis-solid.h
+  stardis-solid-prog.h
+  stardis-tbound.h
+  stardis-tbound-prog.h
   stardis-version.h.in)
 
 set(SDIS_FILES_DOC COPYING README.md)

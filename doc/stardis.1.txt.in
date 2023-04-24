@@ -1,4 +1,4 @@
-// Copyright (C) 2018-2020 |Meso|Star>
+// Copyright (C) 2018-2023 |Méso|Star>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -102,7 +102,9 @@ MANDATORY OPTIONS
 -----------------
 *-M* _file_::
   Read a text file containing a possibly partial description of the system.
-  Can include both media enclosures and boundary conditions, in any order.
+  Can include programs, media enclosures and boundary conditions. Media and
+  boundaries can appear in any order, but programs must be defined before their
+  first reference. Refer to *stardis-input(5)* for details.
   Can be used more than once if the description is split across different
   files.
 
@@ -350,7 +352,7 @@ ends are written to the *probe_ends.csv* file:
 
 COPYRIGHT
 ---------
-Copyright &copy; 2018-2020 |Meso|Star>. License GPLv3+: GNU GPL
+Copyright &copy; 2018-2023 |Méso|Star>. License GPLv3+: GNU GPL
 version 3 or later <http://gnu.org/licenses/gpl.html>. This is free software.
 You are free to change and redistribute it. There is NO WARRANTY, to the extent
 permitted by law.

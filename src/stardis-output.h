@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,50 +39,50 @@ struct dump_path_context {
   struct stardis* stardis;
 };
 
-extern res_T
+res_T
 dump_path
   (const struct sdis_heat_path* path,
    void* context);
 
-extern res_T
+res_T
 print_sample
   (struct sdis_green_path* path,
    void* ctx);
 
-extern res_T
+res_T
 dump_vtk_image
   (const struct sdis_estimator_buffer* buf,
    FILE* stream);
 
-extern res_T
+res_T
 dump_ht_image
   (const struct sdis_estimator_buffer* buf,
    FILE* stream);
 
-extern res_T
+res_T
 dump_green_ascii
   (struct sdis_green_function* green,
    const struct stardis* stardis,
    FILE* stream);
 
-extern res_T
+res_T
 dump_green_bin
   (struct sdis_green_function* green,
    const struct stardis* stardis,
    FILE* stream);
 
-extern res_T
+res_T
 dump_paths_end
   (struct sdis_green_function* green,
    const struct stardis* stardis,
    FILE* stream);
 
-extern res_T
+res_T
 dump_enclosure_related_stuff_at_the_end_of_vtk
   (struct stardis* stardis,
    FILE* stream);
 
-extern res_T
+res_T
 print_computation_time
   (struct sdis_estimator* estimator, /* Can be NULL */
    struct stardis* stardis,
@@ -91,39 +91,39 @@ print_computation_time
     struct time* computation_end,
     struct time* output_end); /* Can be NULL */
 
-extern res_T
+res_T
 print_single_MC_result
   (struct sdis_estimator* estimator,
    struct stardis* stardis,
    FILE* stream);
 
-extern res_T
+res_T
 dump_map
   (const struct stardis* stardis,
    const struct darray_estimators* estimators,
    FILE* stream);
 
-extern res_T
+res_T
 dump_boundaries_at_the_end_of_vtk
   (const struct stardis* stardis,
    FILE* stream);
 
-extern res_T
+res_T
 dump_compute_region_at_the_end_of_vtk
   (struct stardis* stardis,
    FILE* stream);
 
-extern res_T
+res_T
 dump_model_as_c_chunks
   (struct stardis* stardis,
    FILE* stream);
 
-extern res_T
+res_T
 write_random_generator_state
   (struct sdis_estimator* estimator,
    FILE* stream);
 
-extern res_T
+res_T
 read_random_generator_state
   (struct ssp_rng* state,
    FILE* stream);

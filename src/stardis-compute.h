@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,12 +33,12 @@ find_medium_by_name
    const struct str* name,
    unsigned* id); /* Can be NULL */
 
-extern LOCAL_SYM res_T
+res_T
 stardis_compute
   (struct stardis* stardis,
    struct time* start);
 
-extern LOCAL_SYM res_T
+res_T
 read_compute_surface
   (struct stardis* stardis);
 

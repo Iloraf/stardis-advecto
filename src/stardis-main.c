@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,6 +14,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "stardis-app.h"
+#include "stardis-args.h"
 #include "stardis-parsing.h"
 #include "stardis-output.h"
 #include "stardis-compute.h"
@@ -65,7 +66,7 @@ main
   ERR(init_args(&logger, &allocator, &args));
   args_initialized = 1;
   ERR(parse_args(argc, argv, args, &allocator));
-  mode = args->mode;
+  mode = (int)args->mode;
 
   if(mode & MODE_DUMP_HELP) {
     short_help(stdout, argv[0]);

@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2022 |Meso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,7 +14,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #include "stardis-solid.h"
-#include "stardis-compute.h"
 #include "stardis-app.h"
 
 #include <sdis.h>
@@ -174,7 +173,7 @@ init_solid(struct mem_allocator* allocator, struct solid** dst)
   (*dst)->delta = 1;
   (*dst)->tinit = -1;
   (*dst)->imposed_temperature = -1;
-  (*dst)->vpower = 0;
+  (*dst)->vpower = SDIS_VOLUMIC_POWER_NONE;
   (*dst)->t0 = 0;
   (*dst)->is_outside = 0;
   (*dst)->is_green = 0;
@@ -203,18 +202,18 @@ str_print_solid(struct str* str, const struct solid* s)
 {
   res_T res = RES_OK;
   ASSERT(str && s);
-  STR_APPEND_PRINTF(str, "Solid '%s': lambda=%g rho=%g cp=%g delta=%g",
-    ARG5( str_cget(&s->name), s->lambda, s->rho, s->cp, s->delta ) );
+  ERR(str_append_printf(str, "Solid '%s': lambda=%g rho=%g cp=%g delta=%g",
+    str_cget(&s->name), s->lambda, s->rho, s->cp, s->delta));
   if(s->vpower != 0) {
-    STR_APPEND_PRINTF(str, " VPower=%g", ARG1( s->vpower ) );
+    ERR(str_append_printf(str, " VPower=%g", s->vpower));
   }
   if(s->tinit >= 0) {
-    STR_APPEND_PRINTF(str, " Tinit=%g", ARG1( s->tinit ) );
+    ERR(str_append_printf(str, " Tinit=%g", s->tinit));
   }
   if(s->imposed_temperature >= 0) {
-    STR_APPEND_PRINTF(str, " Temp=%g", ARG1( s->imposed_temperature ) );
+    ERR(str_append_printf(str, " Temp=%g", s->imposed_temperature));
   }
-  STR_APPEND_PRINTF(str, " (it is medium %u)", ARG1( s->solid_id ) );
+  ERR(str_append_printf(str, " (it is medium %u)", s->solid_id));
 end:
   return res;
 error:

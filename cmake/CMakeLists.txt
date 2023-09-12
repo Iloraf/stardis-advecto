@@ -38,7 +38,7 @@ set_property(CACHE STARDIS_DOC PROPERTY STRINGS
   "TROFF"
   "TROFF & HTML"
   "NONE")
-  
+
 ###############################################################################
 # Generate files
 ###############################################################################
@@ -69,7 +69,7 @@ set(SDIS_VERSION ${SDIS_VERSION_MAJOR}.${SDIS_VERSION_MINOR}.${SDIS_VERSION_PATC
 
 configure_file(${SDIS_SOURCE_DIR}/stardis-default.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-default.h @ONLY)
-  
+
 configure_file(${SDIS_SOURCE_DIR}/stardis-version.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-version.h @ONLY)
 
@@ -95,7 +95,7 @@ find_package(StarGeom3D 0.1 REQUIRED)
 find_package(Star3D 0.8 REQUIRED)
 find_package(StarEnc3D 0.5 REQUIRED)
 find_package(Stardis 0.14 REQUIRED)
-find_package(StarSTL 0.3 REQUIRED)
+find_package(StarSTL 0.4 REQUIRED)
 find_package(StarSP 0.13 REQUIRED)
 if(MSVC)
   find_package(MuslGetopt REQUIRED)

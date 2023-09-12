@@ -230,7 +230,7 @@ stardis_init
   ASSERT(args && logger && allocator && stardis);
 
   str_init(allocator, &str);
-  /* Init everithing that cannot fail */
+  /* Init everything that cannot fail */
   stardis->dummies = DUMMIES_NULL;
   stardis->logger = logger;
   stardis->allocator = allocator;
@@ -395,8 +395,8 @@ stardis_init
       enum stardis_return_status rs;
       rs = desc->d.program->finalize(desc->d.program->prog_data);
       switch(rs) {
-        case STARDIS_SUCCESS: tmp_res = RES_OK; break; 
-        case STARDIS_FAILURE: tmp_res = RES_BAD_ARG; break; 
+        case STARDIS_SUCCESS: tmp_res = RES_OK; break;
+        case STARDIS_FAILURE: tmp_res = RES_BAD_ARG; break;
         default:
           FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
       }
@@ -732,7 +732,7 @@ init_geometry
   struct sg3d_device* sg3d_dev = NULL;
 
   ASSERT(allocator && geom);
-  
+
   geom->sg3d = NULL;
   darray_interface_ptrs_init(allocator, &geom->interfaces);
   darray_interface_ptrs_init(allocator, &geom->interf_bytrg);

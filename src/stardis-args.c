@@ -751,9 +751,10 @@ parse_args
 
   if(args->mode == UNDEF_MODE) {
     print_multiple_modes(buf, sizeof(buf), EXCLUSIVE_MODES | USE_STDOUT_MODES, 0);
-    logger_print(args->logger, LOG_WARNING,
-      "Nothing to do.\nOne of the following options should be used: %s\n",
-      buf);
+    logger_print(args->logger, LOG_ERROR,
+      "Nothing to do.\n");
+    logger_print(args->logger, LOG_ERROR,
+        "One of the following options should be used: %s\n", buf);
     res = RES_BAD_ARG;
     goto error;
   }

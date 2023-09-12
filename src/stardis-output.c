@@ -1285,9 +1285,11 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
   unsigned tsz, e, s, t, scount, ecount, ocount;
   int* enc_status = NULL;
   const struct description* descriptions;
-  int invalid_enclosures_count = 0;
+  int undef_count = 0, multi_count = 0;
+  struct str msg;
   ASSERT(stardis && stream);
 
+  str_init(stardis->allocator, &msg);
   descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
   trgs = MEM_CALLOC(stardis->allocator, tsz, sizeof(*trgs));
@@ -1376,6 +1378,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         if(properties_conflict_status == NO_PROPERTY_CONFLICT)
           med = stardis->undefined_medium_behind_boundary_id;
         else {
+          if(!(enc_status[e] & ENCLOSURE_WITH_UNDEF_MEDIUM)) undef_count++;
           enc_status[e] |= ENCLOSURE_WITH_UNDEF_MEDIUM;
           continue; /* Don't flag N_MEDIA at the same time */
         }
@@ -1384,18 +1387,37 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         is_fst_med = 0;
         enc_fst_med = med;
       } else {
-        if(enc_fst_med != med)
+        if(enc_fst_med != med) {
+          /* The external (infinite) enclosure can have multiple media */
+          if(!header.is_infinite && !(enc_status[e] & ENCLOSURE_WITH_N_MEDIA))
+            multi_count++;
           enc_status[e] |= ENCLOSURE_WITH_N_MEDIA;
+        }
       }
     }
-    /* The external (infinite) enclosure is always valid */
-    if(enc_status[e] != NO_ENCLOSURE_ERROR && !header.is_infinite)
-      invalid_enclosures_count++;
     ERR(senc3d_enclosure_ref_put(enc));
   }
-  if(invalid_enclosures_count) {
-    logger_print(stardis->logger, LOG_WARNING,
-      "Found %d invalid enclosure(s).\n", invalid_enclosures_count);
+  if(multi_count) {
+    int fst = 1;
+    str_printf(&msg,
+        "Found %d enclosure(s) with more than 1 medium:", multi_count);
+    FOR_EACH(e, 0, ecount) {
+      if(!(enc_status[e] & ENCLOSURE_WITH_N_MEDIA)) continue;
+      str_append_printf(&msg, (fst ? " %u" : ", %u"), e);
+      fst = 0;
+    }
+    logger_print(stardis->logger, LOG_OUTPUT, "%s.\n",  str_cget(&msg));
+  }
+  if(undef_count) {
+    int fst = 1;
+    str_printf(&msg,
+        "Found %d enclosure(s) with undefined medium:", undef_count);
+    FOR_EACH(e, 0, ecount) {
+      if(!(enc_status[e] & ENCLOSURE_WITH_UNDEF_MEDIUM)) continue;
+      str_append_printf(&msg, (fst ? " %u" : ", %u"), e);
+      fst = 0;
+    }
+    logger_print(stardis->logger, LOG_OUTPUT, "%s.\n",  str_cget(&msg));
   }
   fprintf(stream, "FIELD EnclosuresData 2\n");
   fprintf(stream, "Enclosures %d %d unsigned_char\n", ecount, tsz);
@@ -1519,6 +1541,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
 #undef ENC_MEMBER_NO_MEDIUM
 
 exit:
+  str_release(&msg);
   MEM_RM(stardis->allocator, trgs);
   MEM_RM(stardis->allocator, enc_status);
   return res;

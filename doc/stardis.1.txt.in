@@ -29,7 +29,7 @@ SYNOPSIS
 *stardis* *-M* <__file__> [_option_]
 
 DESCRIPTION
-*stardis* solves coupled thermal systems: conductive, convective and 
+*stardis* solves coupled thermal systems: conductive, convective and
 radiative transfers are solved together.  The physical model used for
 conduction is the local unstationary heat conduction equation.
 Convection fluxes are assumed to be linear with temperature, and radiation
@@ -167,7 +167,7 @@ EXCLUSIVE OPTIONS
   **file=**_output_file_;;
     File name to use to write the infrared image to. If no file name is
 	provided, the result is written to _standard output_.
-	
+
   **fmt=**_image_file_format_;;
     Format of the image file in output. Can be *VTK*, or *HT* (see
     htrdr-image(5) and  htpp(1)). Default _image_file_format_ is
@@ -207,15 +207,17 @@ EXCLUSIVE OPTIONS
 
 OTHER OPTIONS
 -------------
-*-d*::
-  Write the geometry to _standard output_ in VTK format along with various
-  properties, including possible errors. If this option is used, no
-  computation occurs.
+*-d* _file_base_name_::
+  Write the geometry to a file in VTK format along with various properties,
+  including possible errors. Also possibly write some problematic parts of the
+  geometry (if any) in OBJ format. Possible parts are overlapping triangles,
+  triangles with property conflicts, and triangles with merge errors. The
+  various file are all named after the provided base name. If this option is
+  used, no computation occurs.
 +
 Using this option in conjunction with an option that
 specifies a compute region (-F, -S, -s) has the effect to include the
-region in the output. This option cannot be used in conjunction with other
-options that write to  _standard output_ (-g, -h, -R, -v).
+region in the VTK output.
 
 *-D* _type,files_name_prefix_::
   Write sampled heat paths of the given *type* to files in VTK format, one

@@ -24,6 +24,7 @@
 #include <rsys/logger.h>
 #include <rsys/clock_time.h>
 
+#include <rsys/str.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -39,12 +40,14 @@ main
   struct args* args = NULL;
   struct stardis stardis;
   int logger_initialized = 0, allocator_initialized = 0,
-    args_initialized = 0, stardis_initialized = 0;
+    args_initialized = 0, stardis_initialized = 0, name_initialized = 0;
   int err = EXIT_SUCCESS;
   struct mem_allocator allocator;
   struct logger logger;
   int mode = 0;
   struct time start;
+  FILE* f = NULL;
+  struct str name;
   res_T res = RES_OK;
 
   time_current(&start);
@@ -58,6 +61,8 @@ main
 
   ERR(logger_init(&allocator, &logger));
   logger_initialized = 1;
+  str_init(&allocator, &name);
+  name_initialized = 1;
   /* Active loggin for args parsing */
   logger_set_stream(&logger, LOG_ERROR, log_err_fn, NULL);
   logger_set_stream(&logger, LOG_WARNING, log_warn_fn, NULL);
@@ -90,17 +95,28 @@ main
   release_args(args);
   args_initialized = 0;
 
-  if(mode & MODE_DUMP_VTK) {
+  if(mode & MODE_DUMP_MODEL) {
+    ERR(str_copy(&name, &stardis.dump_model_filename));
+    ERR(str_append(&name, ".vtk"));
+    f = fopen(str_cget(&name), "w");
+    if(!f) {
+      logger_print(stardis.logger, LOG_ERROR,
+        "cannot open file '%s' for writing.\n", str_cget(&name));
+      res = RES_IO_ERR;
+      goto error;
+    }
+
     /* Dump all the app-independent information */
-    ERR(sg3d_geometry_dump_as_vtk(stardis.geometry.sg3d, stdout));
+    ERR(sg3d_geometry_dump_as_vtk(stardis.geometry.sg3d, f));
     /* Dump boundaries
      * Should we dump connections too? */
-    ERR(dump_boundaries_at_the_end_of_vtk(&stardis, stdout));
+    ERR(dump_boundaries_at_the_end_of_vtk(&stardis, f));
     /* Dump the compute region if any */
     if(mode & REGION_COMPUTE_MODES) {
-      ERR(dump_compute_region_at_the_end_of_vtk(&stardis, stdout));
+      ERR(dump_compute_region_at_the_end_of_vtk(&stardis, f));
     }
-    ERR(dump_enclosure_related_stuff_at_the_end_of_vtk(&stardis, stdout));
+    ERR(dump_enclosure_related_stuff_at_the_end_of_vtk(&stardis, f));
+    fclose(f); f = NULL;
 
     /* If dump, exit after dump done */
     goto exit;
@@ -115,6 +131,8 @@ main
   ERR(stardis_compute(&stardis, &start));
 
 exit:
+  if(name_initialized) str_release(&name);
+  if(f) fclose(f);
   if(args_initialized) release_args(args);
   if(stardis_initialized) stardis_release(&stardis);
   if(logger_initialized) logger_release(&logger);

@@ -31,7 +31,7 @@ enum stardis_mode {
   UNDEF_MODE = 0,
   MODE_DUMP_C_CHUNKS = BIT(0), /* -c */
   MODE_DUMP_PATHS = BIT(1), /* -D */
-  MODE_DUMP_VTK = BIT(2), /* -d */
+  MODE_DUMP_MODEL = BIT(2), /* -d */
   MODE_EXTENDED_RESULTS = BIT(3), /* -e */
   MODE_FLUX_BOUNDARY_COMPUTE = BIT(4), /* -F */
   MODE_BIN_GREEN = BIT(5), /* -G */
@@ -65,15 +65,15 @@ enum stardis_mode {
   SHORT_EXIT_MODES = MODE_DUMP_HELP | MODE_DUMP_VERSION,
 
   USE_STDOUT_MODES
-  = MODE_DUMP_C_CHUNKS | MODE_DUMP_VTK | MODE_DUMP_HELP | MODE_DUMP_VERSION
-  | MODE_IR_COMPUTE | MODE_GREEN,
+    = MODE_DUMP_C_CHUNKS |  MODE_DUMP_HELP | MODE_DUMP_VERSION | MODE_IR_COMPUTE
+    | MODE_GREEN,
 
   RANDOM_RW_MODES
     = MODE_PROBE_COMPUTE | MODE_PROBE_COMPUTE_ON_INTERFACE | MODE_MEDIUM_COMPUTE
     | MODE_BOUNDARY_COMPUTE | MODE_FLUX_BOUNDARY_COMPUTE
 };
 
-STATIC_ASSERT(GREEN_COMPATIBLE_MODES == (COMPUTE_MODES & GREEN_COMPATIBLE_MODES), 
+STATIC_ASSERT(GREEN_COMPATIBLE_MODES == (COMPUTE_MODES & GREEN_COMPATIBLE_MODES),
   Cannot_have_a_GREEN_COMPATIBLE_MODE_that_is_not_a_COMPUTE_MODE);
 
 enum dump_path_type {
@@ -91,6 +91,7 @@ struct args {
   char* solve_filename;
   char* bin_green_filename;
   char* end_paths_filename;
+  char* dump_model_filename;
   char* paths_filename;
   char* rndgen_state_in_filename;
   char* rndgen_state_out_filename;
@@ -100,7 +101,7 @@ struct args {
   double pos_and_time[5];
   unsigned nthreads;
   unsigned picard_order;
-  enum stardis_mode mode;
+  int mode;
   enum dump_path_type dump_paths;
   int verbose;
 };
@@ -133,7 +134,7 @@ parse_args
 
 res_T
 parse_camera
-  (struct logger* logger, 
+  (struct logger* logger,
    char* cam_param,
    struct stardis* stardis);
 

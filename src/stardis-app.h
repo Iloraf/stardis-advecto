@@ -213,6 +213,7 @@ struct stardis {
   struct compute_surface compute_surface; /* 2D compute region when mode is
                                              [FLUX_]BOUNDARY_COMPUTE
                                              or MAP_COMPUTE */
+  struct str dump_model_filename;
   struct str paths_filename;
   struct str bin_green_filename;
   struct str end_paths_filename;

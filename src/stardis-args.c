@@ -29,7 +29,6 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <ctype.h>
 #include <string.h>
 
 #ifdef COMPILER_GCC
@@ -109,7 +108,7 @@ mode_option
   int found = 0;
   char res = '?';
   if(m & MODE_DUMP_C_CHUNKS) { found++; res = 'c'; }
-  if(m & MODE_DUMP_VTK) { found++; res = 'd'; }
+  if(m & MODE_DUMP_MODEL) { found++; res = 'd'; }
   if(m & MODE_DUMP_PATHS) { found++; res = 'D'; }
   if(m & MODE_EXTENDED_RESULTS) { found++; res = 'e'; }
   if(m & MODE_FLUX_BOUNDARY_COMPUTE) { found++; res = 'F'; }
@@ -284,8 +283,12 @@ short_help
   fprintf(stream, "\n  -c NAMES_PREFIX\n");
   fprintf(stream, "     Dump the geometry and property ids to stdout as C chunks.\n");
 
-  fprintf(stream, "\n  -d\n");
-  fprintf(stream, "     Dump the geometry to stdout in VTK format along with various properties.\n");
+  fprintf(stream, "\n  -d FILE_NAME_PREFIX\n");
+  fprintf(stream, "     Dump the geometry to file <FILE_NAME_PREFIX>.vtk in VTK format along with various properties.\n");
+  fprintf(stream, "     If merge errors where detected, the corresponding part of the geometry is dumped to file\n"
+                  "     <FILE_NAME_PREFIX>_merge_conflicts.obj in OBJ format.\n");
+  fprintf(stream, "     If property errors where detected, the corresponding part of the geometry is dumped to file\n"
+                  "     <FILE_NAME_PREFIX>_property_conflicts.obj in OBJ format.\n");
 
   fprintf(stream, "\n  -D TYPE,FILE_NAMES_PREFIX\n");
   fprintf(stream, "     Write thermal paths of the given TYPE in VTK format.\n");
@@ -385,7 +388,7 @@ parse_args
 {
   int opt = 0, n_used = 0, o_used = 0;
   size_t len = 0;
-  const char option_list[] = "c:dD:eF:gG:hm:M:n:o:p:P:R:s:S:t:vV:x:X:";
+  const char option_list[] = "c:d:D:eF:gG:hm:M:n:o:p:P:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -426,15 +429,8 @@ parse_args
       break;
 
     case 'd':
-      if(args->mode & USE_STDOUT_MODES) {
-        res = RES_BAD_ARG;
-        print_multiple_modes(buf, sizeof(buf), USE_STDOUT_MODES, MODE_DUMP_VTK);
-        logger_print(args->logger, LOG_ERROR,
-          "Option -%c cannot be used in conjunction with other dump options (%s).\n",
-          (char)opt, buf);
-        goto error;
-      }
-      args->mode |= MODE_DUMP_VTK;
+      args->dump_model_filename = optarg;
+      args->mode |= MODE_DUMP_MODEL;
       break;
 
     case 'D': {

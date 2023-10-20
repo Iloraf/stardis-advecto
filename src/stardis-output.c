@@ -274,7 +274,7 @@ dump_path
   stream = fopen(name, "w");
   if(!stream) {
     logger_print(dump_ctx->stardis->logger, LOG_ERROR,
-      "cannot open file '%s'\n", name);
+      "cannot open file '%s' for writing.\n", name);
     res = RES_IO_ERR;
     goto error;
   }

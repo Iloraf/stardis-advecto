@@ -13,6 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
+#include <star/sg3d.h>
 #ifdef STARDIS_ENABLE_MPI
 #define _POSIX_C_SOURCE 200112L
 #endif
@@ -37,6 +38,7 @@
 #include <rsys/logger.h>
 #include <rsys/double2.h>
 #include <rsys/double3.h>
+#include <rsys/dynamic_array_double.h>
 
 #include <string.h>
 
@@ -222,7 +224,8 @@ stardis_init
   res_T tmp_res, res = RES_OK;
   struct sg3d_sdisXd_scene_create_context create_context;
   struct htable_intface htable_interfaces;
-  struct str str;
+  struct str str, name;
+  FILE* f = NULL;
   unsigned i, vcount, tcount, ocount, count;
   int is_for_compute;
   struct sdis_device_create_args dev_args = SDIS_DEVICE_CREATE_ARGS_DEFAULT;
@@ -230,6 +233,7 @@ stardis_init
   ASSERT(args && logger && allocator && stardis);
 
   str_init(allocator, &str);
+  str_init(allocator, &name);
   /* Init everything that cannot fail */
   stardis->dummies = DUMMIES_NULL;
   stardis->logger = logger;
@@ -245,6 +249,7 @@ stardis_init
   stardis->counts = COUNTS_NULL;
   init_camera(stardis->allocator, &stardis->camera);
   str_init(stardis->allocator, &stardis->solve_name);
+  str_init(stardis->allocator, &stardis->dump_model_filename);
   str_init(stardis->allocator, &stardis->paths_filename);
   str_init(stardis->allocator, &stardis->bin_green_filename);
   str_init(stardis->allocator, &stardis->end_paths_filename);
@@ -276,7 +281,7 @@ stardis_init
 
   /* If a dump is expected, we won't process any computation */
   is_for_compute =
-    (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_VTK);
+    (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_MODEL);
 
   dev_args.logger = stardis->logger;
   dev_args.allocator = stardis->allocator;
@@ -302,6 +307,10 @@ stardis_init
   ERR(init_geometry(stardis->logger, stardis->allocator, stardis->verbose,
     &stardis->geometry));
   stardis->geometry_initialized = 1;
+
+  if(args->dump_model_filename) {
+    ERR(str_set(&stardis->dump_model_filename, args->dump_model_filename));
+  }
 
   if(args->mode & MODE_IR_COMPUTE) {
     ERR(parse_camera(stardis->logger, args->camera, stardis));
@@ -334,6 +343,20 @@ stardis_init
   ERR(sg3d_geometry_get_unique_triangles_with_properties_conflict_count(
     stardis->geometry.sg3d, &count));
   if(count) {
+    if(!str_is_empty(&stardis->dump_model_filename)) {
+      ERR(str_copy(&name, &stardis->dump_model_filename));
+      ERR(str_append(&name, "_property_conflits.obj"));
+      f = fopen(str_cget(&name), "w");
+      if(!f) {
+        logger_print(stardis->logger, LOG_ERROR,
+          "cannot open file '%s' for writing.\n", str_cget(&name));
+        res = RES_IO_ERR;
+        goto error;
+      }
+      ERR(sg3d_geometry_dump_as_obj(stardis->geometry.sg3d, f,
+            SG3D_OBJ_DUMP_PROPERTY_CONFLICTS));
+      fclose(f); f = NULL;
+    }
     logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
       "Property conflicts found in the model (%u triangles).\n", count);
     if(is_for_compute) {
@@ -376,6 +399,32 @@ stardis_init
   }
   ERR(senc3d_scene_get_overlapping_triangles_count(stardis->senc3d_scn, &ocount));
   if(ocount) {
+    if(!str_is_empty(&stardis->dump_model_filename)) {
+      ERR(str_copy(&name, &stardis->dump_model_filename));
+      ERR(str_append(&name, "_overlapping_triangles.obj"));
+      f = fopen(str_cget(&name), "w");
+      if(!f) {
+        logger_print(stardis->logger, LOG_ERROR,
+          "cannot open file '%s' for writing.\n", str_cget(&name));
+        res = RES_IO_ERR;
+        goto error;
+      }
+      /* Dump vertices */
+      for(i = 0; i < vcount; i++) {
+        double coord[3];
+        ERR(senc3d_scene_get_vertex(stardis->senc3d_scn, i, coord));
+        fprintf(f, "v %.16g %.16g %.16g\n", SPLIT3(coord));
+      }
+      /* Dump triangles */
+      for(i = 0; i < ocount; i++) {
+        unsigned id, trg[3];
+        ERR(senc3d_scene_get_overlapping_triangle(stardis->senc3d_scn, i, &id));
+        ERR(senc3d_scene_get_triangle(stardis->senc3d_scn, id, trg));
+        fprintf(f, "f %u %u %u\n",
+            1 + trg[0], 1 + trg[1], 1 + trg[2]); /* OBJ indexing starts at 1 */
+      }
+      fclose(f); f = NULL;
+    }
     logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
       "Scene contains %u overlapping triangles.\n",
       ocount);
@@ -465,7 +514,9 @@ stardis_init
   }
 
 exit:
+  if(f) fclose(f);
   str_release(&str);
+  str_release(&name);
   htable_intface_release(&htable_interfaces);
   return res;
 error:
@@ -485,6 +536,7 @@ stardis_release
   if(stardis->sdis_scn) SDIS(scene_ref_put(stardis->sdis_scn));
   if(stardis->senc3d_scn) SENC3D(scene_ref_put(stardis->senc3d_scn));
   str_release(&stardis->solve_name);
+  str_release(&stardis->dump_model_filename);
   str_release(&stardis->paths_filename);
   str_release(&stardis->bin_green_filename);
   str_release(&stardis->end_paths_filename);

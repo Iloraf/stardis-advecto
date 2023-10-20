@@ -45,10 +45,10 @@
 #include <rsys/text_reader.h>
 #include <rsys/library.h>
 
+#include <star/sg3d.h>
 #include <wordexp.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <ctype.h>
 #include <string.h>
 #ifdef COMPILER_GCC
 #include <strings.h> /* strcasecmp */
@@ -102,12 +102,14 @@ read_sides_and_files
   unsigned current_merge_errors;
   struct sg3d_geometry_add_callbacks callbacks = SG3D_ADD_CALLBACKS_NULL__;
   struct darray_uint degenerated;
-  struct str str;
+  struct str str, name;
+  FILE* f = NULL;
   res_T res = RES_OK;
 
   ASSERT(stardis && pwordexp && idx);
 
   darray_uint_init(stardis->allocator, &degenerated);
+  str_init(stardis->allocator, &name);
   str_init(stardis->allocator, &str);
   callbacks.get_indices = add_geom_ctx_indices;
   callbacks.get_properties = add_geom_ctx_properties;
@@ -217,7 +219,21 @@ read_sides_and_files
       stardis->geometry.sg3d, &merge_errors));
     if(current_merge_errors != merge_errors) {
       int is_for_compute =
-        (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_VTK);
+        (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_MODEL);
+      if(!str_is_empty(&stardis->dump_model_filename)) {
+        ERR(str_copy(&name, &stardis->dump_model_filename));
+        ERR(str_append(&name, "_merge_conflits.obj"));
+        f = fopen(str_cget(&name), "w");
+        if(!f) {
+          logger_print(stardis->logger, LOG_ERROR,
+            "cannot open file '%s' for writing.\n", str_cget(&name));
+          res = RES_IO_ERR;
+          goto error;
+        }
+        ERR(sg3d_geometry_dump_as_obj(stardis->geometry.sg3d, f,
+              SG3D_OBJ_DUMP_MERGE_CONFLICTS));
+        fclose(f); f = NULL;
+      }
       logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
         "Merge conflicts found reading file '%s' (%u triangles).\n",
         arg, merge_errors - current_merge_errors);
@@ -230,6 +246,8 @@ read_sides_and_files
   }
 
 end:
+  if(f) fclose(f);
+  str_release(&name);
   darray_uint_release(&degenerated);
   str_release(&str);
   if(sstl) SSTL(ref_put(sstl));
@@ -729,7 +747,7 @@ process_program
   ERR(init_program(stardis->allocator, &desc->d.program));
   program = desc->d.program;
   desc->type = DESC_PROGRAM;
-  
+
   CHK_ARG(idx, "program name");
   ERR(description_set_name(stardis, &program->name, arg));
   if(find_description_by_name(stardis, &program->name, desc)) {
@@ -855,7 +873,7 @@ process_h_prog
   ERR(init_h_boundary_prog(stardis->allocator, &desc->d.h_boundary_prog));
   h_boundary_prog = desc->d.h_boundary_prog;
   desc->type = type;
-  
+
   CHK_ARG(idx, "programmed h boundary name");
   ERR(description_set_name(stardis, &h_boundary_prog->name, arg));
   if(find_description_by_name(stardis, &h_boundary_prog->name, desc)) {
@@ -951,7 +969,7 @@ process_hf_prog
   ERR(init_hf_boundary_prog(stardis->allocator, &desc->d.hf_boundary_prog));
   hf_boundary_prog = desc->d.hf_boundary_prog;
   desc->type = type;
-  
+
   CHK_ARG(idx, "programmed hf boundary name");
   ERR(description_set_name(stardis, &hf_boundary_prog->name, arg));
   if(find_description_by_name(stardis, &hf_boundary_prog->name, desc)) {
@@ -1036,7 +1054,7 @@ process_t
 
   ERR(get_dummy_fluid_id(stardis, &t_boundary->mat_id));
 
-  
+
   CHK_ARG(idx, "temperature boundary name");
   ERR(description_set_name(stardis, &t_boundary->name, arg));
   if(find_description_by_name(stardis, &t_boundary->name, desc)) {
@@ -1094,7 +1112,7 @@ process_t_prog
   desc->type = DESC_BOUND_T_FOR_SOLID_PROG;
 
   ERR(get_dummy_fluid_id(stardis, &t_boundary_prog->mat_id));
-  
+
   CHK_ARG(idx, "programmed t boundary name");
   ERR(description_set_name(stardis, &t_boundary_prog->name, arg));
   if(find_description_by_name(stardis, &t_boundary_prog->name, desc)) {
@@ -1221,7 +1239,7 @@ process_flx_prog
   desc->type = DESC_BOUND_F_FOR_SOLID_PROG;
 
   ERR(get_dummy_fluid_id(stardis, &f_boundary_prog->mat_id));
-  
+
   CHK_ARG(idx, "programmed t boundary name");
   ERR(description_set_name(stardis, &f_boundary_prog->name, arg));
   if(find_description_by_name(stardis, &f_boundary_prog->name, desc)) {
@@ -1603,7 +1621,7 @@ read_delta
       goto error;
     }
   } else {
-    /* Could be 'auto' */ 
+    /* Could be 'auto' */
     if(0 == strcasecmp(arg, "AUTO")) {
       /* Set to DELTA_AUTO until actual value is substituted */
       *delta = DELTA_AUTO;
@@ -1647,7 +1665,7 @@ process_solid
   solid->is_outside = 0;
   ASSERT(sz <= UINT_MAX);
   solid->desc_id = (unsigned)sz;
-  
+
   CHK_ARG(idx, "solid name");
   ERR(description_set_name(stardis, &solid->name, arg));
   if(find_description_by_name(stardis, &solid->name, desc)) {
@@ -1766,7 +1784,7 @@ process_solid_prog
   solid_prog->solid_id = allocate_stardis_medium_id(stardis);
   ASSERT(sz <= UINT_MAX);
   solid_prog->desc_id = (unsigned)sz;
-  
+
   CHK_ARG(idx, "programmed solid name");
   ERR(description_set_name(stardis, &solid_prog->name, arg));
   if(find_description_by_name(stardis, &solid_prog->name, desc)) {
@@ -1837,7 +1855,7 @@ process_fluid
   fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   ASSERT(sz <= UINT_MAX);
   fluid->desc_id = (unsigned)sz;
-  
+
   CHK_ARG(idx, "fluid name");
   ERR(description_set_name(stardis, &fluid->name, arg));
   if(find_description_by_name(stardis, &fluid->name, desc)) {
@@ -1930,7 +1948,7 @@ process_fluid_prog
   fluid_prog->fluid_id = allocate_stardis_medium_id(stardis);
   ASSERT(sz <= UINT_MAX);
   fluid_prog->desc_id = (unsigned)sz;
-  
+
   CHK_ARG(idx, "programmed fluid name");
   ERR(description_set_name(stardis, &fluid_prog->name, arg));
   if(find_description_by_name(stardis, &fluid_prog->name, desc)) {
@@ -2090,7 +2108,7 @@ process_model_line
   ASSERT(file_name && line && pwordexp && stardis);
 
   CHK_ARG(idx, "model line type");
-  
+
   if(0 == strcasecmp(arg, "H_BOUNDARY_FOR_SOLID"))
     ERR(process_h(stardis, DESC_BOUND_H_FOR_SOLID, pwordexp));
   else if(0 == strcasecmp(arg, "H_BOUNDARY_FOR_SOLID_PROG"))

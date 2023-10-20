@@ -510,7 +510,8 @@ compute_probe(struct stardis* stardis, struct time* start)
         stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream_g) {
           logger_print(stardis->logger, LOG_ERROR,
-            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
+            "cannot open file '%s' for binary writing.\n",
+            str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
@@ -520,7 +521,8 @@ compute_probe(struct stardis* stardis, struct time* start)
           stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
           if(!stream_p) {
             logger_print(stardis->logger, LOG_ERROR,
-              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
+              "cannot open file '%s' for writing.\n",
+              str_cget(&stardis->end_paths_filename));
             res = RES_IO_ERR;
             goto error;
           }
@@ -769,7 +771,8 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
         stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream_g) {
           logger_print(stardis->logger, LOG_ERROR,
-            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
+            "cannot open file '%s' for binary writing.\n",
+            str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
@@ -779,7 +782,8 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
           stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
           if(!stream_p) {
             logger_print(stardis->logger, LOG_ERROR,
-              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
+              "cannot open file '%s' for writing.\n",
+              str_cget(&stardis->end_paths_filename));
             res = RES_IO_ERR;
             goto error;
           }
@@ -817,7 +821,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
       ERR(print_computation_time(estimator, stardis,
         start, &compute_start, &compute_end, NULL));
       tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
-    
+
       /* Dump recorded paths according to user settings */
       dump_ctx.stardis = stardis;
       dump_ctx.rank = 0;
@@ -980,6 +984,9 @@ compute_camera(struct stardis* stardis, struct time* start)
     else {
       stream = fopen(str_cget(&stardis->camera.file_name), "w");
       if(!stream) {
+        logger_print(stardis->logger, LOG_ERROR,
+          "cannot open file '%s' for writing.\n",
+          str_cget(&stardis->camera.file_name));
         res = RES_IO_ERR;
         goto error;
       }
@@ -1059,7 +1066,8 @@ compute_medium(struct stardis* stardis, struct time* start)
         stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream_g) {
           logger_print(stardis->logger, LOG_ERROR,
-            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
+            "cannot open file '%s' for binary writing.\n",
+            str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
@@ -1069,7 +1077,8 @@ compute_medium(struct stardis* stardis, struct time* start)
           stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
           if(!stream_p) {
             logger_print(stardis->logger, LOG_ERROR,
-              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
+              "cannot open file '%s' for writing.\n",
+              str_cget(&stardis->end_paths_filename));
             res = RES_IO_ERR;
             goto error;
           }
@@ -1215,7 +1224,8 @@ compute_boundary(struct stardis* stardis, struct time* start)
         stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream_g) {
           logger_print(stardis->logger, LOG_ERROR,
-            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
+            "cannot open file '%s' for binary writing.\n",
+            str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
@@ -1225,7 +1235,8 @@ compute_boundary(struct stardis* stardis, struct time* start)
           stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
           if(!stream_p) {
             logger_print(stardis->logger, LOG_ERROR,
-              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
+              "cannot open file '%s' for writing.\n",
+              str_cget(&stardis->end_paths_filename));
             res = RES_IO_ERR;
             goto error;
           }

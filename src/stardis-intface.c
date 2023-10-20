@@ -115,7 +115,7 @@ emissivity_1
   (void)frag, (void)data;
   return 1;
 }
- 
+
 static double
 intface_prog_get_temp
   (const struct sdis_interface_fragment* frag,

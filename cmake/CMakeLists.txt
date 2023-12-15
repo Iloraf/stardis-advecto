@@ -89,14 +89,18 @@ configure_file(${SDIS_PRG_DIR}/stardis-prog-properties-config-version.cmake.in
 ###############################################################################
 # Check dependencies
 ###############################################################################
+include(FindPkgConfig)
+
 find_package(RCMake 0.4 REQUIRED)
-find_package(RSys 0.12 REQUIRED)
-find_package(StarGeom3D 0.1 REQUIRED)
-find_package(Star3D 0.8 REQUIRED)
-find_package(StarEnc3D 0.5 REQUIRED)
-find_package(Stardis 0.14 REQUIRED)
-find_package(StarSTL 0.4 REQUIRED)
-find_package(StarSP 0.13 REQUIRED)
+
+pkg_check_modules(RSys REQUIRED rsys>=0.14)
+pkg_check_modules(Star3D REQUIRED s3d>=0.10)
+pkg_check_modules(StarEnc3D REQUIRED senc3d>=0.6)
+pkg_check_modules(StarGeom3D REQUIRED sg3d>=0.1)
+pkg_check_modules(Stardis REQUIRED sdis>=0.15)
+pkg_check_modules(StarSTL REQUIRED sstl>=0.5)
+pkg_check_modules(StarSP REQUIRED star-sp>=0.14)
+
 if(MSVC)
   find_package(MuslGetopt REQUIRED)
 endif()
@@ -108,13 +112,7 @@ endif()
 
 
 include_directories(
-  ${RSys_INCLUDE_DIR}
-  ${Star3D_INCLUDE_DIR}
   ${StarGeom3D_INCLUDE_DIR}
-  ${StarEnc3D_INCLUDE_DIR}
-  ${Stardis_INCLUDE_DIR}
-  ${StarSTL_INCLUDE_DIR}
-  ${StarSP_INCLUDE_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-green-types
   ${CMAKE_CURRENT_BINARY_DIR}/stardis-prog-properties)
@@ -125,15 +123,6 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${RCMAKE_SOURCE_DIR})
 include(rcmake)
 include(rcmake_runtime)
-
-if(CMAKE_COMPILER_IS_GNUCC)
-  rcmake_append_runtime_dirs(_runtime_dirs
-    RSys Stardis Star3D StarGeom3D StarEnc3D StarSTL StarSP)
-endif()
-if(MSVC)
-  rcmake_append_runtime_dirs(_runtime_dirs
-    RSys MuslGetopt Stardis Star3D StarGeom3D StarEnc3D StarSTL StarSP)
-endif()
 
 ###############################################################################
 # Build subprojects
@@ -225,8 +214,26 @@ endif()
 set_target_properties(stardis
   PROPERTIES VERSION ${SDIS_VERSION})
 
+target_compile_options(stardis PUBLIC
+  ${RSys_CFLAGS}
+  ${Star3D_CFLAGS}
+  ${StarEnc3D_CFLAGS}
+  ${StarGeom3D_CFLAGS}
+  ${Stardis_CFLAGS}
+  ${StarSTL_CFLAGS}
+  ${StarSP_CFLAGS})
+
 target_link_libraries(stardis
-  Stardis Star3D StarGeom3D StarEnc3D StarSTL StarSP RSys ${GETOPT_LIB} ${MATH_LIB})
+  ${StarGeom3D_LDFLAGS}
+  ${RSys_LDFLAGS}
+  ${Star3D_LDFLAGS}
+  ${StarEnc3D_LDFLAGS}
+  ${StarGeom3D_LDFLAGS}
+  ${Stardis_LDFLAGS}
+  ${StarSTL_LDFLAGS}
+  ${StarSP_LDFLAGS}
+  ${GETOPT_LIB}
+  ${MATH_LIB})
 
 if(ENABLE_MPI)
   set_target_properties(stardis PROPERTIES COMPILE_DEFINITIONS "STARDIS_ENABLE_MPI")

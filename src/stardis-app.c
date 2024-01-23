@@ -13,10 +13,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include <star/sg3d.h>
 #ifdef STARDIS_ENABLE_MPI
-#define _POSIX_C_SOURCE 200112L
+  #define _POSIX_C_SOURCE 200112L
 #endif
+
+#include <star/sg3d.h>
 
 #include "stardis-app.h"
 #include "stardis-args.h"
@@ -43,8 +44,8 @@
 #include <string.h>
 
 #ifdef STARDIS_ENABLE_MPI
-#include <stdio.h>
-#include <mpi.h>
+  #include <stdio.h>
+  #include <mpi.h>
 #endif
 
 static const struct dummies DUMMIES_NULL = DUMMIES_NULL__;

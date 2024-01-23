@@ -894,16 +894,16 @@ void
 log_prt_fn
   (const char* msg, void* ctx)
 {
-#ifdef stardis_enable_mpi
+#ifdef STARDIS_ENABLE_MPI
   int initialized, rank = 0;
 #endif
 
   ASSERT(msg);
   (void)ctx;
 
-#ifdef stardis_enable_mpi
-  chk(mpi_initialized(&initialized) == mpi_success);
-  if(initialized) chk(mpi_comm_rank(mpi_comm_world, &rank) == mpi_success);
+#ifdef STARDIS_ENABLE_MPI
+  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
+  if(initialized) CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
   /* only master prints */
   if(rank != 0) return;
 #endif

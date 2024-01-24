@@ -20,8 +20,11 @@ include config.mk
 
 MPI_DEF = -DSTARDIS_ENABLE_MPI
 
+# Default target
+all: build_executable man
+
 ################################################################################
-# Library building
+# Program building
 ################################################################################
 SRC =\
  src/stardis-app.c\
@@ -130,14 +133,36 @@ src/stardis-prog-properties.h: config.mk src/stardis-prog-properties.h.in
 	$(CC) $(CFLAGS) $(DPDC_CFLAGS) $($(DISTRIB_PARALLELISM)_DEF) -c $< -o $@
 
 ################################################################################
+# Man pages
+################################################################################
+man: doc/stardis.1
+
+doc/stardis.1: doc/stardis.1.in
+	sed -e 's/@STARDIS_ARGS_DEFAULT_COMPUTE_TIME@/$(STARDIS_ARGS_DEFAULT_COMPUTE_TIME)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_PICARD_ORDER@/$(STARDIS_ARGS_DEFAULT_PICARD_ORDER)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_RENDERING_FOV@/$(STARDIS_ARGS_DEFAULT_RENDERING_FOV)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_RENDERING_IMG_HEIGHT@/$(STARDIS_ARGS_DEFAULT_RENDERING_IMG_HEIGHT)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_RENDERING_IMG_WIDTH@/$(STARDIS_ARGS_DEFAULT_RENDERING_IMG_WIDTH)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_RENDERING_OUTPUT_FILE_FMT@/$(STARDIS_ARGS_DEFAULT_RENDERING_OUTPUT_FILE_FMT)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_RENDERING_POS@/$(STARDIS_ARGS_DEFAULT_RENDERING_POS)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_RENDERING_SPP@/$(STARDIS_ARGS_DEFAULT_RENDERING_SPP)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_RENDERING_TGT@/$(STARDIS_ARGS_DEFAULT_RENDERING_TGT)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_RENDERING_TIME@/$(STARDIS_ARGS_DEFAULT_RENDERING_TIME)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_RENDERING_UP@/$(STARDIS_ARGS_DEFAULT_RENDERING_UP)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_SAMPLES_COUNT@/$(STARDIS_ARGS_DEFAULT_SAMPLES_COUNT)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_SCALE_FACTOR@/$(STARDIS_ARGS_DEFAULT_SCALE_FACTOR)/' \
+	    -e 's/@STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL@/$(STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL)/' \
+	    $@.in > $@
+
+################################################################################
 # Installation
 ################################################################################
-install: build_executable src/stardis-green-types.h src/stardis-prog-properties.h
+install: all
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" stardis
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/include/stardis" \
-	  src/stardis-green-types.h src/stardis-prog-properties.h
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/doc/stardis" \
-	  COPYING README.md
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/include/stardis" src/stardis-green-types.h
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/include/stardis" src/stardis-prog-properties.h
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/doc/stardis" COPYING README.md
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/stardis.1
 
 uninstall:
 	rm -f "$(DESTDIR)$(PREFIX)/bin/stardis"
@@ -145,17 +170,17 @@ uninstall:
 	rm -f "$(DESTDIR)$(PREFIX)/include/stardis/stardis-prog-properties.h"
 	rm -f "$(DESTDIR)$(PREFIX)/share/doc/stardis/COPYING"
 	rm -f "$(DESTDIR)$(PREFIX)/share/doc/stardis/README.md"
+	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/stardis.1"
 
 ################################################################################
 # Miscellaneous targets
 ################################################################################
-all: build_executable
-
 clean:
 	rm -f $(HDR) $(OBJ) .config stardis
 
 distclean: clean
 	rm -f $(DEP)
 
-lint:
+lint: man
 	shellcheck -o all make.sh
+	mandoc -Tlint -Wall doc/stardis.1 || [ $$? -le 1 ]

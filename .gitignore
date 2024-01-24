@@ -10,3 +10,4 @@ src/stardis-green-types.h
 src/stardis-prog-properties.h
 src/stardis-version.h
 stardis
+doc/stardis.1

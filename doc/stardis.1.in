@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd January 23, 2023
+.Dd January 31, 2024
 .Dt STARDIS 1
 .Os
 .Sh NAME
@@ -152,6 +152,15 @@ has the effect to include the region in the VTK output.
 Use extended format to output Monte Carlo results.
 Can only be used in conjunction with options that compute a single Monte-Carlo
 .Pq Fl F , Fl m , Fl P , Fl p No or Fl s No without options Fl g No or Fl G .
+.It Fl F Pa surface Ns Op , Ns Ar time Ns Op , Ns Ar time
+Compute the mean flux on a given 2D surface at a given time, the surface
+being defined as the front sides of the triangles in the provided STL
+file.
+These triangles are not added to the geometry, but must be part of it.
+Flux is accounted positive when going from the front side to the back
+side, at a single-triangle level.
+By default the compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
+The surface does not need to be connex.
 .It Fl G Pa green_bin Ns Op , Ns Pa green_ascii
 Compute the Green function at the specified time and write it to a binary file.
 If a

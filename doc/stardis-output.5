@@ -1,0 +1,391 @@
+.\" Copyright (C) 2018-2023 |Méso|Star>
+.\"
+.\" This program is free software: you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation, either version 3 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" This program is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License
+.\" along with this program. If not, see <http://www.gnu.org/licenses/>.
+.Dd January 31, 2024
+.Dt STARDIS-INPUT 5
+.Os
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Name and short description
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.Sh NAME
+.Nm stardis-output
+.Nd output format of
+.Xr stardis 1
+results
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Detailed description
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.Sh DESCRIPTION
+.Nm
+describes the output format of the
+.Xr stardis 1
+program.
+Any
+.Xr stardis 1
+result is written to standard output, even though some additional
+information can be written in files.
+.Pp
+The type of the data that are generated depends on the options used when
+.Xr stardis 1 is invoked.
+When invoked with one of the basic computation options
+.Pq Fl p , Fl P , Fl m , Fl s No or Fl F ,
+.Xr stardis 1
+outputs a single Monte Carlo result.
+On the opposite,
+.Xr stardis 1
+ouputs compound results when invoked with
+option
+.Fl S
+or
+.Fl R .
+Additionally, options
+.Fl g
+and
+.Fl G
+make
+.Xr stardis 1
+compute and output a Green function and possibly information on heat
+paths' ends.
+Most of the complex data output is in VTK format.
+.Pp
+Note that some special options
+.Pq Fl v , Fl h No or Fl d
+that does not involve any computation produce output including
+information on the
+.Xr stardis 1
+software
+.Pq their ouputs will not be described thereafter
+or the provided thermal system.
+.Pp
+Any physical quantity in output is in the International System of Units
+.Pq second, metre, kilogram, kelvin
+except the coordinates that are in same system as the geometry.
+.Pp
+In what follows, some lines end with a backslash
+.Pq Li \e .
+This is used as a convenience to continue a description next line.
+However, this trick cannot be used in actual description files and
+actual description lines must be kept single-line.
+Text introduced by the sharp character
+.Pq Li #
+in descriptions is a comment and is not part of the description.
+.Pp
+The output format is as follows:
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va output Ac Ta ::= Ta Aq Va mc-estimate
+.It Ta \& \& | Ta Aq Va green-function
+.It Ta \& \& | Ta Aq Va geometry-dump
+.It Ta \& \& | Ta Aq Va infrared-image
+.El
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Single Monte Carlo estimate
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.Sh SINGLE MONTE CARLO ESTIMATE
+When
+.Xr stardis 1
+is used to calculate a single Monte Carlo estimate, either a temperature
+or a flux, the estimate is output first to standard output, possibly
+followed by some of the heat paths involved in the computation if option
+.Fl D
+was used too.
+Two different formats are possible: a raw, numbers only format
+.Pq the default
+or an extended format that mixes numbers and their descriptions
+.Pq if option Fl e No is used .
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va mc-estimate Ac Ta ::= Ta Ao Va probe-temp Ac # Options Fl P No or Fl p
+.It Ta \& \& | Ta Ao Va medium-temp Ac # Option Fl m
+.It Ta \& \& | Ta Ao Va mean-temp Ac # Option Fl s
+.It Ta \& \& | Ta Ao Va mean-flux Ac # Option Fl F
+.El
+.\" Probe temperature
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va probe-temp Ac Ta ::= Ta Ao Va probe-temp-raw Ac | Ao Va probe-temp-ext Ac
+.It Ao Va probe-temp-raw Ac Ta ::= Ta Ao Va estimate Ac Ao Va failures Ac
+.It Ao Va probe-temp-ext Ac Ta ::= Ta Li Temperature at Ao Va position Ac Ao Va time Ac \e
+.It Ta Ta Ao Va estimate-temp-ext Ac Ao Va failures-ext Ac
+.El
+.\" Medium temperature
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va medium-temp Ac Ta ::= Ta Ao Va medium-temp-raw Ac | Ao Va medium-temp-ext Ac
+.It Ao Va medium-temp-raw Ac Ta ::= Ta Ao Va estimate Ac Ao Va failures Ac
+.It Ao Va medium-temp-ext Ac Ta ::= Ta Li Temperature in medium Ao Va medium-name Ac \e
+.It Ta Ta Ao Va time Ac Ao Va estimate-temp-ext Ac Ao Va failures-ext Ac
+.El
+.\" Mean temperature
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va mean-temp Ac Ta ::= Ta Ao Va mean-temp-raw Ac | Ao Va mean-temp-ext Ac
+.It Ao Va mean-temp-raw Ac Ta ::= Ta Ao Va estimate Ac Ao Va failures Ac
+.It Ao Va mean-temp-ext Ac Ta ::= Ta Li Temperature at boundary Ao Va stl-path Ac \e
+.It Ta Ta Ao Va time Ac Ao Va estimate-temp-ext Ac Ao Va failures-ext Ac
+.El
+.\" Mean flux
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va mean-flux Ac Ta ::= Ta Ao Va mean-flux-raw Ac | Ao Va mean-flux-ext Ac
+.It Ao Va mean-flux-raw Ac Ta ::= Ta Ao Va estimate Ac Ao Va estimate Ac Ao Va estimate Ac \e
+.It Ta Ta Ao Va estimate Ac Ao Va estimate Ac Ao Va failures Ac
+.It Ao Va mean-flux-ext Ac Ta ::= Ta Li Temperature at boundary Ao Va stl-path Ac \e
+.It Ta Ta Ao Va time Ac Ao Va estimate-temp-ext Ac
+.It Ta Ta Li Convective flux at boundary Ao Va stl-path Ac \e
+.It Ta Ta Ao Va time Ac Ao Va estimate-flux-ext Ac
+.It Ta Ta Li Radiative flux at boundary Ao Va stl-path Ac \e
+.It Ta Ta Ao Va time Ac Ao Va estimate-flux-ext Ac
+.It Ta Ta Li Imposed flux at boundary Ao Va stl-path Ac \e
+.It Ta Ta Ao Va time Ac Ao Va estimate-flux-ext Ac
+.It Ta Ta Li Total flux at boundary Ao Va stl-path Ac \e
+.It Ta Ta Ao Va time Ac Ao Va estimate-flux-ext Ac
+.It Ta Ta Ao Va failures-ext Ac
+.El
+.\" Miscellaneous
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va estimate Ac Ta ::= Ta Ao Va expected-value Ac Ao Va standard-error Ac
+.It Ao Va estimate-temp-ext Ac Ta ::= Ta Ao Va expected-value Ac Li K +/- Ao Va standard-error Ac
+.It Ao Va estimate-flux-ext Ac Ta ::= Ta Ao Va expected-value Ac Li W +/- Ao Va standard-error Ac
+.It Ao Va expected-value Ac Ta ::= Ta Vt real
+.It Ao Va standard-error Ac Ta ::= Ta Vt real
+.El
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va failures Ac Ta ::= Ta Ao Va error-count Ac Ao Va success-count Ac
+.It Ao Va error-count Ac Ta ::= Ta Vt integer
+.It Ao Va success-count Ac Ta ::= Ta Vt integer
+.El
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va position Ac Ta ::= Ta [ Vt real , Vt real , Vt real ]
+.It Ao Va time Ac Ta ::= Ta Li at t= Ns Vt real
+.It Ta \& \& | Ta Li with t in [ Vt real , Vt real ]
+.It Ao Va medium-name Ac Ta ::= Ta Vt string
+.It Ao Va stl-path Ac Ta ::= Ta Pa path
+.El
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" Green function
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.Sh GREEN FUNCTION
+The Green function is generated, either in binary or ascii format, when
+a green-compatible
+.Xr stardis 1
+simulation option is used in conjuction with option
+.Fl G
+for a binary output, or option
+.Fl g
+for an ascii output.
+For every successful heat path sampled carrying out the simulation, the
+solver records all the elements of the path history relevant to link the
+various imposed temperature, fluxe and volumic power values to the
+simulation result.
+The output is made of tables containing the different media and
+boundaries and their imposed temperature, flux and volumic power values,
+followed by the heat paths' history.
+Also, option
+.Fl G
+make it possible to output heat paths' end information on an ascii, csv
+formated file.
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va green-function Ac Ta ::= Ta Ao Va green-ascii Ac No # Option Fl g
+.It Ta \& \& | Ta Ao Va green-binary Ac Oo Ao Va paths Ac Oc No # Option Fl G
+.El
+.Pp
+The Monte Carlo estimate and standard deviation for a given set of settings can
+be computed as the mean and standard deviation of the samples of the Green
+function computed using these settings.
+Each sample can be computed as follows:
+.Bl -bullet -compact -offset indent
+.It
+get the temperature of the ending boundary, medium or Trad
+.It
+add the temperature gain of each power term
+.It
+add the temperature gain of each flux term
+.El
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.Ss ASCII format
+Beyond the file format described below,
+.Xr stardis 1
+could write comments
+.Pq characters behind the hash mark Pq Li #
+or blank lines
+.Pq lines without any characters or composed only of spaces and tabs.
+These are not part of the file format and should be ignored.
+.Pp
+The ASCII file format of a Green function is as follows:
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va green-ascii Ac Ta ::= Ta Li ---BEGIN GREEN---
+.It Ta Ta Aq Va time-range
+.It Ta Ta Ao Va #solids Ac Ao Va #fluids Ac \e
+.It Ta Ta Ao Va #dirichlet-boundaries Ac \e
+.It Ta Ta Ao Va #robin-boundaries Ac \e
+.It Ta Ta Ao Va #neumann-boundaries Ac \e
+.It Ta Ta Ao Va #successes Ac Ao Va #failures Ac
+.It Ta Ta Aq Va solid
+.It Ta Ta ...
+.It Ta Ta Aq Va fluid
+.It Ta Ta ...
+.It Ta Ta Aq Va dirichlet-boundary
+.It Ta Ta ...
+.It Ta Ta Aq Va robin-boundary
+.It Ta Ta ...
+.It Ta Ta Aq Va neumann-boundary
+.It Ta Ta ...
+.It Ta Ta Aq Va rad-temp
+.It Ta Ta Aq Va samples
+.It \  Ta Ta
+.It Ao Va time-rad Ac Ta ::= Ta Vt real Vt real
+.It Ao Va #solids Ac Ta ::= Ta Vt integer
+.It Ao Va #fluids Ac Ta ::= Ta Vt integer
+.It Ao Va #dirichlet-boundaries Ac Ta ::= Ta Vt integer
+.It Ao Va #robin-boundaries Ac Ta ::= Ta Vt integer
+.It Ao Va #neumann-boundaries Ac Ta ::= Ta Vt integer
+.It Ao Va #successes Ac Ta ::= Ta Vt integer
+.It Ao Va #failures Ac Ta ::= Ta Vt integer
+.It \  Ta Ta
+.It Ao Va solid Ac Ta ::= Ta Ao Va green-id Ac Ao Va name Ac Ao Va lambda Ac Ao Va rho Ac Ao Va cp Ac \e
+.It Ta Ta Ao Va power Ac Ao Va initial-temp Ac Ao Va imposed-temp Ac
+.It Ao Va fluid Ac Ta ::= Ta Ao Va green-id Ac Ao Va name Ac Ao Va rho Ac Ao Va cp Ac \e
+.It Ta Ta Ao Va initial-temp Ac Ao Va imposed-temp Ac
+.It Ao Va lambda Ac Ta ::= Ta Vt real No # Conductivity > 0 [W/m/K]
+.It Ao Va rho Ac Ta ::= Ta Vt real No # Volumic mass > 0 [kg/m^3]
+.It Ao Va cp Ac Ta ::= Ta Vt real No # Capacity > 0 [J/K/kg]
+.It Ao Va power Ac Ta ::= Ta Vt real No # Volumic power [W/m^3]
+.It Ao Va initial-temp Ac Ta ::= Ta Vt real No # Temperature [K]
+.It Ao Va imposed-temp Ac Ta ::= Ta Vt real No # Temperature [K]
+.It \  Ta Ta
+.It Ao Va dirichlet-boundary Ac Ta ::= Ta Ao Va green-id Ac Ao Va name Ac Ao Va temp Ac
+.It Ao Va robin-boundary Ac Ta ::= Ta Ao Va green-id Ac Ao Va name Ac Ao Va temp-ref Ac \e
+.It Ta Ta Ao Va emissivity Ac Ao Va specular-fraction Ac Ao Va hc Ac \e
+.It Ta Ta Ao Va temp Ac
+.It Ao Va neumann-boundary Ac Ta ::= Ta Ao Va green-id Ac Ao Va name Ac Ao Va flux Ac
+.It Ao Va emissivity Ac Ta ::= Ta Vt real No # \&In [0,1]
+.It Ao Va specular-fraction Ac Ta ::= Ta Vt real No # \&In [0,1]
+.It Ao Va hc Ac Ta ::= Ta Vt real No # Convective coefficient [W/m^2/K]
+.It Ao Va temp Ac Ta ::= Ta Vt real No # Temperature [K]
+.It Ao Va temp-ref Ac Ta ::= Ta Vt real No # Reference temperature [K]
+.It Ao Va flux Ac Ta ::= Ta Vt real No # [W/m^2]
+.It \  Ta Ta
+.It Ao Va rad-temp Ac Ta ::= Ta Ao Va green-id Ac Ao Va Trad Ac Ao Va Trad-ref Ac
+.It Ao Va Trad Ac Ta ::= Ta Vt real No # Radiative temperature [K]
+.It Ao Va Trad-ref Ac Ta ::= Ta Vt real No # Reference temperature [K]
+.It \  Ta Ta
+.It Ao Va sample Ac Ta ::= Ta Ao Va end-type Ac Ao Va green-id Ac \e
+.It Ta Ta Ao Va #power-terms Ac Ao Va #flux-terms Ac \e
+.It Ta Ta Ao Va power-term Ac ... Ao Va flux-term Ac ...
+.It Ao Va end-type Ac Ta ::= Ta Aq Va end-dirichlet
+.It Ta \& \& | Ta Aq Va end-robin
+.It Ta \& \& | Ta Aq Va end-Trad
+.It Ta \& \& | Ta Ao Va end-fluid Ac No # Fluid temperature
+.It Ta \& \& | Ta Ao Va end-solid Ac No # Solid temperature
+.It Ao Va end-dirichlet Ac Ta ::= Ta Li T
+.It Ao Va end-robin Ac Ta ::= Ta Li H
+.It Ao Va end-Trad Ac Ta ::= Ta Li R
+.It Ao Va end-fluid Ac Ta ::= Ta Li F
+.It Ao Va end-solid Ac Ta ::= Ta Li S
+.It Ao Va #power-terms Ac Ta ::= Ta Vt integer
+.It Ao Va #flux-terms Ac Ta ::= Ta Vt integer
+.It Ao Va power-term Ac Ta ::= Ta Ao Va green-id Ac Ao Va factor Ac
+.It Ao Va flux-term Ac Ta ::= Ta Ao Va green-ud Ac Ao Va factor Ac
+.It Ao Va factor Ac Ta ::= Ta Vt real
+.It \  Ta Ta
+.It Ao Va green-id Ac Ta ::= Ta Vt integer
+.It Ao Va name Ac Ta ::= Ta Vt string
+.El
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.Ss Binary format
+Binary Green outputs are formated according to the various C types from the
+.Pa stardis-green.h
+header file.
+The output begins with a header
+.Pq of type Vt struct green_file_header
+that includes counts, followed by descriptions
+.Pq of type Vt struct green_description
+and samples.
+Thereafter is the format of binary Green outputs.
+This output is produced by
+.Sy fwrite
+calls and does not take care of endianness.
+.Pp
+The binary file format of a Green function is as follows:
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va green-binary Ac Ta ::= Ta Li GREEN_BIN_FILE\&:
+.It Ta Ta Aq Va file_format_version
+.It Ta Ta Aq Va #descriptions
+.It Ta Ta Aq Va #solids
+.It Ta Ta Aq Va #fluids
+.It Ta Ta Aq Va #robin-boundaries
+.It Ta Ta Aq Va #dirichlet-boundaries
+.It Ta Ta Aq Va #neumann-boundaries
+.It Ta Ta Aq Va #solid-fluid-connects
+.It Ta Ta Aq Va #solid-solid-connects
+.It Ta Ta Aq Va #successes
+.It Ta Ta Aq Va #failures
+.It Ta Ta Aq Va Trad
+.It Ta Ta Aq Va Trad-ref
+.It Ta Ta Aq Va time-range
+.It Ta Ta Ao Va description Ac ...
+.It Ta Ta Ao Va sample Ac ...
+.It \  Ta Ta
+.It Ao Va file_format_version Ac Ta ::= Ta Vt unsigned
+.It Ao Va #descriptions Ac Ta ::= Ta Vt unsigned
+.It Ao Va #solids Ac Ta ::= Ta Vt unsigned
+.It Ao Va #fluids Ac Ta ::= Ta Vt unsigned
+.It Ao Va #robin-boundaries Ac Ta ::= Ta Vt unsigned
+.It Ao Va #dirichlet-boundaries Ac Ta ::= Ta Vt unsigned
+.It Ao Va #neumann-boundaries Ac Ta ::= Ta Vt unsigned
+.It Ao Va #solid-fluid-connects Ac Ta ::= Ta Vt unsigned
+.It Ao Va #solid-solid-connects Ac Ta ::= Ta Vt unsigned
+.It Ao Va #successes Ac Ta ::= Ta Vt size_t
+.It Ao Va #failures Ac Ta ::= Ta Vt size_t
+.It Ao Va Trad Ac Ta ::= Ta Vt double No # Radiative temperature
+.It Ao Va Trad-ref Ac Ta ::= Ta Vt double No # Reference radiative temperature
+.It Ao Va time-range Ac Ta ::= Ta Vt double[2]
+.It \  Ta Ta
+.It Ao Va description Ac Ta ::= Ta Vt struct green_description
+.It \  Ta Ta
+.It Ao Va sample Ac Ta ::= Ta Ao Va sample-header Ac
+.It Ta Ta Ao Va power-id Ac ...
+.It Ta Ta Ao Va flux-id Ac ...
+.It Ta Ta Ao Va power-weight Ac ...
+.It Ta Ta Ao Va flux-weight Ac ...
+.It Ao Va sample-header Ac Ta ::= Ta Vt struct green_sample_header
+.It Ao Va power-id Ac Ta ::= Ta Vt unsigned
+.It Ao Va flux-id Ac Ta ::= Ta Vt unsigned
+.It Ao Va power-weight Ac Ta ::= Ta Vt double
+.It Ao Va flux-weight Ac Ta ::= Ta Vt double
+.El
+.Pp
+Binary Green function can be followed by partial information on the
+sampled paths.
+The output data are restricted to paths' ends.
+.Bl -column (heat-path-end-list) (::) ()
+.It Ao Va paths Ac Ta ::= Ta Li \&"End\&"\&, \&"End ID\&"\&, \&"X\&"\&, \&"Y\&"\&, \&"Z\&"\&, \e
+.It Ta Ta Li \&"Elapsed Time\&"
+.It Ta Ta Ao Va path-end Ac
+.It Ta Ta ...
+.It \  Ta Ta
+.It Ao Va path-end Ac Ta ::= Ta \
+Ao Va end-name Ac Ns Li \&, \
+Ao Va end-id Ac Ns Li \&, \
+Ao Va x Ac Ns Li \&, \
+Ao Va y Ac Ns Li \&, \
+Ao Va z Ac Ns Li \&, \e
+.It Ta Ta Ao Va elapsed-time Ac
+.It Ao Va end-name Ac Ta ::= Ta Vt string No # Boundary name or TRAD
+.It Ao Va end-id Ac Ta ::= Ta Vt integer
+.It Ao Va x Ac Ta ::= Ta Vt real
+.It Ao Va y Ac Ta ::= Ta Vt real
+.It Ao Va z Ac Ta ::= Ta Vt real
+.It Ao Va elapsed-time Ac Ta ::= Ta Vt real No # [s]
+.El
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.\" External references
+.\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+.Sh SEE ALSO
+.Xr stardis 1

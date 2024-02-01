@@ -178,7 +178,7 @@ uninstall:
 # Miscellaneous targets
 ################################################################################
 clean:
-	rm -f $(HDR) $(OBJ) .config stardis
+	rm -f $(HDR) $(OBJ) .config stardis doc/stardis.1
 
 distclean: clean
 	rm -f $(DEP)

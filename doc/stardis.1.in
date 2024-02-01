@@ -264,7 +264,7 @@ that the entire scene is visible.
 .It Cm spp= Ns Ar samples_per_pixel
 Number of samples to solve the Monte Carlo estimation of each pixel.
 Default is @STARDIS_ARGS_DEFAULT_RENDERING_SPP@.
-.It Cm t= Ar time Ns Op Ns Ar time
+.It Cm t= Ns Ar time , Ns Op Ns Ar time
 Rendering time.
 Default is @STARDIS_ARGS_DEFAULT_RENDERING_TIME@.
 .It Cm tgt= Ns Ar x , Ns Ar y , Ns Ar z

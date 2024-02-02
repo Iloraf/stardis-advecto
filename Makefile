@@ -164,6 +164,7 @@ install: all
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/doc/stardis" COPYING README.md
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/stardis.1
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/stardis-input.5
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/stardis-output.5
 
 uninstall:
 	rm -f "$(DESTDIR)$(PREFIX)/bin/stardis"
@@ -173,6 +174,7 @@ uninstall:
 	rm -f "$(DESTDIR)$(PREFIX)/share/doc/stardis/README.md"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/stardis.1"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/stardis-input.5"
+	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/stardis-output.5"
 
 ################################################################################
 # Miscellaneous targets

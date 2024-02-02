@@ -189,3 +189,4 @@ lint: man
 	shellcheck -o all make.sh
 	mandoc -Tlint -Wall doc/stardis.1 || [ $$? -le 1 ]
 	mandoc -Tlint -Wall doc/stardis-input.5 || [ $$? -le 1 ]
+	mandoc -Tlint -Wall doc/stardis-output.5 || [ $$? -le 1 ]

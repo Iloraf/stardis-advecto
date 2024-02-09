@@ -5,9 +5,11 @@
 *~
 tags
 .config
+src/stardis-args.h
 src/stardis-default.h
 src/stardis-green-types.h
 src/stardis-prog-properties.h
 src/stardis-version.h
 stardis
 doc/stardis.1
+doc/stardis-input.5

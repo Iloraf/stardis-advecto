@@ -42,6 +42,9 @@ STARDIS_ARGS_DEFAULT_SAMPLES_COUNT = 10000
 STARDIS_ARGS_DEFAULT_SCALE_FACTOR = 1
 STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL = 1
 
+# Including NULL char
+STARDIS_MAX_NAME_LENGTH = 64
+
 ################################################################################
 # Tools
 ################################################################################

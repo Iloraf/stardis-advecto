@@ -279,7 +279,8 @@ files, cannot use the same name.
 Additionally, description names cannot a number, nor be one of the
 keywords defined by the present grammar and their lowercase
 counterparts.
-Finally, description names cannot be longer than 63 characters.
+Finally, description names cannot be longer than
+@STARDIS_MAX_NAME_LENGTH@ characters.
 .Bl -column (description-line) (::) ()
 .It Ao Va bound-name Ac Ta ::= Ta Vt string
 .It Ao Va medium-name Ac Ta ::= Ta Vt string

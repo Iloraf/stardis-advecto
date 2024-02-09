@@ -102,8 +102,7 @@ split_line
 }
 
 static char
-mode_option
-  (const int m)
+mode_option(const int m)
 {
   int found = 0;
   char res = '?';
@@ -150,6 +149,123 @@ print_multiple_modes
       fst = 0;
     }
   } while(m < modes);
+}
+
+static res_T
+parse_position_and_time(const char* str, double pos[3], double time[2])
+{
+  char buf[128];
+  double pos_and_time[5];
+  size_t len;
+  res_T res = RES_OK;
+  ASSERT(str && pos && time);
+
+
+  if(strlen(str) >= sizeof(buf)-1/*NULL char*/) {
+    fprintf(stderr,
+      "Could not duplicate the string defining a position and, optionally, "
+      "a time range `%s'\n", str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  res = cstr_to_list_double(str, ',', pos_and_time, &len, 5);
+  if(res != RES_OK
+  || len < 3 /* Invalid position */
+  || len > 5 /* Too many fields */) {
+    fprintf(stderr,
+      "Error parsing position and optional time range `%s'\n", str);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  pos[0] = pos_and_time[0];
+  pos[1] = pos_and_time[1];
+  pos[2] = pos_and_time[2];
+
+  switch(len) {
+    /* No time was parsed => Steady state */
+    case 3:
+      time[0] = INF;
+      time[1] = INF;
+      break;
+    /* A single time was parsed => the time range is degenerated */
+    case 4:
+      time[0] = pos_and_time[3];
+      time[1] = pos_and_time[3];
+      break;
+    /* A time range was parsed and must be not degenerated */
+    case 5:
+      time[0] = pos_and_time[3];
+      time[1] = pos_and_time[4];
+      if(time[0] > time[1]) {
+        fprintf(stderr, "Invalid time range [%g, %g}\n", time[0], time[1]);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+      break;
+    default: FATAL("Unreachable code\n"); break;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+parse_side_indicator(const char* str, char side_name[STARDIS_MAX_NAME_LENGTH])
+{
+  res_T res = RES_OK;
+  ASSERT(str && side_name);
+
+  if(strlen(str) >= STARDIS_MAX_NAME_LENGTH) {
+    fprintf(stderr,
+      "Side indicator could not exceed %d characters `%s'\n",
+      STARDIS_MAX_NAME_LENGTH-1, str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(side_name, str, STARDIS_MAX_NAME_LENGTH);
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+parse_probe_boundary(const char* str, struct stardis_probe_boundary* probe)
+{
+  char buf[128];
+  char* pos_and_time = NULL;
+  char* side = NULL;
+  char* ctx = NULL;
+  res_T res = RES_OK;
+  ASSERT(str && probe);
+
+  if(strlen(str) >= sizeof(buf)-1/*NULL char*/) {
+    fprintf(stderr,
+      "Could not duplicate string defining probe at boundary `%s'\n",  str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  pos_and_time = strtok_r(buf, ":", &ctx);
+  side = strtok_r(NULL, "", &ctx);
+
+  res = parse_position_and_time(pos_and_time, probe->position, probe->time);
+  if(res != RES_OK) goto error;
+
+  res = parse_side_indicator(side, probe->side);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  goto exit;
 }
 
 /*******************************************************************************
@@ -587,39 +703,15 @@ parse_args
 
     case 'P':
         if(args->mode & EXCLUSIVE_MODES) {
-          res = RES_BAD_ARG;
           logger_print(args->logger, LOG_ERROR,
-              "Options -%c and -%c are exclusive.\n",
-              (char)opt, mode_option(args->mode));
+            "Options -%c and -%c are exclusive.\n",
+            (char)opt, mode_option(args->mode));
+          res = RES_BAD_ARG;
           goto error;
         }
         args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
-
-        ERR(str_set(&keep, optarg));
-        line = split_line(optarg, ':');
-        if(!line) {
-          res = RES_MEM_ERR;
-          str_release(&keep);
-          goto error;
-        }
-
-        /* We expect 1 or 2 parts in line */
-        if(!line[0] || (line[1] && line[2])) {
-          logger_print((args->logger), LOG_ERROR,
-            "Invalid argument for option ""-%c"": %s\n",
-            opt, str_cget(&keep));
-          str_release(&keep);
-          res = RES_BAD_ARG;
-          goto error;
-        }
-
-        /* First part is pos and optional time, optional second part is a
-         * medium name (OK if NULL) */
-        GET_POS_AND_OPTIONAL_TIME_RANGE(line[0], args->pos_and_time,
-          str_cget(&keep));
-        if(line[1])
-          args->medium_name = optarg + strlen(line[0]) + 1;
-
+        res = parse_probe_boundary(optarg, &args->probe_boundary);
+        if(res != RES_OK) goto error;
         break;
 
     case 'R':

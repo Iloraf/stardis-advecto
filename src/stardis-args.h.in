@@ -16,6 +16,8 @@
 #ifndef STARDIS_ARGS_H
 #define STARDIS_ARGS_H
 
+#define STARDIS_MAX_NAME_LENGTH @STARDIS_MAX_NAME_LENGTH@
+
 #include <sdis.h>
 
 #include <rsys/rsys.h>
@@ -25,6 +27,15 @@ struct camera;
 struct logger;
 struct mem_allocator;
 struct stardis;
+
+struct stardis_probe_boundary {
+  double position[3];
+  double time[2]; /* Observation time */
+  char side[STARDIS_MAX_NAME_LENGTH];
+};
+#define STARDIS_PROBE_BOUNDARY_NULL__ {{0,0,0},{0,0},{0}}
+static const struct stardis_probe_boundary STARDIS_PROBE_BOUNDARY_NULL =
+  STARDIS_PROBE_BOUNDARY_NULL__;
 
 enum stardis_mode {
   /* Ordered so that print_multiple_modes() prints in alphabetical order */
@@ -104,6 +115,8 @@ struct args {
   int mode;
   enum dump_path_type dump_paths;
   int verbose;
+
+  struct stardis_probe_boundary probe_boundary;
 };
 
 res_T

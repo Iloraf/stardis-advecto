@@ -13,10 +13,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
-#include <star/sg3d.h>
 #ifdef STARDIS_ENABLE_MPI
-#define _POSIX_C_SOURCE 200112L
+  #define _POSIX_C_SOURCE 200112L
 #endif
+
+#include <star/sg3d.h>
 
 #include "stardis-app.h"
 #include "stardis-args.h"
@@ -43,8 +44,8 @@
 #include <string.h>
 
 #ifdef STARDIS_ENABLE_MPI
-#include <stdio.h>
-#include <mpi.h>
+  #include <stdio.h>
+  #include <mpi.h>
 #endif
 
 static const struct dummies DUMMIES_NULL = DUMMIES_NULL__;
@@ -893,16 +894,16 @@ void
 log_prt_fn
   (const char* msg, void* ctx)
 {
-#ifdef stardis_enable_mpi
+#ifdef STARDIS_ENABLE_MPI
   int initialized, rank = 0;
 #endif
 
   ASSERT(msg);
   (void)ctx;
 
-#ifdef stardis_enable_mpi
-  chk(mpi_initialized(&initialized) == mpi_success);
-  if(initialized) chk(mpi_comm_rank(mpi_comm_world, &rank) == mpi_success);
+#ifdef STARDIS_ENABLE_MPI
+  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
+  if(initialized) CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
   /* only master prints */
   if(rank != 0) return;
 #endif

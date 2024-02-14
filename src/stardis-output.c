@@ -1956,7 +1956,8 @@ dump_compute_region_at_the_end_of_vtk
     const struct description* descriptions;
     unsigned medium_id;
     ASSERT(stardis->mode & MODE_MEDIUM_COMPUTE);
-    medium = find_medium_by_name(stardis, &stardis->solve_name, &medium_id);
+    medium = find_medium_by_name
+      (stardis, str_cget(&stardis->solve_name), &medium_id);
     ASSERT(medium != NULL); (void)medium;
     descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
     FOR_EACH(i, 0, tsz) {

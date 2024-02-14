@@ -36,6 +36,8 @@ struct stardis_vertex {
   double P[3]; /* World space position */
   double time; /* "Time" of the vertex */
 };
+#define STARDIS_VERTEX_NULL__ {{0,0,0}, 0}
+static const struct stardis_vertex STARDIS_VERTEX_NULL = STARDIS_VERTEX_NULL__;
 
 enum stardis_side {
   FRONT,

@@ -16,6 +16,7 @@
 #ifndef STARDIS_APP_H
 #define STARDIS_APP_H
 
+#include "stardis-args.h"
 #include "stardis-description.h"
 
 #include <star/sg3d.h>
@@ -238,6 +239,8 @@ struct stardis {
   int geometry_initialized;
   int mpi_initialized;
   int mpi_rank;
+
+  struct stardis_probe_boundary probe_boundary;
 };
 
 unsigned

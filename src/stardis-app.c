@@ -319,8 +319,8 @@ stardis_init
   else if(args->mode & MODE_MEDIUM_COMPUTE) {
     ERR(str_set(&stardis->solve_name, args->medium_name));
   }
-  else if(args->mode & MODE_PROBE_COMPUTE_ON_INTERFACE && args->medium_name) {
-    ERR(str_set(&stardis->solve_name, args->medium_name));
+  else if(args->mode & MODE_PROBE_COMPUTE_ON_INTERFACE) {
+    stardis->probe_boundary = args->probe_boundary;
   }
   else if(args->mode & SURFACE_COMPUTE_MODES) {
     ERR(str_set(&stardis->solve_name, args->solve_filename));
@@ -484,7 +484,7 @@ stardis_init
 
   /* If computation is on a volume, check medium is known */
   if(args->mode & MODE_MEDIUM_COMPUTE) {
-    if(!find_medium_by_name(stardis, &stardis->solve_name, NULL)) {
+    if(!find_medium_by_name(stardis, str_cget(&stardis->solve_name), NULL)) {
       logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
         "Cannot find medium '%s'\n", str_cget(&stardis->solve_name));
       res = RES_BAD_ARG;

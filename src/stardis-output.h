@@ -38,6 +38,9 @@ struct dump_path_context {
   unsigned long rank;
   struct stardis* stardis;
 };
+#define DUMP_PATH_CONTEXT_NULL__ {0,NULL}
+static const struct dump_path_context DUMP_PATH_CONTEXT_NULL =
+  DUMP_PATH_CONTEXT_NULL__;
 
 res_T
 dump_path

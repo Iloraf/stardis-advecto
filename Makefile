@@ -30,6 +30,7 @@ SRC =\
  src/stardis-app.c\
  src/stardis-args.c\
  src/stardis-compute.c\
+ src/stardis-compute-probe-boundary.c\
  src/stardis-description.c\
  src/stardis-fluid.c\
  src/stardis-fluid-prog.c\

@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd January 31, 2024
+.Dd February 15, 2024
 .Dt STARDIS-INPUT 5
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -156,7 +156,7 @@ The file format is as follows:
 .It Ao Va solid Ac Ta ::= Ta Ao Va solid-const Ac | Ao Va solid-prog Ac
 .It Ao Va solid-const Ac Ta ::= Ta
 .Li SOLID Ao Va medium-name Ac Ao Va lambda Ac Ao Va rho Ac Ao Va cp Ac \e
-.It Ta Ta Ao Va initial-temp Ac Ao Va imposed-temp Ac \e
+.It Ta Ta Ao Va delta Ac Ao Va initial-temp Ac Ao Va imposed-temp Ac \e
 .It Ta Ta Ao Va volumic-power Ac Ao Va triangle-sides Ac No ...
 .It Ao Va solid-prog Ac Ta ::= Ta Li SOLID_PROG Ao Va medium-name Ac Ao Va prog-desc Ac
 .It \  Ta Ta

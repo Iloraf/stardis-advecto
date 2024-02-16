@@ -259,8 +259,10 @@ parse_probe_boundary(const char* str, struct stardis_probe_boundary* probe)
   res = parse_position_and_time(pos_and_time, probe->position, probe->time);
   if(res != RES_OK) goto error;
 
-  res = parse_side_indicator(side, probe->side);
-  if(res != RES_OK) goto error;
+  if(side) {
+    res = parse_side_indicator(side, probe->side);
+    if(res != RES_OK) goto error;
+  }
 
 exit:
   return res;

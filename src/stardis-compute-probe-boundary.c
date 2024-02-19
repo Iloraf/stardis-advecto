@@ -816,6 +816,14 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   args.side = probe_side;
   args.register_paths = stardis->dump_paths;
 
+  /* The solver does not accept that the side of the interface on which the
+   * probe is placed is invalid. Below, the side is arbitrarily defined because
+   * at this point, Stardis has already arbitrated that this side does not
+   * matter (i.e. there is no thermal contact resistance) */
+  if(args.side == SDIS_SIDE_NULL__) {
+    args.side = SDIS_FRONT;
+  }
+
   /* Run the calculation */
   if(stardis->mode & (MODE_GREEN | MODE_BIN_GREEN)) {
     ERR(solve_green(stardis, start, &args));

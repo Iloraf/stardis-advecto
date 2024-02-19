@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd February 15, 2024
+.Dd February 19, 2024
 .Dt STARDIS-INPUT 5
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -65,7 +65,7 @@ Depending on the type of description they use, programs must
 export a given list of mandatory functions.
 They can also export some other optional functions.
 The exact list with names and types can be found in the public header
-.Pa stardis-prog.h ,
+.Pa stardis-prog-properties.h ,
 which is installed together with
 .Xr stardis 1
 binary.

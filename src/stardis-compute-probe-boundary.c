@@ -410,7 +410,7 @@ move_to_boundary
 
   /* Probe is on a boundary */
   if(filter_ctx.distance == 0) {
-    logger_print(stardis->logger, LOG_ERROR,
+    logger_print(stardis->logger, LOG_OUTPUT,
       "Probe is on primitive %lu, uv = (%g, %g), not moved.\n",
       (unsigned long)iprim, SPLIT2(uv));
 

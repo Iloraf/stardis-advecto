@@ -213,7 +213,7 @@ find_closest_point
   closest_pt_args.position[2] = pos[2];
   closest_pt_args.radius = INF;
   closest_pt_args.filter_3d = hit_filter;
-  closest_pt_args.filter_data = &filter_ctx;
+  closest_pt_args.filter_data = filter_ctx;
   ERR(sdis_scene_find_closest_point
     (stardis->sdis_scn , &closest_pt_args, iprim, uv));
   if(*iprim == SDIS_PRIMITIVE_NONE) {

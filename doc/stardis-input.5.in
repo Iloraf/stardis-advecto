@@ -151,14 +151,14 @@ The file format is as follows:
 .Li FLUID Ao Va medium-name Ac Ao Va rho Ac Ao Va cp Ac \e
 .It Ta Ta Ao Va initial-temp Ac Ao Va imposed-temp Ac \e
 .It Ta Ta Ao Va triangle-sides Ac ...
-.It Ao Va fluid-prog Ac Ta ::= Ta Li FLUID_PROG Ao Va medium-name Ac Ao Va prog-desc Ac
+.It Ao Va fluid-prog Ac Ta ::= Ta Li FLUID_PROG Ao Va medium-name Ac Ao Va prog-desc-sides Ac
 .It \  Ta Ta
 .It Ao Va solid Ac Ta ::= Ta Ao Va solid-const Ac | Ao Va solid-prog Ac
 .It Ao Va solid-const Ac Ta ::= Ta
 .Li SOLID Ao Va medium-name Ac Ao Va lambda Ac Ao Va rho Ac Ao Va cp Ac \e
 .It Ta Ta Ao Va delta Ac Ao Va initial-temp Ac Ao Va imposed-temp Ac \e
 .It Ta Ta Ao Va volumic-power Ac Ao Va triangle-sides Ac No ...
-.It Ao Va solid-prog Ac Ta ::= Ta Li SOLID_PROG Ao Va medium-name Ac Ao Va prog-desc Ac
+.It Ao Va solid-prog Ac Ta ::= Ta Li SOLID_PROG Ao Va medium-name Ac Ao Va prog-desc-sides Ac
 .It \  Ta Ta
 .It Ao Va lambda Ac Ta ::= Ta Vt real No # Conductivity > 0 [W/m/K]
 .It Ao Va rho Ac Ta ::= Ta Vt real No # Volumic mass > 0 [kg/m^3]
@@ -291,11 +291,14 @@ Finally, description names cannot be longer than
 .It Ao Va lib-path Ac Ta ::= Ta Pa path
 .It \  Ta Ta
 .It Ao Va args Ac Ta ::= Ta Vt string No ...
-.It Ao Va prog-desc Ac Ta ::= Ta Ao Va prog-name Ac Ao Va triangle-sides Ac ... \e
+.It \  Ta Ta
+.It Ao Va prog-desc Ac Ta ::= Ta Ao Va prog-name Ac Ao Va triangles Ac ... \e
+.It Ta Ta Op Li PROG_PARAMS Op Ao Va args Ac
+.It Ao Va prog-desc-sides Ac Ta ::= Ta Ao Va prog-name Ac Ao Va triangles-sides Ac ... \e
 .It Ta Ta Op Li PROG_PARAMS Op Ao Va args Ac
 .It \  Ta Ta
-.It Ao Va triangle-sides Ac Ta ::= Ta Ao Va side-specifier Ac Ao Va triangles Ac
 .It Ao Va triangles Ac Ta ::= Ta Ao Va stl-path Ac
+.It Ao Va triangle-sides Ac Ta ::= Ta Ao Va side-specifier Ac Ao Va triangles Ac
 .El
 .Pp
 Side descriptions in side specifiers rely on the following convention:

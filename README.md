@@ -9,29 +9,28 @@ and exposes some of the main features of the solver in an easy to use way.
 Using stardis is a practical way of carrying out thermal studies on CAD
 models which can be exported from Salomé or other similar software.
 
-## How to build
-
-Stardis relies on the [CMake](http://www.cmake.org) and the
-[RCMake](https://gitlab.com/vaplv/rcmake/) package to build.
-It also depends on the
-[RSys](https://gitlab.com/vaplv/rsys/),
-[star-3d](https://gitlab.com/meso-star/star-3d/),
-[star-enclosures-3d](https://gitlab.com/meso-star/star-enclosures-3d/),
-[star-geometry-3d](https://gitlab.com/meso-star/star-geometry-3d/),
-[star-stl](https://gitlab.com/meso-star/star-stl) and
-[stardis-solver](https://gitlab.com/meso-star/stardis-solver) libraries
-as well as on the [OpenMP](http://www.openmp.org) 2.0 specification to
-parallelize its computations.  It may depend on
-[OpenMPI](https://www.open-mpi.org/) 2.0 if distributed memory parallelism
-is enabled via the `ENABLE_MPI` variable of the CMake file.
-
-First ensure that CMake and a C compiler are installed on your system.
-Then install the RCMake package as well as all the aforementioned
-prerequisites. Finally generate the project from
-the `cmake/CMakeLists.txt` file by appending to the `CMAKE_PREFIX_PATH`
-variable the install directories of its dependencies.
+## Requirements
 
 ## Release notes
+
+- C compiler
+- POSIX make
+- pkg-config
+- Message Passing Interface (optional)
+- [mandoc](https://mandoc.bsd.lv)
+- [RSys](https://gitlab.com/vaplv/rsys)
+- [Star 3D](https://gitlab.com/meso-star/star-3d)
+- [Stardis Solver](https://gitlab.com/meso-star/stardis-solver)
+- [Star Enclosure 3D](https://gitlab.com/meso-star/star-enclosures-3d)
+- [Star Geometry 3D](https://gitlab.com/meso-star/star-geometry-3d)
+- [Star SamPling](https://gitlab.com/meso-star/star-sp)
+- [Star StL](https://gitlab.com/meso-star/star-stl)
+
+## Installation
+
+Edit config.mk as needed, then run:
+
+    make clean install
 
 ### Version 0.9
 

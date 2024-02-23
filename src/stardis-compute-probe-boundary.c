@@ -629,6 +629,7 @@ solve
    res_T output[2])
 {
   struct time t0, t1;
+  struct sdis_mc time = SDIS_MC_NULL;
   struct dump_path_context ctx = DUMP_PATH_CONTEXT_NULL;
   struct sdis_estimator* estimator = NULL;
   const struct str* rng_in = NULL;
@@ -658,7 +659,9 @@ solve
   /* No more to do for non master processes */
   if(!is_master_process) goto exit;
 
-  ERR(print_computation_time(estimator, stardis, start, &t0, &t1, NULL));
+  /* Per per realisation time */
+  ERR(sdis_estimator_get_realisation_time(estimator, &time));
+  ERR(print_computation_time(&time, stardis, start, &t0, &t1, NULL));
 
   /* Write outputs and save their status */
   ctx.stardis = stardis;

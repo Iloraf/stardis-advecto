@@ -456,12 +456,14 @@ compute_probe(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
     } else {
+      struct sdis_mc time = SDIS_MC_NULL;
       res_T tmp_res1, tmp_res2;
       time_current(&compute_start);
       ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
       time_current(&compute_end);
-      ERR(print_computation_time(estimator, stardis,
-        start, &compute_start, &compute_end, NULL));
+      ERR(sdis_estimator_get_realisation_time(estimator, &time));
+      ERR(print_computation_time
+        (&time, stardis, start, &compute_start, &compute_end, NULL));
       tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
 
       /* Dump recorded paths according to user settings */
@@ -751,12 +753,15 @@ compute_medium(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
     } else {
+      struct sdis_mc time = SDIS_MC_NULL;
       res_T tmp_res1, tmp_res2;
       time_current(&compute_start);
       ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
       time_current(&compute_end);
-      ERR(print_computation_time(estimator, stardis,
-        start, &compute_start, &compute_end, NULL));
+
+      ERR(sdis_estimator_get_realisation_time(estimator, &time));
+      ERR(print_computation_time
+        (&time, stardis, start, &compute_start, &compute_end, NULL));
       tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
       /* Dump recorded paths according to user settings */
       dump_ctx.stardis = stardis;
@@ -908,12 +913,14 @@ compute_boundary(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
     } else {
+      struct sdis_mc time = SDIS_MC_NULL;
       res_T tmp_res1, tmp_res2;
       time_current(&compute_start);
       ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
       time_current(&compute_end);
-      ERR(print_computation_time(estimator, stardis,
-        start, &compute_start, &compute_end, NULL));
+      ERR(sdis_estimator_get_realisation_time(estimator, &time));
+      ERR(print_computation_time
+        (&time, stardis, start, &compute_start, &compute_end, NULL));
       tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
       /* Dump recorded paths according to user settings */
       dump_ctx.stardis = stardis;
@@ -967,12 +974,14 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
   if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
     ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
   } else {
+    struct sdis_mc time = SDIS_MC_NULL;
     res_T tmp_res1, tmp_res2;
     time_current(&compute_start);
     ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
     time_current(&compute_end);
-    ERR(print_computation_time(estimator, stardis,
-      start, &compute_start, &compute_end, NULL));
+    ERR(sdis_estimator_get_realisation_time(estimator, &time));
+    ERR(print_computation_time
+      (&time, stardis, start, &compute_start, &compute_end, NULL));
     tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
 
     /* Dump recorded paths according to user settings */

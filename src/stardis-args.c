@@ -20,11 +20,13 @@
 #include "stardis-default.h"
 #include "stardis-version.h"
 
+#include <sdis_version.h>
+
 #include <rsys/cstr.h>
 #include <rsys/double2.h>
 #include <rsys/double3.h>
-#include <sdis_version.h>
 #include <rsys/logger.h>
+#include <rsys/text_reader.h>
 
 #include <getopt.h>
 #include <stdlib.h>
@@ -114,6 +116,7 @@ mode_option(const int m)
   if(m & MODE_GREEN) { found++; res = 'g'; }
   if(m & MODE_BIN_GREEN) { found++; res = 'G'; }
   if(m & MODE_DUMP_HELP) { found++; res = 'h'; }
+  if(m & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE) { found++; res = 'L'; }
   if(m & MODE_MEDIUM_COMPUTE) { found++; res = 'm'; }
   if(m & MODE_PROBE_COMPUTE) { found++; res = 'p'; }
   if(m & MODE_PROBE_COMPUTE_ON_INTERFACE) { found++; res = 'P'; }
@@ -270,6 +273,91 @@ error:
   goto exit;
 }
 
+static res_T
+allocate_probe_boundary
+  (struct args* args,
+   struct stardis_probe_boundary** out_probe)
+{
+  size_t i = 0;
+  res_T res = RES_OK;
+  ASSERT(args && out_probe);
+
+  i = darray_probe_boundary_size_get(&args->probe_boundary_list);
+  res = darray_probe_boundary_resize(&args->probe_boundary_list, i+1);
+  if(res != RES_OK) {
+    logger_print(args->logger, LOG_ERROR,
+      "Error allocating the probe on the boundary -- %s.\n",
+      res_to_cstr(res));
+    goto error;
+  }
+
+  *out_probe = darray_probe_boundary_data_get(&args->probe_boundary_list) + i;
+
+exit:
+  return res;
+error:
+  darray_probe_boundary_resize(&args->probe_boundary_list, i); /* Deallocate */
+  goto exit;
+}
+
+static res_T
+parse_probe_boundary_list
+  (const char* filename,
+   struct logger* logger,
+   struct mem_allocator* allocator,
+   struct darray_probe_boundary* list)
+{
+  struct txtrdr* txtrdr = NULL;
+  res_T res = RES_OK;
+  ASSERT(filename && list);
+
+  res = txtrdr_file(allocator, filename, '#', &txtrdr);
+  if(res != RES_OK) goto error;
+
+  for(;;) {
+    struct stardis_probe_boundary probe = STARDIS_PROBE_BOUNDARY_NULL;
+    const char* line = NULL;
+
+    res = txtrdr_read_line(txtrdr);
+    if(res != RES_OK) {
+      logger_print(logger, LOG_ERROR,
+        "%s: could not read the line `%lu' -- %s.\n",
+        txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
+        res_to_cstr(res));
+      goto error;
+    }
+
+    if(!(line = txtrdr_get_cline(txtrdr))) goto exit; /* No line to parse */
+
+    res = parse_probe_boundary(line, &probe);
+    if(res != RES_OK) goto error;
+
+    res = darray_probe_boundary_push_back(list, &probe);
+    if(res != RES_OK) {
+      logger_print(logger, LOG_ERROR,
+        "%s:%lu: error registering the probe on the boundary -- %s.\n",
+        txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
+        res_to_cstr(res));
+      goto error;
+    }
+  }
+
+  if(!darray_probe_boundary_size_get(list)) {
+    logger_print(logger, LOG_ERROR,
+      "The file `%s' does not list any probes on the boundary.\n",
+      filename);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+exit:
+  if(txtrdr) txtrdr_ref_put(txtrdr);
+  return res;
+error:
+  darray_probe_boundary_clear(list);
+  goto exit;
+}
+
 /*******************************************************************************
  * Public Functions
  ******************************************************************************/
@@ -316,6 +404,7 @@ init_args
   d2(args->pos_and_time+3,
     STARDIS_DEFAULT_COMPUTE_TIME, STARDIS_DEFAULT_COMPUTE_TIME);
   args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;
+  darray_probe_boundary_init(allocator, &args->probe_boundary_list);
 
 end:
   *out_args = args;
@@ -331,6 +420,7 @@ release_args(struct args* args)
 {
   ASSERT(args);
   darray_str_release(&args->model_files);
+  darray_probe_boundary_release(&args->probe_boundary_list);
   free(args);
 }
 
@@ -404,7 +494,7 @@ parse_args
 {
   int opt = 0, n_used = 0, o_used = 0;
   size_t len = 0;
-  const char option_list[] = "c:d:D:eF:gG:hm:M:n:o:p:P:R:s:S:t:vV:x:X:";
+  const char option_list[] = "c:d:D:eF:gG:hL:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -533,6 +623,19 @@ parse_args
       args->mode |= MODE_DUMP_HELP;
       break;
 
+    case 'L':
+      if(args->mode & EXCLUSIVE_MODES) {
+        logger_print(args->logger, LOG_ERROR,
+          "Options -%c and -%c are exclusive.\n",
+          (char)opt, mode_option(args->mode));
+        goto error;
+      }
+      args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
+      res = parse_probe_boundary_list
+        (optarg, args->logger, args->allocator, &args->probe_boundary_list);
+      if(res != RES_OK) goto error;
+      break;
+
     case 'm': {
       char* ptr;
       if(args->mode & EXCLUSIVE_MODES) {
@@ -601,7 +704,9 @@ parse_args
       GET_POS_AND_OPTIONAL_TIME_RANGE(optarg, args->pos_and_time, optarg);
       break;
 
-    case 'P':
+    case 'P': {
+        struct stardis_probe_boundary* probe = NULL;
+
         if(args->mode & EXCLUSIVE_MODES) {
           logger_print(args->logger, LOG_ERROR,
             "Options -%c and -%c are exclusive.\n",
@@ -610,9 +715,12 @@ parse_args
           goto error;
         }
         args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
-        res = parse_probe_boundary(optarg, &args->probe_boundary);
+        res = allocate_probe_boundary(args, &probe);
+        if(res != RES_OK) goto error;
+        res = parse_probe_boundary(optarg, probe);
         if(res != RES_OK) goto error;
         break;
+      }
 
     case 'R':
       if(args->mode & EXCLUSIVE_MODES) {

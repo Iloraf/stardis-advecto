@@ -773,16 +773,15 @@ error:
   goto exit;
 }
 
-/*******************************************************************************
- * Local functions
- ******************************************************************************/
-res_T
-compute_probe_on_interface(struct stardis* stardis, struct time* start)
+static res_T
+compute_single_probe_on_interface
+  (struct stardis* stardis,
+   struct time* start,
+   const struct stardis_probe_boundary* probe)
 {
   /* Probe */
   struct sdis_solve_probe_boundary_args args
     = SDIS_SOLVE_PROBE_BOUNDARY_ARGS_DEFAULT;
-  const struct stardis_probe_boundary* probe = NULL;
   enum sdis_side probe_side = SDIS_SIDE_NULL__;
 
   /* Miscellaneous */
@@ -792,9 +791,8 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   res_T output_status[2] = {RES_OK, RES_OK};
   res_T res = RES_OK;
 
-  ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
-
-  probe = &stardis->probe_boundary;
+  /* Check pre-conditions */
+  ASSERT(stardis && start && probe);
 
   /* Calculate the probe position on the boundary */
   ERR(move_to_boundary(stardis, probe->position, probe->time[0], &iprim, uv));
@@ -836,5 +834,52 @@ exit:
   res = (res != RES_OK ? res : output_status[1]);
   return res;
 error:
- goto exit;
+  goto exit;
+}
+
+static res_T
+compute_multiple_probes_on_interface
+  (struct stardis* stardis,
+   struct time* start)
+{
+  res_T res = RES_OK;
+  ASSERT(stardis && start);
+  (void)stardis, (void)start; /* Avoid "unused variable" warnings */
+
+  /* TODO */
+  return res;
+}
+
+/*******************************************************************************
+ * Local functions
+ ******************************************************************************/
+res_T
+compute_probe_on_interface(struct stardis* stardis, struct time* start)
+{
+  res_T res = RES_OK;
+  ASSERT(stardis && start);
+  ASSERT((stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
+      || (stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE));
+
+  /* Multiple probes */
+  if(stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE) {
+    ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) > 1);
+
+    res = compute_multiple_probes_on_interface(stardis, start);
+    if(res != RES_OK) goto error;
+
+  /* Single probe */
+  } else if(stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE) {
+    const struct stardis_probe_boundary* probe = NULL;
+    ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) == 1);
+
+    probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
+    res = compute_single_probe_on_interface(stardis, start, probe);
+    if(res != RES_OK) goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
 }

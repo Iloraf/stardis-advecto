@@ -1646,11 +1646,14 @@ print_single_MC_result
     break;
   case MODE_PROBE_COMPUTE_ON_INTERFACE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
+      const struct stardis_probe_boundary* probe = NULL;
+      ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) == 1);
+      probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
       if(stardis->time_range[0] == stardis->time_range[1])
         fprintf(stream,
           "Boundary temperature at [%g, %g, %g] at t=%g = %g K +/- %g\n",
-          SPLIT3(stardis->probe_boundary.position),
-          stardis->probe_boundary.time[0],
+          SPLIT3(probe->position),
+          probe->time[0],
           result.E, /* Expected value */
           result.SE); /* Standard error */
       else

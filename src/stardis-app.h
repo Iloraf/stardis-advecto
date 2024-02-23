@@ -240,7 +240,7 @@ struct stardis {
   int mpi_initialized;
   int mpi_rank;
 
-  struct stardis_probe_boundary probe_boundary;
+  struct darray_probe_boundary probe_boundary_list;
 };
 
 unsigned

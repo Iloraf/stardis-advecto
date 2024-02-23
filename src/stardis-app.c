@@ -260,6 +260,7 @@ stardis_init
   darray_size_t_init(stardis->allocator, &stardis->compute_surface.primitives);
   darray_sides_init(stardis->allocator, &stardis->compute_surface.sides);
   darray_uint_init(stardis->allocator, &stardis->compute_surface.err_triangles);
+  darray_probe_boundary_init(stardis->allocator, &stardis->probe_boundary_list);
   stardis->compute_surface.area = 0;
   stardis->samples = args->samples;
   stardis->nthreads = args->nthreads;
@@ -319,8 +320,10 @@ stardis_init
   else if(args->mode & MODE_MEDIUM_COMPUTE) {
     ERR(str_set(&stardis->solve_name, args->medium_name));
   }
-  else if(args->mode & MODE_PROBE_COMPUTE_ON_INTERFACE) {
-    stardis->probe_boundary = args->probe_boundary;
+  else if((args->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
+       || (args->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE)) {
+    ERR(darray_probe_boundary_copy
+      (&stardis->probe_boundary_list, &args->probe_boundary_list));
   }
   else if(args->mode & SURFACE_COMPUTE_MODES) {
     ERR(str_set(&stardis->solve_name, args->solve_filename));
@@ -572,6 +575,7 @@ stardis_release
   if(stardis->dummies.stardis_solid) {
     release_solid(stardis->dummies.stardis_solid, stardis->allocator);
   }
+  darray_probe_boundary_release(&stardis->probe_boundary_list);
 }
 
 unsigned

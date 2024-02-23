@@ -1171,6 +1171,8 @@ stardis_compute
     ERR(compute_probe(stardis, start));
   else if(stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
     ERR(compute_probe_on_interface(stardis, start));
+  else if(stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE)
+    ERR(compute_probe_on_interface(stardis, start));
   else if(stardis->mode & MODE_IR_COMPUTE)
     ERR(compute_camera(stardis, start));
   else if(stardis->mode & MODE_MEDIUM_COMPUTE)

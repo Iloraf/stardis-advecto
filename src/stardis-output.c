@@ -1659,7 +1659,7 @@ print_single_MC_result
       else
         fprintf(stream,
           "Boundary temperature at [%g, %g, %g] with t in [%g %g] = %g K +/- %g\n",
-          SPLIT3(stardis->probe), SPLIT2(stardis->time_range),
+          SPLIT3(probe->position), SPLIT2(probe->time),
           result.E, /* Expected value */
           result.SE); /* Standard error */
     }

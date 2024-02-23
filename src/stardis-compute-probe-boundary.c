@@ -725,7 +725,7 @@ solve_list
     res_T res2 = RES_OK;
 
     probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list) + i;
-    ERR(sdis_estimator_buffer_at(buffer, i, 1, &estimator));
+    ERR(sdis_estimator_buffer_at(buffer, i, 0, &estimator));
 
     res2 = print_single_MC_result_probe_boundary
       (stardis, probe, estimator, stdout);

@@ -685,6 +685,61 @@ error:
 }
 
 static res_T
+solve_list
+  (struct stardis* stardis,
+   struct time* start,
+   struct sdis_solve_probe_boundary_list_args* args,
+   res_T* output)
+{
+  struct time t0, t1;
+  struct sdis_mc time = SDIS_MC_NULL; /* Time per realisation */
+  struct sdis_estimator_buffer* buffer = NULL;
+  size_t i = 0;
+  size_t def[2] = {0, 0};
+  int is_master_process = 0;
+  res_T res = RES_OK;
+  ASSERT(stardis && start && args);
+
+  is_master_process = !stardis->mpi_initialized || stardis->mpi_rank == 0;
+
+  /* Run the calculation */
+  time_current(&t0);
+  ERR(sdis_solve_probe_boundary_list(stardis->sdis_scn, args, &buffer));
+  time_current(&t1);
+
+  /* No more to do for non master processes */
+  if(!is_master_process) goto exit;
+
+  /* Retrieve the number of solved probes */
+  ERR(sdis_estimator_buffer_get_definition(buffer, def));
+  ASSERT(def[0] == darray_probe_boundary_size_get(&stardis->probe_boundary_list));
+  ASSERT(def[1] == 1);
+
+  ERR(sdis_estimator_buffer_get_realisation_time(buffer, &time));
+  ERR(print_computation_time(&time, stardis, start, &t0, &t1, NULL));
+
+  /* Print the estimated temperature of each probe */
+  FOR_EACH(i, 0, def[0]) {
+    const struct stardis_probe_boundary* probe = NULL;
+    const struct sdis_estimator* estimator = NULL;
+    res_T res2 = RES_OK;
+
+    probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list) + i;
+    ERR(sdis_estimator_buffer_at(buffer, i, 1, &estimator));
+
+    res2 = print_single_MC_result_probe_boundary
+      (stardis, probe, estimator, stdout);
+    if(res2 != RES_OK && *output == RES_OK) *output = res2;
+  }
+
+exit:
+  if(buffer) SDIS(estimator_buffer_ref_put(buffer));
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
 solve_green
   (struct stardis* stardis,
    struct time* start,
@@ -777,25 +832,17 @@ error:
 }
 
 static res_T
-compute_single_probe_on_interface
+setup_solve_probe_boundary_args
   (struct stardis* stardis,
-   struct time* start,
-   const struct stardis_probe_boundary* probe)
+   const struct stardis_probe_boundary* probe,
+   struct sdis_solve_probe_boundary_args* args)
 {
-  /* Probe */
-  struct sdis_solve_probe_boundary_args args
-    = SDIS_SOLVE_PROBE_BOUNDARY_ARGS_DEFAULT;
   enum sdis_side probe_side = SDIS_SIDE_NULL__;
-
-  /* Miscellaneous */
-  unsigned desc_ids[SG3D_PROP_TYPES_COUNT__] = {0};
   double uv[2] = {0, 0};
   size_t iprim = SIZE_MAX;
-  res_T output_status[2] = {RES_OK, RES_OK};
+  unsigned desc_ids[SG3D_PROP_TYPES_COUNT__];
   res_T res = RES_OK;
-
-  /* Check pre-conditions */
-  ASSERT(stardis && start && probe);
+  ASSERT(stardis && probe && args);
 
   /* Calculate the probe position on the boundary */
   ERR(move_to_boundary(stardis, probe->position, probe->time[0], &iprim, uv));
@@ -807,23 +854,43 @@ compute_single_probe_on_interface
   ERR(setup_thermal_contact_resistance(stardis, desc_ids, probe_side));
 
   /* Setup of solve input parameters */
-  args.nrealisations = stardis->samples;
-  args.iprim = iprim;
-  args.uv[0] = uv[0];
-  args.uv[1] = uv[1];
-  args.time_range[0] = probe->time[0];
-  args.time_range[1] = probe->time[1];
-  args.picard_order = stardis->picard_order;
-  args.side = probe_side;
-  args.register_paths = stardis->dump_paths;
+  args->nrealisations = stardis->samples;
+  args->iprim = iprim;
+  args->uv[0] = uv[0];
+  args->uv[1] = uv[1];
+  args->time_range[0] = probe->time[0];
+  args->time_range[1] = probe->time[1];
+  args->picard_order = stardis->picard_order;
+  args->side = probe_side;
+  args->register_paths = stardis->dump_paths;
 
   /* The solver does not accept that the side of the interface on which the
    * probe is placed is invalid. Below, the side is arbitrarily defined because
    * at this point, Stardis has already arbitrated that this side does not
    * matter (i.e. there is no thermal contact resistance) */
-  if(args.side == SDIS_SIDE_NULL__) {
-    args.side = SDIS_FRONT;
+  if(args->side == SDIS_SIDE_NULL__) {
+    args->side = SDIS_FRONT;
   }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+compute_single_probe_on_interface
+  (struct stardis* stardis,
+   struct time* start,
+   const struct stardis_probe_boundary* probe)
+{
+  struct sdis_solve_probe_boundary_args args
+    = SDIS_SOLVE_PROBE_BOUNDARY_ARGS_DEFAULT;
+  res_T output_status[2] = {RES_OK, RES_OK};
+  res_T res = RES_OK;
+  ASSERT(stardis && start && probe);
+
+  ERR(setup_solve_probe_boundary_args(stardis, probe, &args));
 
   /* Run the calculation */
   if(stardis->mode & (MODE_GREEN | MODE_BIN_GREEN)) {
@@ -845,12 +912,50 @@ compute_multiple_probes_on_interface
   (struct stardis* stardis,
    struct time* start)
 {
-  res_T res = RES_OK;
-  ASSERT(stardis && start);
-  (void)stardis, (void)start; /* Avoid "unused variable" warnings */
+  /* Probes */
+  const struct stardis_probe_boundary* probes = NULL;
+  struct sdis_solve_probe_boundary_args* solve_args = NULL;
+  struct sdis_solve_probe_boundary_list_args solve_list_args =
+    SDIS_SOLVE_PROBE_BOUNDARY_LIST_ARGS_DEFAULT;
+  size_t nprobes = 0;
 
-  /* TODO */
+  /* Miscellaneous */
+  res_T output_status = RES_OK;
+  res_T res = RES_OK;
+  size_t i= 0;
+  ASSERT(stardis && start);
+
+  /* Fetch the list of probes arguments */
+  probes = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
+  nprobes = darray_probe_boundary_size_get(&stardis->probe_boundary_list);
+  ASSERT(nprobes > 1);
+
+  solve_args = MEM_CALLOC(stardis->allocator, nprobes, sizeof(*solve_args));
+  if(!probes) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Argument list allocation error for resolving multiple probes "
+      "on the boundary.\n");
+    res = RES_MEM_ERR;
+    goto error;
+  }
+
+  /* Setup the solve arguments */
+  FOR_EACH(i, 0, nprobes) {
+    solve_args[i] = SDIS_SOLVE_PROBE_BOUNDARY_ARGS_DEFAULT;
+    ERR(setup_solve_probe_boundary_args(stardis, &probes[i], &solve_args[i]));
+  }
+  solve_list_args.probes = solve_args;
+  solve_list_args.nprobes = nprobes;
+
+  /* Run calculations */
+  ERR(solve_list(stardis, start, &solve_list_args, &output_status));
+
+exit:
+  if(probes) MEM_RM(stardis->allocator, probes);
+  res = (res != RES_OK ? res : output_status);
   return res;
+error:
+  goto exit;
 }
 
 /*******************************************************************************

@@ -951,7 +951,7 @@ compute_multiple_probes_on_interface
   ERR(solve_list(stardis, start, &solve_list_args, &output_status));
 
 exit:
-  if(probes) MEM_RM(stardis->allocator, probes);
+  if(probes) MEM_RM(stardis->allocator, solve_args);
   res = (res != RES_OK ? res : output_status);
   return res;
 error:

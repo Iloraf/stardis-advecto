@@ -630,7 +630,7 @@ parse_args
           (char)opt, mode_option(args->mode));
         goto error;
       }
-      args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
+      args->mode |= MODE_PROBE_LIST_COMPUTE_ON_INTERFACE;
       res = parse_probe_boundary_list
         (optarg, args->logger, args->allocator, &args->probe_boundary_list);
       if(res != RES_OK) goto error;

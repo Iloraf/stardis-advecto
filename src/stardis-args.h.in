@@ -119,33 +119,32 @@ struct args {
   struct stardis_probe_boundary probe_boundary;
 };
 
-res_T
+extern LOCAL_SYM res_T
 init_args
   (struct logger* logger,
    struct mem_allocator* mem,
    struct args** args);
 
-void
+extern LOCAL_SYM void
 release_args
   (struct args* args);
 
-void
+extern LOCAL_SYM void
 print_version
   (FILE* stream);
 
-void
-short_help
-  (FILE* stream,
-   const char* prog);
+extern LOCAL_SYM void
+usage
+  (FILE* stream);
 
-res_T
+extern LOCAL_SYM res_T
 parse_args
   (const int argc,
    char** argv,
    struct args* args,
    struct mem_allocator* allocator);
 
-res_T
+extern LOCAL_SYM res_T
 parse_camera
   (struct logger* logger,
    char* cam_param,

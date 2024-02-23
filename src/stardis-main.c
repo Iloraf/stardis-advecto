@@ -77,7 +77,7 @@ main(int argc, char** argv)
   mode = (int)args->mode;
 
   if(mode & MODE_DUMP_HELP) {
-    short_help(stdout, argv[0]);
+    usage(stdout);
     goto exit;
   }
   else if(mode & MODE_DUMP_VERSION) {

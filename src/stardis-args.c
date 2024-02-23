@@ -335,120 +335,18 @@ release_args(struct args* args)
 }
 
 void
-short_help
-  (FILE* stream,
-   const char* prog)
+usage(FILE* stream)
 {
-  const char* name;
-#ifdef STARDIS_ENABLE_MPI
-  int rank;
-#endif
-  ASSERT(stream && prog);
-
-#ifdef STARDIS_ENABLE_MPI
-  CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
-  /* Only master prints */
-  if(rank != 0) return;
-#endif
-
-#ifdef COMPILER_GCC
-  name = strrchr(prog, '/');
-#else
-  name = strrchr(prog, '\\');
-#endif
-
-  name = name ? name + 1 : prog;
-  fprintf(stream,
-    "Usage: %s [OPTIONS]\n"
-    "\nSolve coupled thermal systems under the linear assumption.\n"
-    "Refer to stardis(1) man page for more information.\n\n",
-    name);
-  print_version(stream);
-
-  fprintf(stream, "\nMandatory options\n");
-  fprintf(stream,   "-----------------\n");
-
-  fprintf(stream, "\n  -M <FILE>\n");
-  fprintf(stream, "     Read a text file that contains (partial) description of the model.\n");
-
-  fprintf(stream, "\nExclusive options\n");
-  fprintf(stream,   "-----------------\n");
-
-  fprintf(stream, "\n  -F STL_FILE[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the mean flux on a given 2D region at a given time.\n");
-
-  fprintf(stream, "\n  -m MEDIUM_NAME[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the mean temperature in a given medium at a given time.\n");
-
-  fprintf(stream, "\n  -p X,Y,Z[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the temperature at the given probe.\n");
-
-  fprintf(stream, "\n  -P X,Y,Z[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the temperature at the given probe on an interface.\n");
-
-  fprintf(stream, "\n  -R [RENDERING_OPTIONS]\n");
-  fprintf(stream, "     Compute an infra-red image of the model.\n");
-
-  fprintf(stream, "\n  -s STL_FILE[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the mean temperature on a given 2D region.\n");
-
-  fprintf(stream, "\n  -S STL_FILE[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the by-triangle mean temperature on a given 2D region.\n");
-
-  fprintf(stream, "\nOther options\n");
-  fprintf(stream,   "-------------\n");
-
-  fprintf(stream, "\n  -c NAMES_PREFIX\n");
-  fprintf(stream, "     Dump the geometry and property ids to stdout as C chunks.\n");
-
-  fprintf(stream, "\n  -d FILE_NAME_PREFIX\n");
-  fprintf(stream, "     Dump the geometry to file <FILE_NAME_PREFIX>.vtk in VTK format along with various properties.\n");
-  fprintf(stream, "     If merge errors where detected, the corresponding part of the geometry is dumped to file\n"
-                  "     <FILE_NAME_PREFIX>_merge_conflicts.obj in OBJ format.\n");
-  fprintf(stream, "     If property errors where detected, the corresponding part of the geometry is dumped to file\n"
-                  "     <FILE_NAME_PREFIX>_property_conflicts.obj in OBJ format.\n");
-
-  fprintf(stream, "\n  -D TYPE,FILE_NAMES_PREFIX\n");
-  fprintf(stream, "     Write thermal paths of the given TYPE in VTK format.\n");
-
-  fprintf(stream, "\n  -e\n");
-  fprintf(stream, "     Use extended format to output Monte-Carlo results.\n");
-
-  fprintf(stream, "\n  -g\n");
-  fprintf(stream, "     Change the computation to produce the green function.\n");
-
-  fprintf(stream, "\n  -G BIN_FILE_NAME[,CSV_FILE_NAME]\n");
-  fprintf(stream, "     Change the computation to produce the green function and possibly end of paths information.\n");
-
-  fprintf(stream, "\n  -h\n");
-  fprintf(stream, "     Print this help and exit.\n");
-
-  fprintf(stream, "\n  -n SAMPLE_COUNT\n");
-  fprintf(stream, "     Set the number of Monte-Carlo samples.\n");
-
-  fprintf(stream, "\n  -o\n");
-  fprintf(stream, "     Set the order for the Picard linearization of radiative transfer.\n");
-
-  fprintf(stream, "\n  -t NUM_OF_THREADS\n");
-  fprintf(stream, "     Hint on the number of threads.\n");
-
-  fprintf(stream, "\n  -v\n");
-  fprintf(stream, "     Print version information and exit.\n");
-
-  fprintf(stream, "\n  -V LEVEL\n");
-  fprintf(stream, "     Set the verbosity level.\n");
-
-  fprintf(stream, "\n  -x <FILE>\n");
-  fprintf(stream, "     Use a random generator's state read from a file.\n");
-
-  fprintf(stream, "\n  -X <FILE>\n");
-  fprintf(stream, "     Save the final random generator's state in a file.\n");
-
-  fprintf(stream,
-"\nCopyright (C) 2018-2023 |Méso|Star> <contact@meso-star.com>.\n"
-"stardis is free software released under the GNU GPL license, version 3 or later.\n"
-"You are free to change or redistribute it under certain conditions\n"
-"<http://gnu.org/licenses/gpl.html>.\n");
+  #define PRINT(Msg) fprintf(stream, Msg)
+  PRINT("usage: stardis [-eghv] [-D path_type,files_name_prefix] [-d file_base_name]\n");
+  PRINT("               [-F surface[,time[,time]]] [-G green_bin[,green_ascii]]\n");
+  PRINT("               [-m medium_name[,time[,time]]] [-n samples_count]\n");
+  PRINT("               [-o picard_order] [-P x,y,z[,time[,time]][:side_indicator]]\n");
+  PRINT("               [-p x,y,z[,time[,time]]] [-R rendering_opt[:rendering_opt ...]]\n");
+  PRINT("               [-S surface[,time[,time]]] [-s surface[,time[,time]]]\n");
+  PRINT("               [-t threads_count] [-V verbosity_level] [-X output_rng]\n");
+  PRINT("               [-x input_rng] -M system\n");
+  #undef P
 }
 
 #define FREE_AARRAY(ARRAY) \

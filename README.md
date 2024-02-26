@@ -12,8 +12,6 @@ models which can be exported from Salomé or other similar software.
 
 ## Requirements
 
-## Release notes
-
 - C compiler
 - POSIX make
 - pkg-config
@@ -32,6 +30,8 @@ models which can be exported from Salomé or other similar software.
 Edit config.mk as needed, then run:
 
     make clean install
+
+## Release notes
 
 ### Version 0.9
 

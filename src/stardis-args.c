@@ -428,15 +428,16 @@ void
 usage(FILE* stream)
 {
   #define PRINT(Msg) fprintf(stream, Msg)
-  PRINT("usage: stardis [-eghv] [-D path_type,files_name_prefix] [-d file_base_name]\n");
-  PRINT("               [-F surface[,time[,time]]] [-G green_bin[,green_ascii]]\n");
-  PRINT("               [-m medium_name[,time[,time]]] [-n samples_count]\n");
-  PRINT("               [-o picard_order] [-P x,y,z[,time[,time]][:side_indicator]]\n");
-  PRINT("               [-p x,y,z[,time[,time]]] [-R rendering_opt[:rendering_opt ...]]\n");
-  PRINT("               [-S surface[,time[,time]]] [-s surface[,time[,time]]]\n");
-  PRINT("               [-t threads_count] [-V verbosity_level] [-X output_rng]\n");
-  PRINT("               [-x input_rng] -M system\n");
-  #undef P
+  PRINT("stardis [-eghv] [-D path_type,files_name_prefix] [-d file_base_name]\n");
+  PRINT("        [-F surface[,time[,time]]] [-G green_bin[,green_ascii]]\n");
+  PRINT("        [-L interface_probes] [-m medium_name[,time[,time]]]\n");
+  PRINT("        [-n samples_count] [-o picard_order]\n");
+  PRINT("        [-P x,y,z[,time[,time]][:side_indicator]]\n");
+  PRINT("        [-p x,y,z[,time[,time]]] [-R rendering_opt[:rendering_opt ...]]\n");
+  PRINT("        [-S surface[,time[,time]]] [-s surface[,time[,time]]]\n");
+  PRINT("        [-t threads_count] [-V verbosity_level] [-X output_rng]\n");
+  PRINT("        [-x input_rng] -M system\n");
+  #undef PRINT
 }
 
 #define FREE_AARRAY(ARRAY) \

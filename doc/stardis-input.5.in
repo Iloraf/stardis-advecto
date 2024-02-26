@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd January 31, 2024
+.Dd February 19, 2024
 .Dt STARDIS-INPUT 5
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -65,7 +65,7 @@ Depending on the type of description they use, programs must
 export a given list of mandatory functions.
 They can also export some other optional functions.
 The exact list with names and types can be found in the public header
-.Pa stardis-prog.h ,
+.Pa stardis-prog-properties.h ,
 which is installed together with
 .Xr stardis 1
 binary.
@@ -151,14 +151,14 @@ The file format is as follows:
 .Li FLUID Ao Va medium-name Ac Ao Va rho Ac Ao Va cp Ac \e
 .It Ta Ta Ao Va initial-temp Ac Ao Va imposed-temp Ac \e
 .It Ta Ta Ao Va triangle-sides Ac ...
-.It Ao Va fluid-prog Ac Ta ::= Ta Li FLUID_PROG Ao Va medium-name Ac Ao Va prog-desc Ac
+.It Ao Va fluid-prog Ac Ta ::= Ta Li FLUID_PROG Ao Va medium-name Ac Ao Va prog-desc-sides Ac
 .It \  Ta Ta
 .It Ao Va solid Ac Ta ::= Ta Ao Va solid-const Ac | Ao Va solid-prog Ac
 .It Ao Va solid-const Ac Ta ::= Ta
 .Li SOLID Ao Va medium-name Ac Ao Va lambda Ac Ao Va rho Ac Ao Va cp Ac \e
-.It Ta Ta Ao Va initial-temp Ac Ao Va imposed-temp Ac \e
+.It Ta Ta Ao Va delta Ac Ao Va initial-temp Ac Ao Va imposed-temp Ac \e
 .It Ta Ta Ao Va volumic-power Ac Ao Va triangle-sides Ac No ...
-.It Ao Va solid-prog Ac Ta ::= Ta Li SOLID_PROG Ao Va medium-name Ac Ao Va prog-desc Ac
+.It Ao Va solid-prog Ac Ta ::= Ta Li SOLID_PROG Ao Va medium-name Ac Ao Va prog-desc-sides Ac
 .It \  Ta Ta
 .It Ao Va lambda Ac Ta ::= Ta Vt real No # Conductivity > 0 [W/m/K]
 .It Ao Va rho Ac Ta ::= Ta Vt real No # Volumic mass > 0 [kg/m^3]
@@ -279,7 +279,8 @@ files, cannot use the same name.
 Additionally, description names cannot a number, nor be one of the
 keywords defined by the present grammar and their lowercase
 counterparts.
-Finally, description names cannot be longer than 63 characters.
+Finally, description names cannot be longer than
+@STARDIS_MAX_NAME_LENGTH@ characters.
 .Bl -column (description-line) (::) ()
 .It Ao Va bound-name Ac Ta ::= Ta Vt string
 .It Ao Va medium-name Ac Ta ::= Ta Vt string
@@ -290,11 +291,14 @@ Finally, description names cannot be longer than 63 characters.
 .It Ao Va lib-path Ac Ta ::= Ta Pa path
 .It \  Ta Ta
 .It Ao Va args Ac Ta ::= Ta Vt string No ...
-.It Ao Va prog-desc Ac Ta ::= Ta Ao Va prog-name Ac Ao Va triangle-sides Ac ... \e
+.It \  Ta Ta
+.It Ao Va prog-desc Ac Ta ::= Ta Ao Va prog-name Ac Ao Va triangles Ac ... \e
+.It Ta Ta Op Li PROG_PARAMS Op Ao Va args Ac
+.It Ao Va prog-desc-sides Ac Ta ::= Ta Ao Va prog-name Ac Ao Va triangles-sides Ac ... \e
 .It Ta Ta Op Li PROG_PARAMS Op Ao Va args Ac
 .It \  Ta Ta
-.It Ao Va triangle-sides Ac Ta ::= Ta Ao Va side-specifier Ac Ao Va triangles Ac
 .It Ao Va triangles Ac Ta ::= Ta Ao Va stl-path Ac
+.It Ao Va triangle-sides Ac Ta ::= Ta Ao Va side-specifier Ac Ao Va triangles Ac
 .El
 .Pp
 Side descriptions in side specifiers rely on the following convention:

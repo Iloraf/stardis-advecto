@@ -1551,15 +1551,13 @@ error:
 
 res_T
 print_computation_time
-  (struct sdis_estimator* estimator,
+  (struct sdis_mc* time_per_realisation,
    struct stardis* stardis,
    struct time* start,
    struct time* compute_start,
    struct time* compute_end,
    struct time* output_end)
 {
-  res_T res = RES_OK;
-  struct sdis_mc time;
   struct time tmp;
   char buf[128];
   const int flag = TIME_MSEC | TIME_SEC | TIME_MIN | TIME_HOUR | TIME_DAY;
@@ -1584,16 +1582,13 @@ print_computation_time
       "Result output time = %s\n", buf);
   }
 
-  if(estimator) {
-    ERR(sdis_estimator_get_realisation_time(estimator, &time));
+  if(time_per_realisation) {
     logger_print(stardis->logger, LOG_OUTPUT,
-      "Time per realisation (in usec) = %g +/- %g\n", time.E, time.SE);
+      "Time per realisation (in usec) = %g +/- %g\n",
+        time_per_realisation->E, time_per_realisation->SE);
   }
 
-exit:
-  return res;
-error:
-  goto exit;
+  return RES_OK;
 }
 
 res_T
@@ -1644,24 +1639,13 @@ print_single_MC_result
     else fprintf(stream, "%g %g %lu %lu\n",
       result.E, result.SE, nfailures, nsamples);
     break;
-  case MODE_PROBE_COMPUTE_ON_INTERFACE:
-    if(stardis->mode & MODE_EXTENDED_RESULTS) {
-      if(stardis->time_range[0] == stardis->time_range[1])
-        fprintf(stream,
-          "Boundary temperature at [%g, %g, %g] at t=%g = %g K +/- %g\n",
-          SPLIT3(stardis->probe), stardis->time_range[0],
-          result.E, /* Expected value */
-          result.SE); /* Standard error */
-      else
-        fprintf(stream,
-          "Boundary temperature at [%g, %g, %g] with t in [%g %g] = %g K +/- %g\n",
-          SPLIT3(stardis->probe), SPLIT2(stardis->time_range),
-          result.E, /* Expected value */
-          result.SE); /* Standard error */
+  case MODE_PROBE_COMPUTE_ON_INTERFACE: {
+      const struct stardis_probe_boundary* probe = NULL;
+      probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
+      ERR(print_single_MC_result_probe_boundary
+        (stardis, probe, estimator, stream));
+      break;
     }
-    else fprintf(stream, "%g %g %lu %lu\n",
-      result.E, result.SE, nfailures, nsamples);
-    break;
   case MODE_MEDIUM_COMPUTE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
       if(stardis->time_range[0] == stardis->time_range[1])
@@ -1798,6 +1782,61 @@ error:
 abort:
   res = RES_BAD_ARG;
   goto error;
+}
+
+res_T
+print_single_MC_result_probe_boundary
+  (struct stardis* stardis,
+   const struct stardis_probe_boundary* probe,
+   const struct sdis_estimator* estimator,
+   FILE* stream)
+{
+  struct sdis_mc result = SDIS_MC_NULL;
+  size_t nfailures = 0;
+  size_t nsamples = 0;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && probe && estimator);
+  ASSERT((stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
+      || (stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE));
+
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
+
+  /* Fetch the estimation data */
+  ERR(sdis_estimator_get_temperature(estimator, &result));
+  ERR(sdis_estimator_get_failure_count(estimator, &nfailures));
+  nsamples = stardis->samples;
+
+  if(nfailures == nsamples) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "All the %lu samples failed. No result to display.\n", nsamples);
+    res = RES_BAD_OP;
+    goto error;
+  }
+
+  /* Raw output */
+  if((stardis->mode & MODE_EXTENDED_RESULTS) == 0)  {
+    fprintf(stream, "%g %g %lu %lu\n",
+      result.E, result.SE, (unsigned long)nfailures, (unsigned long)nsamples);
+
+  /* Extended output */
+  } else if(stardis->time_range[0] == stardis->time_range[1]) {
+    fprintf(stream,
+      "Boundary temperature at [%g, %g, %g] at t=%g = %g K +/- %g\n",
+        SPLIT3(probe->position), probe->time[0], result.E, result.SE);
+
+  /* Extended output with time range */
+  } else {
+    fprintf(stream,
+      "Boundary temperature at [%g, %g, %g] with t in [%g %g] = %g K +/- %g\n",
+      SPLIT3(probe->position), SPLIT2(probe->time), result.E, result.SE);
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
 }
 
 res_T
@@ -1956,7 +1995,8 @@ dump_compute_region_at_the_end_of_vtk
     const struct description* descriptions;
     unsigned medium_id;
     ASSERT(stardis->mode & MODE_MEDIUM_COMPUTE);
-    medium = find_medium_by_name(stardis, &stardis->solve_name, &medium_id);
+    medium = find_medium_by_name
+      (stardis, str_cget(&stardis->solve_name), &medium_id);
     ASSERT(medium != NULL); (void)medium;
     descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
     FOR_EACH(i, 0, tsz) {

@@ -33,14 +33,10 @@
 #endif
 
 int
-main
-  (int argc,
-   char** argv)
+main(int argc, char** argv)
 {
   struct args* args = NULL;
   struct stardis stardis;
-  int logger_initialized = 0, allocator_initialized = 0,
-    args_initialized = 0, stardis_initialized = 0, name_initialized = 0;
   int err = EXIT_SUCCESS;
   struct mem_allocator allocator;
   struct logger logger;
@@ -49,6 +45,13 @@ main
   FILE* f = NULL;
   struct str name;
   res_T res = RES_OK;
+
+  /* Initialisation statuses */
+  int logger_initialized = 0;
+  int allocator_initialized = 0;
+  int args_initialized = 0;
+  int stardis_initialized = 0;
+  int name_initialized = 0;
 
   time_current(&start);
 
@@ -74,7 +77,7 @@ main
   mode = (int)args->mode;
 
   if(mode & MODE_DUMP_HELP) {
-    short_help(stdout, argv[0]);
+    usage(stdout);
     goto exit;
   }
   else if(mode & MODE_DUMP_VERSION) {

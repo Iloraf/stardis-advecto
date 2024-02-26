@@ -30,6 +30,7 @@ SRC =\
  src/stardis-app.c\
  src/stardis-args.c\
  src/stardis-compute.c\
+ src/stardis-compute-probe-boundary.c\
  src/stardis-description.c\
  src/stardis-fluid.c\
  src/stardis-fluid-prog.c\
@@ -55,6 +56,7 @@ SRC =\
 
 # Headers to configure
 HDR=\
+ src/stardis-args.h\
  src/stardis-default.h\
  src/stardis-green-types.h\
  src/stardis-prog-properties.h\
@@ -110,6 +112,10 @@ src/stardis-default.h: config.mk src/stardis-default.h.in
 	    -e 's/@STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL@/$(STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL)/' \
 	    $@.in > $@
 
+src/stardis-args.h: config.mk src/stardis-args.h.in
+	sed -e 's/@STARDIS_MAX_NAME_LENGTH@/$(STARDIS_MAX_NAME_LENGTH)/' \
+	    $@.in > $@
+
 src/stardis-version.h: config.mk src/stardis-version.h.in
 	sed -e 's/@STARDIS_APP_VERSION_MAJOR@/$(VERSION_MAJOR)/' \
 	    -e 's/@STARDIS_APP_VERSION_MINOR@/$(VERSION_MINOR)/' \
@@ -118,6 +124,7 @@ src/stardis-version.h: config.mk src/stardis-version.h.in
 
 src/stardis-green-types.h: config.mk src/stardis-green-types.h.in
 	sed -e 's/@STARDIS_GREEN_TYPES_VERSION@/$(GREEN_TYPES_VERSION)/' \
+	    -e "s/@STARDIS_MAX_NAME_LENGTH@/$$(($(STARDIS_MAX_NAME_LENGTH)-1))/" \
 	    $@.in > $@
 
 src/stardis-prog-properties.h: config.mk src/stardis-prog-properties.h.in
@@ -135,7 +142,7 @@ src/stardis-prog-properties.h: config.mk src/stardis-prog-properties.h.in
 ################################################################################
 # Man pages
 ################################################################################
-man: doc/stardis.1
+man: doc/stardis.1 doc/stardis-input.5
 
 doc/stardis.1: doc/stardis.1.in
 	sed -e 's/@STARDIS_ARGS_DEFAULT_COMPUTE_TIME@/$(STARDIS_ARGS_DEFAULT_COMPUTE_TIME)/' \
@@ -152,6 +159,10 @@ doc/stardis.1: doc/stardis.1.in
 	    -e 's/@STARDIS_ARGS_DEFAULT_SAMPLES_COUNT@/$(STARDIS_ARGS_DEFAULT_SAMPLES_COUNT)/' \
 	    -e 's/@STARDIS_ARGS_DEFAULT_SCALE_FACTOR@/$(STARDIS_ARGS_DEFAULT_SCALE_FACTOR)/' \
 	    -e 's/@STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL@/$(STARDIS_ARGS_DEFAULT_VERBOSE_LEVEL)/' \
+	    $@.in > $@
+
+doc/stardis-input.5: doc/stardis-input.5.in
+	sed -e "s/@STARDIS_MAX_NAME_LENGTH@/$$(($(STARDIS_MAX_NAME_LENGTH)-1))/" \
 	    $@.in > $@
 
 ################################################################################
@@ -180,7 +191,7 @@ uninstall:
 # Miscellaneous targets
 ################################################################################
 clean:
-	rm -f $(HDR) $(OBJ) .config stardis doc/stardis.1
+	rm -f $(HDR) $(OBJ) .config stardis doc/stardis.1 doc/stardis-input.5
 
 distclean: clean
 	rm -f $(DEP)

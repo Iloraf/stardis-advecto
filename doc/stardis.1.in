@@ -25,6 +25,7 @@
 .Op Fl d Ar file_base_name
 .Op Fl F Pa surface Ns Op , Ns Ar time Ns Op , Ns Ar time
 .Op Fl G Pa green_bin Ns Op , Ns Pa green_ascii
+.Op Fl L Pa interface_probes
 .Op Fl m Ar medium_name Ns Op , Ns Ar time Ns Op , Ns Ar time
 .Op Fl n Ar samples_count
 .Op Fl o Ar picard_order
@@ -185,6 +186,25 @@ and cannot be used in conjunction with option
 .Fl D .
 .It Fl h
 Output short help and exit.
+.It Fl L Pa interface_probes
+Defines a set of interface probes for which
+.Nm
+calculates the temperature.
+The argument file lists the interface probe points.
+Each line of this file describes a probe point using the same grammar as
+that used to describe a single interface probe
+.Pq see Fl P No option .
+In addition to this syntax, characters behind the hash mark
+.Pq Li #
+are considered comments and are therefore ignored, as are empty lines,
+i.e. lines with no characters at all or composed solely of spaces and
+tabs.
+.Pp
+Note that this option parallelizes the calculation of the probe list,
+and not the calculation of each individual probe.
+Its use is therefore more advantageous in terms of load distribution
+when the number of probes to be evaluated is large, compared with the
+cost of calculating a single probe point.
 .It Fl M Pa system
 Read a text file containing a possibly partial description of the system.
 Can include programs, media enclosures and boundary conditions.

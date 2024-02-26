@@ -27,19 +27,24 @@ struct str;
 #define DARRAY_DATA struct sdis_estimator*
 #include <rsys/dynamic_array.h>
 
-struct sdis_medium*
+extern LOCAL_SYM struct sdis_medium*
 find_medium_by_name
   (struct stardis* stardis,
-   const struct str* name,
+   const char* name,
    unsigned* id); /* Can be NULL */
 
-res_T
+extern LOCAL_SYM res_T
 stardis_compute
   (struct stardis* stardis,
    struct time* start);
 
-res_T
+extern LOCAL_SYM res_T
 read_compute_surface
   (struct stardis* stardis);
+
+extern LOCAL_SYM res_T
+compute_probe_on_interface
+  (struct stardis* stardis,
+   struct time* start);
 
 #endif

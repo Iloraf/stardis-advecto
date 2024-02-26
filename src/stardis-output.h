@@ -23,11 +23,13 @@ struct sdis_green_path;
 struct sdis_heat_path;
 struct sdis_estimator_buffer;
 struct sdis_green_function;
+struct sdis_mc;
 struct counts;
 struct description;
 struct mem_allocator;
 struct sdis_estimator;
 struct stardis;
+struct stardis_probe_boundary;
 struct geometry;
 struct vertex;
 struct darray_estimators;
@@ -38,72 +40,82 @@ struct dump_path_context {
   unsigned long rank;
   struct stardis* stardis;
 };
+#define DUMP_PATH_CONTEXT_NULL__ {0,NULL}
+static const struct dump_path_context DUMP_PATH_CONTEXT_NULL =
+  DUMP_PATH_CONTEXT_NULL__;
 
-res_T
+extern LOCAL_SYM res_T
 dump_path
   (const struct sdis_heat_path* path,
    void* context);
 
-res_T
+extern LOCAL_SYM res_T
 print_sample
   (struct sdis_green_path* path,
    void* ctx);
 
-res_T
+extern LOCAL_SYM res_T
 dump_vtk_image
   (const struct sdis_estimator_buffer* buf,
    FILE* stream);
 
-res_T
+extern LOCAL_SYM res_T
 dump_ht_image
   (const struct sdis_estimator_buffer* buf,
    FILE* stream);
 
-res_T
+extern LOCAL_SYM res_T
 dump_green_ascii
   (struct sdis_green_function* green,
    const struct stardis* stardis,
    FILE* stream);
 
-res_T
+extern LOCAL_SYM res_T
 dump_green_bin
   (struct sdis_green_function* green,
    const struct stardis* stardis,
    FILE* stream);
 
-res_T
+extern LOCAL_SYM res_T
 dump_paths_end
   (struct sdis_green_function* green,
    const struct stardis* stardis,
    FILE* stream);
 
-res_T
+extern LOCAL_SYM res_T
 dump_enclosure_related_stuff_at_the_end_of_vtk
   (struct stardis* stardis,
    FILE* stream);
 
-res_T
+extern LOCAL_SYM res_T
 print_computation_time
-  (struct sdis_estimator* estimator, /* Can be NULL */
+  (struct sdis_mc* time_per_realisation, /* Can be NULL */
    struct stardis* stardis,
-    struct time* start,
-    struct time* computation_start,
-    struct time* computation_end,
-    struct time* output_end); /* Can be NULL */
+   struct time* start,
+   struct time* computation_start,
+   struct time* computation_end,
+   struct time* output_end); /* Can be NULL */
 
-res_T
+extern LOCAL_SYM res_T
 print_single_MC_result
   (struct sdis_estimator* estimator,
    struct stardis* stardis,
    FILE* stream);
 
-res_T
+extern LOCAL_SYM res_T
+print_single_MC_result_probe_boundary
+  (struct stardis* stardis,
+   const struct stardis_probe_boundary* probe,
+   const struct sdis_estimator* estimator,
+   FILE* stream);
+
+extern LOCAL_SYM res_T
 dump_map
   (const struct stardis* stardis,
    const struct darray_estimators* estimators,
    FILE* stream);
 
-res_T
+extern LOCAL_SYM res_T
 dump_boundaries_at_the_end_of_vtk
   (const struct stardis* stardis,
    FILE* stream);

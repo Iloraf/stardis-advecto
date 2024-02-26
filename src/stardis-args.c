@@ -20,11 +20,13 @@
 #include "stardis-default.h"
 #include "stardis-version.h"
 
+#include <sdis_version.h>
+
 #include <rsys/cstr.h>
 #include <rsys/double2.h>
 #include <rsys/double3.h>
-#include <sdis_version.h>
 #include <rsys/logger.h>
+#include <rsys/text_reader.h>
 
 #include <getopt.h>
 #include <stdlib.h>
@@ -102,8 +104,7 @@ split_line
 }
 
 static char
-mode_option
-  (const int m)
+mode_option(const int m)
 {
   int found = 0;
   char res = '?';
@@ -115,6 +116,7 @@ mode_option
   if(m & MODE_GREEN) { found++; res = 'g'; }
   if(m & MODE_BIN_GREEN) { found++; res = 'G'; }
   if(m & MODE_DUMP_HELP) { found++; res = 'h'; }
+  if(m & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE) { found++; res = 'L'; }
   if(m & MODE_MEDIUM_COMPUTE) { found++; res = 'm'; }
   if(m & MODE_PROBE_COMPUTE) { found++; res = 'p'; }
   if(m & MODE_PROBE_COMPUTE_ON_INTERFACE) { found++; res = 'P'; }
@@ -150,6 +152,210 @@ print_multiple_modes
       fst = 0;
     }
   } while(m < modes);
+}
+
+static res_T
+parse_position_and_time(const char* str, double pos[3], double time[2])
+{
+  char buf[128];
+  double pos_and_time[5];
+  size_t len;
+  res_T res = RES_OK;
+  ASSERT(str && pos && time);
+
+
+  if(strlen(str) >= sizeof(buf)-1/*NULL char*/) {
+    fprintf(stderr,
+      "Could not duplicate the string defining a position and, optionally, "
+      "a time range `%s'\n", str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  res = cstr_to_list_double(str, ',', pos_and_time, &len, 5);
+  if(res != RES_OK
+  || len < 3 /* Invalid position */
+  || len > 5 /* Too many fields */) {
+    fprintf(stderr,
+      "Error parsing position and optional time range `%s'\n", str);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  pos[0] = pos_and_time[0];
+  pos[1] = pos_and_time[1];
+  pos[2] = pos_and_time[2];
+
+  switch(len) {
+    /* No time was parsed => Steady state */
+    case 3:
+      time[0] = INF;
+      time[1] = INF;
+      break;
+    /* A single time was parsed => the time range is degenerated */
+    case 4:
+      time[0] = pos_and_time[3];
+      time[1] = pos_and_time[3];
+      break;
+    /* A time range was parsed and must be not degenerated */
+    case 5:
+      time[0] = pos_and_time[3];
+      time[1] = pos_and_time[4];
+      if(time[0] > time[1]) {
+        fprintf(stderr, "Invalid time range [%g, %g}\n", time[0], time[1]);
+        res = RES_BAD_ARG;
+        goto error;
+      }
+      break;
+    default: FATAL("Unreachable code\n"); break;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+parse_side_indicator(const char* str, char side_name[STARDIS_MAX_NAME_LENGTH])
+{
+  res_T res = RES_OK;
+  ASSERT(str && side_name);
+
+  if(strlen(str) >= STARDIS_MAX_NAME_LENGTH) {
+    fprintf(stderr,
+      "Side indicator could not exceed %d characters `%s'\n",
+      STARDIS_MAX_NAME_LENGTH-1, str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(side_name, str, STARDIS_MAX_NAME_LENGTH);
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+parse_probe_boundary(const char* str, struct stardis_probe_boundary* probe)
+{
+  char buf[128];
+  char* pos_and_time = NULL;
+  char* side = NULL;
+  char* ctx = NULL;
+  res_T res = RES_OK;
+  ASSERT(str && probe);
+
+  if(strlen(str) >= sizeof(buf)-1/*NULL char*/) {
+    fprintf(stderr,
+      "Could not duplicate string defining probe at boundary `%s'\n",  str);
+    res = RES_MEM_ERR;
+    goto error;
+  }
+  strncpy(buf, str, sizeof(buf));
+
+  pos_and_time = strtok_r(buf, ":", &ctx);
+  side = strtok_r(NULL, "", &ctx);
+
+  res = parse_position_and_time(pos_and_time, probe->position, probe->time);
+  if(res != RES_OK) goto error;
+
+  if(side) {
+    res = parse_side_indicator(side, probe->side);
+    if(res != RES_OK) goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+allocate_probe_boundary
+  (struct args* args,
+   struct stardis_probe_boundary** out_probe)
+{
+  size_t i = 0;
+  res_T res = RES_OK;
+  ASSERT(args && out_probe);
+
+  i = darray_probe_boundary_size_get(&args->probe_boundary_list);
+  res = darray_probe_boundary_resize(&args->probe_boundary_list, i+1);
+  if(res != RES_OK) {
+    logger_print(args->logger, LOG_ERROR,
+      "Error allocating the probe on the boundary -- %s.\n",
+      res_to_cstr(res));
+    goto error;
+  }
+
+  *out_probe = darray_probe_boundary_data_get(&args->probe_boundary_list) + i;
+
+exit:
+  return res;
+error:
+  darray_probe_boundary_resize(&args->probe_boundary_list, i); /* Deallocate */
+  goto exit;
+}
+
+static res_T
+parse_probe_boundary_list
+  (const char* filename,
+   struct logger* logger,
+   struct mem_allocator* allocator,
+   struct darray_probe_boundary* list)
+{
+  struct txtrdr* txtrdr = NULL;
+  res_T res = RES_OK;
+  ASSERT(filename && list);
+
+  res = txtrdr_file(allocator, filename, '#', &txtrdr);
+  if(res != RES_OK) goto error;
+
+  for(;;) {
+    struct stardis_probe_boundary probe = STARDIS_PROBE_BOUNDARY_NULL;
+    const char* line = NULL;
+
+    res = txtrdr_read_line(txtrdr);
+    if(res != RES_OK) {
+      logger_print(logger, LOG_ERROR,
+        "%s: could not read the line `%lu' -- %s.\n",
+        txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
+        res_to_cstr(res));
+      goto error;
+    }
+
+    if(!(line = txtrdr_get_cline(txtrdr))) goto exit; /* No line to parse */
+
+    res = parse_probe_boundary(line, &probe);
+    if(res != RES_OK) goto error;
+
+    res = darray_probe_boundary_push_back(list, &probe);
+    if(res != RES_OK) {
+      logger_print(logger, LOG_ERROR,
+        "%s:%lu: error registering the probe on the boundary -- %s.\n",
+        txtrdr_get_name(txtrdr), (unsigned long)txtrdr_get_line_num(txtrdr),
+        res_to_cstr(res));
+      goto error;
+    }
+  }
+
+  if(!darray_probe_boundary_size_get(list)) {
+    logger_print(logger, LOG_ERROR,
+      "The file `%s' does not list any probes on the boundary.\n",
+      filename);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+exit:
+  if(txtrdr) txtrdr_ref_put(txtrdr);
+  return res;
+error:
+  darray_probe_boundary_clear(list);
+  goto exit;
 }
 
 /*******************************************************************************
@@ -198,6 +404,7 @@ init_args
   d2(args->pos_and_time+3,
     STARDIS_DEFAULT_COMPUTE_TIME, STARDIS_DEFAULT_COMPUTE_TIME);
   args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;
+  darray_probe_boundary_init(allocator, &args->probe_boundary_list);
 
 end:
   *out_args = args;
@@ -213,124 +420,24 @@ release_args(struct args* args)
 {
   ASSERT(args);
   darray_str_release(&args->model_files);
+  darray_probe_boundary_release(&args->probe_boundary_list);
   free(args);
 }
 
 void
-short_help
-  (FILE* stream,
-   const char* prog)
+usage(FILE* stream)
 {
-  const char* name;
-#ifdef STARDIS_ENABLE_MPI
-  int rank;
-#endif
-  ASSERT(stream && prog);
-
-#ifdef STARDIS_ENABLE_MPI
-  CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
-  /* Only master prints */
-  if(rank != 0) return;
-#endif
-
-#ifdef COMPILER_GCC
-  name = strrchr(prog, '/');
-#else
-  name = strrchr(prog, '\\');
-#endif
-
-  name = name ? name + 1 : prog;
-  fprintf(stream,
-    "Usage: %s [OPTIONS]\n"
-    "\nSolve coupled thermal systems under the linear assumption.\n"
-    "Refer to stardis(1) man page for more information.\n\n",
-    name);
-  print_version(stream);
-
-  fprintf(stream, "\nMandatory options\n");
-  fprintf(stream,   "-----------------\n");
-
-  fprintf(stream, "\n  -M <FILE>\n");
-  fprintf(stream, "     Read a text file that contains (partial) description of the model.\n");
-
-  fprintf(stream, "\nExclusive options\n");
-  fprintf(stream,   "-----------------\n");
-
-  fprintf(stream, "\n  -F STL_FILE[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the mean flux on a given 2D region at a given time.\n");
-
-  fprintf(stream, "\n  -m MEDIUM_NAME[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the mean temperature in a given medium at a given time.\n");
-
-  fprintf(stream, "\n  -p X,Y,Z[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the temperature at the given probe.\n");
-
-  fprintf(stream, "\n  -P X,Y,Z[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the temperature at the given probe on an interface.\n");
-
-  fprintf(stream, "\n  -R [RENDERING_OPTIONS]\n");
-  fprintf(stream, "     Compute an infra-red image of the model.\n");
-
-  fprintf(stream, "\n  -s STL_FILE[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the mean temperature on a given 2D region.\n");
-
-  fprintf(stream, "\n  -S STL_FILE[,TIME-RANGE]\n");
-  fprintf(stream, "     Compute the by-triangle mean temperature on a given 2D region.\n");
-
-  fprintf(stream, "\nOther options\n");
-  fprintf(stream,   "-------------\n");
-
-  fprintf(stream, "\n  -c NAMES_PREFIX\n");
-  fprintf(stream, "     Dump the geometry and property ids to stdout as C chunks.\n");
-
-  fprintf(stream, "\n  -d FILE_NAME_PREFIX\n");
-  fprintf(stream, "     Dump the geometry to file <FILE_NAME_PREFIX>.vtk in VTK format along with various properties.\n");
-  fprintf(stream, "     If merge errors where detected, the corresponding part of the geometry is dumped to file\n"
-                  "     <FILE_NAME_PREFIX>_merge_conflicts.obj in OBJ format.\n");
-  fprintf(stream, "     If property errors where detected, the corresponding part of the geometry is dumped to file\n"
-                  "     <FILE_NAME_PREFIX>_property_conflicts.obj in OBJ format.\n");
-
-  fprintf(stream, "\n  -D TYPE,FILE_NAMES_PREFIX\n");
-  fprintf(stream, "     Write thermal paths of the given TYPE in VTK format.\n");
-
-  fprintf(stream, "\n  -e\n");
-  fprintf(stream, "     Use extended format to output Monte-Carlo results.\n");
-
-  fprintf(stream, "\n  -g\n");
-  fprintf(stream, "     Change the computation to produce the green function.\n");
-
-  fprintf(stream, "\n  -G BIN_FILE_NAME[,CSV_FILE_NAME]\n");
-  fprintf(stream, "     Change the computation to produce the green function and possibly end of paths information.\n");
-
-  fprintf(stream, "\n  -h\n");
-  fprintf(stream, "     Print this help and exit.\n");
-
-  fprintf(stream, "\n  -n SAMPLE_COUNT\n");
-  fprintf(stream, "     Set the number of Monte-Carlo samples.\n");
-
-  fprintf(stream, "\n  -o\n");
-  fprintf(stream, "     Set the order for the Picard linearization of radiative transfer.\n");
-
-  fprintf(stream, "\n  -t NUM_OF_THREADS\n");
-  fprintf(stream, "     Hint on the number of threads.\n");
-
-  fprintf(stream, "\n  -v\n");
-  fprintf(stream, "     Print version information and exit.\n");
-
-  fprintf(stream, "\n  -V LEVEL\n");
-  fprintf(stream, "     Set the verbosity level.\n");
-
-  fprintf(stream, "\n  -x <FILE>\n");
-  fprintf(stream, "     Use a random generator's state read from a file.\n");
-
-  fprintf(stream, "\n  -X <FILE>\n");
-  fprintf(stream, "     Save the final random generator's state in a file.\n");
-
-  fprintf(stream,
-"\nCopyright (C) 2018-2023 |Méso|Star> <contact@meso-star.com>.\n"
-"stardis is free software released under the GNU GPL license, version 3 or later.\n"
-"You are free to change or redistribute it under certain conditions\n"
-"<http://gnu.org/licenses/gpl.html>.\n");
+  #define PRINT(Msg) fprintf(stream, Msg)
+  PRINT("stardis [-eghv] [-D path_type,files_name_prefix] [-d file_base_name]\n");
+  PRINT("        [-F surface[,time[,time]]] [-G green_bin[,green_ascii]]\n");
+  PRINT("        [-L interface_probes] [-m medium_name[,time[,time]]]\n");
+  PRINT("        [-n samples_count] [-o picard_order]\n");
+  PRINT("        [-P x,y,z[,time[,time]][:side_indicator]]\n");
+  PRINT("        [-p x,y,z[,time[,time]]] [-R rendering_opt[:rendering_opt ...]]\n");
+  PRINT("        [-S surface[,time[,time]]] [-s surface[,time[,time]]]\n");
+  PRINT("        [-t threads_count] [-V verbosity_level] [-X output_rng]\n");
+  PRINT("        [-x input_rng] -M system\n");
+  #undef PRINT
 }
 
 #define FREE_AARRAY(ARRAY) \
@@ -388,7 +495,7 @@ parse_args
 {
   int opt = 0, n_used = 0, o_used = 0;
   size_t len = 0;
-  const char option_list[] = "c:d:D:eF:gG:hm:M:n:o:p:P:R:s:S:t:vV:x:X:";
+  const char option_list[] = "c:d:D:eF:gG:hL:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -517,6 +624,19 @@ parse_args
       args->mode |= MODE_DUMP_HELP;
       break;
 
+    case 'L':
+      if(args->mode & EXCLUSIVE_MODES) {
+        logger_print(args->logger, LOG_ERROR,
+          "Options -%c and -%c are exclusive.\n",
+          (char)opt, mode_option(args->mode));
+        goto error;
+      }
+      args->mode |= MODE_PROBE_LIST_COMPUTE_ON_INTERFACE;
+      res = parse_probe_boundary_list
+        (optarg, args->logger, args->allocator, &args->probe_boundary_list);
+      if(res != RES_OK) goto error;
+      break;
+
     case 'm': {
       char* ptr;
       if(args->mode & EXCLUSIVE_MODES) {
@@ -585,42 +705,23 @@ parse_args
       GET_POS_AND_OPTIONAL_TIME_RANGE(optarg, args->pos_and_time, optarg);
       break;
 
-    case 'P':
+    case 'P': {
+        struct stardis_probe_boundary* probe = NULL;
+
         if(args->mode & EXCLUSIVE_MODES) {
-          res = RES_BAD_ARG;
           logger_print(args->logger, LOG_ERROR,
-              "Options -%c and -%c are exclusive.\n",
-              (char)opt, mode_option(args->mode));
+            "Options -%c and -%c are exclusive.\n",
+            (char)opt, mode_option(args->mode));
+          res = RES_BAD_ARG;
           goto error;
         }
         args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
-
-        ERR(str_set(&keep, optarg));
-        line = split_line(optarg, ':');
-        if(!line) {
-          res = RES_MEM_ERR;
-          str_release(&keep);
-          goto error;
-        }
-
-        /* We expect 1 or 2 parts in line */
-        if(!line[0] || (line[1] && line[2])) {
-          logger_print((args->logger), LOG_ERROR,
-            "Invalid argument for option ""-%c"": %s\n",
-            opt, str_cget(&keep));
-          str_release(&keep);
-          res = RES_BAD_ARG;
-          goto error;
-        }
-
-        /* First part is pos and optional time, optional second part is a
-         * medium name (OK if NULL) */
-        GET_POS_AND_OPTIONAL_TIME_RANGE(line[0], args->pos_and_time,
-          str_cget(&keep));
-        if(line[1])
-          args->medium_name = optarg + strlen(line[0]) + 1;
-
+        res = allocate_probe_boundary(args, &probe);
+        if(res != RES_OK) goto error;
+        res = parse_probe_boundary(optarg, probe);
+        if(res != RES_OK) goto error;
         break;
+      }
 
     case 'R':
       if(args->mode & EXCLUSIVE_MODES) {

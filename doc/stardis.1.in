@@ -187,16 +187,17 @@ and cannot be used in conjunction with option
 .It Fl h
 Output short help and exit.
 .It Fl L Pa interface_probes
-Defines a set of interface probes for which Stardis calculates the
-temperature.
+Defines a set of interface probes for which
+.Nm
+calculates the temperature.
 The argument file lists the interface probe points.
 Each line of this file describes a probe point using the same grammar as
 that used to describe a single interface probe
 .Pq see Fl P No option .
-Characters behind the hash mark
+In addition to this syntax, characters behind the hash mark
 .Pq Li #
-are considered comments and are therefore ignored, as well as empty
-lines, i.e. lines without any  characters or composed only of spaces and
+are considered comments and are therefore ignored, as are empty lines,
+i.e. lines with no characters at all or composed solely of spaces and
 tabs.
 .Pp
 Note that this option parallelizes the calculation of the probe list,

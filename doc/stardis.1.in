@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd January 31, 2024
+.Dd February 26, 2024
 .Dt STARDIS 1
 .Os
 .Sh NAME

@@ -106,7 +106,11 @@ check_delta_and_create_solid
           external = 1;
         } else {
           double d = header.volume / (header.area * 6);
-          ASSERT(d >= 0);
+          if(d <= 0) {
+            /* Should not */
+            res = RES_BAD_OP;
+            goto error;
+          }
           delta_range[0] = MMIN(delta_range[0], d);
           delta_range[1] = MMAX(delta_range[1], d);
         }

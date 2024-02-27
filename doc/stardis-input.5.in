@@ -348,7 +348,7 @@ and its volumic power is
 .Ar 2.5 No W/m^3 .
 The boundary properties are
 .No emissivity= Ns Ar 0 ,
-.No specular-fraction= Ns Ar 0,
+.No specular-fraction= Ns Ar 0 ,
 .No hc= Ns Ar 10 No W/m^2/K
 and
 .No external-temperature= Ns Ar 100 No K .

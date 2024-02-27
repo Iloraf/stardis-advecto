@@ -281,6 +281,9 @@ stardis_init
   stardis->verbose = args->verbose;
   darray_media_ptr_init(stardis->allocator, &stardis->media);
 
+  /* Init the external source */
+  extern_source_init(&stardis->extsrc);
+
   /* If a dump is expected, we won't process any computation */
   is_for_compute =
     (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_MODEL);
@@ -508,6 +511,7 @@ stardis_init
     scn_args.trad.temperature = stardis->trad;
     scn_args.trad.reference = stardis->trad_ref;
     d2_set(scn_args.t_range, stardis->t_range);
+    scn_args.source = stardis->extsrc.sdis_src;
     scn_args.context = &create_context;
     res = sdis_scene_create(stardis->dev, &scn_args, &stardis->sdis_scn);
     if(res != RES_OK) {
@@ -576,6 +580,7 @@ stardis_release
     release_solid(stardis->dummies.stardis_solid, stardis->allocator);
   }
   darray_probe_boundary_release(&stardis->probe_boundary_list);
+  extern_source_release(&stardis->extsrc);
 }
 
 unsigned

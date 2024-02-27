@@ -2070,6 +2070,70 @@ error:
   goto end;
 }
 
+static res_T
+process_spherical_source
+  (struct stardis* stardis,
+   wordexp_t* pwordexp)
+{
+  struct spherical_source* src = NULL;
+  char* arg = NULL;
+  size_t idx = 1;
+  res_T res = RES_OK;
+  ASSERT(stardis && pwordexp);
+
+  src = &stardis->extsrc.data.sphere;
+
+  if(stardis->extsrc.type != EXTERN_SOURCE_NONE__) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Only one external source can be defined\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  CHK_ARG(idx, "radius");
+  res = cstr_to_double(arg, &src->radius);
+  if(res == RES_OK && src->radius < 0) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid spherical source radius: %s\n", arg);
+    goto error;
+  }
+
+  #define PARSE_POS(Name, Id) { \
+    CHK_ARG(idx, "position "Name); \
+    res = cstr_to_double(arg, &src->position[Id]); \
+    if(res != RES_OK) { \
+      logger_print(stardis->logger, LOG_ERROR, \
+        "Invalid spherical source "Name" coordinate: %s\n", arg); \
+      goto error; \
+    } \
+  } (void)0
+  PARSE_POS("X", 0);
+  PARSE_POS("Y", 1);
+  PARSE_POS("Z", 2);
+  #undef PARSE_POS
+
+  CHK_ARG(idx, "power");
+  res = cstr_to_double(arg, &src->power);
+  if(res == RES_OK && src->power < 0) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid sphercial source power: %s\n", arg);
+    goto error;
+  }
+
+  stardis->extsrc.type = EXTERN_SOURCE_SPHERE;
+
+  res = extern_source_create_solver_source(&stardis->extsrc, stardis);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  stardis->extsrc = EXTERN_SOURCE_NULL;
+  goto exit;
+}
+
 /* Read medium or boundary line; should be one of:
  * SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_sides_filenames
  * FLUID Name rho cp Tinit Timposed STL_filenames
@@ -2151,6 +2215,8 @@ process_model_line
     ERR(process_scale(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "TRAD"))
     ERR(process_radiative(stardis, pwordexp));
+  else if(0 == strcasecmp(arg, "SPHERICAL_SOURCE"))
+    ERR(process_spherical_source(stardis, pwordexp));
   else {
     logger_print(stardis->logger, LOG_ERROR,
       "Unknown description type: %s\n", arg);

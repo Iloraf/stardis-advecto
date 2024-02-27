@@ -18,6 +18,7 @@
 
 #include "stardis-args.h"
 #include "stardis-description.h"
+#include "stardis-extern-source.h"
 
 #include <star/sg3d.h>
 
@@ -241,6 +242,7 @@ struct stardis {
   int mpi_rank;
 
   struct darray_probe_boundary probe_boundary_list;
+  struct extern_source extsrc;
 };
 
 unsigned

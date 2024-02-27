@@ -214,6 +214,7 @@ that changes at
 .It Ta \& \& | Ta Aq Va neumann
 .It Ta \& \& | Ta Aq Va robin-neumann
 .It Ta \& \& | Ta Ao Va rad-temp Ac No # \&At most once
+.It Ta \& \& | Ta Ao Va ext-source Ac No # \&At most once
 .It \  Ta Ta
 .\" Dirichlet
 .It Ao Va dirichlet  Ac Ta ::= Ta Ao Va dirichlet-const Ac | Ao Va dirichlet-prog Ac
@@ -257,10 +258,21 @@ that changes at
 .It Ao Va rad-temp Ac Ta ::= Ta Li TRAD Ao Va temp Ac Ao Va Tref Ac
 # Radiative temperatures
 .It \  Ta Ta
+.\" External source
+.It Ao Va ext-source Ac Ta ::= Ta Ao Va ext-source-const Ac | Ao Va ext-source-prog Ac
+.It Ao Va ext-source-const Ac Ta ::= Ta Li SPHERICAL_SOURCE Ao Va position Ac Ao Va radius Ac \e
+.It Ta Ta Ao Va power Ac
+.It Ao Va ext-source-prog Ac Ta ::= Ta Li SPHERICAL_SOURCE_PROG Ao Va radius Ac \e
+.It Ta Ta Ao Va prog-name Ac Op Li PROG_PARAMS Op Ao Va args Ac
+.It \  Ta Ta
+.\" Miscellaneous
 .It Ao Va temp Ac Ta ::= Ta Vt real No # Temperature > 0 [K]
 .It Ao Va Tref Ac Ta ::= Ta Vt real No # Reference temperature > 0 [K]
-.It Ao Va flux Ac Ta ::= Ta Vt real No # [W/m^2]
 .It Ao Va outside-temp Ac Ta ::= Ta Vt real No # Temperature > 0 [K]
+.It Ao Va flux Ac Ta ::= Ta Vt real No # [W/m^2]
+.It Ao Va power Ac Ta ::= Ta Vt real No # [W]
+.It Ao Va position Ac Ta ::= Ta Vt real real real
+.It Ao Va radius Ac Ta ::= Ta Vt real
 .El
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Ss Miscellaneous

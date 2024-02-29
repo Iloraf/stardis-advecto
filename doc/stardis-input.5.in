@@ -260,7 +260,7 @@ that changes at
 .It \  Ta Ta
 .\" External source
 .It Ao Va ext-source Ac Ta ::= Ta Ao Va ext-source-const Ac | Ao Va ext-source-prog Ac
-.It Ao Va ext-source-const Ac Ta ::= Ta Li SPHERICAL_SOURCE Ao Va position Ac Ao Va radius Ac \e
+.It Ao Va ext-source-const Ac Ta ::= Ta Li SPHERICAL_SOURCE Ao Va radius Ac Ao Va position Ac \e
 .It Ta Ta Ao Va power Ac
 .It Ao Va ext-source-prog Ac Ta ::= Ta Li SPHERICAL_SOURCE_PROG Ao Va radius Ac \e
 .It Ta Ta Ao Va prog-name Ac Op Li PROG_PARAMS Op Ao Va args Ac

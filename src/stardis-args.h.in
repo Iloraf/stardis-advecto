@@ -142,6 +142,7 @@ struct args {
   int mode;
   enum dump_path_type dump_paths;
   int verbose;
+  int disable_intrad; /* Disable internal radiative exchanges */
 
   struct darray_probe_boundary probe_boundary_list;
 };

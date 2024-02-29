@@ -243,6 +243,7 @@ struct stardis {
 
   struct darray_probe_boundary probe_boundary_list;
   struct extern_source extsrc;
+  int disable_intrad; /* Disable internal radiative exchanges */
 };
 
 unsigned

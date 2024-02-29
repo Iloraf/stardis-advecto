@@ -428,7 +428,7 @@ void
 usage(FILE* stream)
 {
   #define PRINT(Msg) fprintf(stream, Msg)
-  PRINT("stardis [-eghv] [-D path_type,files_name_prefix] [-d file_base_name]\n");
+  PRINT("stardis [-eghiv] [-D path_type,files_name_prefix] [-d file_base_name]\n");
   PRINT("        [-F surface[,time[,time]]] [-G green_bin[,green_ascii]]\n");
   PRINT("        [-L interface_probes] [-m medium_name[,time[,time]]]\n");
   PRINT("        [-n samples_count] [-o picard_order]\n");
@@ -495,7 +495,7 @@ parse_args
 {
   int opt = 0, n_used = 0, o_used = 0;
   size_t len = 0;
-  const char option_list[] = "c:d:D:eF:gG:hL:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
+  const char option_list[] = "c:d:D:eF:gG:hiL:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -622,6 +622,10 @@ parse_args
         goto error;
       }
       args->mode |= MODE_DUMP_HELP;
+      break;
+
+    case 'i':
+      args->disable_intrad = 1;
       break;
 
     case 'L':

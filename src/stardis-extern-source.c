@@ -62,10 +62,10 @@ create_solver_source_sphere
   ASSERT(src && src->type == EXTERN_SOURCE_SPHERE && stardis);
 
   /* Register with the solver source a pointer to the external source */
-  res = sdis_data_create(stardis->dev, sizeof(struct extern_source*),
-    ALIGNOF(struct extern_source*), NULL, &data);
+  res = sdis_data_create(stardis->dev, sizeof(struct extern_source),
+    ALIGNOF(struct extern_source), NULL, &data);
   if(res != RES_OK) goto error;
-  *((struct extern_source**)sdis_data_get(data)) = src;
+  *((struct extern_source*)sdis_data_get(data)) = *src;
 
   /* Create the spherical source */
   args.position = sphere_get_position;

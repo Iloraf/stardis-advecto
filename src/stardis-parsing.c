@@ -2186,7 +2186,9 @@ process_spherical_source_prog(struct stardis* stardis, wordexp_t* pwordexp)
   if(idx < pwordexp->we_wordc
   && strcasecmp(pwordexp->we_wordv[idx], "PROG_PARAMS")) {
     logger_print(stardis->logger, LOG_ERROR,
-      "Expecting PROG_PARAMS keyword while parsing `%s'.\n", arg);
+      "Expecting PROG_PARAMS keyword while parsing `%s'.\n",
+      pwordexp->we_wordv[idx]);
+    res = RES_BAD_ARG;
     goto error;
   }
 

@@ -632,9 +632,9 @@ create_intface
         }
         ASSERT(fluid_side_shader);
         fluid_side_shader->reference_temperature = interface_get_ref_temperature;
+        fluid_side_shader->specular_fraction = interface_get_alpha;
         if(intface->d.sf_connect->emissivity > 0) {
           fluid_side_shader->emissivity = interface_get_emissivity;
-          fluid_side_shader->specular_fraction = interface_get_alpha;
         }
         break;
       case DESC_SOLID_FLUID_CONNECT_PROG:

@@ -2090,6 +2090,9 @@ process_spherical_source
     goto error;
   }
 
+  res = extern_source_init_sphere(stardis->allocator, &stardis->extsrc);
+  if(res != RES_OK) goto error;
+
   CHK_ARG(idx, "radius");
   res = cstr_to_double(arg, &src->radius);
   if(res == RES_OK && src->radius < 0) res = RES_BAD_ARG;
@@ -2122,7 +2125,63 @@ process_spherical_source
     goto error;
   }
 
-  stardis->extsrc.type = EXTERN_SOURCE_SPHERE;
+  res = extern_source_create_solver_source(&stardis->extsrc, stardis);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  extern_source_release(&stardis->extsrc);
+  stardis->extsrc = EXTERN_SOURCE_NULL;
+  goto exit;
+}
+
+static res_T
+process_spherical_source_prog(struct stardis* stardis, wordexp_t* pwordexp)
+{
+  struct spherical_source_prog* src = NULL;
+  char* lib_name = NULL;
+  char* arg = NULL;
+  size_t idx = 1;
+  res_T res = RES_OK;
+  ASSERT(stardis && pwordexp);
+
+  src = &stardis->extsrc.data.sphere_prog;
+
+  if(stardis->extsrc.type != EXTERN_SOURCE_NONE__) {
+      logger_print(stardis->logger, LOG_ERROR,
+      "Only one external source can be defined\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = extern_source_init_sphere_prog(stardis->allocator, &stardis->extsrc);
+  if(res != RES_OK) goto error;
+
+  CHK_ARG(idx, "radius");
+  res = cstr_to_double(arg, &src->radius);
+  if(res == RES_OK && src->radius < 0) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid spherical source radius: %s\n", arg);
+    goto error;
+  }
+
+  CHK_ARG(idx, "program name");
+  ERR(str_set(&src->prog_name, arg));
+  lib_name = arg;
+
+  if(idx < pwordexp->we_wordc
+  && strcasecmp(pwordexp->we_wordv[idx], "PROG_PARAMS")) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Expecting PROG_PARAMS keyword while parsing `%s'.\n", arg);
+    goto error;
+  }
+
+  ERR(set_argc_argv(stardis->allocator, &src->argc, &src->argv, pwordexp, idx));
+  ERR(get_prog_common(lib_name, stardis, &src->program, &src->create, &src->release));
+  GET_LIB_SYMBOL(src, position, stardis_spherical_source_position);
+  GET_LIB_SYMBOL(src, power, stardis_spherical_source_power);
 
   res = extern_source_create_solver_source(&stardis->extsrc, stardis);
   if(res != RES_OK) goto error;
@@ -2130,6 +2189,7 @@ process_spherical_source
 exit:
   return res;
 error:
+  extern_source_release(&stardis->extsrc);
   stardis->extsrc = EXTERN_SOURCE_NULL;
   goto exit;
 }
@@ -2217,6 +2277,8 @@ process_model_line
     ERR(process_radiative(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "SPHERICAL_SOURCE"))
     ERR(process_spherical_source(stardis, pwordexp));
+  else if(0 == strcasecmp(arg, "SPHERICAL_SOURCE_PROG"))
+    ERR(process_spherical_source_prog(stardis, pwordexp));
   else {
     logger_print(stardis->logger, LOG_ERROR,
       "Unknown description type: %s\n", arg);

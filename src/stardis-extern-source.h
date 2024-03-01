@@ -20,9 +20,11 @@
 
 /* Forward declaration */
 struct stardis;
+struct stardis_description_create_context;
 
 enum source_type {
   EXTERN_SOURCE_SPHERE,
+  EXTERN_SOURCE_SPHERE_PROG,
   EXTERN_SOURCE_NONE__
 };
 
@@ -35,11 +37,50 @@ struct spherical_source {
 static const struct spherical_source SPHERICAL_SOURCE_NULL =
   SPHERICAL_SOURCE_NULL__;
 
+struct spherical_source_prog {
+  struct str prog_name;
+  struct program* program;
+  void* data; /* Pointer toward the program data */
+
+  /* Input arguments */
+  size_t argc;
+  char** argv;
+
+  double radius; /* Not programmable */
+
+  void*
+  (*create)
+    (const struct stardis_description_create_context*,
+     void* lib_data,
+     size_t argc,
+     char* argv[]);
+
+  void
+  (*release)
+    (void* data);
+
+  double*
+  (*position)
+    (const double time,
+     double position[3],
+     void* data);
+
+  double
+  (*power)
+    (const double time,
+     void* data);
+};
+#define SPHERICAL_SOURCE_PROG_NULL__ \
+  {{0}, NULL, NULL, 0, NULL, 0, NULL, NULL, NULL, NULL}
+static const struct spherical_source_prog SPHERICAL_SOURCE_PROG_NULL=
+  SPHERICAL_SOURCE_PROG_NULL__;
+
 /* Interface of an external source */
 struct extern_source {
   enum source_type type;
   union {
     struct spherical_source sphere;
+    struct spherical_source_prog sphere_prog;
   } data;
   struct sdis_source* sdis_src;
 };
@@ -47,12 +88,15 @@ struct extern_source {
   {EXTERN_SOURCE_NONE__, {SPHERICAL_SOURCE_NULL__}, NULL}
 static const struct extern_source EXTERN_SOURCE_NULL = EXTERN_SOURCE_NULL__;
 
-static INLINE void
-extern_source_init(struct extern_source* src)
-{
-  ASSERT(src);
-  *src = EXTERN_SOURCE_NULL;
-}
+extern LOCAL_SYM res_T
+extern_source_init_sphere
+  (struct mem_allocator* allocator,
+   struct extern_source* src);
+
+extern LOCAL_SYM res_T
+extern_source_init_sphere_prog
+  (struct mem_allocator* allocator,
+   struct extern_source* src);
 
 extern LOCAL_SYM void
 extern_source_release

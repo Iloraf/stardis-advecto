@@ -279,11 +279,9 @@ stardis_init
   stardis->next_medium_id = 0;
   stardis->undefined_medium_behind_boundary_id = SENC3D_UNSPECIFIED_MEDIUM;
   stardis->verbose = args->verbose;
+  stardis->extsrc = EXTERN_SOURCE_NULL;
   stardis->disable_intrad = args->disable_intrad;
   darray_media_ptr_init(stardis->allocator, &stardis->media);
-
-  /* Init the external source */
-  extern_source_init(&stardis->extsrc);
 
   /* If a dump is expected, we won't process any computation */
   is_for_compute =

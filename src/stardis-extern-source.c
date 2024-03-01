@@ -26,28 +26,24 @@
 static void
 sphere_get_position(const double time, double pos[3], struct sdis_data* data)
 {
-  const struct extern_source* src = NULL;
+  const struct spherical_source* src = NULL;
   ASSERT(pos);
   (void)time;
 
-  src = sdis_data_cget(data);
-  ASSERT(src->type == EXTERN_SOURCE_SPHERE);
-
-  pos[0] = src->data.sphere.position[0];
-  pos[1] = src->data.sphere.position[1];
-  pos[2] = src->data.sphere.position[2];
+  src = *((const struct spherical_source* const*)sdis_data_cget(data));
+  pos[0] = src->position[0];
+  pos[1] = src->position[1];
+  pos[2] = src->position[2];
 }
 
 static double
 sphere_get_power(const double time, struct sdis_data* data)
 {
-  const struct extern_source* src = NULL;
+  const struct spherical_source* src = NULL;
   (void)time;
 
-  src = sdis_data_cget(data);
-  ASSERT(src->type == EXTERN_SOURCE_SPHERE);
-
-  return src->data.sphere.power; /* [W] */
+  src = *((const struct spherical_source* const*)sdis_data_cget(data));
+  return src->power; /* [W] */
 }
 
 static res_T
@@ -62,10 +58,10 @@ create_solver_source_sphere
   ASSERT(src && src->type == EXTERN_SOURCE_SPHERE && stardis);
 
   /* Register with the solver source a pointer to the external source */
-  res = sdis_data_create(stardis->dev, sizeof(struct extern_source),
-    ALIGNOF(struct extern_source), NULL, &data);
+  res = sdis_data_create(stardis->dev, sizeof(struct spherical_source*),
+    ALIGNOF(struct spherical_source*), NULL, &data);
   if(res != RES_OK) goto error;
-  *((struct extern_source*)sdis_data_get(data)) = *src;
+  *((struct spherical_source**)sdis_data_get(data)) = &src->data.sphere;
 
   /* Create the spherical source */
   args.position = sphere_get_position;
@@ -86,14 +82,98 @@ error:
   goto exit;
 }
 
+static void
+sphere_prog_get_position(const double time, double pos[3], struct sdis_data* data)
+{
+  const struct spherical_source_prog* src = NULL;
+  ASSERT(pos);
+  (void)time;
+
+  src = *((const struct spherical_source_prog* const*)sdis_data_cget(data));
+  src->position(time, pos, src->data);;
+}
+
+static double
+sphere_prog_get_power(const double time, struct sdis_data* data)
+{
+  const struct spherical_source_prog* src = NULL;
+  (void)time;
+
+  src = *((const struct spherical_source_prog* const*)sdis_data_cget(data));
+  return src->power(time, src->data);
+}
+
+static res_T
+create_solver_source_sphere_prog
+  (struct extern_source* src,
+   struct stardis* stardis)
+{
+  struct sdis_spherical_source_create_args args =
+    SDIS_SPHERICAL_SOURCE_CREATE_ARGS_NULL;
+  struct sdis_data* data = NULL;
+  res_T res = RES_OK;
+  ASSERT(src && src->type == EXTERN_SOURCE_SPHERE_PROG && stardis);
+
+  /* Register with the solver source a pointer to the external source */
+  res = sdis_data_create(stardis->dev, sizeof(struct spherical_source_prog*),
+    ALIGNOF(struct spherical_source_prog*), NULL, &data);
+  if(res != RES_OK) goto error;
+  *((struct spherical_source_prog**)sdis_data_get(data)) = &src->data.sphere_prog;
+
+  /* Create the spherical source */
+  args.position = sphere_prog_get_position;
+  args.power = sphere_prog_get_power;
+  args.data = data;
+  args.radius = src->data.sphere_prog.radius;
+  res = sdis_spherical_source_create(stardis->dev, &args, &src->sdis_src);
+  if(res != RES_OK) goto error;
+
+exit:
+  /* Release the local reference on the data: it is kept by the sdis source */
+  if(data) SDIS(data_ref_put(data));
+  return res;
+error:
+  logger_print(stardis->logger, LOG_ERROR,
+    "Error when creating the external spherical source for the Solver -- %s\n",
+    res_to_cstr(res));
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
+res_T
+extern_source_init_sphere
+  (struct mem_allocator* allocator,
+   struct extern_source* src)
+{
+  ASSERT(src);
+  (void)allocator;
+  src->type = EXTERN_SOURCE_SPHERE;
+  src->data.sphere = SPHERICAL_SOURCE_NULL;
+  return RES_OK;
+}
+
+res_T
+extern_source_init_sphere_prog
+  (struct mem_allocator* allocator,
+   struct extern_source* src)
+{
+  ASSERT(src);
+  src->type = EXTERN_SOURCE_SPHERE_PROG;
+  src->data.sphere_prog = SPHERICAL_SOURCE_PROG_NULL;
+  str_init(allocator, &src->data.sphere_prog.prog_name);
+  return RES_OK;
+}
+
 void
 extern_source_release(struct extern_source* src)
 {
   ASSERT(src);
   if(src->sdis_src) SDIS(source_ref_put(src->sdis_src));
+  if(src->type == EXTERN_SOURCE_SPHERE_PROG) {
+    str_release(&src->data.sphere_prog.prog_name);
+  }
 }
 
 res_T
@@ -107,6 +187,10 @@ extern_source_create_solver_source
   switch(src->type) {
     case EXTERN_SOURCE_SPHERE:
       res = create_solver_source_sphere(src, stardis);
+      if(res != RES_OK) goto error;
+      break;
+    case EXTERN_SOURCE_SPHERE_PROG:
+      res = create_solver_source_sphere_prog(src, stardis);
       if(res != RES_OK) goto error;
       break;
     default: FATAL("Unreachable code\n"); break;

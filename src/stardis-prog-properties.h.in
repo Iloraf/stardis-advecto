@@ -592,6 +592,26 @@ stardis_t_range
   (void* data,
    double range[2]);
 
+/******************************************************************************/
+/* Additional mandatory functions for a programmed spherical source           */
+/* These functions are used to calculate the external flux at the boundaries. */
+/******************************************************************************/
+
+/* Retrieve the position of the spherical source center.
+ * This function is used to calculate the external flux at the boundaries.
+ * Returns its modified position argument */
+STARDIS_API double*
+stardis_spherical_source_position
+  (const double time, /* [s] */
+   double position[3],
+   void* data);
+
+/* Retrieve the power of the spherical source. */
+STARDIS_API double /* [W] */
+stardis_spherical_source_power
+  (const double time,
+   void* data);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

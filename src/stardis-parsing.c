@@ -628,6 +628,18 @@ set_argc_argv
     goto error;
   }
   *argc = pwordexp->we_wordc - idx;
+  /* Review: why allocate an extra argument? In fact, it's necessary because
+   * this function is called even if there are no arguments to analyze. In this
+   * case, allocation would fail, as the size to be allocated would be zero.
+   * This +1 therefore guarantees that at least one element will be allocated.
+   * But this could be eliminated by checking that there are no arguments
+   * (argc==0) and, if necessary, returning before any allocation.
+   *
+   * Nevertheless, this extra argument makes sense. It should be the first
+   * argument and contain the program name. In this way, the argument list would
+   * respect the C convention for declaring an argument list. And so, anyone
+   * could use the getopt analysis function without having to declare a dummy
+   * argument as the program's first parameter */
   *argv = MEM_CALLOC(allocator, 1 + *argc, sizeof(char *));
   if(*argv == NULL) {
     res = RES_MEM_ERR;

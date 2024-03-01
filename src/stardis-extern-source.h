@@ -41,6 +41,7 @@ struct spherical_source_prog {
   struct str prog_name;
   struct program* program;
   void* data; /* Pointer toward the program data */
+  struct mem_allocator* allocator;
 
   /* Input arguments */
   size_t argc;
@@ -71,7 +72,7 @@ struct spherical_source_prog {
      void* data);
 };
 #define SPHERICAL_SOURCE_PROG_NULL__ \
-  {{0}, NULL, NULL, 0, NULL, 0, NULL, NULL, NULL, NULL}
+  {{0}, NULL, NULL, NULL, 0, NULL, 0, NULL, NULL, NULL, NULL}
 static const struct spherical_source_prog SPHERICAL_SOURCE_PROG_NULL=
   SPHERICAL_SOURCE_PROG_NULL__;
 

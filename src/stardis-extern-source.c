@@ -162,6 +162,7 @@ extern_source_init_sphere_prog
   ASSERT(src);
   src->type = EXTERN_SOURCE_SPHERE_PROG;
   src->data.sphere_prog = SPHERICAL_SOURCE_PROG_NULL;
+  src->data.sphere_prog.allocator = allocator;
   str_init(allocator, &src->data.sphere_prog.prog_name);
   return RES_OK;
 }
@@ -171,8 +172,16 @@ extern_source_release(struct extern_source* src)
 {
   ASSERT(src);
   if(src->sdis_src) SDIS(source_ref_put(src->sdis_src));
+
   if(src->type == EXTERN_SOURCE_SPHERE_PROG) {
-    str_release(&src->data.sphere_prog.prog_name);
+    struct spherical_source_prog* src_prog = &src->data.sphere_prog;
+    size_t i;
+
+    str_release(&src_prog->prog_name);
+    FOR_EACH(i, 0, src_prog->argc) {
+      MEM_RM(src_prog->allocator, src_prog->argv[i]);
+    }
+    MEM_RM(src_prog->allocator, src_prog->argv);
   }
 }
 

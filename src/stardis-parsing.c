@@ -2151,6 +2151,7 @@ error:
 static res_T
 process_spherical_source_prog(struct stardis* stardis, wordexp_t* pwordexp)
 {
+  struct stardis_description_create_context ctx;
   struct spherical_source_prog* src = NULL;
   char* lib_name = NULL;
   char* arg = NULL;
@@ -2196,6 +2197,15 @@ process_spherical_source_prog(struct stardis* stardis, wordexp_t* pwordexp)
   ERR(get_prog_common(lib_name, stardis, &src->program, &src->create, &src->release));
   GET_LIB_SYMBOL(src, position, stardis_spherical_source_position);
   GET_LIB_SYMBOL(src, power, stardis_spherical_source_power);
+
+  ctx.name = "External spherical source";
+  src->data = src->create(&ctx, src->program->prog_data, src->argc, src->argv);
+  if(!src->data) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot create data for the external spherical source\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
 
   res = extern_source_create_solver_source(&stardis->extsrc, stardis);
   if(res != RES_OK) goto error;

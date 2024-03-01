@@ -558,6 +558,9 @@ stardis_release
   str_release(&stardis->bin_green_filename);
   str_release(&stardis->end_paths_filename);
   str_release(&stardis->chunks_prefix);
+
+  extern_source_release(&stardis->extsrc);
+
   /* release non-PROGRAM descritions first */
   FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
     struct description* d = darray_descriptions_data_get(&stardis->descriptions) +i;
@@ -589,7 +592,6 @@ stardis_release
     release_solid(stardis->dummies.stardis_solid, stardis->allocator);
   }
   darray_probe_boundary_release(&stardis->probe_boundary_list);
-  extern_source_release(&stardis->extsrc);
 }
 
 unsigned

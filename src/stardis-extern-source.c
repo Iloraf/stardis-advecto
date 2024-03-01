@@ -171,18 +171,24 @@ void
 extern_source_release(struct extern_source* src)
 {
   ASSERT(src);
-  if(src->sdis_src) SDIS(source_ref_put(src->sdis_src));
-
   if(src->type == EXTERN_SOURCE_SPHERE_PROG) {
     struct spherical_source_prog* src_prog = &src->data.sphere_prog;
     size_t i;
+
+    if(src_prog->data) {
+      ASSERT(src_prog->release);
+      src_prog->release(src_prog->data);
+    }
 
     str_release(&src_prog->prog_name);
     FOR_EACH(i, 0, src_prog->argc) {
       MEM_RM(src_prog->allocator, src_prog->argv[i]);
     }
+
     MEM_RM(src_prog->allocator, src_prog->argv);
   }
+
+  if(src->sdis_src) SDIS(source_ref_put(src->sdis_src));
 }
 
 res_T

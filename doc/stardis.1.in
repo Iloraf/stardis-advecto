@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd January 31, 2024
+.Dd February 26, 2024
 .Dt STARDIS 1
 .Os
 .Sh NAME
@@ -20,7 +20,7 @@
 .Nd statistical solving of coupled thermal systems
 .Sh SYNOPSIS
 .Nm
-.Op Fl eghv
+.Op Fl eghiv
 .Op Fl D Ar path_type , Ns Ar files_name_prefix
 .Op Fl d Ar file_base_name
 .Op Fl F Pa surface Ns Op , Ns Ar time Ns Op , Ns Ar time
@@ -186,6 +186,10 @@ and cannot be used in conjunction with option
 .Fl D .
 .It Fl h
 Output short help and exit.
+.It Fl i
+Disable internal radiative exchanges.
+External radiative exchanges are still processed, i.e. the external
+source.
 .It Fl L Pa interface_probes
 Defines a set of interface probes for which
 .Nm

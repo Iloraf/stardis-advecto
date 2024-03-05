@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd February 19, 2024
+.Dd February 27, 2024
 .Dt STARDIS-INPUT 5
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -128,18 +128,11 @@ The file format is as follows:
 .It Ta \& \& | Ta Ao Va boundary-condition Ac Op Ao Va comment Ac
 .It Ta \& \& | Ta Ao Va scaling Ac Op Ao Va comment Ac
 # At most once
-.It Ta \& \& | Ta Ao Va rad-temps Ac Op Ao Va comment Ac
-# At most once
 .It \  Ta Ta
 .It Ao Va comment Ac Ta ::= Ta Li # Vt string
 .It Ao Va program Ac Ta ::= Ta Li PROGRAM Ao Va prog-name Ac Ao Va lib-path Ac Op Ao Va args Ac
 .It Ao Va scaling Ac Ta ::= Ta Li SCALE Vt real
 # Geometry scaling in ]0, INF)
-.It \  Ta Ta
-.It Ao Va rad-temps Ac Ta ::= Ta Li TRAD Ao Va temp Ac Ao Va Tref Ac
-# Radiative temperatures
-.It Ao Va temp Ac Ta ::= Ta Vt real No # Temperature > 0 [K]
-.It Ao Va Tref Ac Ta ::= Ta Vt real No # Reference temperature > 0 [K]
 .El
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Ss Media
@@ -220,6 +213,8 @@ that changes at
 .It Ta \& \& | Ta Aq Va robin
 .It Ta \& \& | Ta Aq Va neumann
 .It Ta \& \& | Ta Aq Va robin-neumann
+.It Ta \& \& | Ta Ao Va rad-temp Ac No # \&At most once
+.It Ta \& \& | Ta Ao Va ext-source Ac No # \&At most once
 .It \  Ta Ta
 .\" Dirichlet
 .It Ao Va dirichlet  Ac Ta ::= Ta Ao Va dirichlet-const Ac | Ao Va dirichlet-prog Ac
@@ -259,8 +254,25 @@ that changes at
 .It Ao Va robin-neumann-prog Ac Ta ::= Ta Li HF_BOUNDARY_FOR_SOLID_PROG Ao Va bound-name Ac \e
 .It Ta Ta Ao Va prog-desc Ac
 .It \  Ta Ta
-.It Ao Va flux Ac Ta ::= Ta Vt real No # [W/m^2]
+.\" Radiative temperature
+.It Ao Va rad-temp Ac Ta ::= Ta Li TRAD Ao Va temp Ac Ao Va Tref Ac
+# Radiative temperatures
+.It \  Ta Ta
+.\" External source
+.It Ao Va ext-source Ac Ta ::= Ta Ao Va ext-source-const Ac | Ao Va ext-source-prog Ac
+.It Ao Va ext-source-const Ac Ta ::= Ta Li SPHERICAL_SOURCE Ao Va radius Ac Ao Va position Ac \e
+.It Ta Ta Ao Va power Ac
+.It Ao Va ext-source-prog Ac Ta ::= Ta Li SPHERICAL_SOURCE_PROG Ao Va radius Ac \e
+.It Ta Ta Ao Va prog-name Ac Op Li PROG_PARAMS Op Ao Va args Ac
+.It \  Ta Ta
+.\" Miscellaneous
+.It Ao Va temp Ac Ta ::= Ta Vt real No # Temperature > 0 [K]
+.It Ao Va Tref Ac Ta ::= Ta Vt real No # Reference temperature > 0 [K]
 .It Ao Va outside-temp Ac Ta ::= Ta Vt real No # Temperature > 0 [K]
+.It Ao Va flux Ac Ta ::= Ta Vt real No # [W/m^2]
+.It Ao Va power Ac Ta ::= Ta Vt real No # [W]
+.It Ao Va position Ac Ta ::= Ta Vt real real real
+.It Ao Va radius Ac Ta ::= Ta Vt real
 .El
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Ss Miscellaneous
@@ -336,7 +348,7 @@ and its volumic power is
 .Ar 2.5 No W/m^3 .
 The boundary properties are
 .No emissivity= Ns Ar 0 ,
-.No specular-fraction= Ns Ar 0,
+.No specular-fraction= Ns Ar 0 ,
 .No hc= Ns Ar 10 No W/m^2/K
 and
 .No external-temperature= Ns Ar 100 No K .

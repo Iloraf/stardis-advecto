@@ -283,6 +283,8 @@ stardis_init
   stardis->next_medium_id = 0;
   stardis->undefined_medium_behind_boundary_id = SENC3D_UNSPECIFIED_MEDIUM;
   stardis->verbose = args->verbose;
+  stardis->extsrc = EXTERN_SOURCE_NULL;
+  stardis->disable_intrad = args->disable_intrad;
   darray_media_ptr_init(stardis->allocator, &stardis->media);
 
   /* If a dump is expected, we won't process any computation */
@@ -511,8 +513,19 @@ stardis_init
     scn_args.fp_to_meter = stardis->scale_factor;
     scn_args.trad.temperature = stardis->trad;
     scn_args.trad.reference = stardis->trad_ref;
-    d2_set(scn_args.t_range, stardis->t_range);
+    scn_args.t_range[0] = stardis->t_range[0];
+    scn_args.t_range[1] = stardis->t_range[1];
+    scn_args.source = stardis->extsrc.sdis_src;
     scn_args.context = &create_context;
+
+    /* Setting Tmax to 0 is a way of setting the radiative coefficient to 0, and
+     * thus setting the probability of evolving in a radiative random walk to
+     * zero. */
+    if(stardis->disable_intrad) {
+      scn_args.t_range[0] = 0;
+      scn_args.t_range[1] = 0;
+    }
+
     res = sdis_scene_create(stardis->dev, &scn_args, &stardis->sdis_scn);
     if(res != RES_OK) {
       logger_print(stardis->logger, LOG_ERROR,
@@ -549,6 +562,9 @@ stardis_release
   str_release(&stardis->bin_green_filename);
   str_release(&stardis->end_paths_filename);
   str_release(&stardis->chunks_prefix);
+
+  extern_source_release(&stardis->extsrc);
+
   /* release non-PROGRAM descritions first */
   FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
     struct description* d = darray_descriptions_data_get(&stardis->descriptions) +i;

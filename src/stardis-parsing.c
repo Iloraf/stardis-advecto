@@ -303,8 +303,8 @@ description_set_name
     "H_BOUNDARY_FOR_SOLID", "H_BOUNDARY_FOR_SOLID_PROG", "PROGRAM", "PROG_PARAMS",
     "SCALE", "SOLID", "SOLID_PROG", "SOLID_FLUID_CONNECTION",
     "SOLID_FLUID_CONNECTION_PROG", "SOLID_SOLID_CONNECTION",
-    "SOLID_SOLID_CONNECTION_PROG", "TRAD", "T_BOUNDARY_FOR_SOLID",
-    "T_BOUNDARY_FOR_SOLID_PROG", "UNKNOWN" };
+    "SOLID_SOLID_CONNECTION_PROG", "SPHERICAL_SOURCE", "SPHERICAL_SOURCE_PROG",
+    "TRAD", "T_BOUNDARY_FOR_SOLID", "T_BOUNDARY_FOR_SOLID_PROG", "UNKNOWN" };
   const char* reason = NULL;
   size_t i;
   ASSERT(name && arg);
@@ -628,6 +628,18 @@ set_argc_argv
     goto error;
   }
   *argc = pwordexp->we_wordc - idx;
+  /* Review: why allocate an extra argument? In fact, it's necessary because
+   * this function is called even if there are no arguments to analyze. In this
+   * case, allocation would fail, as the size to be allocated would be zero.
+   * This +1 therefore guarantees that at least one element will be allocated.
+   * But this could be eliminated by checking that there are no arguments
+   * (argc==0) and, if necessary, returning before any allocation.
+   *
+   * Nevertheless, this extra argument makes sense. It should be the first
+   * argument and contain the program name. In this way, the argument list would
+   * respect the C convention for declaring an argument list. And so, anyone
+   * could use the getopt analysis function without having to declare a dummy
+   * argument as the program's first parameter */
   *argv = MEM_CALLOC(allocator, 1 + *argc, sizeof(char *));
   if(*argv == NULL) {
     res = RES_MEM_ERR;
@@ -2070,6 +2082,142 @@ error:
   goto end;
 }
 
+static res_T
+process_spherical_source
+  (struct stardis* stardis,
+   wordexp_t* pwordexp)
+{
+  struct spherical_source* src = NULL;
+  char* arg = NULL;
+  size_t idx = 1;
+  res_T res = RES_OK;
+  ASSERT(stardis && pwordexp);
+
+  src = &stardis->extsrc.data.sphere;
+
+  if(stardis->extsrc.type != EXTERN_SOURCE_NONE__) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Only one external source can be defined\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = extern_source_init_sphere(stardis->allocator, &stardis->extsrc);
+  if(res != RES_OK) goto error;
+
+  CHK_ARG(idx, "radius");
+  res = cstr_to_double(arg, &src->radius);
+  if(res == RES_OK && src->radius < 0) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid spherical source radius: %s\n", arg);
+    goto error;
+  }
+
+  #define PARSE_POS(Name, Id) { \
+    CHK_ARG(idx, "position "Name); \
+    res = cstr_to_double(arg, &src->position[Id]); \
+    if(res != RES_OK) { \
+      logger_print(stardis->logger, LOG_ERROR, \
+        "Invalid spherical source "Name" coordinate: %s\n", arg); \
+      goto error; \
+    } \
+  } (void)0
+  PARSE_POS("X", 0);
+  PARSE_POS("Y", 1);
+  PARSE_POS("Z", 2);
+  #undef PARSE_POS
+
+  CHK_ARG(idx, "power");
+  res = cstr_to_double(arg, &src->power);
+  if(res == RES_OK && src->power < 0) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid sphercial source power: %s\n", arg);
+    goto error;
+  }
+
+  res = extern_source_create_solver_source(&stardis->extsrc, stardis);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  extern_source_release(&stardis->extsrc);
+  stardis->extsrc = EXTERN_SOURCE_NULL;
+  goto exit;
+}
+
+static res_T
+process_spherical_source_prog(struct stardis* stardis, wordexp_t* pwordexp)
+{
+  struct stardis_description_create_context ctx;
+  struct spherical_source_prog* src = NULL;
+  char* lib_name = NULL;
+  char* arg = NULL;
+  size_t idx = 1;
+  res_T res = RES_OK;
+  ASSERT(stardis && pwordexp);
+
+  src = &stardis->extsrc.data.sphere_prog;
+
+  if(stardis->extsrc.type != EXTERN_SOURCE_NONE__) {
+      logger_print(stardis->logger, LOG_ERROR,
+      "Only one external source can be defined\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = extern_source_init_sphere_prog(stardis->allocator, &stardis->extsrc);
+  if(res != RES_OK) goto error;
+
+  CHK_ARG(idx, "radius");
+  res = cstr_to_double(arg, &src->radius);
+  if(res == RES_OK && src->radius < 0) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid spherical source radius: %s\n", arg);
+    goto error;
+  }
+
+  CHK_ARG(idx, "program name");
+  ERR(str_set(&src->prog_name, arg));
+  lib_name = arg;
+
+  if(idx < pwordexp->we_wordc
+  && strcasecmp(pwordexp->we_wordv[idx], "PROG_PARAMS")) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Expecting PROG_PARAMS keyword while parsing `%s'.\n",
+      pwordexp->we_wordv[idx]);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  ERR(set_argc_argv(stardis->allocator, &src->argc, &src->argv, pwordexp, idx));
+  ERR(get_prog_common(lib_name, stardis, &src->program, &src->create, &src->release));
+  GET_LIB_SYMBOL(src, position, stardis_spherical_source_position);
+  GET_LIB_SYMBOL(src, power, stardis_spherical_source_power);
+
+  ctx.name = "External spherical source";
+  src->data = src->create(&ctx, src->program->prog_data, src->argc, src->argv);
+  if(!src->data) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot create data for the external spherical source\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = extern_source_create_solver_source(&stardis->extsrc, stardis);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  extern_source_release(&stardis->extsrc);
+  stardis->extsrc = EXTERN_SOURCE_NULL;
+  goto exit;
+}
+
 /* Read medium or boundary line; should be one of:
  * SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_sides_filenames
  * FLUID Name rho cp Tinit Timposed STL_filenames
@@ -2151,6 +2299,10 @@ process_model_line
     ERR(process_scale(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "TRAD"))
     ERR(process_radiative(stardis, pwordexp));
+  else if(0 == strcasecmp(arg, "SPHERICAL_SOURCE"))
+    ERR(process_spherical_source(stardis, pwordexp));
+  else if(0 == strcasecmp(arg, "SPHERICAL_SOURCE_PROG"))
+    ERR(process_spherical_source_prog(stardis, pwordexp));
   else {
     logger_print(stardis->logger, LOG_ERROR,
       "Unknown description type: %s\n", arg);

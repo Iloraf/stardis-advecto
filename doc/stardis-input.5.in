@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd February 27, 2024
+.Dd April 5, 2024
 .Dt STARDIS-INPUT 5
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -288,7 +288,7 @@ as one may consider using in standard file names.
 Description names are case-sensitive and two different description
 lines, either in the same description file or from different description
 files, cannot use the same name.
-Additionally, description names cannot a number, nor be one of the
+Additionally, description names cannot be a number, nor be one of the
 keywords defined by the present grammar and their lowercase
 counterparts.
 Finally, description names cannot be longer than

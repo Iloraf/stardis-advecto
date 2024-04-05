@@ -280,6 +280,7 @@ stardis_init
     stardis->dump_paths |= SDIS_HEAT_PATH_FAILURE;
   if(args->dump_paths & DUMP_SUCCESS)
     stardis->dump_paths |= SDIS_HEAT_PATH_SUCCESS;
+  stardis->diff_algo = args->diff_algo;
   stardis->next_medium_id = 0;
   stardis->undefined_medium_behind_boundary_id = SENC3D_UNSPECIFIED_MEDIUM;
   stardis->verbose = args->verbose;

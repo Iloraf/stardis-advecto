@@ -235,6 +235,7 @@ struct stardis {
   unsigned picard_order;
   unsigned next_medium_id;
   unsigned undefined_medium_behind_boundary_id;
+  enum sdis_diffusion_algorithm diff_algo;
   int dump_paths;
   int verbose;
   int geometry_initialized;

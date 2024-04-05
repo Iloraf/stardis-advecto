@@ -155,6 +155,34 @@ print_multiple_modes
 }
 
 static res_T
+parse_diff_algo
+  (const char* str,
+   struct logger* logger,
+   enum sdis_diffusion_algorithm* out_diff_algo)
+{
+  enum sdis_diffusion_algorithm diff_algo = SDIS_DIFFUSION_NONE;
+  res_T res = RES_OK;
+  ASSERT(str && out_diff_algo);
+
+  if(!strcmp(str, "dsphere")) {
+    diff_algo = SDIS_DIFFUSION_DELTA_SPHERE;
+  } else if(!strcmp(str, "wos")) {
+    diff_algo = SDIS_DIFFUSION_WOS;
+  } else {
+    logger_print(logger, LOG_ERROR,
+      "Invalid diffusion algorithm `%s'\n", str);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+exit:
+  *out_diff_algo = diff_algo;
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
 parse_position_and_time(const char* str, double pos[3], double time[2])
 {
   char buf[128];
@@ -401,6 +429,7 @@ init_args
   args->samples = STARDIS_DEFAULT_SAMPLES_COUNT;
   args->nthreads = SDIS_NTHREADS_DEFAULT;
   args->picard_order = STARDIS_DEFAULT_PICARD_ORDER;
+  args->diff_algo = SDIS_DIFFUSION_DELTA_SPHERE;
   d2(args->pos_and_time+3,
     STARDIS_DEFAULT_COMPUTE_TIME, STARDIS_DEFAULT_COMPUTE_TIME);
   args->verbose = STARDIS_DEFAULT_VERBOSE_LEVEL;
@@ -428,11 +457,11 @@ void
 usage(FILE* stream)
 {
   #define PRINT(Msg) fprintf(stream, Msg)
-  PRINT("stardis [-eghiv] [-D path_type,files_name_prefix] [-d file_base_name]\n");
-  PRINT("        [-F surface[,time[,time]]] [-G green_bin[,green_ascii]]\n");
-  PRINT("        [-L interface_probes] [-m medium_name[,time[,time]]]\n");
-  PRINT("        [-n samples_count] [-o picard_order]\n");
-  PRINT("        [-P x,y,z[,time[,time]][:side_indicator]]\n");
+  PRINT("stardis [-eghiv] [-a diff_algo] [-D path_type,files_name_prefix]\n");
+  PRINT("        [-d file_base_name] [-F surface[,time[,time]]]\n");
+  PRINT("        [-G green_bin[,green_ascii]] [-L interface_probes]\n");
+  PRINT("        [-m medium_name[,time[,time]]] [-n samples_count]\n");
+  PRINT("        [-o picard_order] [-P x,y,z[,time[,time]][:side_indicator]]\n");
   PRINT("        [-p x,y,z[,time[,time]]] [-R rendering_opt[:rendering_opt ...]]\n");
   PRINT("        [-S surface[,time[,time]]] [-s surface[,time[,time]]]\n");
   PRINT("        [-t threads_count] [-V verbosity_level] [-X output_rng]\n");
@@ -495,7 +524,7 @@ parse_args
 {
   int opt = 0, n_used = 0, o_used = 0;
   size_t len = 0;
-  const char option_list[] = "c:d:D:eF:gG:hiL:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
+  const char option_list[] = "a:c:d:D:eF:gG:hiL:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -521,6 +550,11 @@ parse_args
       }
       goto error;
     }
+
+    case 'a':
+      res = parse_diff_algo(optarg, args->logger, &args->diff_algo);
+      if(res != RES_OK) goto error;
+      break;
 
     case 'c':
       if(args->mode & USE_STDOUT_MODES) {

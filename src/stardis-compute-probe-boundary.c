@@ -863,6 +863,7 @@ setup_solve_probe_boundary_args
   args->picard_order = stardis->picard_order;
   args->side = probe_side;
   args->register_paths = stardis->dump_paths;
+  args->diff_algo = stardis->diff_algo;
 
   /* The solver does not accept that the side of the interface on which the
    * probe is placed is invalid. Below, the side is arbitrarily defined because

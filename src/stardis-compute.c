@@ -400,6 +400,7 @@ compute_probe(struct stardis* stardis, struct time* start)
   args.nrealisations = stardis->samples;
   d3_set(args.position, stardis->probe);
   d2_set(args.time_range, stardis->time_range);
+  args.diff_algo = stardis->diff_algo;
 
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
@@ -613,6 +614,7 @@ compute_camera(struct stardis* stardis, struct time* start)
   args.spp = (size_t)stardis->camera.spp;
   args.register_paths = stardis->dump_paths;
   args.picard_order = stardis->picard_order;
+  args.diff_algo = stardis->diff_algo;
 
   /* Launch the simulation */
   if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
@@ -696,6 +698,7 @@ compute_medium(struct stardis* stardis, struct time* start)
   args.nrealisations = stardis->samples;
   args.medium = medium;
   d2_set(args.time_range, stardis->time_range);
+  args.diff_algo = stardis->diff_algo;
 
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
@@ -857,6 +860,7 @@ compute_boundary(struct stardis* stardis, struct time* start)
   args.nprimitives
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
   d2_set(args.time_range, stardis->time_range);
+  args.diff_algo = stardis->diff_algo;
 
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
@@ -967,6 +971,7 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
   args.picard_order = stardis->picard_order;
   d2_set(args.time_range, stardis->time_range);
+  args.diff_algo = stardis->diff_algo;
 
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
@@ -1037,6 +1042,7 @@ compute_map(struct stardis* stardis, struct time* start)
     d2_set(args.time_range, stardis->time_range);
     args.register_paths = stardis->dump_paths;
     args.picard_order = stardis->picard_order;
+    args.diff_algo = stardis->diff_algo;
 
     ERR(sdis_solve_boundary(stardis->sdis_scn, &args,
       darray_estimators_data_get(&estimators) + p));

@@ -141,6 +141,7 @@ struct args {
   unsigned picard_order;
   int mode;
   enum dump_path_type dump_paths;
+  enum sdis_diffusion_algorithm diff_algo;
   int verbose;
   int disable_intrad; /* Disable internal radiative exchanges */
 

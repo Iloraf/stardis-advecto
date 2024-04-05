@@ -21,7 +21,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl eghiv
-.Op Fl c Ar diff_algo
+.Op Fl a Ar diff_algo
 .Op Fl D Ar path_type , Ns Ar files_name_prefix
 .Op Fl d Ar file_base_name
 .Op Fl F Pa surface Ns Op , Ns Ar time Ns Op , Ns Ar time
@@ -114,7 +114,7 @@ multiple nodes.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
-.It Fl c Ar diff_algo
+.It Fl a Ar diff_algo
 Define the diffusion algorithm to be used when sampling a conductive
 path.
 The default diffusion algorithm is

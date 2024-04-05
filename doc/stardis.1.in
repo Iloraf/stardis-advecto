@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd February 26, 2024
+.Dd April 5, 2024
 .Dt STARDIS 1
 .Os
 .Sh NAME
@@ -21,6 +21,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl eghiv
+.Op Fl c Ar diff_algo
 .Op Fl D Ar path_type , Ns Ar files_name_prefix
 .Op Fl d Ar file_base_name
 .Op Fl F Pa surface Ns Op , Ns Ar time Ns Op , Ns Ar time
@@ -113,6 +114,37 @@ multiple nodes.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
+.It Fl c Ar diff_algo
+Define the diffusion algorithm to be used when sampling a conductive
+path.
+The default diffusion algorithm is
+.Cm dsphere .
+.Pp
+The diffusion algorithms are as follows:
+.Bl -tag -width Ds
+.It Cm dsphere
+Use the delta sphere algorithm, in which Brownian motion is approximated
+by a random walk of random delta steps.
+The algorithm is consistent with respect to the
+.Ar delta
+parameter, i.e. Brownian motion is estimated exactly with
+.Ar delta
+tending towards 0.
+This numerical parameter
+.Ar delta
+is defined by solid and can be varied in
+time and space to handle the spatio-temporal temperature gradient
+without prohibitively increasing computation time
+.Pq see Xr stardis-input 1 .
+.It Cm wos
+Use the Walk on Sphere algorithm to estimate Brownian motion.
+Although a numerical parameter is required to define the distance at
+which the random walk is considered to have reached the boundary, it can
+be assumed that this algorithm estimates Brownian motion without any
+bias with respect to numerical uncertainty.
+Indeed, the aforementioned distance can be set to the computer's
+numerical accuracy without any significant impact on performance.
+.El
 .It Fl D Ar path_type , Ns Ar files_name_prefix
 Write sampled heat paths of the given
 .Ar path_type
@@ -515,6 +547,17 @@ Monte Carlo algorithm: A general theoretical framework for linear situations
 .%P 653--681
 .%D 2014
 .%U https://doi.org/10.1016/j.solener.2013.02.035
+.Re
+.Rs
+.%A Abdolhossein Haji-Sheikh
+.%A Ephraim Maurice Sparrow
+.%T The floating random walk and its applications to Monte-Carlo \
+solutions of heat equations
+.%J SIAM Journal on Applied Mathematics
+.%V 14
+.%N 2
+.%P 370--389
+.%D 1966
 .Re
 .Rs
 .%A Mervin E Muller

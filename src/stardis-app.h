@@ -57,7 +57,7 @@ struct fluid;
 
 
 #define DELTA_AUTO INF /* Placeholder until actual value is substituted */
-#define UNKNOWN_MEDIUM_TEMPERATURE -1 /* Unknown for stardis solver is -1 */
+#define UNKNOWN_MEDIUM_TEMPERATURE SDIS_TEMPERATURE_NONE
 
 enum properties_conflict_t {
   NO_PROPERTY_CONFLICT,

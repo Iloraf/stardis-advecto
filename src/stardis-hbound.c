@@ -44,7 +44,7 @@ init_h_boundary
   }
   str_init(allocator, &(*dst)->name);
   str_initialized = 1;
-  (*dst)->imposed_temperature = -1;
+  (*dst)->imposed_temperature = SDIS_TEMPERATURE_NONE;
   (*dst)->mat_id = UINT_MAX;
 end:
   return res;

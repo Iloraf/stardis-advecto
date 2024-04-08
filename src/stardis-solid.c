@@ -98,7 +98,7 @@ solid_get_temperature
     }
     return (*solid_props)->tinit;
   }
-  return -1; /* Unknown temperature */
+  return SDIS_TEMPERATURE_NONE;
 }
 
 static double
@@ -171,8 +171,8 @@ init_solid(struct mem_allocator* allocator, struct solid** dst)
   (*dst)->rho = 1;
   (*dst)->cp = 1;
   (*dst)->delta = 1;
-  (*dst)->tinit = -1;
-  (*dst)->imposed_temperature = -1;
+  (*dst)->tinit = SDIS_TEMPERATURE_NONE;
+  (*dst)->imposed_temperature = SDIS_TEMPERATURE_NONE;
   (*dst)->vpower = SDIS_VOLUMIC_POWER_NONE;
   (*dst)->t0 = 0;
   (*dst)->is_outside = 0;

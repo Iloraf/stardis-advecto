@@ -283,7 +283,7 @@ create_intface
     ERR(sdis_data_create(stardis->dev, sizeof(struct intface),
       ALIGNOF(struct intface), NULL, &data));
     interface_props = sdis_data_get(data);
-    interface_props->imposed_temperature = -1;
+    interface_props->imposed_temperature = SDIS_TEMPERATURE_NONE;
     interface_props->imposed_flux = SDIS_FLUX_NONE;
     interface_props->front_medium_id = UINT_MAX;
     interface_props->back_medium_id = UINT_MAX;

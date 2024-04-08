@@ -45,7 +45,7 @@ init_f_boundary
   str_init(allocator, &(*dst)->name);
   str_initialized = 1;
   (*dst)->mat_id = UINT_MAX;
-  (*dst)->imposed_flux = -1;
+  (*dst)->imposed_flux = SDIS_FLUX_NONE;
 end:
   return res;
 error:

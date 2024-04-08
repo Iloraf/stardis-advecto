@@ -67,7 +67,7 @@ fluid_get_temperature
     }
     return (*fluid_props)->tinit;
   }
-  return -1; /* Unknown temperature */
+  return SDIS_TEMPERATURE_NONE; /* Unknown temperature */
 }
 
 /*******************************************************************************
@@ -122,8 +122,8 @@ init_fluid(struct mem_allocator* allocator, struct fluid** dst)
   str_initialized = 1;
   (*dst)->rho = 1;
   (*dst)->cp = 1;
-  (*dst)->tinit = -1;
-  (*dst)->imposed_temperature = -1;
+  (*dst)->tinit = SDIS_TEMPERATURE_NONE;
+  (*dst)->imposed_temperature = SDIS_TEMPERATURE_NONE;
   (*dst)->t0 = 0;
   (*dst)->is_outside = 0;
   (*dst)->is_green = 0;

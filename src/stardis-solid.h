@@ -32,7 +32,7 @@ struct solid {
   double cp; /* Calorific capacity */
   double delta; /* Numerical parameter */
   double tinit; /* Initial temperature */
-  double imposed_temperature; /* allow to impose a T; -1 if unset */
+  double imposed_temperature; /* Impose a T; SDIS_TEMPERATURE_NONE if unset */
   double vpower;
   double t0; /* End time of tinit */
   int is_outside; /* the solid is used for a boundary */

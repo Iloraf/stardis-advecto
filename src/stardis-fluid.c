@@ -88,6 +88,7 @@ create_solver_fluid
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
   fluid_shader.volumic_mass = fluid_get_volumic_mass;
   fluid_shader.temperature = fluid_get_temperature;
+  fluid_shader.t0 = stardis->initial_time;
   ERR(sdis_data_create(stardis->dev, sizeof(struct fluid*), ALIGNOF(struct fluid*),
     NULL, &data));
 

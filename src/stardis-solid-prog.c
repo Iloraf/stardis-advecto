@@ -120,6 +120,7 @@ create_solver_solid_prog
   solid_shader.delta= solid_prog_get_delta;
   solid_shader.volumic_power = solid_prog_get_volumic_power;
   solid_shader.temperature = solid_prog_get_temperature;
+  solid_shader.t0 = stardis->initial_time;
   ERR(sdis_data_create(stardis->dev, sizeof(struct solid_prog*),
     ALIGNOF(struct solid_prog*), NULL, &data));
 

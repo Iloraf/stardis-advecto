@@ -81,6 +81,7 @@ create_solver_fluid_prog
   fluid_shader.calorific_capacity = fluid_prog_get_calorific_capacity;
   fluid_shader.volumic_mass = fluid_prog_get_volumic_mass;
   fluid_shader.temperature = fluid_prog_get_temperature;
+  fluid_shader.t0 = stardis->initial_time;
   ERR(sdis_data_create(stardis->dev, sizeof(struct fluid_prog*),
     ALIGNOF(struct fluid_prog*), NULL, &data));
 
@@ -114,6 +115,7 @@ create_solver_external_fluid_prog
   fluid_shader.calorific_capacity = fluid_prog_get_calorific_capacity;
   fluid_shader.volumic_mass = fluid_prog_get_volumic_mass;
   fluid_shader.temperature = fluid_prog_get_temperature;
+  fluid_shader.t0 = stardis->initial_time;
   /* temperature has to be provided by h_boundary_prog */
   ERR(sdis_data_create(stardis->dev, sizeof(struct fluid_prog*),
     ALIGNOF(struct fluid_prog*), NULL, &data));

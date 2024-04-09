@@ -458,6 +458,7 @@ process_h
     ASSERT(sz <= UINT_MAX);
     fluid->desc_id = (unsigned)sz;
     fluid->imposed_temperature = h_boundary->imposed_temperature;
+    fluid->t0 = stardis->initial_time;
     fluid->is_outside = 1;
     fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
     ERR(create_solver_fluid(stardis, fluid));
@@ -578,6 +579,7 @@ process_hf
   ASSERT(sz <= UINT_MAX);
   fluid->desc_id = (unsigned)sz;
   fluid->imposed_temperature = hf_boundary->imposed_temperature;
+  fluid->t0 = stardis->initial_time;
   fluid->is_outside = 1;
   fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   ERR(create_solver_fluid(stardis, fluid));
@@ -1643,6 +1645,7 @@ process_solid
   desc->type = DESC_MAT_SOLID;
   solid->solid_id = allocate_stardis_medium_id(stardis);
   solid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  solid->t0 = stardis->initial_time;
   solid->is_outside = 0;
   ASSERT(sz <= UINT_MAX);
   solid->desc_id = (unsigned)sz;
@@ -1831,6 +1834,7 @@ process_fluid
   ERR(init_fluid(stardis->allocator, &desc->d.fluid));
   fluid = desc->d.fluid;
   desc->type = DESC_MAT_FLUID;
+  fluid->t0 = stardis->initial_time;
   fluid->fluid_id = allocate_stardis_medium_id(stardis);
   fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   ASSERT(sz <= UINT_MAX);
@@ -2304,6 +2308,7 @@ get_dummy_solid_id
   dummies->stardis_solid = dummy;
   dummies->dummy_solid_id = allocate_stardis_medium_id(stardis);
   dummy->solid_id = dummies->dummy_solid_id;
+  dummy->t0 = stardis->initial_time;
   dummy->is_outside = 1;
   dummy->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   create_solver_solid(stardis, dummy);
@@ -2337,6 +2342,7 @@ get_dummy_fluid_id
   dummies->stardis_fluid = dummy;
   dummies->dummy_fluid_id = allocate_stardis_medium_id(stardis);
   dummy->fluid_id = dummies->dummy_fluid_id;
+  dummy->t0 = stardis->initial_time;
   dummy->is_outside = 1;
   dummy->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   create_solver_fluid(stardis, dummy);

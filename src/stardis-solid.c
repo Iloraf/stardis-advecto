@@ -135,6 +135,7 @@ create_solver_solid
   solid_shader.delta_boundary = solid_get_delta_boundary;
 #endif
   solid_shader.temperature = solid_get_temperature;
+  solid_shader.t0 = stardis->initial_time;
   ERR(sdis_data_create(stardis->dev, sizeof(struct solid), ALIGNOF(struct solid),
     NULL, &data));
 

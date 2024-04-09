@@ -229,6 +229,7 @@ struct stardis {
   double scale_factor;
   double trad, trad_ref;
   double t_range[2];
+  double initial_time; /* [s] */
   int mode;
   int trad_def;
   unsigned nthreads;

@@ -137,6 +137,7 @@ struct args {
   char* camera;
   size_t samples;
   double pos_and_time[5];
+  double initial_time; /* [s] */
   unsigned nthreads;
   unsigned picard_order;
   int mode;

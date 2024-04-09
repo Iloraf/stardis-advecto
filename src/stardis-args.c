@@ -459,9 +459,10 @@ usage(FILE* stream)
   #define PRINT(Msg) fprintf(stream, Msg)
   PRINT("stardis [-eghiv] [-a diff_algo] [-D path_type,files_name_prefix]\n");
   PRINT("        [-d file_base_name] [-F surface[,time[,time]]]\n");
-  PRINT("        [-G green_bin[,green_ascii]] [-L interface_probes]\n");
-  PRINT("        [-m medium_name[,time[,time]]] [-n samples_count]\n");
-  PRINT("        [-o picard_order] [-P x,y,z[,time[,time]][:side_indicator]]\n");
+  PRINT("        [-G green_bin[,green_ascii]] [-I initial_time]\n");
+  PRINT("        [-L interface_probes] [-m medium_name[,time[,time]]]\n");
+  PRINT("        [-n samples_count] [-o picard_order]\n");
+  PRINT("        [-P x,y,z[,time[,time]][:side_indicator]]\n");
   PRINT("        [-p x,y,z[,time[,time]]] [-R rendering_opt[:rendering_opt ...]]\n");
   PRINT("        [-S surface[,time[,time]]] [-s surface[,time[,time]]]\n");
   PRINT("        [-t threads_count] [-V verbosity_level] [-X output_rng]\n");
@@ -524,7 +525,7 @@ parse_args
 {
   int opt = 0, n_used = 0, o_used = 0;
   size_t len = 0;
-  const char option_list[] = "a:c:d:D:eF:gG:hiL:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
+  const char option_list[] = "a:c:d:D:eF:gG:hiI:L:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -656,6 +657,11 @@ parse_args
         goto error;
       }
       args->mode |= MODE_DUMP_HELP;
+      break;
+
+    case 'I':
+      res = cstr_to_double(optarg, &args->initial_time);
+      if(res != RES_OK) goto error;
       break;
 
     case 'i':

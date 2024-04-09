@@ -273,6 +273,7 @@ stardis_init
   stardis->trad = STARDIS_DEFAULT_TRAD;
   stardis->trad_ref = STARDIS_DEFAULT_TRAD_REFERENCE;
   stardis->trad_def = 0;
+  stardis->initial_time = args->initial_time;
   stardis->geometry_initialized = 0;
   d2(stardis->t_range, INF, -INF);
   stardis->dump_paths = SDIS_HEAT_PATH_NONE;

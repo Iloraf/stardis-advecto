@@ -26,6 +26,7 @@
 .Op Fl d Ar file_base_name
 .Op Fl F Pa surface Ns Op , Ns Ar time Ns Op , Ns Ar time
 .Op Fl G Pa green_bin Ns Op , Ns Pa green_ascii
+.Op Fl I Ar initial_time
 .Op Fl L Pa interface_probes
 .Op Fl m Ar medium_name Ns Op , Ns Ar time Ns Op , Ns Ar time
 .Op Fl n Ar samples_count
@@ -218,6 +219,10 @@ and cannot be used in conjunction with option
 .Fl D .
 .It Fl h
 Output short help and exit.
+.It Fl I Ar initial_time
+Define initial time in seconds.
+It can take any value between +/- infinity.
+The default initial time is 0.
 .It Fl i
 Disable internal radiative exchanges.
 External radiative exchanges are still processed, i.e. the external

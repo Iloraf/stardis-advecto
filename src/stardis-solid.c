@@ -83,12 +83,12 @@ solid_get_temperature
    struct sdis_data* data)
 {
   const struct solid* const* solid_props = sdis_data_cget(data);
-  if((*solid_props)->imposed_temperature >= 0)
+  if(SDIS_TEMPERATURE_IS_KNOWN((*solid_props)->imposed_temperature))
     /* If there is an imposed temp, it is imposed regardless of time */
     return (*solid_props)->imposed_temperature;
   if(vtx->time <= (*solid_props)->t0) {
     /* If time is <= t0: use tinit */
-    if((*solid_props)->tinit < 0) {
+    if(SDIS_TEMPERATURE_IS_UNKNOWN((*solid_props)->tinit)) {
       if(str_is_empty(&(*solid_props)->name)) {
         FATAL("solid_get_temperature: getting undefined Tinit\n");
       } else {
@@ -207,10 +207,10 @@ str_print_solid(struct str* str, const struct solid* s)
   if(s->vpower != 0) {
     ERR(str_append_printf(str, " VPower=%g", s->vpower));
   }
-  if(s->tinit >= 0) {
+  if(SDIS_TEMPERATURE_IS_KNOWN(s->tinit)) {
     ERR(str_append_printf(str, " Tinit=%g", s->tinit));
   }
-  if(s->imposed_temperature >= 0) {
+  if(SDIS_TEMPERATURE_IS_KNOWN(s->imposed_temperature)) {
     ERR(str_append_printf(str, " Temp=%g", s->imposed_temperature));
   }
   ERR(str_append_printf(str, " (it is medium %u)", s->solid_id));

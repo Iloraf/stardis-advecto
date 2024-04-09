@@ -1128,12 +1128,12 @@ dump_green_ascii
       sl = desc->d.solid;
       fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g",
         i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower);
-      if(sl->tinit >= 0) {
+      if(SDIS_TEMPERATURE_IS_KNOWN(sl->tinit)) {
         fprintf(stream, "\t%g", sl->tinit);
       } else {
         fprintf(stream, "\tNONE");
       }
-      if(sl->imposed_temperature >= 0) {
+      if(SDIS_TEMPERATURE_IS_KNOWN(sl->imposed_temperature)) {
         fprintf(stream, "\t%g\n", sl->imposed_temperature);
       } else {
         fprintf(stream, "\tNONE\n");
@@ -1148,19 +1148,19 @@ dump_green_ascii
       const struct fluid* fl;
       if(desc->type != DESC_MAT_FLUID) continue;
       fl = desc->d.fluid;
-      if(fl->imposed_temperature >= 0) {
+      if(SDIS_TEMPERATURE_IS_KNOWN(fl->imposed_temperature)) {
         fprintf(stream, "%u\t%s\t%g\t%g",
           i, str_cget(&fl->name), fl->rho, fl->cp);
       } else {
         fprintf(stream, "%u\t%s\t%g\t%g",
           i, str_cget(&fl->name), fl->rho, fl->cp);
       }
-      if(fl->tinit >= 0) {
+      if(SDIS_TEMPERATURE_IS_KNOWN(fl->tinit)) {
         fprintf(stream, "\t%g", fl->tinit);
       } else {
         fprintf(stream, "\tNONE");
       }
-      if(fl->imposed_temperature >= 0) {
+      if(SDIS_TEMPERATURE_IS_KNOWN(fl->imposed_temperature)) {
         fprintf(stream, "\t%g\n", fl->imposed_temperature);
       } else {
         fprintf(stream, "\tNONE\n");

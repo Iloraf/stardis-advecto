@@ -366,7 +366,7 @@ create_intface
           goto error;
         }
         for_fluid = 1;
-        ASSERT(intface->d.h_boundary->imposed_temperature >= 0);
+        ASSERT(SDIS_TEMPERATURE_IS_KNOWN(intface->d.h_boundary->imposed_temperature));
         interface_props->imposed_temperature
           = intface->d.h_boundary->imposed_temperature;
         ASSERT(fluid_side_shader);
@@ -544,7 +544,7 @@ create_intface
          * a possible external fluid to 'see' the imposed T */
         fluid_side_shader->emissivity = interface_get_emissivity;
         interface_props->emissivity = 1;
-        ASSERT(intface->d.t_boundary->imposed_temperature >= 0);
+        ASSERT(SDIS_TEMPERATURE_IS_KNOWN(intface->d.t_boundary->imposed_temperature));
         interface_props->imposed_temperature
           = intface->d.t_boundary->imposed_temperature;
         break;

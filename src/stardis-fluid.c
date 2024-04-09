@@ -52,12 +52,12 @@ fluid_get_temperature
    struct sdis_data* data)
 {
   const struct fluid* const* fluid_props = sdis_data_cget(data);
-  if((*fluid_props)->imposed_temperature >= 0)
+  if(SDIS_TEMPERATURE_IS_KNOWN((*fluid_props)->imposed_temperature))
     /* If there is an imposed temp, it is imposed regardless of time */
     return (*fluid_props)->imposed_temperature;
   if(vtx->time <= (*fluid_props)->t0) {
     /* If time is <= t0: use tinit */
-    if((*fluid_props)->tinit < 0) {
+    if(SDIS_TEMPERATURE_IS_UNKNOWN((*fluid_props)->tinit)) {
       if(str_is_empty(&(*fluid_props)->name)) {
         FATAL("fluid_get_temperature: getting undefined Tinit\n");
       } else {
@@ -154,10 +154,10 @@ str_print_fluid(struct str* str, const struct fluid* f)
   ASSERT(str && f);
   ERR(str_append_printf(str, "Fluid '%s': rho=%g cp=%g",
     str_cget(&f->name), f->rho, f->cp));
-  if(f->tinit >= 0) {
+  if(SDIS_TEMPERATURE_IS_KNOWN(f->tinit)) {
     ERR(str_append_printf(str, " Tinit=%g", f->tinit));
   }
-  if(f->imposed_temperature >= 0) {
+  if(SDIS_TEMPERATURE_IS_KNOWN(f->imposed_temperature)) {
     ERR(str_append_printf(str, " Temp=%g", f->imposed_temperature));
   }
   ERR(str_append_printf(str, " (it is medium %u)", f->fluid_id));

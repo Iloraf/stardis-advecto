@@ -46,6 +46,7 @@ SRC =\
  src/stardis-output.c\
  src/stardis-parsing.c\
  src/stardis-program.c\
+ src/stardis-radiative-env.c\
  src/stardis-sfconnect.c\
  src/stardis-sfconnect-prog.c\
  src/stardis-ssconnect.c\

@@ -19,6 +19,7 @@
 #include "stardis-args.h"
 #include "stardis-description.h"
 #include "stardis-extern-source.h"
+#include "stardis-radiative-env.h"
 
 #include <star/sg3d.h>
 
@@ -225,13 +226,13 @@ struct stardis {
   struct mem_allocator* allocator;
   struct logger* logger;
   struct sdis_device* dev;
+  struct radiative_env radenv;
+  int radenv_def;
   size_t samples;
   double scale_factor;
-  double trad, trad_ref;
   double t_range[2];
   double initial_time; /* [s] */
   int mode;
-  int trad_def;
   unsigned nthreads;
   unsigned picard_order;
   unsigned next_medium_id;

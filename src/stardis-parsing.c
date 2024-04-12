@@ -2011,37 +2011,44 @@ process_radiative
   (struct stardis* stardis,
    wordexp_t* pwordexp)
 {
+  double trad = 0;
+  double tref = 0;
   char* arg = NULL;
   size_t idx = 1;
   res_T res = RES_OK;
 
   ASSERT(stardis && pwordexp);
 
-  if(stardis->trad_def) {
+  if(stardis->radenv_def) {
     logger_print(stardis->logger, LOG_ERROR,
       "TRAD cannot be specified twice\n");
     res = RES_BAD_ARG;
     goto end;
   }
+
+  res = radiative_env_init_const(stardis->allocator, &stardis->radenv);
+  if(res != RES_OK) goto error;
+
   CHK_ARG(idx, "Trad");
-  res = cstr_to_double(arg, &stardis->trad);
-  if(res != RES_OK || SDIS_TEMPERATURE_IS_UNKNOWN(stardis->trad)) {
+  res = cstr_to_double(arg, &trad);
+  if(res != RES_OK || SDIS_TEMPERATURE_IS_UNKNOWN(trad)) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid Trad: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
   CHK_ARG(idx, "Trad reference");
-  res = cstr_to_double(arg, &stardis->trad_ref);
-  if(res != RES_OK
-    || stardis->trad_ref < 0)
-  {
+  res = cstr_to_double(arg, &tref);
+  if(res != RES_OK || tref < 0) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid Trad reference: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->trad_def = 1;
+
+  stardis->radenv.data.cst.temperature = trad;
+  stardis->radenv.data.cst.reference_temperature = tref;
+  stardis->radenv_def = 1;
 
 end:
   return res;
@@ -2435,10 +2442,14 @@ exp_error:
     stardis->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
   logger_print(stardis->logger, LOG_OUTPUT,
     "Scaling factor is %g\n", stardis->scale_factor);
-  logger_print(stardis->logger, LOG_OUTPUT,
-    "Trad is %g, Trad reference is %g\n", stardis->trad, stardis->trad_ref);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], stardis->trad_ref);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], stardis->trad_ref);
+  if(stardis->radenv.type == RADIATIVE_ENV_CONST) {
+    const double trad = stardis->radenv.data.cst.temperature;
+    const double trad_ref = stardis->radenv.data.cst.reference_temperature;
+    logger_print(stardis->logger, LOG_OUTPUT,
+      "Trad is %g, Trad reference is %g\n", trad, trad_ref);
+    stardis->t_range[0] = MMIN(stardis->t_range[0], trad_ref);
+    stardis->t_range[1] = MMAX(stardis->t_range[1], trad_ref);
+  }
   logger_print(stardis->logger, LOG_OUTPUT,
     "System T range is [%g %g]\n", SPLIT2(stardis->t_range));
   logger_print(stardis->logger, LOG_OUTPUT,

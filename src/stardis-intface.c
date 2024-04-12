@@ -80,20 +80,22 @@ interface_get_ref_temperature
 static double
 interface_get_emissivity
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  (void)frag;
+  (void)frag, (void)source_id;
   return interface_props->emissivity;
 }
 
 static double
 interface_get_alpha
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  (void)frag;
+  (void)frag, (void)source_id;
   return interface_props->alpha;
 }
 
@@ -167,10 +169,12 @@ intface_prog_get_hc
 static double
 intface_prog_get_emissivity
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
   struct stardis_interface_fragment f;
+  (void)source_id;
   d3_set(f.P, frag->P);
   d3_set(f.Ng, frag->Ng);
   d3_set(f.uv, frag->uv);
@@ -183,10 +187,12 @@ intface_prog_get_emissivity
 static double
 intface_prog_get_alpha
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
   struct stardis_interface_fragment f;
+  (void)source_id;
   d3_set(f.P, frag->P);
   d3_set(f.Ng, frag->Ng);
   d3_set(f.uv, frag->uv);

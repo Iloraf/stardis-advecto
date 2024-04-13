@@ -303,6 +303,7 @@ stardis_boundary_temperature
 STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
@@ -312,6 +313,7 @@ stardis_emissivity
 STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.
@@ -361,6 +363,7 @@ stardis_t_range
 STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
@@ -370,6 +373,7 @@ stardis_emissivity
 STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.
@@ -452,6 +456,7 @@ stardis_t_range
 STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
@@ -461,6 +466,7 @@ stardis_emissivity
 STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.
@@ -556,6 +562,7 @@ stardis_thermal_contact_resistance
 STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
@@ -565,6 +572,7 @@ stardis_emissivity
 STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.

@@ -41,8 +41,10 @@ struct h_boundary_prog {
     (const struct stardis_description_create_context*, void*, size_t, char**);
   void (*release)(void*);
   double (*ref_temp)(const struct stardis_interface_fragment*, void*);
-  double (*emissivity)(const struct stardis_interface_fragment*, void*);
-  double (*alpha)(const struct stardis_interface_fragment*, void*);
+  double (*emissivity)
+    (const struct stardis_interface_fragment*, const unsigned src_id, void*);
+  double (*alpha)
+    (const struct stardis_interface_fragment*, const unsigned src_id, void*);
   double (*hc)(const struct stardis_interface_fragment*, void*);
   double (*hmax)(void*);
   double* (*t_range)(void*, double trange[2]);

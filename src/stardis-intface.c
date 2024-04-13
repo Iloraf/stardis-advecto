@@ -112,9 +112,10 @@ interface_get_tcr
 static double
 emissivity_1
   (const struct stardis_interface_fragment* frag,
+   const unsigned src_id,
    void* data)
 {
-  (void)frag, (void)data;
+  (void)frag, (void)src_id, (void)data;
   return 1;
 }
 
@@ -181,7 +182,8 @@ intface_prog_get_emissivity
   f.time = frag->time;
   ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
   f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
-  return interface_props->get_emissivity(&f, interface_props->prog_data);
+  return interface_props->get_emissivity
+    (&f, source_id, interface_props->prog_data);
 }
 
 static double
@@ -199,7 +201,8 @@ intface_prog_get_alpha
   f.time = frag->time;
   ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
   f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
-  return interface_props->get_alpha(&f, interface_props->prog_data);
+  return interface_props->get_alpha
+    (&f, source_id, interface_props->prog_data);
 }
 
 static double

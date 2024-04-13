@@ -691,6 +691,9 @@ dump_sample_end(struct sdis_green_path* path, void* ctx)
       d__ = sdis_data_get(data);
       id = d__->desc_id;
       CHK(DESC_IS_T(descs+id) || DESC_IS_H(descs+id));
+      /* End, End ID, X, Y, Z, Elapsed time */
+      fprintf(stream, "%s, %u, %g, %g, %g, %g\n",
+        str_cget(get_description_name(descs + id)), id, SPLIT3(pos), elapsed);
       break;
     }
     case SDIS_GREEN_PATH_END_IN_VOLUME:
@@ -710,12 +713,12 @@ dump_sample_end(struct sdis_green_path* path, void* ctx)
         ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
         id = (*psolid)->desc_id;
       }
+      /* End, End ID, X, Y, Z, Elapsed time */
+      fprintf(stream, "%s, %u, %g, %g, %g, %g\n",
+        str_cget(get_description_name(descs + id)), id, SPLIT3(pos), elapsed);
       break;
     default: FATAL("Unreachable code.\n"); break;
   }
-  /* End, End ID, X, Y, Z, Elapsed time */
-  fprintf(stream, "%s, %u, %g, %g, %g, %g\n",
-    str_cget(get_description_name(descs + id)), id, SPLIT3(pos), elapsed);
 
 end:
   return res;

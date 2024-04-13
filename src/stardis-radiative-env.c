@@ -50,7 +50,7 @@ create_radenv_const
   struct sdis_data* data = NULL;
   struct radiative_env_const* props = NULL;
   res_T res = RES_OK;
-  ASSERT(radenv && stardis);
+  ASSERT(radenv && radenv->type == RADIATIVE_ENV_CONST && stardis);
 
   res = sdis_data_create(stardis->dev, sizeof(struct radiative_env_const),
     ALIGNOF(struct radiative_env_const), NULL, &data);
@@ -65,11 +65,8 @@ create_radenv_const
   if(res != RES_OK) goto error;
 
 exit:
+  /* Release the local reference on the data: it is kept by the sdis radenv */
   if(data) SDIS(data_ref_put(data));
-  if(radenv->sdis_radenv) {
-    SDIS(radiative_env_ref_put(radenv->sdis_radenv));
-    radenv->sdis_radenv = NULL;
-  }
   return res;
 error:
   goto exit;

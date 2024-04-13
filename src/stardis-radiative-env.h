@@ -38,7 +38,41 @@ struct radiative_env_const {
 static const struct radiative_env_const RADIATIVE_ENV_CONST_DEFAULT =
   RADIATIVE_ENV_CONST_DEFAULT__;
 
-struct radiative_env_prog { char dummy; }; /* TODO */
+struct radiative_env_prog {
+  struct str prog_name;
+  struct program* program;
+  void* data; /* Pointer toward the program data */
+  struct mem_allocator* allocator;
+
+  /* Input arguments */
+  size_t argc;
+  char** argv;
+
+  void*
+  (*create)
+    (const struct stardis_description_create_context* ctx,
+     void* lib_data,
+     size_t argc,
+     char* argv[]);
+
+  void
+  (*release)
+    (void* data);
+
+  double
+  (*temperature)
+    (const double dir[3],
+     void* data);
+
+  double
+  (*reference_temperature)
+    (const double dir[3],
+     void* data);
+};
+#define RADIATIVE_ENV_PROG_NULL__ \
+  {{0}, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL}
+static const struct radiative_env_prog RADIATIVE_ENV_PROG_NULL =
+  RADIATIVE_ENV_PROG_NULL__;
 
 struct radiative_env {
   enum radiative_env_type type;
@@ -57,6 +91,11 @@ static const struct radiative_env RADIATIVE_ENV_DEFAULT = RADIATIVE_ENV_DEFAULT_
 
 extern LOCAL_SYM res_T
 radiative_env_init_const
+  (struct mem_allocator* allocator,
+   struct radiative_env* radenv);
+
+extern LOCAL_SYM res_T
+radiative_env_init_prog
   (struct mem_allocator* allocator,
    struct radiative_env* radenv);
 

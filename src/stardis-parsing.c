@@ -2021,9 +2021,9 @@ process_radiative
 
   if(stardis->radenv_def) {
     logger_print(stardis->logger, LOG_ERROR,
-      "TRAD cannot be specified twice\n");
+      "Radiative environment cannot be specified twice\n");
     res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   res = radiative_env_init_const(stardis->allocator, &stardis->radenv);
@@ -2053,7 +2053,72 @@ process_radiative
 end:
   return res;
 error:
+  radiative_env_release(&stardis->radenv);
+  stardis->radenv = RADIATIVE_ENV_DEFAULT;
   goto end;
+}
+
+static res_T
+process_radiative_prog(struct stardis* stardis, wordexp_t* pwordexp)
+{
+  struct stardis_description_create_context ctx;
+  struct radiative_env_prog* radenv = NULL;
+  char* lib_name = NULL;
+  char* arg = NULL;
+  size_t idx = 1;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && pwordexp);
+
+  radenv = &stardis->radenv.data.prg;
+
+  if(stardis->radenv_def) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Radiative environment cannot be specified twice\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = radiative_env_init_prog(stardis->allocator, &stardis->radenv);
+
+  CHK_ARG(idx, "program name");
+  ERR(str_set(&radenv->prog_name, arg));
+  lib_name = arg;
+
+  if(idx < pwordexp->we_wordc
+  && strcasecmp(pwordexp->we_wordv[idx], "PROG_PARAMS")) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Expecting PROG_PARAMS keyword while parsing `%s'.\n",
+      pwordexp->we_wordv[idx]);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  ERR(set_argc_argv
+    (stardis->allocator, &radenv->argc, &radenv->argv, pwordexp, idx));
+  ERR(get_prog_common
+    (lib_name, stardis, &radenv->program, &radenv->create, &radenv->release));
+  GET_LIB_SYMBOL(radenv, temperature,
+    stardis_radiative_env_temperature);
+  GET_LIB_SYMBOL(radenv, reference_temperature,
+    stardis_radiative_env_reference_temperature);
+
+  ctx.name = "Radiative environment";
+  radenv->data = radenv->create
+    (&ctx, radenv->program->prog_data, radenv->argc, radenv->argv);
+  if(!radenv->data) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot create data for the radiative environment\n");
+    res = RES_UNKNOWN_ERR;
+    goto error;
+  }
+
+exit:
+  return res;
+error:
+  radiative_env_release(&stardis->radenv);
+  stardis->radenv = RADIATIVE_ENV_DEFAULT;
+  goto exit;
 }
 
 static res_T
@@ -2177,7 +2242,7 @@ process_spherical_source_prog(struct stardis* stardis, wordexp_t* pwordexp)
   if(!src->data) {
     logger_print(stardis->logger, LOG_ERROR,
       "Cannot create data for the external spherical source\n");
-    res = RES_BAD_ARG;
+    res = RES_UNKNOWN_ERR;
     goto error;
   }
 
@@ -2273,6 +2338,8 @@ process_model_line
     ERR(process_scale(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "TRAD"))
     ERR(process_radiative(stardis, pwordexp));
+  else if(0 == strcasecmp(arg, "TRAD_PROG"))
+    ERR(process_radiative_prog(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "SPHERICAL_SOURCE"))
     ERR(process_spherical_source(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "SPHERICAL_SOURCE_PROG"))

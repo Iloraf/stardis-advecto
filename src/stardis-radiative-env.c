@@ -17,6 +17,8 @@
 #include "stardis-radiative-env.h"
 
 #include <sdis.h>
+#include <rsys/cstr.h>
+#include <rsys/logger.h>
 
 /*******************************************************************************
  * Helper functions
@@ -69,6 +71,66 @@ exit:
   if(data) SDIS(data_ref_put(data));
   return res;
 error:
+  logger_print(stardis->logger, LOG_ERROR,
+    "Error when creating the radiative environment for the solver -- %s\n",
+    res_to_cstr(res));
+  goto exit;
+}
+
+static double
+radenv_prog_get_temperature
+  (const struct sdis_radiative_ray* ray,
+   struct sdis_data* data)
+{
+  const struct radiative_env_prog* radenv = NULL;
+
+  radenv = *((const struct radiative_env_prog* const*)sdis_data_cget(data));
+  return radenv->temperature(ray->dir, radenv->data);
+}
+
+static double
+radenv_prog_get_reference_temperature
+  (const struct sdis_radiative_ray* ray,
+   struct sdis_data* data)
+{
+  const struct radiative_env_prog* radenv = NULL;
+
+  radenv = *((const struct radiative_env_prog* const*)sdis_data_cget(data));
+  return radenv->reference_temperature(ray->dir, radenv->data);
+}
+
+static res_T
+create_radenv_prog
+  (struct radiative_env* radenv,
+   struct stardis* stardis)
+{
+  struct sdis_radiative_env_shader shader = SDIS_RADIATIVE_ENV_SHADER_NULL;
+  struct sdis_data* data = NULL;
+  res_T res = RES_OK;
+  ASSERT(radenv && radenv->type == RADIATIVE_ENV_PROG && stardis);
+
+  /* Register a pointer to the radiative environment with the solver radiative
+   * environment */
+  res = sdis_data_create(stardis->dev, sizeof(struct radiative_env_prog*),
+    ALIGNOF(struct radiative_env_prog*), NULL, &data);
+  if(res != RES_OK) goto error;
+  *((struct radiative_env_prog**)sdis_data_get(data)) = &radenv->data.prg;
+
+  /* Create the radiative environment */
+  shader.temperature = radenv_prog_get_temperature;
+  shader.reference_temperature = radenv_prog_get_reference_temperature;
+  res = sdis_radiative_env_create
+    (stardis->dev, &shader, data, &radenv->sdis_radenv);
+  if(res != RES_OK) goto error;
+
+exit:
+  /* Release the local reference on the data: it is kept by the sdis radenv */
+  if(data) SDIS(data_ref_put(data));
+  return res;
+error:
+  logger_print(stardis->logger, LOG_ERROR,
+    "Error when creating the radiative environment for the solver -- %s\n",
+    res_to_cstr(res));
   goto exit;
 }
 
@@ -87,10 +149,40 @@ radiative_env_init_const
   return RES_OK;
 }
 
+res_T
+radiative_env_init_prog
+  (struct mem_allocator* allocator,
+   struct radiative_env* radenv)
+{
+  ASSERT(radenv);
+  radenv->type = RADIATIVE_ENV_PROG;
+  radenv->data.prg = RADIATIVE_ENV_PROG_NULL;
+  radenv->data.prg.allocator = allocator;
+  str_init(allocator, &radenv->data.prg.prog_name);
+  return RES_OK;
+}
+
 void
 radiative_env_release(struct radiative_env* radenv)
 {
   ASSERT(radenv);
+
+  if(radenv->type == RADIATIVE_ENV_PROG) {
+    struct radiative_env_prog* radenv_prog = &radenv->data.prg;
+    size_t i = 0;
+
+    if(radenv_prog->data) {
+      ASSERT(radenv_prog->release);
+      radenv_prog->release(radenv_prog->data);
+    }
+
+    str_release(&radenv_prog->prog_name);
+    FOR_EACH(i, 0, radenv_prog->argc) {
+      MEM_RM(radenv_prog->allocator, radenv_prog->argv[i]);
+    }
+    MEM_RM(radenv_prog->allocator, radenv_prog->argv);
+  }
+
   if(radenv->sdis_radenv) SDIS(radiative_env_ref_put(radenv->sdis_radenv));
   radenv->sdis_radenv = NULL;
 }
@@ -109,9 +201,10 @@ radiative_env_create_solver_radiative_env
       if(res != RES_OK) goto error;
       break;
     case RADIATIVE_ENV_PROG:
-      /* TODO */
+      res = create_radenv_prog(radenv, stardis);
+      if(res != RES_OK) goto error;
       break;
-    default: FATAL("Unreachable code.\n"); break;
+    default: FATAL("Unreachable code\n"); break;
   }
 
 exit:

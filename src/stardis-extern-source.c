@@ -77,7 +77,7 @@ exit:
   return res;
 error:
   logger_print(stardis->logger, LOG_ERROR,
-    "Error when creating the external spherical source for the Solver -- %s\n",
+    "Error when creating the external spherical source for the solver -- %s\n",
     res_to_cstr(res));
   goto exit;
 }
@@ -114,7 +114,7 @@ create_solver_source_sphere_prog
   res_T res = RES_OK;
   ASSERT(src && src->type == EXTERN_SOURCE_SPHERE_PROG && stardis);
 
-  /* Register with the solver source a pointer to the external source */
+  /* Register a pointer to the external source with the solver source */
   res = sdis_data_create(stardis->dev, sizeof(struct spherical_source_prog*),
     ALIGNOF(struct spherical_source_prog*), NULL, &data);
   if(res != RES_OK) goto error;
@@ -134,7 +134,7 @@ exit:
   return res;
 error:
   logger_print(stardis->logger, LOG_ERROR,
-    "Error when creating the external spherical source for the Solver -- %s\n",
+    "Error when creating the external spherical source for the solver -- %s\n",
     res_to_cstr(res));
   goto exit;
 }

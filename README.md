@@ -162,7 +162,7 @@ parameters:
 
 ## License
 
-Copyright (C) 2018-2023 |Méso|Star> (<contact@meso-star.com>)
+Copyright (C) 2018-2024 |Méso|Star> (<contact@meso-star.com>)
 
 Stardis is free software released under the GPL v3+ license: GNU GPL
 version 3 or later. You are welcome to redistribute it under certain

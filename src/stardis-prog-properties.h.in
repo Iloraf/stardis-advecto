@@ -620,6 +620,23 @@ stardis_spherical_source_power
   (const double time,
    void* data);
 
+/******************************************************************************/
+/* Additional mandatory functions for a programmed radiative environment      */
+/******************************************************************************/
+
+/* Retrieve the temperature of radiative paths that reach infinity */
+STARDIS_API double
+stardis_radiative_env_temperature
+  (const double dir[3],
+   void* data);
+
+/* Recover the reference temperature of radiative paths that reach
+ * infinity. It is used to linearize radiative transfer */
+STARDIS_API double
+stardis_radiative_env_reference_temperature
+  (const double dir[3],
+   void* data);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

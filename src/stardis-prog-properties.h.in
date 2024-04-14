@@ -591,6 +591,17 @@ STARDIS_API double
 stardis_max_convection_coefficient
   (void* data);
 
+/* Returns the reference temperature at a given fragment.
+ * This temperature is used as a reference to linearize radiative transfer
+ * in Picard computations.
+ * This functions is called every time a path of the computation reaches
+ * this boundary.
+ * data is the pointer returned by stardis_create_data for this boundary. */
+STARDIS_API double
+stardis_reference_temperature
+  (const struct stardis_interface_fragment* frag,
+   void* data);
+
 /* Computes the expected temperature range for this connection.
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this connection.

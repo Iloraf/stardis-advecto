@@ -2063,6 +2063,7 @@ process_radiative_prog(struct stardis* stardis, wordexp_t* pwordexp)
 {
   struct stardis_description_create_context ctx;
   struct radiative_env_prog* radenv = NULL;
+  double radenv_t_range[2] = {DBL_MAX, -DBL_MAX};
   char* lib_name = NULL;
   char* arg = NULL;
   size_t idx = 1;
@@ -2102,6 +2103,8 @@ process_radiative_prog(struct stardis* stardis, wordexp_t* pwordexp)
     stardis_radiative_env_temperature);
   GET_LIB_SYMBOL(radenv, reference_temperature,
     stardis_radiative_env_reference_temperature);
+  GET_LIB_SYMBOL(radenv, t_range,
+    stardis_t_range);
 
   ctx.name = "Radiative environment";
   radenv->data = radenv->create
@@ -2112,6 +2115,10 @@ process_radiative_prog(struct stardis* stardis, wordexp_t* pwordexp)
     res = RES_UNKNOWN_ERR;
     goto error;
   }
+
+  radenv->t_range(radenv->data, radenv_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], radenv_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], radenv_t_range[1]);
 
 exit:
   return res;

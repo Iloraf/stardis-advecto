@@ -68,9 +68,14 @@ struct radiative_env_prog {
   (*reference_temperature)
     (const double dir[3],
      void* data);
+
+  double*
+  (*t_range)
+    (void* data,
+     double t_range[2]);
 };
 #define RADIATIVE_ENV_PROG_NULL__ \
-  {{0}, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL}
+  {{0}, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL}
 static const struct radiative_env_prog RADIATIVE_ENV_PROG_NULL =
   RADIATIVE_ENV_PROG_NULL__;
 

@@ -637,6 +637,17 @@ stardis_radiative_env_reference_temperature
   (const double dir[3],
    void* data);
 
+/* Computes the expected temperature range for this radiative
+ * environment.
+ * This functions is called once when initializing the computation.
+ * data is the pointer returned by stardis_create_data for this
+ * radiative environment.
+ * Returns its modified range argument. */
+STARDIS_API double*
+stardis_t_range
+  (void* data,
+   double range[2]);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

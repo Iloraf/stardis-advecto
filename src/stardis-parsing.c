@@ -857,6 +857,7 @@ process_h_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double h_bound_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct h_boundary_prog* h_boundary_prog;
   struct stardis_description_create_context ctx;
@@ -912,7 +913,9 @@ process_h_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(h_boundary_prog);
 
-  h_boundary_prog->t_range(h_boundary_prog->prog_data, stardis->t_range);
+  h_boundary_prog->t_range(h_boundary_prog->prog_data, h_bound_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], h_bound_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], h_bound_t_range[1]);
 
   /* create the media behind the interface */
   if(type == DESC_BOUND_H_FOR_FLUID_PROG) {
@@ -951,6 +954,7 @@ process_hf_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double hf_bound_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct hf_boundary_prog* hf_boundary_prog;
   struct stardis_description_create_context ctx;
@@ -1005,7 +1009,9 @@ process_hf_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(hf_boundary_prog);
 
-  hf_boundary_prog->t_range(hf_boundary_prog->prog_data, stardis->t_range);
+  hf_boundary_prog->t_range(hf_boundary_prog->prog_data, hf_bound_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], hf_bound_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], hf_bound_t_range[1]);
 
   /* create the media behind the interface */
   ERR(init_fluid_prog(stardis->allocator, &fluid_prog));
@@ -1094,6 +1100,7 @@ process_t_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double t_bound_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct t_boundary_prog* t_boundary_prog;
   struct stardis_description_create_context ctx;
@@ -1142,7 +1149,9 @@ process_t_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(t_boundary_prog);
 
-  t_boundary_prog->t_range(t_boundary_prog->prog_data, stardis->t_range);
+  t_boundary_prog->t_range(t_boundary_prog->prog_data, t_bound_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], t_bound_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], t_bound_t_range[1]);
 
 end:
   return res;
@@ -1369,6 +1378,7 @@ process_sfc_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double sf_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct solid_fluid_connect_prog* sf_connect_prog;
   struct stardis_description_create_context ctx;
@@ -1419,7 +1429,9 @@ process_sfc_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(sf_connect_prog);
 
-  sf_connect_prog->t_range(sf_connect_prog->prog_data, stardis->t_range);
+  sf_connect_prog->t_range(sf_connect_prog->prog_data, sf_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], sf_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], sf_t_range[1]);
 
 end:
   return res;
@@ -1748,6 +1760,7 @@ process_solid_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double solid_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct solid_prog* solid_prog;
   struct stardis_description_create_context ctx;
@@ -1801,7 +1814,9 @@ process_solid_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(solid_prog);
 
-  solid_prog->t_range(solid_prog->prog_data, stardis->t_range);
+  solid_prog->t_range(solid_prog->prog_data, solid_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], solid_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], solid_t_range[1]);
 
   ERR(create_solver_solid_prog(stardis, solid_prog));
 
@@ -1910,6 +1925,7 @@ process_fluid_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double fluid_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct fluid_prog* fluid_prog;
   struct stardis_description_create_context ctx;
@@ -1960,7 +1976,9 @@ process_fluid_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(fluid_prog);
 
-  fluid_prog->t_range(fluid_prog->prog_data, stardis->t_range);
+  fluid_prog->t_range(fluid_prog->prog_data, fluid_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], fluid_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], fluid_t_range[1]);
 
   ERR(create_solver_fluid_prog(stardis, fluid_prog));
 

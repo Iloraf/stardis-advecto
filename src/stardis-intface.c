@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -80,20 +80,22 @@ interface_get_ref_temperature
 static double
 interface_get_emissivity
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  (void)frag;
+  (void)frag, (void)source_id;
   return interface_props->emissivity;
 }
 
 static double
 interface_get_alpha
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  (void)frag;
+  (void)frag, (void)source_id;
   return interface_props->alpha;
 }
 
@@ -110,9 +112,10 @@ interface_get_tcr
 static double
 emissivity_1
   (const struct stardis_interface_fragment* frag,
+   const unsigned src_id,
    void* data)
 {
-  (void)frag, (void)data;
+  (void)frag, (void)src_id, (void)data;
   return 1;
 }
 
@@ -167,33 +170,39 @@ intface_prog_get_hc
 static double
 intface_prog_get_emissivity
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
   struct stardis_interface_fragment f;
+  (void)source_id;
   d3_set(f.P, frag->P);
   d3_set(f.Ng, frag->Ng);
   d3_set(f.uv, frag->uv);
   f.time = frag->time;
   ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
   f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
-  return interface_props->get_emissivity(&f, interface_props->prog_data);
+  return interface_props->get_emissivity
+    (&f, source_id, interface_props->prog_data);
 }
 
 static double
 intface_prog_get_alpha
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
   struct stardis_interface_fragment f;
+  (void)source_id;
   d3_set(f.P, frag->P);
   d3_set(f.Ng, frag->Ng);
   d3_set(f.uv, frag->uv);
   f.time = frag->time;
   ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
   f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
-  return interface_props->get_alpha(&f, interface_props->prog_data);
+  return interface_props->get_alpha
+    (&f, source_id, interface_props->prog_data);
 }
 
 static double

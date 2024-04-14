@@ -303,6 +303,7 @@ stardis_boundary_temperature
 STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
@@ -312,6 +313,7 @@ stardis_emissivity
 STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.
@@ -361,6 +363,7 @@ stardis_t_range
 STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
@@ -370,6 +373,7 @@ stardis_emissivity
 STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.
@@ -452,6 +456,7 @@ stardis_t_range
 STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
@@ -461,6 +466,7 @@ stardis_emissivity
 STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.
@@ -556,6 +562,7 @@ stardis_thermal_contact_resistance
 STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
@@ -565,6 +572,7 @@ stardis_emissivity
 STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.
@@ -582,6 +590,17 @@ stardis_convection_coefficient
 STARDIS_API double
 stardis_max_convection_coefficient
   (void* data);
+
+/* Returns the reference temperature at a given fragment.
+ * This temperature is used as a reference to linearize radiative transfer
+ * in Picard computations.
+ * This functions is called every time a path of the computation reaches
+ * this boundary.
+ * data is the pointer returned by stardis_create_data for this boundary. */
+STARDIS_API double
+stardis_reference_temperature
+  (const struct stardis_interface_fragment* frag,
+   void* data);
 
 /* Computes the expected temperature range for this connection.
  * This functions is called once when initializing the computation.
@@ -611,6 +630,34 @@ STARDIS_API double /* [W] */
 stardis_spherical_source_power
   (const double time,
    void* data);
+
+/******************************************************************************/
+/* Additional mandatory functions for a programmed radiative environment      */
+/******************************************************************************/
+
+/* Retrieve the temperature of radiative paths that reach infinity */
+STARDIS_API double
+stardis_radiative_env_temperature
+  (const double dir[3],
+   void* data);
+
+/* Recover the reference temperature of radiative paths that reach
+ * infinity. It is used to linearize radiative transfer */
+STARDIS_API double
+stardis_radiative_env_reference_temperature
+  (const double dir[3],
+   void* data);
+
+/* Computes the expected temperature range for this radiative
+ * environment.
+ * This functions is called once when initializing the computation.
+ * data is the pointer returned by stardis_create_data for this
+ * radiative environment.
+ * Returns its modified range argument. */
+STARDIS_API double*
+stardis_t_range
+  (void* data,
+   double range[2]);
 
 #ifdef __cplusplus
 } /* extern "C" */

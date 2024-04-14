@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -2011,42 +2011,121 @@ process_radiative
   (struct stardis* stardis,
    wordexp_t* pwordexp)
 {
+  double trad = 0;
+  double tref = 0;
   char* arg = NULL;
   size_t idx = 1;
   res_T res = RES_OK;
 
   ASSERT(stardis && pwordexp);
 
-  if(stardis->trad_def) {
+  if(stardis->radenv_def) {
     logger_print(stardis->logger, LOG_ERROR,
-      "TRAD cannot be specified twice\n");
+      "Radiative environment cannot be specified twice\n");
     res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
+
+  res = radiative_env_init_const(stardis->allocator, &stardis->radenv);
+  if(res != RES_OK) goto error;
+
   CHK_ARG(idx, "Trad");
-  res = cstr_to_double(arg, &stardis->trad);
-  if(res != RES_OK || SDIS_TEMPERATURE_IS_UNKNOWN(stardis->trad)) {
+  res = cstr_to_double(arg, &trad);
+  if(res != RES_OK || SDIS_TEMPERATURE_IS_UNKNOWN(trad)) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid Trad: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
   CHK_ARG(idx, "Trad reference");
-  res = cstr_to_double(arg, &stardis->trad_ref);
-  if(res != RES_OK
-    || stardis->trad_ref < 0)
-  {
+  res = cstr_to_double(arg, &tref);
+  if(res != RES_OK || tref < 0) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid Trad reference: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->trad_def = 1;
+
+  stardis->radenv.data.cst.temperature = trad;
+  stardis->radenv.data.cst.reference_temperature = tref;
+  stardis->radenv_def = 1;
 
 end:
   return res;
 error:
+  radiative_env_release(&stardis->radenv);
+  stardis->radenv = RADIATIVE_ENV_DEFAULT;
   goto end;
+}
+
+static res_T
+process_radiative_prog(struct stardis* stardis, wordexp_t* pwordexp)
+{
+  struct stardis_description_create_context ctx;
+  struct radiative_env_prog* radenv = NULL;
+  double radenv_t_range[2] = {DBL_MAX, -DBL_MAX};
+  char* lib_name = NULL;
+  char* arg = NULL;
+  size_t idx = 1;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && pwordexp);
+
+  radenv = &stardis->radenv.data.prg;
+
+  if(stardis->radenv_def) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Radiative environment cannot be specified twice\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = radiative_env_init_prog(stardis->allocator, &stardis->radenv);
+
+  CHK_ARG(idx, "program name");
+  ERR(str_set(&radenv->prog_name, arg));
+  lib_name = arg;
+
+  if(idx < pwordexp->we_wordc
+  && strcasecmp(pwordexp->we_wordv[idx], "PROG_PARAMS")) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Expecting PROG_PARAMS keyword while parsing `%s'.\n",
+      pwordexp->we_wordv[idx]);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  ERR(set_argc_argv
+    (stardis->allocator, &radenv->argc, &radenv->argv, pwordexp, idx));
+  ERR(get_prog_common
+    (lib_name, stardis, &radenv->program, &radenv->create, &radenv->release));
+  GET_LIB_SYMBOL(radenv, temperature,
+    stardis_radiative_env_temperature);
+  GET_LIB_SYMBOL(radenv, reference_temperature,
+    stardis_radiative_env_reference_temperature);
+  GET_LIB_SYMBOL(radenv, t_range,
+    stardis_t_range);
+
+  ctx.name = "Radiative environment";
+  radenv->data = radenv->create
+    (&ctx, radenv->program->prog_data, radenv->argc, radenv->argv);
+  if(!radenv->data) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot create data for the radiative environment\n");
+    res = RES_UNKNOWN_ERR;
+    goto error;
+  }
+
+  radenv->t_range(radenv->data, radenv_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], radenv_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], radenv_t_range[1]);
+
+exit:
+  return res;
+error:
+  radiative_env_release(&stardis->radenv);
+  stardis->radenv = RADIATIVE_ENV_DEFAULT;
+  goto exit;
 }
 
 static res_T
@@ -2170,7 +2249,7 @@ process_spherical_source_prog(struct stardis* stardis, wordexp_t* pwordexp)
   if(!src->data) {
     logger_print(stardis->logger, LOG_ERROR,
       "Cannot create data for the external spherical source\n");
-    res = RES_BAD_ARG;
+    res = RES_UNKNOWN_ERR;
     goto error;
   }
 
@@ -2266,6 +2345,8 @@ process_model_line
     ERR(process_scale(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "TRAD"))
     ERR(process_radiative(stardis, pwordexp));
+  else if(0 == strcasecmp(arg, "TRAD_PROG"))
+    ERR(process_radiative_prog(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "SPHERICAL_SOURCE"))
     ERR(process_spherical_source(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "SPHERICAL_SOURCE_PROG"))
@@ -2435,10 +2516,14 @@ exp_error:
     stardis->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
   logger_print(stardis->logger, LOG_OUTPUT,
     "Scaling factor is %g\n", stardis->scale_factor);
-  logger_print(stardis->logger, LOG_OUTPUT,
-    "Trad is %g, Trad reference is %g\n", stardis->trad, stardis->trad_ref);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], stardis->trad_ref);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], stardis->trad_ref);
+  if(stardis->radenv.type == RADIATIVE_ENV_CONST) {
+    const double trad = stardis->radenv.data.cst.temperature;
+    const double trad_ref = stardis->radenv.data.cst.reference_temperature;
+    logger_print(stardis->logger, LOG_OUTPUT,
+      "Trad is %g, Trad reference is %g\n", trad, trad_ref);
+    stardis->t_range[0] = MMIN(stardis->t_range[0], trad_ref);
+    stardis->t_range[1] = MMAX(stardis->t_range[1], trad_ref);
+  }
   logger_print(stardis->logger, LOG_OUTPUT,
     "System T range is [%g %g]\n", SPLIT2(stardis->t_range));
   logger_print(stardis->logger, LOG_OUTPUT,

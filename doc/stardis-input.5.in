@@ -1,4 +1,4 @@
-.\" Copyright (C) 2018-2023 |Méso|Star>
+.\" Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
 .\"
 .\" This program is free software: you can redistribute it and/or modify
 .\" it under the terms of the GNU General Public License as published by
@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd April 5, 2024
+.Dd April 13, 2024
 .Dt STARDIS-INPUT 5
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -213,7 +213,7 @@ that changes at
 .It Ta \& \& | Ta Aq Va robin
 .It Ta \& \& | Ta Aq Va neumann
 .It Ta \& \& | Ta Aq Va robin-neumann
-.It Ta \& \& | Ta Ao Va rad-temp Ac No # \&At most once
+.It Ta \& \& | Ta Ao Va rad-env Ac No # \&At most once
 .It Ta \& \& | Ta Ao Va ext-source Ac No # \&At most once
 .It \  Ta Ta
 .\" Dirichlet
@@ -255,8 +255,10 @@ that changes at
 .It Ta Ta Ao Va prog-desc Ac
 .It \  Ta Ta
 .\" Radiative temperature
-.It Ao Va rad-temp Ac Ta ::= Ta Li TRAD Ao Va temp Ac Ao Va Tref Ac
-# Radiative temperatures
+.It Ao Va rad-env Ac Ta ::= Ta Ao Va rad-env-const Ac | Ao Va rad-env-prog Ac
+.It Ao Va rad-env-const Ac Ta ::= Ta Li TRAD Ao Va temp Ac Ao Va Tref Ac
+.It Ao Va rad-env-prog Ac Ta ::= Ta Li TRAD_PROG Ao Va prog-name Ac \e
+.It Ta Ta Op Li PROG_PARAMS Op Ao Va args Ac
 .It \  Ta Ta
 .\" External source
 .It Ao Va ext-source Ac Ta ::= Ta Ao Va ext-source-const Ac | Ao Va ext-source-prog Ac

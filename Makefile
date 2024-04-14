@@ -1,4 +1,4 @@
-# Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+# Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -46,6 +46,7 @@ SRC =\
  src/stardis-output.c\
  src/stardis-parsing.c\
  src/stardis-program.c\
+ src/stardis-radiative-env.c\
  src/stardis-sfconnect.c\
  src/stardis-sfconnect-prog.c\
  src/stardis-ssconnect.c\

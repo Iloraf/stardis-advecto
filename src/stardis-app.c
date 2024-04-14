@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -270,9 +270,8 @@ stardis_init
   stardis->nthreads = args->nthreads;
   stardis->picard_order = args->picard_order;
   stardis->scale_factor = -1; /* invalid value */
-  stardis->trad = STARDIS_DEFAULT_TRAD;
-  stardis->trad_ref = STARDIS_DEFAULT_TRAD_REFERENCE;
-  stardis->trad_def = 0;
+  stardis->radenv = RADIATIVE_ENV_DEFAULT;
+  stardis->radenv_def = 0;
   stardis->initial_time = args->initial_time;
   stardis->geometry_initialized = 0;
   d2(stardis->t_range, INF, -INF);
@@ -507,17 +506,20 @@ stardis_init
     struct sdis_scene_create_args scn_args = SDIS_SCENE_CREATE_ARGS_DEFAULT;
     ASSERT(darray_interface_ptrs_size_get(&stardis->geometry.interf_bytrg)
       == tcount);
+
+    res = radiative_env_create_solver_radiative_env(&stardis->radenv, stardis);
+    if(res != RES_OK) goto error;
+
     scn_args.get_indices = sg3d_sdisXd_geometry_get_indices;
     scn_args.get_interface = sg3d_sdisXd_geometry_get_interface;
     scn_args.get_position = sg3d_sdisXd_geometry_get_position;
     scn_args.nprimitives = tcount;
     scn_args.nvertices = vcount;
     scn_args.fp_to_meter = stardis->scale_factor;
-    scn_args.trad.temperature = stardis->trad;
-    scn_args.trad.reference = stardis->trad_ref;
     scn_args.t_range[0] = stardis->t_range[0];
     scn_args.t_range[1] = stardis->t_range[1];
     scn_args.source = stardis->extsrc.sdis_src;
+    scn_args.radenv = stardis->radenv.sdis_radenv;
     scn_args.context = &create_context;
 
     /* Setting Tmax to 0 is a way of setting the radiative coefficient to 0, and
@@ -566,6 +568,7 @@ stardis_release
   str_release(&stardis->chunks_prefix);
 
   extern_source_release(&stardis->extsrc);
+  radiative_env_release(&stardis->radenv);
 
   /* release non-PROGRAM descritions first */
   FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {

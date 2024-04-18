@@ -64,8 +64,7 @@ create_solver_source_sphere
   (struct extern_source* src,
    struct stardis* stardis)
 {
-  struct sdis_spherical_source_create_args args =
-    SDIS_SPHERICAL_SOURCE_CREATE_ARGS_NULL;
+  struct sdis_spherical_source_shader shader = SDIS_SPHERICAL_SOURCE_SHADER_NULL;
   struct sdis_data* data = NULL;
   res_T res = RES_OK;
   ASSERT(src && src->type == EXTERN_SOURCE_SPHERE && stardis);
@@ -77,12 +76,11 @@ create_solver_source_sphere
   *((struct spherical_source**)sdis_data_get(data)) = &src->data.sphere;
 
   /* Create the spherical source */
-  args.position = sphere_get_position;
-  args.power = sphere_get_power;
-  args.diffuse_radiance = sphere_get_diffuse_radiance;
-  args.data = data;
-  args.radius = src->data.sphere.radius;
-  res = sdis_spherical_source_create(stardis->dev, &args, &src->sdis_src);
+  shader.position = sphere_get_position;
+  shader.power = sphere_get_power;
+  shader.diffuse_radiance = sphere_get_diffuse_radiance;
+  shader.radius = src->data.sphere.radius;
+  res = sdis_spherical_source_create(stardis->dev, &shader, data, &src->sdis_src);
   if(res != RES_OK) goto error;
 
 exit:
@@ -132,8 +130,7 @@ create_solver_source_sphere_prog
   (struct extern_source* src,
    struct stardis* stardis)
 {
-  struct sdis_spherical_source_create_args args =
-    SDIS_SPHERICAL_SOURCE_CREATE_ARGS_NULL;
+  struct sdis_spherical_source_shader shader = SDIS_SPHERICAL_SOURCE_SHADER_NULL;
   struct sdis_data* data = NULL;
   res_T res = RES_OK;
   ASSERT(src && src->type == EXTERN_SOURCE_SPHERE_PROG && stardis);
@@ -145,12 +142,11 @@ create_solver_source_sphere_prog
   *((struct spherical_source_prog**)sdis_data_get(data)) = &src->data.sphere_prog;
 
   /* Create the spherical source */
-  args.position = sphere_prog_get_position;
-  args.power = sphere_prog_get_power;
-  args.diffuse_radiance = sphere_prog_get_diffuse_radiance;
-  args.data = data;
-  args.radius = src->data.sphere_prog.radius;
-  res = sdis_spherical_source_create(stardis->dev, &args, &src->sdis_src);
+  shader.position = sphere_prog_get_position;
+  shader.power = sphere_prog_get_power;
+  shader.diffuse_radiance = sphere_prog_get_diffuse_radiance;
+  shader.radius = src->data.sphere_prog.radius;
+  res = sdis_spherical_source_create(stardis->dev, &shader, data, &src->sdis_src);
   if(res != RES_OK) goto error;
 
 exit:

@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd April 13, 2024
+.Dd April 18, 2024
 .Dt STARDIS-INPUT 5
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -263,7 +263,7 @@ that changes at
 .\" External source
 .It Ao Va ext-source Ac Ta ::= Ta Ao Va ext-source-const Ac | Ao Va ext-source-prog Ac
 .It Ao Va ext-source-const Ac Ta ::= Ta Li SPHERICAL_SOURCE Ao Va radius Ac Ao Va position Ac \e
-.It Ta Ta Ao Va power Ac
+.It Ta Ta Ao Va power Ac Ao Va diffuse-radiance Ac
 .It Ao Va ext-source-prog Ac Ta ::= Ta Li SPHERICAL_SOURCE_PROG Ao Va radius Ac \e
 .It Ta Ta Ao Va prog-name Ac Op Li PROG_PARAMS Op Ao Va args Ac
 .It \  Ta Ta
@@ -273,6 +273,7 @@ that changes at
 .It Ao Va outside-temp Ac Ta ::= Ta Vt real No # Temperature > 0 [K]
 .It Ao Va flux Ac Ta ::= Ta Vt real No # [W/m^2]
 .It Ao Va power Ac Ta ::= Ta Vt real No # [W]
+.It Ao Va diffuse-radiance Ac Ta ::= Ta Vt real No # [W/m^2/sr]
 .It Ao Va position Ac Ta ::= Ta Vt real real real
 .It Ao Va radius Ac Ta ::= Ta Vt real
 .El

@@ -631,6 +631,17 @@ stardis_spherical_source_power
   (const double time,
    void* data);
 
+/* Describes the diffuse part of the source's radiance, i.e. the radiance
+ * emitted by the source and scattered at least once in the environment. This
+ * parameter is actually used to approximate a semi-transparent medium. Its
+ * value can be 0, meaning that the source has not been scattered by the
+ * environment, or, to put it another way, that the source is in a vacuum. */
+STARDIS_API double /* [W/m^2/sr] */
+stardis_spherical_source_diffuse_radiance
+  (const double time,
+   const double dir[3],
+   void* data);
+
 /******************************************************************************/
 /* Additional mandatory functions for a programmed radiative environment      */
 /******************************************************************************/

@@ -46,6 +46,19 @@ sphere_get_power(const double time, struct sdis_data* data)
   return src->power; /* [W] */
 }
 
+static double
+sphere_get_diffuse_radiance
+  (const double time,
+   const double dir[3],
+   struct sdis_data* data)
+{
+  const struct spherical_source* src = NULL;
+  (void)time, (void)dir;
+
+  src = *((const struct spherical_source* const*)sdis_data_cget(data));
+  return src->diffuse_radiance; /* [W/m^2/sr] */
+}
+
 static res_T
 create_solver_source_sphere
   (struct extern_source* src,
@@ -66,6 +79,7 @@ create_solver_source_sphere
   /* Create the spherical source */
   args.position = sphere_get_position;
   args.power = sphere_get_power;
+  args.diffuse_radiance = sphere_get_diffuse_radiance;
   args.data = data;
   args.radius = src->data.sphere.radius;
   res = sdis_spherical_source_create(stardis->dev, &args, &src->sdis_src);
@@ -87,7 +101,6 @@ sphere_prog_get_position(const double time, double pos[3], struct sdis_data* dat
 {
   const struct spherical_source_prog* src = NULL;
   ASSERT(pos);
-  (void)time;
 
   src = *((const struct spherical_source_prog* const*)sdis_data_cget(data));
   src->position(time, pos, src->data);;
@@ -97,10 +110,21 @@ static double
 sphere_prog_get_power(const double time, struct sdis_data* data)
 {
   const struct spherical_source_prog* src = NULL;
-  (void)time;
 
   src = *((const struct spherical_source_prog* const*)sdis_data_cget(data));
   return src->power(time, src->data);
+}
+
+static double
+sphere_prog_get_diffuse_radiance
+  (const double time,
+   const double dir[3],
+   struct sdis_data* data)
+{
+  const struct spherical_source_prog* src = NULL;
+
+  src = *((const struct spherical_source_prog* const*)sdis_data_cget(data));
+  return src->diffuse_radiance(time, dir, src->data);
 }
 
 static res_T
@@ -123,6 +147,7 @@ create_solver_source_sphere_prog
   /* Create the spherical source */
   args.position = sphere_prog_get_position;
   args.power = sphere_prog_get_power;
+  args.diffuse_radiance = sphere_prog_get_diffuse_radiance;
   args.data = data;
   args.radius = src->data.sphere_prog.radius;
   res = sdis_spherical_source_create(stardis->dev, &args, &src->sdis_src);

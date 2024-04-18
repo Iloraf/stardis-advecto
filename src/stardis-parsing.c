@@ -2197,7 +2197,16 @@ process_spherical_source
   if(res == RES_OK && src->power < 0) res = RES_BAD_ARG;
   if(res != RES_OK) {
     logger_print(stardis->logger, LOG_ERROR,
-      "Invalid sphercial source power: %s\n", arg);
+      "Invalid spherical source power: %s\n", arg);
+    goto error;
+  }
+
+  CHK_ARG(idx, "diffuse radiance");
+  res = cstr_to_double(arg, &src->diffuse_radiance);
+  if(res == RES_OK && src->diffuse_radiance < 0) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid diffuse radiance for the spherical source: %s\n", arg);
     goto error;
   }
 
@@ -2261,6 +2270,7 @@ process_spherical_source_prog(struct stardis* stardis, wordexp_t* pwordexp)
   ERR(get_prog_common(lib_name, stardis, &src->program, &src->create, &src->release));
   GET_LIB_SYMBOL(src, position, stardis_spherical_source_position);
   GET_LIB_SYMBOL(src, power, stardis_spherical_source_power);
+  GET_LIB_SYMBOL(src, diffuse_radiance, stardis_spherical_source_diffuse_radiance);
 
   ctx.name = "External spherical source";
   src->data = src->create(&ctx, src->program->prog_data, src->argc, src->argv);

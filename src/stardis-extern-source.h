@@ -32,8 +32,9 @@ struct spherical_source {
   double position[3];
   double radius;
   double power; /* [W] */
+  double diffuse_radiance; /* [W/m^2/sr] */
 };
-#define SPHERICAL_SOURCE_NULL__ {{0,0,0}, -1, 0}
+#define SPHERICAL_SOURCE_NULL__ {{0,0,0}, -1, 0, 0}
 static const struct spherical_source SPHERICAL_SOURCE_NULL =
   SPHERICAL_SOURCE_NULL__;
 
@@ -70,9 +71,15 @@ struct spherical_source_prog {
   (*power)
     (const double time,
      void* data);
+
+  double
+  (*diffuse_radiance)
+    (const double time,
+     const double dir[3],
+     void* data);
 };
 #define SPHERICAL_SOURCE_PROG_NULL__ \
-  {{0}, NULL, NULL, NULL, 0, NULL, 0, NULL, NULL, NULL, NULL}
+  {{0}, NULL, NULL, NULL, 0, NULL, 0, NULL, NULL, NULL, NULL, NULL}
 static const struct spherical_source_prog SPHERICAL_SOURCE_PROG_NULL=
   SPHERICAL_SOURCE_PROG_NULL__;
 

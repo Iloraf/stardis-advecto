@@ -649,14 +649,16 @@ stardis_spherical_source_diffuse_radiance
 /* Retrieve the temperature of radiative paths that reach infinity */
 STARDIS_API double
 stardis_radiative_env_temperature
-  (const double dir[3],
+  (const double time, /* [s] */
+   const double dir[3],
    void* data);
 
 /* Recover the reference temperature of radiative paths that reach
  * infinity. It is used to linearize radiative transfer */
 STARDIS_API double
 stardis_radiative_env_reference_temperature
-  (const double dir[3],
+  (const double time, /* [s] */
+   const double dir[3],
    void* data);
 
 /* Computes the expected temperature range for this radiative

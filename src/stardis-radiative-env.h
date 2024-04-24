@@ -61,12 +61,14 @@ struct radiative_env_prog {
 
   double
   (*temperature)
-    (const double dir[3],
+    (const double time, /* [s] */
+     const double dir[3],
      void* data);
 
   double
   (*reference_temperature)
-    (const double dir[3],
+    (const double time, /* [s] */
+     const double dir[3],
      void* data);
 
   double*

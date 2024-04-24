@@ -85,7 +85,7 @@ radenv_prog_get_temperature
   const struct radiative_env_prog* radenv = NULL;
 
   radenv = *((const struct radiative_env_prog* const*)sdis_data_cget(data));
-  return radenv->temperature(ray->dir, radenv->data);
+  return radenv->temperature(ray->time, ray->dir, radenv->data);
 }
 
 static double
@@ -96,7 +96,7 @@ radenv_prog_get_reference_temperature
   const struct radiative_env_prog* radenv = NULL;
 
   radenv = *((const struct radiative_env_prog* const*)sdis_data_cget(data));
-  return radenv->reference_temperature(ray->dir, radenv->data);
+  return radenv->reference_temperature(ray->time, ray->dir, radenv->data);
 }
 
 static res_T

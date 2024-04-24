@@ -103,15 +103,23 @@ the presence of high temperature gradients.
 Increasing the Picard order may be necessary in this case, until the required
 convergence is reached.
 .Pp
-A main property of this approach is that the resulting algorithms do
-not rely on a volumic mesh of the system: only the representation
-of interfaces is necessary.
+One of the key features of
+.Nm
+is that its algorithms are not based on a volumetric mesh of the system:
+only the representation of its interfaces is required.
+And these are used only as a description of the system, not as a basis
+for calculation, whose discretization would have an impact on the
+accuracy of estimates.
 .Pp
 .Nm
 implements mixed parallelism.
 On a single computer (that is, a node), it uses shared memory parallelism while
 it relies on Message Passing Interface (MPI) to parallelize calculations between
 multiple nodes.
+.Nm
+can therefore be launched either directly or via a process launcher such as
+.Xr mpirun 1
+to distribute the calculation on several computers.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds

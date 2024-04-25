@@ -74,7 +74,7 @@ S3D_VERSION = 0.10
 S3D_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags s3d)
 S3D_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs s3d)
 
-SDIS_VERSION = 0.15
+SDIS_VERSION = 0.15.1
 SDIS_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags sdis)
 SDIS_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs sdis)
 

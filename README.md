@@ -4,83 +4,199 @@
 
 Stardis is a software dedicated to the resolution of coupled
 convective-conductive-radiative thermal problems in 3D environments.
-It is based on [stardis-solver](https://gitlab.com/meso-star/stardis-solver)
-and exposes some of the main features of the solver in an easy to use way.
-Using stardis is a practical way of carrying out thermal studies on CAD
+It is based on
+[Stardis Solver](https://gitlab.com/meso-star/stardis-solver) and
+exposes some of the main features of the solver in an easy to use way.
+Using Stardis is a practical way of carrying out thermal studies on CAD
 models which can be exported from Salomé or other similar software.
 
-## How to build
+## Requirements
 
-Stardis relies on the [CMake](http://www.cmake.org) and the
-[RCMake](https://gitlab.com/vaplv/rcmake/) package to build.
-It also depends on the
-[RSys](https://gitlab.com/vaplv/rsys/),
-[star-3d](https://gitlab.com/meso-star/star-3d/),
-[star-enclosures-3d](https://gitlab.com/meso-star/star-enclosures-3d/),
-[star-geometry-3d](https://gitlab.com/meso-star/star-geometry-3d/),
-[star-stl](https://gitlab.com/meso-star/star-stl) and
-[stardis-solver](https://gitlab.com/meso-star/stardis-solver) libraries
-as well as on the [OpenMP](http://www.openmp.org) 2.0 specification to
-parallelize its computations.  It may depend on
-[OpenMPI](https://www.open-mpi.org/) 2.0 if distributed memory parallelism
-is enabled via the `ENABLE_MPI` variable of the CMake file.
+- C compiler
+- POSIX make
+- pkg-config
+- Message Passing Interface (optional)
+- [mandoc](https://mandoc.bsd.lv)
+- [RSys](https://gitlab.com/vaplv/rsys)
+- [Star 3D](https://gitlab.com/meso-star/star-3d)
+- [Stardis Solver](https://gitlab.com/meso-star/stardis-solver)
+- [Star Enclosure 3D](https://gitlab.com/meso-star/star-enclosures-3d)
+- [Star Geometry 3D](https://gitlab.com/meso-star/star-geometry-3d)
+- [Star SamPling](https://gitlab.com/meso-star/star-sp)
+- [Star StL](https://gitlab.com/meso-star/star-stl)
 
-First ensure that CMake and a C compiler are installed on your system.
-Then install the RCMake package as well as all the aforementioned
-prerequisites. Finally generate the project from
-the `cmake/CMakeLists.txt` file by appending to the `CMAKE_PREFIX_PATH`
-variable the install directories of its dependencies.
+## Installation
+
+Edit config.mk as needed, then run:
+
+    make clean install
 
 ## Release notes
+
+### Version 0.10
+
+#### New conduction algorithm
+
+Addition of a new algorithm for sampling a potentially unsteady
+conductive path. The new `-a` option lets you select the algorithm to be
+used, i.e. either the sphere delta algorithm used until now (which is
+still the default algorithm), or the new Walk on Sphere algorithm (WoS).
+
+This new algorithm samples an unbiased diffuse trajectory in a solid
+with Dirichlet boundary conditions, unbiased with respect to what
+numerical accuracy can account for. Its coupling with other boundary or
+connection conditions behaves as with the delta sphere algorithm, i.e.
+the solution is exact when the length of the trajectory used as a
+first-order approximation tends towards 0.
+
+Currently, when using WoS, the initial condition must be constant for
+the solid. The power density is also taken into account, but cannot
+vary in time and space.
+
+#### External spherical source
+
+An external spherical source can be added to the scene using the new
+stardis-input keyword `SPHERICAL_SOURCE`. Once defined, it is considered
+as a new boundary condition whose contribution is calculated at the
+solid/fluid interfaces in the form of an external net flux.
+
+The external net flux is calculated by evaluating the direct and diffuse
+part of the incident flux due to the external source. The diffuse part
+of the flux manages not only the radiation from the external source that
+reaches the interface after one or more reflections, but also the
+external radiation scattered in the environment, here simply represented
+by a `diffuse-radiance` parameter.
+
+An external spherical source is defined by its position, radius, power
+and diffuse radiance. While the radius is constant, all other parameters
+can be programmed using the `SPHERICAL_SOURCE_PROG` keyword. In doing
+so, the user can provide a shared object as input, enabling him to
+define a time-dependent power and position, and a diffuse radiance that
+also depends on the direction along which the sampled trajectory reaches
+the environment.
+
+#### Making surface radiative properties source-dependent
+
+Emissivity and specular fraction can now be varied according to the type
+of source (internal or external). This is only possible using
+programmable properties (`H_BOUNDARY_FOR_FLUID_PROG`,
+`HF_BOUNDARY_FOR_SOLID_PROG` and `SOLID_FLUID_PROG`). Properties are
+otherwise assumed to be the same for all sources.
+
+#### Make the radiative environment programmable
+
+Addition of the `TRAD_PROG` keyword, which allows the user to define a
+radiative temperature and a reference radiative temperature that depend
+on a direction.
+
+#### Parallelize the resolutions of multiple boundary probes
+
+Add the `-L` option to calculate multiple boundary probes at once.
+Stardis will then parallelize the probe list calculations, rather than
+each probe calculation one after the other. Using this option is
+therefore more advantageous in terms of load distribution when the
+number of boundary probes to be evaluated is large compared to the cost
+of calculating a single probe (option `-P`).
+
+#### Allow relative temperatures
+
+Allow to perform calculations relative to a given temperature T. In this
+case, the temperatures managed by Stardis would be relative to T and
+could therefore be negative, since they would express a deviation from
+T. It should be noted that reference temperatures must always be
+positive, i.e. expressed in the absolute domain. Finally, we emphasize
+that relative calculations only make sense in linear situations, i.e.
+negative temperatures are not valid for systems with non-linear
+radiative exchanges (i.e. option `-o` whose argument is greater than
+one).
+
+This is a file format break that users *must* take into account. Until
+now, negative temperatures were considered unknown, whereas they are now
+valid. For example, an interface with a negative temperature could be
+considered adiabatic, whereas it is now a Dirichlet boundary condition.
+In other words, the same data could define completely different systems
+before and after this version.
+
+#### Use POSIX make as a build system
+
+The build procedure is now written in POSIX make instead of CMake.
+In addition to the features already provided by its CMake alternative,
+the Makefile supports the use of static libraries and provides an
+uninstall target. In any case, the main motivation behind its writing is
+to use a good old well-established standard with simple features,
+available on all UNIX systems, thus simplifying its portability and
+support while being much lighter
+
+#### Proof-reading and editing manual pages
+
+Write the man pages directly in mdoc's roff macros, instead of using the
+asciidoc markup language as a source for man pages.
+
+Unlike writing manuals with man's roff macros, and even more so with
+asciidoc, mdoc macros take care of layout, font handling and all the other
+typesetting details which, by construction, guarantee the consistency of
+all manuals without leaving the responsibility to the individual author.
+This also facilitates translation into other formats and documentation
+tools. These are the main reasons for writing manual pages with mdoc
+macros.
+
+A complete re-reading of the manual pages was carried out during the
+translation into mdoc, with several corrections and rewrites to make the
+manual clearer.
 
 ### Version 0.9
 
 #### Programmable properties
 
-Until now, physical properties as well as boundary and connection conditions
-were constant in time and space. In this version, they can be programmed, i.e.
-they are variables returned by functions implemented in user-defined libraries
-and submitted as dynamically loaded input libraries when Stardis starts. User
-libraries must also provide create/release functions that are invoked at
-start-up to allow users to load their data and build the internal data
-structures required by their libraries at run-time.
+Until now, physical properties as well as boundary and connection
+conditions were constant in time and space. In this version, they can be
+programmed, i.e.  they are variables returned by functions implemented
+in user-defined libraries and submitted as dynamically loaded input
+libraries when Stardis starts. User libraries must also provide
+create/release functions that are invoked at start-up to allow users to
+load their data and build the internal data structures required by their
+libraries at run-time.
 
 The `stardis-input` file format has been updated to provide a set of new
 `_PROG` suffixed keywords used to define these programmed properties and
-conditions (e.g. `T_BOUNDARY_FOR_SOLID_PROG` or `H_BOUNDARY_FOR_FLUID_PROG`)
+conditions (e.g. `T_BOUNDARY_FOR_SOLID_PROG` or
+`H_BOUNDARY_FOR_FLUID_PROG`)
 
 #### Miscellaneous
 
-- Addition of the keyword `HF_BOUNDARY_FOR_SOLID` which allows to impose a flux
-  on a boundary with another condition. For example, a net flux can be defined
-  in addition to a convective exchange and a radiative transfer.
-- Correct the definition of a net flux as a boundary condition: it might not be
-  defined on the right side of the interface.
-- Correct the "subpath type" data of the output paths: as we attach the segment
-  type to the vertices, we need to locate the type changes along the path on
-  zero length segments, otherwise the colouring will show a misleading colour
-  gradient.
-- Replace the Mersenne Twister random number generator with Threefry: the
-  former is much less efficient at rejecting random numbers than the latter,
-  which is designed for this purpose, a feature on which parallel random number
-  generations depend heavily
+- Addition of the keyword `HF_BOUNDARY_FOR_SOLID` which allows to impose
+  a flux on a boundary with another condition. For example, a net flux
+  can be defined in addition to a convective exchange and a radiative
+  transfer.
+- Correct the definition of a net flux as a boundary condition: it might
+  not be defined on the right side of the interface.
+- Correct the "subpath type" data of the output paths: as we attach the
+  segment type to the vertices, we need to locate the type changes along
+  the path on zero length segments, otherwise the colouring will show a
+  misleading colour gradient.
+- Replace the Mersenne Twister random number generator with Threefry:
+  the former is much less efficient at rejecting random numbers than the
+  latter, which is designed for this purpose, a feature on which
+  parallel random number generations depend heavily
 
 ### Version 0.8
 
-- Add a new option to support non-linear radiative transfer computations.
-- Changes in input file's format to support non-linear radiative transfer by
-  adding reference temperatures on interfaces.
-- Add optional support for MPI (must be enabled at compile time, default is OFF).
+- Add a new option to support non-linear radiative transfer
+  computations.
+- Changes in input file's format to support non-linear radiative
+  transfer by adding reference temperatures on interfaces.
+- Add optional support for MPI (must be enabled at compile time, default
+  is OFF).
 - Change random number generator type to use Threefry.
-- Change the format of binary Green files. A new public header file is now
-  installed that describes all types involved in binary Green files.
+- Change the format of binary Green files. A new public header file is
+  now installed that describes all types involved in binary Green files.
 - Fix a crash on an exit-on-error execution path.
 - Fix parsing of command-line options.
 
 ### Version 0.7.2
 
-Fix the binary file format of the green function: the fileformat has been
-updated without incrementing the version of the serialised data.
+Fix the binary file format of the green function: the fileformat has
+been updated without incrementing the version of the serialised data.
 
 ### Version 0.7.1
 
@@ -88,10 +204,10 @@ Fix debug build.
 
 ### Version 0.7
 
-- Remove the boundary condition `T_BOUNDARY_FOR_FLUID`: it was exactly the same
-  than `H_BOUNDARY_FOR_FLUID` that should now be used instead.
-- Sets the required version of Star-SampPling to 0.12. This version fixes
-  compilation errors with gcc 11 but introduces API breaks.
+- Remove the boundary condition `T_BOUNDARY_FOR_FLUID`: it was exactly
+  the same than `H_BOUNDARY_FOR_FLUID` that should now be used instead.
+- Sets the required version of Star-SampPling to 0.12. This version
+  fixes compilation errors with gcc 11 but introduces API breaks.
 
 ### Version 0.6
 
@@ -126,14 +242,15 @@ Fix debug build.
 ### Version 0.3.2
 
 - Add the `solve_probe_boundary` feature. The `solve_probe_boundary` VS
-  `solve_probe` selection is automated according the probe-geometry distance.
-  `solve_probe_boundary` is called for probe points closer than 2.1 delta
-  from geometry.
+  `solve_probe` selection is automated according the probe-geometry
+  distance.  `solve_probe_boundary` is called for probe points closer
+  than 2.1 delta from geometry.
 - Add flux boundary conditions.
 
 ### Version 0.3.1
 
-Add radiative transfer computations. To achieve this, media gain 2 new parameters:
+Add radiative transfer computations. To achieve this, media gain 2 new
+parameters:
 
 - emissivity;
 - `specular_fraction`.
@@ -142,10 +259,11 @@ Add radiative transfer computations. To achieve this, media gain 2 new parameter
 
 - Upgrade stardis-solver to v0.3.
 - Add volumic power sources on solids;
-- Allow to use the `fp_to_meter` parameter of the stardis-solver solve function;
+- Allow to use the `fp_to_meter` parameter of the stardis-solver solve
+  function;
 - Add a dump geometry feature. It outputs the geometry as it is sent to
-  stardis-solver in VTK format, together with the front and back media and
-  boundary conditions information.
+  stardis-solver in VTK format, together with the front and back media
+  and boundary conditions information.
 
 
 ### Version 0.1
@@ -155,8 +273,9 @@ Add radiative transfer computations. To achieve this, media gain 2 new parameter
 
 ## License
 
-Copyright (C) 2018-2023 |Méso|Star> (<contact@meso-star.com>). Stardis is free
-software released under the GPL v3+ license: GNU GPL version 3 or later. You
-are welcome to redistribute it under certain conditions; refer to the COPYING
-file for details.
+Copyright (C) 2018-2024 |Méso|Star> (<contact@meso-star.com>)
+
+Stardis is free software released under the GPL v3+ license: GNU GPL
+version 3 or later. You are welcome to redistribute it under certain
+conditions; refer to the COPYING file for details.
 

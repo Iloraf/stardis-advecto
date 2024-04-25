@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,10 @@
 #ifndef STARDIS_APP_H
 #define STARDIS_APP_H
 
+#include "stardis-args.h"
 #include "stardis-description.h"
+#include "stardis-extern-source.h"
+#include "stardis-radiative-env.h"
 
 #include <star/sg3d.h>
 
@@ -55,7 +58,7 @@ struct fluid;
 
 
 #define DELTA_AUTO INF /* Placeholder until actual value is substituted */
-#define UNKNOWN_MEDIUM_TEMPERATURE -1 /* Unknown for stardis solver is -1 */
+#define UNKNOWN_MEDIUM_TEMPERATURE SDIS_TEMPERATURE_NONE
 
 enum properties_conflict_t {
   NO_PROPERTY_CONFLICT,
@@ -213,6 +216,7 @@ struct stardis {
   struct compute_surface compute_surface; /* 2D compute region when mode is
                                              [FLUX_]BOUNDARY_COMPUTE
                                              or MAP_COMPUTE */
+  struct str dump_model_filename;
   struct str paths_filename;
   struct str bin_green_filename;
   struct str end_paths_filename;
@@ -222,21 +226,27 @@ struct stardis {
   struct mem_allocator* allocator;
   struct logger* logger;
   struct sdis_device* dev;
+  struct radiative_env radenv;
+  int radenv_def;
   size_t samples;
   double scale_factor;
-  double trad, trad_ref;
   double t_range[2];
+  double initial_time; /* [s] */
   int mode;
-  int trad_def;
   unsigned nthreads;
   unsigned picard_order;
   unsigned next_medium_id;
   unsigned undefined_medium_behind_boundary_id;
+  enum sdis_diffusion_algorithm diff_algo;
   int dump_paths;
   int verbose;
   int geometry_initialized;
   int mpi_initialized;
   int mpi_rank;
+
+  struct darray_probe_boundary probe_boundary_list;
+  struct extern_source extsrc;
+  int disable_intrad; /* Disable internal radiative exchanges */
 };
 
 unsigned

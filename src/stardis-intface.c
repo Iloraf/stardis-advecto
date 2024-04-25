@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -80,20 +80,22 @@ interface_get_ref_temperature
 static double
 interface_get_emissivity
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  (void)frag;
+  (void)frag, (void)source_id;
   return interface_props->emissivity;
 }
 
 static double
 interface_get_alpha
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
-  (void)frag;
+  (void)frag, (void)source_id;
   return interface_props->alpha;
 }
 
@@ -110,12 +112,13 @@ interface_get_tcr
 static double
 emissivity_1
   (const struct stardis_interface_fragment* frag,
+   const unsigned src_id,
    void* data)
 {
-  (void)frag, (void)data;
+  (void)frag, (void)src_id, (void)data;
   return 1;
 }
- 
+
 static double
 intface_prog_get_temp
   (const struct sdis_interface_fragment* frag,
@@ -167,33 +170,39 @@ intface_prog_get_hc
 static double
 intface_prog_get_emissivity
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
   struct stardis_interface_fragment f;
+  (void)source_id;
   d3_set(f.P, frag->P);
   d3_set(f.Ng, frag->Ng);
   d3_set(f.uv, frag->uv);
   f.time = frag->time;
   ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
   f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
-  return interface_props->get_emissivity(&f, interface_props->prog_data);
+  return interface_props->get_emissivity
+    (&f, source_id, interface_props->prog_data);
 }
 
 static double
 intface_prog_get_alpha
   (const struct sdis_interface_fragment* frag,
+   const unsigned source_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
   struct stardis_interface_fragment f;
+  (void)source_id;
   d3_set(f.P, frag->P);
   d3_set(f.Ng, frag->Ng);
   d3_set(f.uv, frag->uv);
   f.time = frag->time;
   ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
   f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
-  return interface_props->get_alpha(&f, interface_props->prog_data);
+  return interface_props->get_alpha
+    (&f, source_id, interface_props->prog_data);
 }
 
 static double
@@ -283,7 +292,7 @@ create_intface
     ERR(sdis_data_create(stardis->dev, sizeof(struct intface),
       ALIGNOF(struct intface), NULL, &data));
     interface_props = sdis_data_get(data);
-    interface_props->imposed_temperature = -1;
+    interface_props->imposed_temperature = SDIS_TEMPERATURE_NONE;
     interface_props->imposed_flux = SDIS_FLUX_NONE;
     interface_props->front_medium_id = UINT_MAX;
     interface_props->back_medium_id = UINT_MAX;
@@ -366,7 +375,7 @@ create_intface
           goto error;
         }
         for_fluid = 1;
-        ASSERT(intface->d.h_boundary->imposed_temperature >= 0);
+        ASSERT(SDIS_TEMPERATURE_IS_KNOWN(intface->d.h_boundary->imposed_temperature));
         interface_props->imposed_temperature
           = intface->d.h_boundary->imposed_temperature;
         ASSERT(fluid_side_shader);
@@ -544,7 +553,7 @@ create_intface
          * a possible external fluid to 'see' the imposed T */
         fluid_side_shader->emissivity = interface_get_emissivity;
         interface_props->emissivity = 1;
-        ASSERT(intface->d.t_boundary->imposed_temperature >= 0);
+        ASSERT(SDIS_TEMPERATURE_IS_KNOWN(intface->d.t_boundary->imposed_temperature));
         interface_props->imposed_temperature
           = intface->d.t_boundary->imposed_temperature;
         break;
@@ -632,9 +641,9 @@ create_intface
         }
         ASSERT(fluid_side_shader);
         fluid_side_shader->reference_temperature = interface_get_ref_temperature;
+        fluid_side_shader->specular_fraction = interface_get_alpha;
         if(intface->d.sf_connect->emissivity > 0) {
           fluid_side_shader->emissivity = interface_get_emissivity;
-          fluid_side_shader->specular_fraction = interface_get_alpha;
         }
         break;
       case DESC_SOLID_FLUID_CONNECT_PROG:

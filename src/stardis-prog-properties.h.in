@@ -4,12 +4,12 @@
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
  * version 3 of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
@@ -26,6 +26,12 @@
 
 #include <stddef.h>
 
+#if defined(__GNUC__)
+  #define STARDIS_API extern __attribute__((visibility("default")))
+#else
+  #define STARDIS_API extern
+#endif
+
 /*****************************************************************************/
 /* API types.                                                                */
 /* The various functions defining programmed descriptions receive arguments  */
@@ -36,6 +42,8 @@ struct stardis_vertex {
   double P[3]; /* World space position */
   double time; /* "Time" of the vertex */
 };
+#define STARDIS_VERTEX_NULL__ {{0,0,0}, 0}
+static const struct stardis_vertex STARDIS_VERTEX_NULL = STARDIS_VERTEX_NULL__;
 
 enum stardis_side {
   FRONT,
@@ -71,6 +79,10 @@ struct stardis_description_create_context {
   const char* name; /* Description name */
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /******************************************************************************/
 /* Optional functions for any programmed library.                             */
 /* Either all 3 or none of the 3 following functions must be defined.         */
@@ -83,7 +95,7 @@ struct stardis_description_create_context {
  * processed.
  * argc + argv describe the (possibly zero) arguments coming from the stardis
  * input file in the main-like standard way. */
-extern void*
+STARDIS_API void*
 stardis_create_library_data
   (const struct stardis_program_context* ctx,
    size_t argc,
@@ -96,7 +108,7 @@ stardis_create_library_data
  * starts.
  * lib_data is the pointer returned by stardis_create_library_data for this
  * library. */
-enum stardis_return_status
+STARDIS_API enum stardis_return_status
 stardis_finalize_library_data
   (void* lib_data);
 
@@ -105,7 +117,7 @@ stardis_finalize_library_data
  * descriptions data.
  * lib_data is the pointer returned by stardis_create_library_data for this
  * library. */
-extern void
+STARDIS_API void
 stardis_release_library_data
   (void* lib_data);
 
@@ -114,14 +126,14 @@ stardis_release_library_data
 /******************************************************************************/
 
 /* Create the data attached to a given description.
- * A NULL result is interpreted as an error and ends the program. 
+ * A NULL result is interpreted as an error and ends the program.
  * This function is called every time a description using this library is
  * processed.
  * lib_data is the pointer returned by stardis_create_library_data for the
  * library or NULL if stardis_create_library_data is not defined.
  * argc + argv describe the (possibly zero) arguments coming from the stardis
  * input file in the main-like standard way. */
-extern void*
+STARDIS_API void*
 stardis_create_data
   (const struct stardis_description_create_context *ctx,
    void* lib_data,
@@ -131,28 +143,28 @@ stardis_create_data
 /* Release the data created by stardis_create_data.
  * This function is called after the simulation finished.
  * data is the pointer returned by stardis_create_data for the description. */
-extern void
+STARDIS_API void
 stardis_release_data
   (void* data);
 
 /* Get the copyright notice.
  * A NULL result is interpreted as an error and ends the program.
  * data is the pointer returned by stardis_create_data for the description. */
-const char*
+STARDIS_API const char*
 get_copyright_notice
   (void* data);
 
 /* Get single-line (name and link?) version of the license.
  * A NULL result is interpreted as an error and ends the program.
  * data is the pointer returned by stardis_create_data for the description. */
-const char*
+STARDIS_API const char*
 get_license_short
   (void* data);
 
 /* Get full license text.
  * A NULL result is interpreted as an error and ends the program.
  * data is the pointer returned by stardis_create_data for the description. */
-const char*
+STARDIS_API const char*
 get_license_text
   (void* data);
 
@@ -170,7 +182,7 @@ get_license_text
  * This functions is called at every vertex of every path of the computation
  * crossing this solid.
  * data is the pointer returned by stardis_create_data for this solid. */
-extern double
+STARDIS_API double
 stardis_calorific_capacity
   (const struct stardis_vertex* vtx,
    void* data);
@@ -179,7 +191,7 @@ stardis_calorific_capacity
  * This functions is called at every vertex of every path of the computation
  * crossing this solid.
  * data is the pointer returned by stardis_create_data for this solid. */
-extern double
+STARDIS_API double
 stardis_volumic_mass
   (const struct stardis_vertex* vtx,
    void* data);
@@ -188,7 +200,7 @@ stardis_volumic_mass
  * This functions is called at every vertex of every path of the computation
  * crossing this solid.
  * data is the pointer returned by stardis_create_data for this solid. */
-extern double
+STARDIS_API double
 stardis_conductivity
   (const struct stardis_vertex* vtx,
    void* data);
@@ -197,7 +209,7 @@ stardis_conductivity
  * This functions is called at every vertex of every path of the computation
  * crossing this solid.
  * data is the pointer returned by stardis_create_data for this solid. */
-extern double
+STARDIS_API double
 stardis_delta_solid
   (const struct stardis_vertex* vtx,
    void* data);
@@ -206,7 +218,7 @@ stardis_delta_solid
  * This functions is called at every vertex of every path of the computation
  * crossing this solid.
  * data is the pointer returned by stardis_create_data for this solid. */
-extern double
+STARDIS_API double
 stardis_volumic_power
   (const struct stardis_vertex* vtx,
    void* data);
@@ -216,7 +228,7 @@ stardis_volumic_power
  * This functions is called at every vertex of every path of the computation
  * crossing this solid.
  * data is the pointer returned by stardis_create_data for this solid. */
-extern double
+STARDIS_API double
 stardis_medium_temperature
   (const struct stardis_vertex* vtx,
    void* data);
@@ -225,7 +237,7 @@ stardis_medium_temperature
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this solid.
  * Returns its modified range argument. */
-extern double*
+STARDIS_API double*
 stardis_t_range
   (void* data,
    double range[2]);
@@ -238,7 +250,7 @@ stardis_t_range
  * This functions is called at every vertex of every path of the computation
  * crossing this fluid.
  * data is the pointer returned by stardis_create_data for this fluid. */
-extern double
+STARDIS_API double
 stardis_calorific_capacity
   (const struct stardis_vertex* vtx,
    void* data);
@@ -247,7 +259,7 @@ stardis_calorific_capacity
  * This functions is called at every vertex of every path of the computation
  * crossing this fluid.
  * data is the pointer returned by stardis_create_data for this fluid. */
-extern double
+STARDIS_API double
 stardis_volumic_mass
   (const struct stardis_vertex* vtx,
    void* data);
@@ -257,7 +269,7 @@ stardis_volumic_mass
  * This functions is called at every vertex of every path of the computation
  * crossing this fluid.
  * data is the pointer returned by stardis_create_data for this fluid. */
-extern double
+STARDIS_API double
 stardis_medium_temperature
   (const struct stardis_vertex* vtx,
    void* data);
@@ -266,7 +278,7 @@ stardis_medium_temperature
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this fluid.
  * Returns its modified range argument. */
-extern double*
+STARDIS_API double*
 stardis_t_range
   (void* data,
    double range[2]);
@@ -279,7 +291,7 @@ stardis_t_range
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_boundary_temperature
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -288,25 +300,27 @@ stardis_boundary_temperature
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_convection_coefficient
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -317,7 +331,7 @@ stardis_convection_coefficient
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_reference_temperature
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -325,7 +339,7 @@ stardis_reference_temperature
 /* Returns the upper bound of the convection coefficient accross this boundary.
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_max_convection_coefficient
   (void* data);
 
@@ -333,7 +347,7 @@ stardis_max_convection_coefficient
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this boundary.
  * Returns its modified range argument. */
-extern double*
+STARDIS_API double*
 stardis_t_range
   (void* data,
    double range[2]);
@@ -346,25 +360,27 @@ stardis_t_range
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_convection_coefficient
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -375,7 +391,7 @@ stardis_convection_coefficient
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_reference_temperature
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -386,7 +402,7 @@ stardis_reference_temperature
  * This functions is called at every vertex of every path of the computation
  * crossing this fluid.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_medium_temperature
   (const struct stardis_vertex* vtx,
    void* data);
@@ -394,7 +410,7 @@ stardis_medium_temperature
 /* Returns the upper bound of the convection coefficient accross this boundary.
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_max_convection_coefficient
   (void* data);
 
@@ -402,7 +418,7 @@ stardis_max_convection_coefficient
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this boundary.
  * Returns its modified range argument. */
-extern double*
+STARDIS_API double*
 stardis_t_range
   (void* data,
    double range[2]);
@@ -415,7 +431,7 @@ stardis_t_range
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_boundary_temperature
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -424,7 +440,7 @@ stardis_boundary_temperature
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this boundary.
  * Returns its modified range argument. */
-extern double*
+STARDIS_API double*
 stardis_t_range
   (void* data,
    double range[2]);
@@ -437,25 +453,27 @@ stardis_t_range
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_convection_coefficient
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -464,7 +482,7 @@ stardis_convection_coefficient
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_boundary_flux
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -475,7 +493,7 @@ stardis_boundary_flux
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_reference_temperature
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -486,7 +504,7 @@ stardis_reference_temperature
  * This functions is called at every vertex of every path of the computation
  * crossing this fluid.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_medium_temperature
   (const struct stardis_vertex* vtx,
    void* data);
@@ -494,7 +512,7 @@ stardis_medium_temperature
 /* Returns the upper bound of the convection coefficient accross this boundary.
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_max_convection_coefficient
   (void* data);
 
@@ -502,7 +520,7 @@ stardis_max_convection_coefficient
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this boundary.
  * Returns its modified range argument. */
-extern double*
+STARDIS_API double*
 stardis_t_range
   (void* data,
    double range[2]);
@@ -515,7 +533,7 @@ stardis_t_range
  * This functions is called every time a path of the computation reaches
  * this boundary.
  * data is the pointer returned by stardis_create_data for this boundary. */
-extern double
+STARDIS_API double
 stardis_boundary_flux
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -528,7 +546,7 @@ stardis_boundary_flux
  * This functions is called every time a path of the computation reaches
  * this connection.
  * data is the pointer returned by stardis_create_data for this connection. */
-extern double
+STARDIS_API double
 stardis_thermal_contact_resistance
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -541,25 +559,27 @@ stardis_thermal_contact_resistance
  * This functions is called every time a path of the computation reaches
  * this connection.
  * data is the pointer returned by stardis_create_data for this connection. */
-extern double
+STARDIS_API double
 stardis_emissivity
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the specular fraction at a given fragment.
  * This functions is called every time a path of the computation reaches
  * this connection.
  * data is the pointer returned by stardis_create_data for this connection. */
-extern double
+STARDIS_API double
 stardis_specular_fraction
   (const struct stardis_interface_fragment* frag,
+   const unsigned source_id,
    void* data);
 
 /* Returns the convection coefficient at a given fragment.
  * This functions is called every time a path of the computation reaches
  * this connection.
  * data is the pointer returned by stardis_create_data for this connection. */
-extern double
+STARDIS_API double
 stardis_convection_coefficient
   (const struct stardis_interface_fragment* frag,
    void* data);
@@ -567,18 +587,93 @@ stardis_convection_coefficient
 /* Returns the upper bound of the convection coefficient accross this connection.
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this connection. */
-extern double
+STARDIS_API double
 stardis_max_convection_coefficient
   (void* data);
+
+/* Returns the reference temperature at a given fragment.
+ * This temperature is used as a reference to linearize radiative transfer
+ * in Picard computations.
+ * This functions is called every time a path of the computation reaches
+ * this boundary.
+ * data is the pointer returned by stardis_create_data for this boundary. */
+STARDIS_API double
+stardis_reference_temperature
+  (const struct stardis_interface_fragment* frag,
+   void* data);
 
 /* Computes the expected temperature range for this connection.
  * This functions is called once when initializing the computation.
  * data is the pointer returned by stardis_create_data for this connection.
  * Returns its modified range argument. */
-extern double*
+STARDIS_API double*
 stardis_t_range
   (void* data,
    double range[2]);
 
+/******************************************************************************/
+/* Additional mandatory functions for a programmed spherical source           */
+/* These functions are used to calculate the external flux at the boundaries. */
+/******************************************************************************/
+
+/* Retrieve the position of the spherical source center.
+ * This function is used to calculate the external flux at the boundaries.
+ * Returns its modified position argument */
+STARDIS_API double*
+stardis_spherical_source_position
+  (const double time, /* [s] */
+   double position[3],
+   void* data);
+
+/* Retrieve the power of the spherical source. */
+STARDIS_API double /* [W] */
+stardis_spherical_source_power
+  (const double time,
+   void* data);
+
+/* Describes the diffuse part of the source's radiance, i.e. the radiance
+ * emitted by the source and scattered at least once in the environment. This
+ * parameter is actually used to approximate a semi-transparent medium. Its
+ * value can be 0, meaning that the source has not been scattered by the
+ * environment, or, to put it another way, that the source is in a vacuum. */
+STARDIS_API double /* [W/m^2/sr] */
+stardis_spherical_source_diffuse_radiance
+  (const double time,
+   const double dir[3],
+   void* data);
+
+/******************************************************************************/
+/* Additional mandatory functions for a programmed radiative environment      */
+/******************************************************************************/
+
+/* Retrieve the temperature of radiative paths that reach infinity */
+STARDIS_API double
+stardis_radiative_env_temperature
+  (const double time, /* [s] */
+   const double dir[3],
+   void* data);
+
+/* Recover the reference temperature of radiative paths that reach
+ * infinity. It is used to linearize radiative transfer */
+STARDIS_API double
+stardis_radiative_env_reference_temperature
+  (const double time, /* [s] */
+   const double dir[3],
+   void* data);
+
+/* Computes the expected temperature range for this radiative
+ * environment.
+ * This functions is called once when initializing the computation.
+ * data is the pointer returned by stardis_create_data for this
+ * radiative environment.
+ * Returns its modified range argument. */
+STARDIS_API double*
+stardis_t_range
+  (void* data,
+   double range[2]);
+
+#ifdef __cplusplus
+} /* extern "C" */
 #endif
 
+#endif

@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,8 +14,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>. */
 
 #ifdef STARDIS_ENABLE_MPI
-#define _POSIX_C_SOURCE 200112L
+  #define _POSIX_C_SOURCE 200112L
 #endif
+
+#include <star/sg3d.h>
 
 #include "stardis-app.h"
 #include "stardis-args.h"
@@ -37,12 +39,13 @@
 #include <rsys/logger.h>
 #include <rsys/double2.h>
 #include <rsys/double3.h>
+#include <rsys/dynamic_array_double.h>
 
 #include <string.h>
 
 #ifdef STARDIS_ENABLE_MPI
-#include <stdio.h>
-#include <mpi.h>
+  #include <stdio.h>
+  #include <mpi.h>
 #endif
 
 static const struct dummies DUMMIES_NULL = DUMMIES_NULL__;
@@ -103,7 +106,11 @@ check_delta_and_create_solid
           external = 1;
         } else {
           double d = header.volume / (header.area * 6);
-          ASSERT(d >= 0);
+          if(d <= 0) {
+            /* Should not */
+            res = RES_BAD_OP;
+            goto error;
+          }
           delta_range[0] = MMIN(delta_range[0], d);
           delta_range[1] = MMAX(delta_range[1], d);
         }
@@ -222,7 +229,8 @@ stardis_init
   res_T tmp_res, res = RES_OK;
   struct sg3d_sdisXd_scene_create_context create_context;
   struct htable_intface htable_interfaces;
-  struct str str;
+  struct str str, name;
+  FILE* f = NULL;
   unsigned i, vcount, tcount, ocount, count;
   int is_for_compute;
   struct sdis_device_create_args dev_args = SDIS_DEVICE_CREATE_ARGS_DEFAULT;
@@ -230,7 +238,8 @@ stardis_init
   ASSERT(args && logger && allocator && stardis);
 
   str_init(allocator, &str);
-  /* Init everithing that cannot fail */
+  str_init(allocator, &name);
+  /* Init everything that cannot fail */
   stardis->dummies = DUMMIES_NULL;
   stardis->logger = logger;
   stardis->allocator = allocator;
@@ -245,6 +254,7 @@ stardis_init
   stardis->counts = COUNTS_NULL;
   init_camera(stardis->allocator, &stardis->camera);
   str_init(stardis->allocator, &stardis->solve_name);
+  str_init(stardis->allocator, &stardis->dump_model_filename);
   str_init(stardis->allocator, &stardis->paths_filename);
   str_init(stardis->allocator, &stardis->bin_green_filename);
   str_init(stardis->allocator, &stardis->end_paths_filename);
@@ -254,14 +264,15 @@ stardis_init
   darray_size_t_init(stardis->allocator, &stardis->compute_surface.primitives);
   darray_sides_init(stardis->allocator, &stardis->compute_surface.sides);
   darray_uint_init(stardis->allocator, &stardis->compute_surface.err_triangles);
+  darray_probe_boundary_init(stardis->allocator, &stardis->probe_boundary_list);
   stardis->compute_surface.area = 0;
   stardis->samples = args->samples;
   stardis->nthreads = args->nthreads;
   stardis->picard_order = args->picard_order;
   stardis->scale_factor = -1; /* invalid value */
-  stardis->trad = STARDIS_DEFAULT_TRAD;
-  stardis->trad_ref = STARDIS_DEFAULT_TRAD_REFERENCE;
-  stardis->trad_def = 0;
+  stardis->radenv = RADIATIVE_ENV_DEFAULT;
+  stardis->radenv_def = 0;
+  stardis->initial_time = args->initial_time;
   stardis->geometry_initialized = 0;
   d2(stardis->t_range, INF, -INF);
   stardis->dump_paths = SDIS_HEAT_PATH_NONE;
@@ -269,14 +280,17 @@ stardis_init
     stardis->dump_paths |= SDIS_HEAT_PATH_FAILURE;
   if(args->dump_paths & DUMP_SUCCESS)
     stardis->dump_paths |= SDIS_HEAT_PATH_SUCCESS;
+  stardis->diff_algo = args->diff_algo;
   stardis->next_medium_id = 0;
   stardis->undefined_medium_behind_boundary_id = SENC3D_UNSPECIFIED_MEDIUM;
   stardis->verbose = args->verbose;
+  stardis->extsrc = EXTERN_SOURCE_NULL;
+  stardis->disable_intrad = args->disable_intrad;
   darray_media_ptr_init(stardis->allocator, &stardis->media);
 
   /* If a dump is expected, we won't process any computation */
   is_for_compute =
-    (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_VTK);
+    (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_MODEL);
 
   dev_args.logger = stardis->logger;
   dev_args.allocator = stardis->allocator;
@@ -303,14 +317,20 @@ stardis_init
     &stardis->geometry));
   stardis->geometry_initialized = 1;
 
+  if(args->dump_model_filename) {
+    ERR(str_set(&stardis->dump_model_filename, args->dump_model_filename));
+  }
+
   if(args->mode & MODE_IR_COMPUTE) {
     ERR(parse_camera(stardis->logger, args->camera, stardis));
   }
   else if(args->mode & MODE_MEDIUM_COMPUTE) {
     ERR(str_set(&stardis->solve_name, args->medium_name));
   }
-  else if(args->mode & MODE_PROBE_COMPUTE_ON_INTERFACE && args->medium_name) {
-    ERR(str_set(&stardis->solve_name, args->medium_name));
+  else if((args->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
+       || (args->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE)) {
+    ERR(darray_probe_boundary_copy
+      (&stardis->probe_boundary_list, &args->probe_boundary_list));
   }
   else if(args->mode & SURFACE_COMPUTE_MODES) {
     ERR(str_set(&stardis->solve_name, args->solve_filename));
@@ -334,6 +354,20 @@ stardis_init
   ERR(sg3d_geometry_get_unique_triangles_with_properties_conflict_count(
     stardis->geometry.sg3d, &count));
   if(count) {
+    if(!str_is_empty(&stardis->dump_model_filename)) {
+      ERR(str_copy(&name, &stardis->dump_model_filename));
+      ERR(str_append(&name, "_property_conflits.obj"));
+      f = fopen(str_cget(&name), "w");
+      if(!f) {
+        logger_print(stardis->logger, LOG_ERROR,
+          "cannot open file '%s' for writing.\n", str_cget(&name));
+        res = RES_IO_ERR;
+        goto error;
+      }
+      ERR(sg3d_geometry_dump_as_obj(stardis->geometry.sg3d, f,
+            SG3D_OBJ_DUMP_PROPERTY_CONFLICTS));
+      fclose(f); f = NULL;
+    }
     logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
       "Property conflicts found in the model (%u triangles).\n", count);
     if(is_for_compute) {
@@ -376,6 +410,32 @@ stardis_init
   }
   ERR(senc3d_scene_get_overlapping_triangles_count(stardis->senc3d_scn, &ocount));
   if(ocount) {
+    if(!str_is_empty(&stardis->dump_model_filename)) {
+      ERR(str_copy(&name, &stardis->dump_model_filename));
+      ERR(str_append(&name, "_overlapping_triangles.obj"));
+      f = fopen(str_cget(&name), "w");
+      if(!f) {
+        logger_print(stardis->logger, LOG_ERROR,
+          "cannot open file '%s' for writing.\n", str_cget(&name));
+        res = RES_IO_ERR;
+        goto error;
+      }
+      /* Dump vertices */
+      for(i = 0; i < vcount; i++) {
+        double coord[3];
+        ERR(senc3d_scene_get_vertex(stardis->senc3d_scn, i, coord));
+        fprintf(f, "v %.16g %.16g %.16g\n", SPLIT3(coord));
+      }
+      /* Dump triangles */
+      for(i = 0; i < ocount; i++) {
+        unsigned id, trg[3];
+        ERR(senc3d_scene_get_overlapping_triangle(stardis->senc3d_scn, i, &id));
+        ERR(senc3d_scene_get_triangle(stardis->senc3d_scn, id, trg));
+        fprintf(f, "f %u %u %u\n",
+            1 + trg[0], 1 + trg[1], 1 + trg[2]); /* OBJ indexing starts at 1 */
+      }
+      fclose(f); f = NULL;
+    }
     logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
       "Scene contains %u overlapping triangles.\n",
       ocount);
@@ -395,8 +455,8 @@ stardis_init
       enum stardis_return_status rs;
       rs = desc->d.program->finalize(desc->d.program->prog_data);
       switch(rs) {
-        case STARDIS_SUCCESS: tmp_res = RES_OK; break; 
-        case STARDIS_FAILURE: tmp_res = RES_BAD_ARG; break; 
+        case STARDIS_SUCCESS: tmp_res = RES_OK; break;
+        case STARDIS_FAILURE: tmp_res = RES_BAD_ARG; break;
         default:
           FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
       }
@@ -434,7 +494,7 @@ stardis_init
 
   /* If computation is on a volume, check medium is known */
   if(args->mode & MODE_MEDIUM_COMPUTE) {
-    if(!find_medium_by_name(stardis, &stardis->solve_name, NULL)) {
+    if(!find_medium_by_name(stardis, str_cget(&stardis->solve_name), NULL)) {
       logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
         "Cannot find medium '%s'\n", str_cget(&stardis->solve_name));
       res = RES_BAD_ARG;
@@ -446,16 +506,30 @@ stardis_init
     struct sdis_scene_create_args scn_args = SDIS_SCENE_CREATE_ARGS_DEFAULT;
     ASSERT(darray_interface_ptrs_size_get(&stardis->geometry.interf_bytrg)
       == tcount);
+
+    res = radiative_env_create_solver_radiative_env(&stardis->radenv, stardis);
+    if(res != RES_OK) goto error;
+
     scn_args.get_indices = sg3d_sdisXd_geometry_get_indices;
     scn_args.get_interface = sg3d_sdisXd_geometry_get_interface;
     scn_args.get_position = sg3d_sdisXd_geometry_get_position;
     scn_args.nprimitives = tcount;
     scn_args.nvertices = vcount;
     scn_args.fp_to_meter = stardis->scale_factor;
-    scn_args.trad.temperature = stardis->trad;
-    scn_args.trad.reference = stardis->trad_ref;
-    d2_set(scn_args.t_range, stardis->t_range);
+    scn_args.t_range[0] = stardis->t_range[0];
+    scn_args.t_range[1] = stardis->t_range[1];
+    scn_args.source = stardis->extsrc.sdis_src;
+    scn_args.radenv = stardis->radenv.sdis_radenv;
     scn_args.context = &create_context;
+
+    /* Setting Tmax to 0 is a way of setting the radiative coefficient to 0, and
+     * thus setting the probability of evolving in a radiative random walk to
+     * zero. */
+    if(stardis->disable_intrad) {
+      scn_args.t_range[0] = 0;
+      scn_args.t_range[1] = 0;
+    }
+
     res = sdis_scene_create(stardis->dev, &scn_args, &stardis->sdis_scn);
     if(res != RES_OK) {
       logger_print(stardis->logger, LOG_ERROR,
@@ -465,7 +539,9 @@ stardis_init
   }
 
 exit:
+  if(f) fclose(f);
   str_release(&str);
+  str_release(&name);
   htable_intface_release(&htable_interfaces);
   return res;
 error:
@@ -485,10 +561,15 @@ stardis_release
   if(stardis->sdis_scn) SDIS(scene_ref_put(stardis->sdis_scn));
   if(stardis->senc3d_scn) SENC3D(scene_ref_put(stardis->senc3d_scn));
   str_release(&stardis->solve_name);
+  str_release(&stardis->dump_model_filename);
   str_release(&stardis->paths_filename);
   str_release(&stardis->bin_green_filename);
   str_release(&stardis->end_paths_filename);
   str_release(&stardis->chunks_prefix);
+
+  extern_source_release(&stardis->extsrc);
+  radiative_env_release(&stardis->radenv);
+
   /* release non-PROGRAM descritions first */
   FOR_EACH(i, 0, darray_descriptions_size_get(&stardis->descriptions)) {
     struct description* d = darray_descriptions_data_get(&stardis->descriptions) +i;
@@ -519,6 +600,7 @@ stardis_release
   if(stardis->dummies.stardis_solid) {
     release_solid(stardis->dummies.stardis_solid, stardis->allocator);
   }
+  darray_probe_boundary_release(&stardis->probe_boundary_list);
 }
 
 unsigned
@@ -732,7 +814,7 @@ init_geometry
   struct sg3d_device* sg3d_dev = NULL;
 
   ASSERT(allocator && geom);
-  
+
   geom->sg3d = NULL;
   darray_interface_ptrs_init(allocator, &geom->interfaces);
   darray_interface_ptrs_init(allocator, &geom->interf_bytrg);
@@ -841,16 +923,16 @@ void
 log_prt_fn
   (const char* msg, void* ctx)
 {
-#ifdef stardis_enable_mpi
+#ifdef STARDIS_ENABLE_MPI
   int initialized, rank = 0;
 #endif
 
   ASSERT(msg);
   (void)ctx;
 
-#ifdef stardis_enable_mpi
-  chk(mpi_initialized(&initialized) == mpi_success);
-  if(initialized) chk(mpi_comm_rank(mpi_comm_world, &rank) == mpi_success);
+#ifdef STARDIS_ENABLE_MPI
+  CHK(MPI_Initialized(&initialized) == MPI_SUCCESS);
+  if(initialized) CHK(MPI_Comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS);
   /* only master prints */
   if(rank != 0) return;
 #endif

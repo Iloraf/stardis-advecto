@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -192,7 +192,6 @@ hit_filter
 static res_T
 check_probe_conform_to_type
   (const struct stardis* stardis,
-   const int move2boundary,
    double pos[3],
    double time,
    unsigned* iprim,
@@ -207,7 +206,7 @@ check_probe_conform_to_type
   struct s3d_vertex_data attribs;
   struct filter_ctx filter_ctx = FILTER_CTX_DEFAULT__;
   float origin[3];
-  unsigned vcount, tcount, j;
+  unsigned vcount, tcount;
 
   ASSERT(stardis && pos && iprim && uv);
 
@@ -244,175 +243,80 @@ check_probe_conform_to_type
   }
   ASSERT(filter_ctx.dist == hit.distance);
 
-  if(move2boundary) {
-    /* Need to move probe to closest boundary */
-    int danger = 0;
-    if(filter_ctx.outside) {
-      /* Not an error as probe moved to boundary */
-      logger_print(stardis->logger, LOG_WARNING,
-        "Probe was outside the model.\n");
-    }
-    if(!filter_ctx.desc) {
-      /* Not an error as probe moved to boundary */
-      if(!filter_ctx.probe_on_boundary && !filter_ctx.outside)
-        logger_print(stardis->logger, LOG_WARNING,
-          "Could not determine the medium probe is in.\n");
+  /* Need to check medium */
+  if(filter_ctx.outside) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Probe is outside the model.\n");
+    logger_print(stardis->logger, LOG_ERROR,
+      "Closest geometry is primitive %u, uv = (%g, %g), pos (%g, %g, %g).\n",
+      hit.prim.prim_id, SPLIT2(hit.uv), SPLIT3(filter_ctx.pos));
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(filter_ctx.probe_on_boundary) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Probe is on primitive %u, uv = (%g, %g). Use -P instead of -p.\n",
+      hit.prim.prim_id, SPLIT2(hit.uv));
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(!filter_ctx.desc) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Could not determine the medium probe is in. "
+      "Try moving it slightly.\n");
+    logger_print(stardis->logger, LOG_ERROR,
+      "Closest geometry is primitive %u, uv = (%g, %g), distance %g.\n",
+      hit.prim.prim_id, SPLIT2(hit.uv), filter_ctx.dist);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+  if(DESC_IS_SOLID(filter_ctx.desc)) {
+    double delta;
+    if(filter_ctx.desc->type == DESC_MAT_SOLID) {
+      struct solid* solid = filter_ctx.desc->d.solid;
+      delta = solid->delta;
     } else {
-      if(DESC_IS_SOLID(filter_ctx.desc)) {
-        double delta;
-        const char* pppp;
-        if(filter_ctx.desc->type == DESC_MAT_SOLID) {
-          struct solid* solid = filter_ctx.desc->d.solid;
-          delta = solid->delta;
-          pppp = "";
-        } else {
-          struct solid_prog* solid_prog = filter_ctx.desc->d.solid_prog;
-          struct stardis_vertex vtx;
-          ASSERT(filter_ctx.desc->type == DESC_MAT_SOLID_PROG);
-          d3_set(vtx.P, pos);
-          vtx.time = time;
-          delta = solid_prog->delta(&vtx, solid_prog->prog_data);
-          pppp = "programmed ";
-        }
-        ASSERT(delta < INF);
-        logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe was in %ssolid '%s'.\n",
-          pppp, str_cget(get_description_name(filter_ctx.desc)));
-        if(filter_ctx.dist > 2 * delta) {
-          logger_print(stardis->logger, LOG_ERROR,
-            "Probe moved to (%g, %g, %g), primitive %u, uv = (%g, %g).\n",
-            SPLIT3(filter_ctx.pos), hit.prim.prim_id, SPLIT2(hit.uv));
-          logger_print(stardis->logger, LOG_ERROR,
-            "Move is %g delta long. Use -p instead of -P.\n",
-            filter_ctx.dist / delta);
-          res = RES_BAD_ARG;
-          goto error;
-        }
-        if(filter_ctx.dist > 0.5 * delta) {
-          logger_print(stardis->logger, LOG_WARNING,
-            "Probe was %g delta from closest boundary. "
-            "Consider using -p instead of -P.\n",
-            filter_ctx.dist / delta);
-        } else {
-          if(filter_ctx.dist != 0)
-            logger_print(stardis->logger, LOG_OUTPUT,
-              "Probe was %g delta from closest boundary.\n",
-              filter_ctx.dist / delta);
-        }
-      } else {
-        const char* pppp;
-        ASSERT(DESC_IS_FLUID(filter_ctx.desc));
-        /* TODO: check move length wrt local geometry? */
-        if(filter_ctx.desc->type == DESC_MAT_FLUID) {
-          pppp = "";
-        } else {
-          ASSERT(filter_ctx.desc->type == DESC_MAT_FLUID_PROG);
-          pppp = "programmed ";
-        }
-        logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe was in %sfluid '%s'.\n",
-          pppp, str_cget(get_description_name(filter_ctx.desc)));
-        logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe distance from closest boundary was %g.\n", filter_ctx.dist);
-      }
+      struct solid_prog* solid_prog = filter_ctx.desc->d.solid_prog;
+      struct stardis_vertex vtx;
+      ASSERT(filter_ctx.desc->type == DESC_MAT_SOLID_PROG);
+      d3_set(vtx.P, pos);
+      vtx.time = time;
+      delta = solid_prog->delta(&vtx, solid_prog->prog_data);
     }
-    /* Check if moved to vertex/edge */
-    FOR_EACH(j, 0, 2) {
-      if(CLAMP(hit.uv[j], 0.0005, 0.9995) != hit.uv[j])
-        danger++;
-    }
-    if(danger) {
-      logger_print(stardis->logger, LOG_WARNING,
-        "Probe %s close to / on %s. "
-        "If computation fails, try moving it slightly.\n",
-        (filter_ctx.dist != 0 ? "moved" : "is"), (danger == 1 ? "an edge" : "a vertex"));
-    }
-    if(filter_ctx.probe_on_boundary) {
-      logger_print(stardis->logger, LOG_OUTPUT,
-        "Probe is on primitive %u, uv = (%g, %g), not moved.\n",
+    if(filter_ctx.dist < 0.25 * delta) {
+      logger_print(stardis->logger, LOG_ERROR,
+        "Probe is %g delta from closest boundary. Use -P instead of -p.\n",
+        filter_ctx.dist / delta);
+      logger_print(stardis->logger, LOG_ERROR,
+        "Closest geometry is primitive %u, uv = (%g, %g).\n",
         hit.prim.prim_id, SPLIT2(hit.uv));
+      res = RES_BAD_ARG;
+      goto error;
+    }
+    if(filter_ctx.dist < 0.5 * delta) {
+      logger_print(stardis->logger, LOG_WARNING,
+        "Probe is %g delta from closest boundary. "
+        "Consider using -P instead of -p.\n",
+        filter_ctx.dist / delta);
     } else {
       logger_print(stardis->logger, LOG_OUTPUT,
-        "Probe moved to (%g, %g, %g), primitive %u, uv = (%g, %g).\n",
-        SPLIT3(filter_ctx.pos), hit.prim.prim_id, SPLIT2(hit.uv));
+        "Probe is %g delta from closest boundary.\n",
+        filter_ctx.dist / delta);
     }
-    d3_set_f3(pos, filter_ctx.pos);
   } else {
-    /* Need to check medium */
-    if(filter_ctx.outside) {
-      logger_print(stardis->logger, LOG_ERROR,
-        "Probe is outside the model.\n");
-      logger_print(stardis->logger, LOG_ERROR,
-        "Closest geometry is primitive %u, uv = (%g, %g), pos (%g, %g, %g).\n",
-        hit.prim.prim_id, SPLIT2(hit.uv), SPLIT3(filter_ctx.pos));
-      res = RES_BAD_ARG;
-      goto error;
-    }
-    if(filter_ctx.probe_on_boundary) {
-      logger_print(stardis->logger, LOG_ERROR,
-        "Probe is on primitive %u, uv = (%g, %g). Use -P instead of -p.\n",
-        hit.prim.prim_id, SPLIT2(hit.uv));
-      res = RES_BAD_ARG;
-      goto error;
-    }
-    if(!filter_ctx.desc) {
-      logger_print(stardis->logger, LOG_ERROR,
-        "Could not determine the medium probe is in. "
-        "Try moving it slightly.\n");
-      logger_print(stardis->logger, LOG_ERROR,
-        "Closest geometry is primitive %u, uv = (%g, %g), distance %g.\n",
-        hit.prim.prim_id, SPLIT2(hit.uv), filter_ctx.dist);
-      res = RES_BAD_ARG;
-      goto error;
-    }
-    if(DESC_IS_SOLID(filter_ctx.desc)) {
-      double delta;
-      if(filter_ctx.desc->type == DESC_MAT_SOLID) {
-        struct solid* solid = filter_ctx.desc->d.solid;
-        delta = solid->delta;
-      } else {
-        struct solid_prog* solid_prog = filter_ctx.desc->d.solid_prog;
-        struct stardis_vertex vtx;
-        ASSERT(filter_ctx.desc->type == DESC_MAT_SOLID_PROG);
-        d3_set(vtx.P, pos);
-        vtx.time = time;
-        delta = solid_prog->delta(&vtx, solid_prog->prog_data);
-      }
-      if(filter_ctx.dist < 0.25 * delta) {
-        logger_print(stardis->logger, LOG_ERROR,
-          "Probe is %g delta from closest boundary. Use -P instead of -p.\n",
-          filter_ctx.dist / delta);
-        logger_print(stardis->logger, LOG_ERROR,
-          "Closest geometry is primitive %u, uv = (%g, %g).\n",
-          hit.prim.prim_id, SPLIT2(hit.uv));
-        res = RES_BAD_ARG;
-        goto error;
-      }
-      if(filter_ctx.dist < 0.5 * delta) {
-        logger_print(stardis->logger, LOG_WARNING,
-          "Probe is %g delta from closest boundary. "
-          "Consider using -P instead of -p.\n",
-          filter_ctx.dist / delta);
-      } else {
-        logger_print(stardis->logger, LOG_OUTPUT,
-          "Probe is %g delta from closest boundary.\n",
-          filter_ctx.dist / delta);
-      }
+    ASSERT(DESC_IS_FLUID(filter_ctx.desc));
+    /* In fluid; TODO: check distance wrt local geometry (use 4V/S?) */
+    if(filter_ctx.desc->type == DESC_MAT_FLUID) {
+      logger_print(stardis->logger, LOG_WARNING,
+        "Probe is in fluid '%s': computing fluid temperature, "
+        "not using a specific position.\n",
+        str_cget(&filter_ctx.desc->d.fluid->name));
     } else {
-      ASSERT(DESC_IS_FLUID(filter_ctx.desc));
-      /* In fluid; TODO: check distance wrt local geometry (use 4V/S?) */
-      if(filter_ctx.desc->type == DESC_MAT_FLUID) {
-        logger_print(stardis->logger, LOG_WARNING,
-          "Probe is in fluid '%s': computing fluid temperature, "
-          "not using a specific position.\n",
-          str_cget(&filter_ctx.desc->d.fluid->name));
-      } else {
-        ASSERT(filter_ctx.desc->type == DESC_MAT_FLUID_PROG);
-        logger_print(stardis->logger, LOG_WARNING,
-          "Probe is in fluid_prog '%s': computing fluid temperature, "
-          "not using a specific position.\n",
-          str_cget(&filter_ctx.desc->d.fluid_prog->name));
-      }
+      ASSERT(filter_ctx.desc->type == DESC_MAT_FLUID_PROG);
+      logger_print(stardis->logger, LOG_WARNING,
+        "Probe is in fluid_prog '%s': computing fluid temperature, "
+        "not using a specific position.\n",
+        str_cget(&filter_ctx.desc->d.fluid_prog->name));
     }
   }
 
@@ -490,12 +394,13 @@ compute_probe(struct stardis* stardis, struct time* start)
 
   ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE));
 
-  ERR(check_probe_conform_to_type(stardis, 0, stardis->probe,
+  ERR(check_probe_conform_to_type(stardis, stardis->probe,
     stardis->time_range[0], &iprim, uv));
 
   args.nrealisations = stardis->samples;
   d3_set(args.position, stardis->probe);
   d2_set(args.time_range, stardis->time_range);
+  args.diff_algo = stardis->diff_algo;
 
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
@@ -510,7 +415,8 @@ compute_probe(struct stardis* stardis, struct time* start)
         stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream_g) {
           logger_print(stardis->logger, LOG_ERROR,
-            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
+            "cannot open file '%s' for binary writing.\n",
+            str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
@@ -520,7 +426,8 @@ compute_probe(struct stardis* stardis, struct time* start)
           stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
           if(!stream_p) {
             logger_print(stardis->logger, LOG_ERROR,
-              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
+              "cannot open file '%s' for writing.\n",
+              str_cget(&stardis->end_paths_filename));
             res = RES_IO_ERR;
             goto error;
           }
@@ -550,274 +457,16 @@ compute_probe(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
     } else {
+      struct sdis_mc time = SDIS_MC_NULL;
       res_T tmp_res1, tmp_res2;
       time_current(&compute_start);
       ERR(sdis_solve_probe(stardis->sdis_scn, &args, &estimator));
       time_current(&compute_end);
-      ERR(print_computation_time(estimator, stardis,
-        start, &compute_start, &compute_end, NULL));
+      ERR(sdis_estimator_get_realisation_time(estimator, &time));
+      ERR(print_computation_time
+        (&time, stardis, start, &compute_start, &compute_end, NULL));
       tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
 
-      /* Dump recorded paths according to user settings */
-      dump_ctx.stardis = stardis;
-      dump_ctx.rank = 0;
-      tmp_res2 = sdis_estimator_for_each_path(estimator, dump_path, &dump_ctx);
-      if(tmp_res1 != RES_OK) res = tmp_res1;
-      else if(tmp_res2 != RES_OK) res = tmp_res2;
-    }
-  }
-
-  /* Output random state? */
-  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
-
-end:
-  if(stream_r) fclose(stream_r);
-  if(stream_g) fclose(stream_g);
-  if(stream_p) fclose(stream_p);
-  if(estimator) SDIS(estimator_ref_put(estimator));
-  if(green) SDIS(green_function_ref_put(green));
-  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
-  return res;
-error:
-  goto end;
-}
-
-static res_T
-compute_probe_on_interface(struct stardis* stardis, struct time* start)
-{
-  res_T res = RES_OK;
-  double uv[2] = { 0,0 };
-  unsigned iprim = UINT_MAX;
-  struct sdis_estimator* estimator = NULL;
-  struct sdis_green_function* green = NULL;
-  struct dump_path_context dump_ctx;
-  struct sdis_solve_probe_boundary_args args
-    = SDIS_SOLVE_PROBE_BOUNDARY_ARGS_DEFAULT;
-  FILE* stream_r = NULL;
-  FILE* stream_g = NULL;
-  FILE* stream_p = NULL;
-  struct time compute_start, compute_end;
-  enum sdis_side compute_side;
-  unsigned prop[3];
-  const struct description* descriptions
-    = darray_descriptions_cdata_get(&stardis->descriptions);
-  double tcr = 0;
-  const char* solve_name;
-  const char* compute_side_name = NULL;
-  const char* medium_name = NULL;
-  const struct description* intface_desc = NULL;
-#ifndef NDEBUG
-  const size_t dcount = darray_descriptions_size_get(&stardis->descriptions);
-#endif
-
-  ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE));
-  ERR(check_probe_conform_to_type(stardis, 1, stardis->probe,
-    stardis->time_range[0], &iprim, uv));
-  ASSERT(iprim != UINT_MAX);
-
-  ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
-    (unsigned)iprim, prop));
-
-  if(prop[SG3D_INTFACE] != SG3D_UNSPECIFIED_PROPERTY) {
-    ASSERT(prop[SG3D_INTFACE] < dcount);
-    intface_desc = descriptions + prop[SG3D_INTFACE];
-    if(intface_desc->type == DESC_SOLID_SOLID_CONNECT)
-      tcr = intface_desc->d.ss_connect->tcr;
-  }
-
-  if(str_is_empty(&stardis->solve_name)) {
-    solve_name = NULL;
-    compute_side = SDIS_SIDE_NULL__; /* Side is let unspecified */
-  } else {
-    solve_name = str_cget(&stardis->solve_name);
-    if(0 == strcasecmp(solve_name, "FRONT")) {
-      const struct description* d;
-      ASSERT(prop[SG3D_FRONT] < dcount);
-      d = descriptions + prop[SG3D_FRONT];
-      ASSERT(DESC_IS_MEDIUM(d));
-      medium_name = str_cget(get_description_name(d));
-      compute_side = SDIS_FRONT;
-      compute_side_name = "FRONT";
-    }
-    else if(0 == strcasecmp(solve_name, "BACK")) {
-      const struct description* d;
-      ASSERT(prop[SG3D_BACK] < dcount);
-      d = descriptions + prop[SG3D_BACK];
-      ASSERT(DESC_IS_MEDIUM(d));
-      medium_name = str_cget(get_description_name(d));
-      compute_side = SDIS_BACK;
-      compute_side_name = "BACK";
-    } else { /* solve_name must be a medium name */
-      unsigned med_id, fmat_id, bmat_id;
-      const struct description* fd;
-      const struct description* bd;
-      struct sdis_medium* medium
-        = find_medium_by_name(stardis, &stardis->solve_name, &med_id);
-      if(medium == NULL) { /* Not found */
-        logger_print(stardis->logger, LOG_ERROR,
-          "Cannot locate side from medium name '%s' (unknown medium)\n",
-          solve_name);
-        res = RES_BAD_ARG;
-        goto error;
-      }
-
-      fd = descriptions + prop[SG3D_FRONT];
-      bd = descriptions + prop[SG3D_BACK];
-      ASSERT(DESC_IS_MEDIUM(fd));
-      ASSERT(DESC_IS_MEDIUM(bd));
-      description_get_medium_id(fd, &fmat_id);
-      description_get_medium_id(bd, &bmat_id);
-
-      if(med_id != fmat_id && med_id != bmat_id) { /* Not here */
-        logger_print(stardis->logger, LOG_ERROR,
-          "Medium '%s' is not used at this interface (prim id=%u)\n",
-          solve_name, iprim);
-        res = RES_BAD_ARG;
-        goto error;
-      }
-      if(fmat_id == bmat_id) { /* Cannot differentiate */
-        unsigned encs[2];
-        ERR(senc3d_scene_get_triangle_enclosures(stardis->senc3d_scn, iprim,
-          encs));
-        logger_print(stardis->logger, LOG_ERROR,
-          "Medium '%s' is used on both sides of this interface (prim id=%u)\n",
-          solve_name,iprim);
-        logger_print(stardis->logger, LOG_ERROR,
-          "Side must be defined using either FRONT or BACK.\n");
-        logger_print(stardis->logger, LOG_ERROR,
-          "FRONT side is related to enclosure %u, BACK side to enclosure %u.\n",
-          encs[SENC3D_FRONT], encs[SENC3D_BACK]);
-        res = RES_BAD_ARG;
-        goto error;
-      }
-      medium_name = solve_name;
-      if(med_id == fmat_id) {
-        compute_side = SDIS_FRONT;
-        compute_side_name = "FRONT";
-      } else {
-        compute_side = SDIS_BACK;
-        compute_side_name = "BACK";
-      }
-    }
-  }
-
-  if(compute_side == SDIS_SIDE_NULL__) {
-    /* Cannot have defined a contact resistance here */
-    if(tcr != 0) {
-      const struct description* fdesc = NULL;
-      const struct description* bdesc = NULL;
-      if(prop[SG3D_FRONT] != SG3D_UNSPECIFIED_PROPERTY) {
-        ASSERT(prop[SG3D_FRONT] < dcount);
-        fdesc = descriptions + prop[SG3D_FRONT];
-      }
-      if(prop[SG3D_BACK] != SG3D_UNSPECIFIED_PROPERTY) {
-        ASSERT(prop[SG3D_BACK] < dcount);
-        bdesc = descriptions + prop[SG3D_BACK];
-      }
-      ASSERT(fdesc || bdesc);
-      logger_print(stardis->logger, LOG_ERROR,
-        "Cannot let probe computation side unspecified on an interface with a "
-        "non-nul thermal resistance.\n");
-      logger_print(stardis->logger, LOG_ERROR,
-        "Interface '%s',%s%s%s%s%s%s%s, resistance=%g K.m^2/W.\n",
-        str_cget(get_description_name(intface_desc)),
-        (fdesc ? " FRONT:'" : ""),
-        (fdesc ? str_cget(get_description_name(fdesc)) : ""),
-        (fdesc ? "'" : ""),
-        (fdesc && bdesc ? "," : ""),
-        (bdesc ? " BACK:'" : ""),
-        (bdesc ? str_cget(get_description_name(bdesc)) : ""),
-        (bdesc ? "'" : ""),
-        tcr);
-      res = RES_BAD_ARG;
-      goto error;
-    }
-    /* Any side is OK as temperature is the same */
-    compute_side = SDIS_FRONT;
-  } else if (tcr == 0) {
-    /* Warn if side defined and no resistance defined */
-    logger_print(stardis->logger, LOG_WARNING,
-      "Specifying a compute side at an interface with no contact resistance "
-      "is meaningless.\n");
-  }
-
-  if(tcr > 0) {
-    ASSERT(compute_side_name && medium_name);
-    logger_print(stardis->logger, LOG_OUTPUT,
-      "Probe computation on an interface with a thermal resistance = %g K.m^2/W "
-      "on %s side (medium is '%s').\n",
-      tcr, compute_side_name, medium_name);
-  }
-
-  args.nrealisations = stardis->samples;
-  args.iprim = iprim;
-  d2_set(args.uv, uv);
-  args.side = compute_side;
-  d2_set(args.time_range, stardis->time_range);
-
-  /* Input random state? */
-  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
-
-  if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
-    if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
-      ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
-        &green));
-    } else {
-      /* Try to open output files to detect errors early */
-      if(stardis->mode & MODE_BIN_GREEN) {
-        ASSERT(!str_is_empty(&stardis->bin_green_filename));
-        stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
-        if(!stream_g) {
-          logger_print(stardis->logger, LOG_ERROR,
-            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
-          res = RES_IO_ERR;
-          goto error;
-        }
-        if(str_cget(&stardis->end_paths_filename)
-          && strlen(str_cget(&stardis->end_paths_filename)))
-        {
-          stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
-          if(!stream_p) {
-            logger_print(stardis->logger, LOG_ERROR,
-              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
-            res = RES_IO_ERR;
-            goto error;
-          }
-        }
-      }
-      /* Call solve() */
-      time_current(&compute_start);
-      ERR(sdis_solve_probe_boundary_green_function(stardis->sdis_scn, &args,
-        &green));
-      time_current(&compute_end);
-      if(stardis->mode & MODE_BIN_GREEN) {
-        struct time output_end;
-        ERR(dump_green_bin(green, stardis, stream_g));
-        if(stream_p) {
-          ERR(dump_paths_end(green, stardis, stream_p));
-        }
-        time_current(&output_end);
-        ERR(print_computation_time(NULL, stardis,
-          start, &compute_start, &compute_end, &output_end));
-      }
-      if(stardis->mode & MODE_GREEN) {
-        ERR(dump_green_ascii(green, stardis, stdout));
-      }
-    }
-  } else {
-    args.register_paths = stardis->dump_paths;
-    args.picard_order = stardis->picard_order;
-    if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
-      ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
-    } else {
-      res_T tmp_res1, tmp_res2;
-      time_current(&compute_start);
-      ERR(sdis_solve_probe_boundary(stardis->sdis_scn, &args, &estimator));
-      time_current(&compute_end);
-      ERR(print_computation_time(estimator, stardis,
-        start, &compute_start, &compute_end, NULL));
-      tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
-    
       /* Dump recorded paths according to user settings */
       dump_ctx.stardis = stardis;
       dump_ctx.rank = 0;
@@ -965,6 +614,7 @@ compute_camera(struct stardis* stardis, struct time* start)
   args.spp = (size_t)stardis->camera.spp;
   args.register_paths = stardis->dump_paths;
   args.picard_order = stardis->picard_order;
+  args.diff_algo = stardis->diff_algo;
 
   /* Launch the simulation */
   if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
@@ -980,6 +630,9 @@ compute_camera(struct stardis* stardis, struct time* start)
     else {
       stream = fopen(str_cget(&stardis->camera.file_name), "w");
       if(!stream) {
+        logger_print(stardis->logger, LOG_ERROR,
+          "cannot open file '%s' for writing.\n",
+          str_cget(&stardis->camera.file_name));
         res = RES_IO_ERR;
         goto error;
       }
@@ -1033,7 +686,7 @@ compute_medium(struct stardis* stardis, struct time* start)
   ASSERT(stardis && start && (stardis->mode & MODE_MEDIUM_COMPUTE));
 
   /* Find medium */
-  medium = find_medium_by_name(stardis, &stardis->solve_name, NULL);
+  medium = find_medium_by_name(stardis, str_cget(&stardis->solve_name), NULL);
   if(medium == NULL) { /* Not found */
     logger_print(stardis->logger, LOG_ERROR,
       "Cannot solve medium '%s' (unknown medium)\n",
@@ -1045,6 +698,7 @@ compute_medium(struct stardis* stardis, struct time* start)
   args.nrealisations = stardis->samples;
   args.medium = medium;
   d2_set(args.time_range, stardis->time_range);
+  args.diff_algo = stardis->diff_algo;
 
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
@@ -1059,7 +713,8 @@ compute_medium(struct stardis* stardis, struct time* start)
         stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream_g) {
           logger_print(stardis->logger, LOG_ERROR,
-            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
+            "cannot open file '%s' for binary writing.\n",
+            str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
@@ -1069,7 +724,8 @@ compute_medium(struct stardis* stardis, struct time* start)
           stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
           if(!stream_p) {
             logger_print(stardis->logger, LOG_ERROR,
-              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
+              "cannot open file '%s' for writing.\n",
+              str_cget(&stardis->end_paths_filename));
             res = RES_IO_ERR;
             goto error;
           }
@@ -1100,12 +756,15 @@ compute_medium(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
     } else {
+      struct sdis_mc time = SDIS_MC_NULL;
       res_T tmp_res1, tmp_res2;
       time_current(&compute_start);
       ERR(sdis_solve_medium(stardis->sdis_scn, &args, &estimator));
       time_current(&compute_end);
-      ERR(print_computation_time(estimator, stardis,
-        start, &compute_start, &compute_end, NULL));
+
+      ERR(sdis_estimator_get_realisation_time(estimator, &time));
+      ERR(print_computation_time
+        (&time, stardis, start, &compute_start, &compute_end, NULL));
       tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
       /* Dump recorded paths according to user settings */
       dump_ctx.stardis = stardis;
@@ -1201,6 +860,7 @@ compute_boundary(struct stardis* stardis, struct time* start)
   args.nprimitives
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
   d2_set(args.time_range, stardis->time_range);
+  args.diff_algo = stardis->diff_algo;
 
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
@@ -1215,7 +875,8 @@ compute_boundary(struct stardis* stardis, struct time* start)
         stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream_g) {
           logger_print(stardis->logger, LOG_ERROR,
-            "cannot open file '%s'\n", str_cget(&stardis->bin_green_filename));
+            "cannot open file '%s' for binary writing.\n",
+            str_cget(&stardis->bin_green_filename));
           res = RES_IO_ERR;
           goto error;
         }
@@ -1225,7 +886,8 @@ compute_boundary(struct stardis* stardis, struct time* start)
           stream_p = fopen(str_cget(&stardis->end_paths_filename), "w");
           if(!stream_p) {
             logger_print(stardis->logger, LOG_ERROR,
-              "cannot open file '%s'\n", str_cget(&stardis->end_paths_filename));
+              "cannot open file '%s' for writing.\n",
+              str_cget(&stardis->end_paths_filename));
             res = RES_IO_ERR;
             goto error;
           }
@@ -1255,12 +917,14 @@ compute_boundary(struct stardis* stardis, struct time* start)
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
     } else {
+      struct sdis_mc time = SDIS_MC_NULL;
       res_T tmp_res1, tmp_res2;
       time_current(&compute_start);
       ERR(sdis_solve_boundary(stardis->sdis_scn, &args, &estimator));
       time_current(&compute_end);
-      ERR(print_computation_time(estimator, stardis,
-        start, &compute_start, &compute_end, NULL));
+      ERR(sdis_estimator_get_realisation_time(estimator, &time));
+      ERR(print_computation_time
+        (&time, stardis, start, &compute_start, &compute_end, NULL));
       tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
       /* Dump recorded paths according to user settings */
       dump_ctx.stardis = stardis;
@@ -1307,6 +971,7 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
     = darray_size_t_size_get(&stardis->compute_surface.primitives);
   args.picard_order = stardis->picard_order;
   d2_set(args.time_range, stardis->time_range);
+  args.diff_algo = stardis->diff_algo;
 
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
@@ -1314,12 +979,14 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
   if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
     ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
   } else {
+    struct sdis_mc time = SDIS_MC_NULL;
     res_T tmp_res1, tmp_res2;
     time_current(&compute_start);
     ERR(sdis_solve_boundary_flux(stardis->sdis_scn, &args, &estimator));
     time_current(&compute_end);
-    ERR(print_computation_time(estimator, stardis,
-      start, &compute_start, &compute_end, NULL));
+    ERR(sdis_estimator_get_realisation_time(estimator, &time));
+    ERR(print_computation_time
+      (&time, stardis, start, &compute_start, &compute_end, NULL));
     tmp_res1 = print_single_MC_result(estimator, stardis, stdout);
 
     /* Dump recorded paths according to user settings */
@@ -1375,6 +1042,7 @@ compute_map(struct stardis* stardis, struct time* start)
     d2_set(args.time_range, stardis->time_range);
     args.register_paths = stardis->dump_paths;
     args.picard_order = stardis->picard_order;
+    args.diff_algo = stardis->diff_algo;
 
     ERR(sdis_solve_boundary(stardis->sdis_scn, &args,
       darray_estimators_data_get(&estimators) + p));
@@ -1407,7 +1075,7 @@ error:
 struct sdis_medium*
 find_medium_by_name
   (struct stardis* stardis,
-   const struct str* name,
+   const char* name,
    unsigned* out_id)
 {
   struct sdis_medium* medium = NULL;
@@ -1419,7 +1087,7 @@ find_medium_by_name
     unsigned id;
     struct description* desc =
       darray_descriptions_data_get(&stardis->descriptions) + i;
-    if(!str_eq(name, get_description_name(desc)))
+    if(strcmp(name, str_cget(get_description_name(desc))) != 0)
       continue;
     description_get_medium_id(desc, &id);
     ASSERT(darray_media_ptr_size_get(&stardis->media) > id);
@@ -1517,6 +1185,8 @@ stardis_compute
   if(stardis->mode & MODE_PROBE_COMPUTE)
     ERR(compute_probe(stardis, start));
   else if(stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
+    ERR(compute_probe_on_interface(stardis, start));
+  else if(stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE)
     ERR(compute_probe_on_interface(stardis, start));
   else if(stardis->mode & MODE_IR_COMPUTE)
     ERR(compute_camera(stardis, start));

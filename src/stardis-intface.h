@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,13 +28,16 @@ struct stardis_interface_fragment;
  ******************************************************************************/
 struct intface {
   /* programmed interfaces */
-  double (*get_temp)(const struct stardis_interface_fragment*, void*); 
-  double (*get_flux)(const struct stardis_interface_fragment*, void*); 
-  double (*get_hc)(const struct stardis_interface_fragment*, void*); 
-  double (*get_emissivity)(const struct stardis_interface_fragment*, void*); 
-  double (*get_alpha)(const struct stardis_interface_fragment*, void*); 
-  double (*get_ref_temp)(const struct stardis_interface_fragment*, void*); 
-  double (*get_tcr)(const struct stardis_interface_fragment*, void*); 
+  double (*get_temp)(const struct stardis_interface_fragment*, void*);
+  double (*get_flux)(const struct stardis_interface_fragment*, void*);
+  double (*get_hc)(const struct stardis_interface_fragment*, void*);
+  double (*get_ref_temp)(const struct stardis_interface_fragment*, void*);
+  double (*get_tcr)(const struct stardis_interface_fragment*, void*);
+  double (*get_emissivity)
+    (const struct stardis_interface_fragment*, const unsigned src_id, void*);
+  double (*get_alpha)
+    (const struct stardis_interface_fragment*, const unsigned src_id, void*);
+
   void* prog_data;
   /* fluid - solid */
   double hc;

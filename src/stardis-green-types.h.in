@@ -21,8 +21,8 @@
 /* The number of the file format as presented thereafter */
 #define GREEN_FILE_FORMAT_VERSION @STARDIS_GREEN_TYPES_VERSION@
 
-/* The max length for a description name */
-#define DESC_NAME_MAX_LEN 63
+/* The max length for a description name *WITHOUT* null char */
+#define DESC_NAME_MAX_LEN @STARDIS_MAX_NAME_LENGTH@
 
 /* The string at the beginning of a binary Green file that identifies it */
 #define BIN_FILE_IDENT_STRING "GREEN_BIN_FILE:"

@@ -1,4 +1,6 @@
-# Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+#!/bin/sh
+
+# Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,16 +15,25 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-cmake_minimum_required(VERSION 3.1)
-include(SelectLibraryConfigurations)
+set -e
 
-# Try to find stardis-prog-properties
+install()
+{
+  prefix=$1
+  shift 1
 
-# Look for stardis-prog-properties header
-find_path(SPROG_INCLUDE_DIR stardis/stardis-prog-properties.h)
+  mkdir -p "${prefix}"
 
-# Check the package
-include(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(stardis-prog-properties DEFAULT_MSG
-  SPROG_INCLUDE_DIR)
+  for i in "$@"; do
+    dst="${prefix}/${i##*/}"
 
+    if cmp -s "${i}" "${dst}"; then
+      printf "Up to date %s\n" "${dst}"
+    else
+      printf "Installing %s\n" "${dst}"
+      cp "${i}" "${prefix}"
+    fi
+  done
+}
+
+"$@"

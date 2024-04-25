@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -274,7 +274,7 @@ dump_path
   stream = fopen(name, "w");
   if(!stream) {
     logger_print(dump_ctx->stardis->logger, LOG_ERROR,
-      "cannot open file '%s'\n", name);
+      "cannot open file '%s' for writing.\n", name);
     res = RES_IO_ERR;
     goto error;
   }
@@ -648,82 +648,82 @@ medium_get_t0
 }
 
 static res_T
-dump_sample_end
-  (struct sdis_green_path* path,
-   void* ctx)
+dump_sample_end(struct sdis_green_path* path, void* ctx)
 {
-  res_T res = RES_OK;
+  /* Stardis */
+  struct sdis_green_path_end end = SDIS_GREEN_PATH_END_NULL;
+  struct sdis_data* data = NULL;
+  enum sdis_medium_type type;
+
+  /* Stream */
   struct e_ctx* e_ctx = ctx;
-  enum sdis_green_path_end_type end_type;
   FILE* stream;
+
+  /* Miscellaneous */
+  const struct description* descs;
+  double* pos;
   double elapsed;
   size_t sz;
   unsigned trad_id;
+  unsigned id;
+  res_T res = RES_OK;
 
   CHK(path && ctx);
 
   stream = e_ctx->stream;
   ERR(sdis_green_path_get_elapsed_time(path, &elapsed));
-  ERR(sdis_green_path_get_end_type(path, &end_type));
+  ERR(sdis_green_path_get_end(path, &end));
+
   sz = darray_descriptions_size_get(e_ctx->desc);
-  if(sz > UINT_MAX) goto abort;
+  if(sz > UINT_MAX) { res = RES_BAD_ARG; goto error; }
   trad_id = (unsigned)sz;
-  if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
-    /* End, End ID, X, Y, Z, Elapsed time */
-    fprintf(stream, "TRAD, %u, 0, 0, 0, %g\n", trad_id, elapsed);
-  } else {
-    struct sdis_point pt = SDIS_POINT_NULL;
-    struct sdis_data* data = NULL;
-    enum sdis_medium_type type;
-    const struct description* descs;
-    double* pos;
-    unsigned id;
 
-    ERR(sdis_green_path_get_limit_point(path, &pt));
-
-    descs = darray_descriptions_cdata_get(e_ctx->desc);
-    switch(pt.type) {
-      case SDIS_FRAGMENT: {
-        struct intface* d__;
-        data = sdis_interface_get_data(pt.data.itfrag.intface);
-        pos = pt.data.itfrag.fragment.P;
-        d__ = sdis_data_get(data);
-        id = d__->desc_id;
-        CHK(DESC_IS_T(descs+id) || DESC_IS_H(descs+id));
-        break;
-      }
-      case SDIS_VERTEX:
-        type = sdis_medium_get_type(pt.data.mdmvert.medium);
-        data = sdis_medium_get_data(pt.data.mdmvert.medium);
-        pos = pt.data.mdmvert.vertex.P;
-        if(pt.data.mdmvert.vertex.P[0] == INF) {
-          /* Radiative output (Trad) */
-          id = trad_id;
-        }
-        else if(type == SDIS_FLUID) {
-          struct fluid** pfluid = sdis_data_get(data);
-          id = (*pfluid)->desc_id;
-        } else {
-          struct solid** psolid = sdis_data_get(data);
-          ASSERT(type == SDIS_SOLID);
-          ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
-          id = (*psolid)->desc_id;
-        }
-        break;
-      default: FATAL("Unreachable code.\n"); break;
+  descs = darray_descriptions_cdata_get(e_ctx->desc);
+  switch(end.type) {
+    case SDIS_GREEN_PATH_END_AT_RADIATIVE_ENV:
+      /* End, End ID, X, Y, Z, Elapsed time */
+      fprintf(stream, "TRAD, %u, 0, 0, 0, %g\n", trad_id, elapsed);
+      break;
+    case SDIS_GREEN_PATH_END_AT_INTERFACE: {
+      struct intface* d__;
+      data = sdis_interface_get_data(end.data.itfrag.intface);
+      pos = end.data.itfrag.fragment.P;
+      d__ = sdis_data_get(data);
+      id = d__->desc_id;
+      CHK(DESC_IS_T(descs+id) || DESC_IS_H(descs+id));
+      /* End, End ID, X, Y, Z, Elapsed time */
+      fprintf(stream, "%s, %u, %g, %g, %g, %g\n",
+        str_cget(get_description_name(descs + id)), id, SPLIT3(pos), elapsed);
+      break;
     }
-    /* End, End ID, X, Y, Z, Elapsed time */
-    fprintf(stream, "%s, %u, %g, %g, %g, %g\n",
-      str_cget(get_description_name(descs + id)), id, SPLIT3(pos), elapsed);
+    case SDIS_GREEN_PATH_END_IN_VOLUME:
+      type = sdis_medium_get_type(end.data.mdmvert.medium);
+      data = sdis_medium_get_data(end.data.mdmvert.medium);
+      pos = end.data.mdmvert.vertex.P;
+      if(end.data.mdmvert.vertex.P[0] == INF) {
+        /* Radiative output (Trad) */
+        id = trad_id;
+      }
+      else if(type == SDIS_FLUID) {
+        struct fluid** pfluid = sdis_data_get(data);
+        id = (*pfluid)->desc_id;
+      } else {
+        struct solid** psolid = sdis_data_get(data);
+        ASSERT(type == SDIS_SOLID);
+        ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
+        id = (*psolid)->desc_id;
+      }
+      /* End, End ID, X, Y, Z, Elapsed time */
+      fprintf(stream, "%s, %u, %g, %g, %g, %g\n",
+        str_cget(get_description_name(descs + id)), id, SPLIT3(pos), elapsed);
+      break;
+    default: FATAL("Unreachable code.\n"); break;
   }
 
 end:
   return res;
 error:
   goto end;
-abort:
-  res = RES_BAD_ARG;
-  goto error;
 }
 
 static res_T
@@ -731,75 +731,75 @@ dump_sample
   (struct sdis_green_path* path,
    void* ctx)
 {
-  res_T res = RES_OK;
+  /* Stardis variables */
+  struct sdis_green_path_end path_end = SDIS_GREEN_PATH_END_NULL;
+  struct sdis_data* data = NULL;
+  enum sdis_medium_type type;
+
+  /* Miscellaneous variables */
+  struct w_ctx* w_ctx = ctx;
+  FILE* stream;
+  const struct description* descs;
   struct htable_weigth_iterator it, end;
   struct green_sample_header header;
-  struct w_ctx* w_ctx = ctx;
-  enum sdis_green_path_end_type end_type;
-  FILE* stream;
   unsigned* ids = NULL;
   double* weights = NULL;
+  double t0;
   size_t sz, i;
   unsigned trad_id;
+  res_T res = RES_OK;
+
   CHK(path && ctx);
 
   stream = w_ctx->stream;
-  ERR(sdis_green_path_get_end_type(path, &end_type));
+  ERR(sdis_green_path_get_end(path, &path_end));
   sz = darray_descriptions_size_get(w_ctx->desc);
-  if(sz > UINT_MAX) goto abort;
+  if(sz > UINT_MAX) { res = RES_BAD_ARG; goto error; }
   trad_id = (unsigned)sz;
-  if(end_type == SDIS_GREEN_PATH_END_RADIATIVE) {
-    header.at_initial = 0;
-    header.sample_end_description_id = trad_id;
-  } else {
-    struct sdis_point pt = SDIS_POINT_NULL;
-    struct sdis_data* data = NULL;
-    enum sdis_medium_type type;
-    const struct description* descs;
-    double t0;
 
-    ERR(sdis_green_path_get_limit_point(path, &pt));
+  /* For each path, dump:
+   * # end_id #power_terms #flux_terms
+   *    power_id_1  ... power_id_n flux_id_1 ... flux_id_n
+   *    power_factor_1  ... power_factor_n flux_factor_1 ... flux_factor_n
+   */
 
-    /* For each path, dump:
-     * # end_id #power_terms #flux_terms
-     *    power_id_1  ... power_id_n flux_id_1 ... flux_id_n
-     *    power_factor_1  ... power_factor_n flux_factor_1 ... flux_factor_n
-     */
-
-    descs = darray_descriptions_cdata_get(w_ctx->desc);
-    switch(pt.type) {
-      case SDIS_FRAGMENT: {
-        struct intface* d__;
-        unsigned desc_id;
-        data = sdis_interface_get_data(pt.data.itfrag.intface);
-        d__ = sdis_data_get(data);
-        desc_id = d__->desc_id;
-        CHK(DESC_IS_T(descs+desc_id) || DESC_IS_H(descs+desc_id));
-        header.sample_end_description_id = desc_id;
-        header.at_initial = 0;
-        break;
-      }
-      case SDIS_VERTEX:
-        type = sdis_medium_get_type(pt.data.mdmvert.medium);
-        data = sdis_medium_get_data(pt.data.mdmvert.medium);
-        t0 = medium_get_t0(pt.data.mdmvert.medium);
-        header.at_initial = (pt.data.mdmvert.vertex.time <= t0);
-        if(pt.data.mdmvert.vertex.P[0] == INF) {
-          /* Radiative output (Trad) */
-          header.sample_end_description_id = trad_id;
-        }
-        else if(type == SDIS_FLUID) {
-          struct fluid** pfluid = sdis_data_get(data);
-          header.sample_end_description_id = (*pfluid)->desc_id;
-        } else {
-          struct solid** psolid = sdis_data_get(data);
-          ASSERT(type == SDIS_SOLID);
-          ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
-          header.sample_end_description_id = (*psolid)->desc_id;
-        }
-        break;
-      default: FATAL("Unreachable code.\n"); break;
+  descs = darray_descriptions_cdata_get(w_ctx->desc);
+  switch(path_end.type) {
+    case SDIS_GREEN_PATH_END_AT_RADIATIVE_ENV:
+      header.at_initial = 0;
+      header.sample_end_description_id = trad_id;
+      break;
+    case SDIS_GREEN_PATH_END_AT_INTERFACE: {
+      struct intface* d__;
+      unsigned desc_id;
+      data = sdis_interface_get_data(path_end.data.itfrag.intface);
+      d__ = sdis_data_get(data);
+      desc_id = d__->desc_id;
+      CHK(DESC_IS_T(descs+desc_id) || DESC_IS_H(descs+desc_id));
+      header.sample_end_description_id = desc_id;
+      header.at_initial = 0;
+      break;
     }
+    case SDIS_GREEN_PATH_END_IN_VOLUME:
+      type = sdis_medium_get_type(path_end.data.mdmvert.medium);
+      data = sdis_medium_get_data(path_end.data.mdmvert.medium);
+      t0 = medium_get_t0(path_end.data.mdmvert.medium);
+      header.at_initial = (path_end.data.mdmvert.vertex.time <= t0);
+      if(path_end.data.mdmvert.vertex.P[0] == INF) {
+        /* Radiative output (Trad) */
+        header.sample_end_description_id = trad_id;
+      }
+      else if(type == SDIS_FLUID) {
+        struct fluid** pfluid = sdis_data_get(data);
+        header.sample_end_description_id = (*pfluid)->desc_id;
+      } else {
+        struct solid** psolid = sdis_data_get(data);
+        ASSERT(type == SDIS_SOLID);
+        ASSERT(!(*psolid)->is_outside); /* FIXME: what if in external solid? */
+        header.sample_end_description_id = (*psolid)->desc_id;
+      }
+      break;
+    default: FATAL("Unreachable code.\n"); break;
   }
 
   /* Merge power and flux terms */
@@ -808,10 +808,10 @@ dump_sample
   ERR(sdis_green_path_for_each_power_term(path, merge_power_terms, w_ctx));
   ERR(sdis_green_path_for_each_flux_term(path, merge_flux_terms, w_ctx));
   sz = htable_weigth_size_get(&w_ctx->pw);
-  if(sz > UINT_MAX) goto abort;
+  if(sz > UINT_MAX) { res = RES_BAD_ARG; goto error; }
   header.pw_count = (unsigned)sz;
   sz = htable_weigth_size_get(&w_ctx->flux);
-  if(sz > UINT_MAX) goto abort;
+  if(sz > UINT_MAX) { res = RES_BAD_ARG; goto error; }
   header.fx_count = (unsigned)sz;
 
   /* Write path's header */
@@ -863,9 +863,6 @@ end:
   return res;
 error:
   goto end;
-abort:
-  res = RES_BAD_ARG;
-  goto error;
 }
 
 res_T
@@ -874,14 +871,20 @@ dump_green_bin
    const struct stardis* stardis,
    FILE* stream)
 {
-  res_T res = RES_OK;
-  size_t sz, i;
-  struct w_ctx w_ctx;
-  int table_initialized = 0;
   /* The following type must be identical to its stardis-green counterpart! */
   struct green_file_header header;
+  const struct radiative_env_const* radenv_const = NULL;
+  struct w_ctx w_ctx;
+  size_t sz, i;
+  int table_initialized = 0;
+  res_T res = RES_OK;
 
   ASSERT(green && stardis && stream);
+
+  /* Stardis can produce the green function on systems
+   * with constant properties only */
+  ASSERT(stardis->radenv.type == RADIATIVE_ENV_CONST);
+  radenv_const = &stardis->radenv.data.cst;
 
   /* Init header */
   strcpy(header.green_string, BIN_FILE_IDENT_STRING);
@@ -903,8 +906,9 @@ dump_green_bin
       + stardis->counts.fbound_count + stardis->counts.sfconnect_count
       + stardis->counts.ssconnect_count));
   header.description_count = (unsigned)sz;
-  header.ambient_radiative_temperature = stardis->trad;
-  header.ambient_radiative_temperature_reference = stardis->trad_ref;
+  header.ambient_radiative_temperature = radenv_const->temperature;
+  header.ambient_radiative_temperature_reference =
+    radenv_const->reference_temperature;
   d2_set(header.time_range, stardis->time_range);
 
   /* Write header */
@@ -967,7 +971,7 @@ print_sample
    void* ctx)
 {
   res_T res = RES_OK;
-  struct sdis_point pt = SDIS_POINT_NULL;
+  struct sdis_green_path_end path_end = SDIS_GREEN_PATH_END_NULL;
   struct sdis_data* data = NULL;
   enum sdis_medium_type type;
   struct htable_weigth_iterator it, end;
@@ -977,7 +981,7 @@ print_sample
   const struct description* descs;
   CHK(path && ctx);
 
-  ERR(sdis_green_path_get_limit_point(path, &pt));
+  ERR(sdis_green_path_get_end(path, &path_end));
 
   /* For each path, prints:
    * # end #power_terms #flux_terms power_term_1  ... power_term_n flux_term_1 ... flux_term_n
@@ -988,10 +992,10 @@ print_sample
    */
 
   descs = darray_descriptions_cdata_get(w_ctx->desc);
-  switch (pt.type) {
-  case SDIS_FRAGMENT: {
+  switch (path_end.type) {
+  case SDIS_GREEN_PATH_END_AT_INTERFACE: {
     struct intface* d__;
-    data = sdis_interface_get_data(pt.data.itfrag.intface);
+    data = sdis_interface_get_data(path_end.data.itfrag.intface);
     d__ = sdis_data_get(data);
     desc_id = d__->desc_id;
     switch (descs[desc_id].type) {
@@ -1009,10 +1013,10 @@ print_sample
     }
     break;
   }
-  case SDIS_VERTEX:
-    type = sdis_medium_get_type(pt.data.mdmvert.medium);
-    data = sdis_medium_get_data(pt.data.mdmvert.medium);
-    if(pt.data.mdmvert.vertex.P[0] == INF) {
+  case SDIS_GREEN_PATH_END_IN_VOLUME:
+    type = sdis_medium_get_type(path_end.data.mdmvert.medium);
+    data = sdis_medium_get_data(path_end.data.mdmvert.medium);
+    if(path_end.data.mdmvert.vertex.P[0] == INF) {
       /* Radiative output (Trad)*/
       size_t sz = darray_descriptions_size_get(w_ctx->desc);
       if(sz > UINT_MAX) goto abort;
@@ -1085,6 +1089,7 @@ dump_green_ascii
    FILE* stream)
 {
   res_T res = RES_OK;
+  const struct radiative_env_const* radenv_const = NULL;
   unsigned ok_count, failed_count;
   size_t sz;
   struct w_ctx w_ctx;
@@ -1093,6 +1098,11 @@ dump_green_ascii
   const struct description* descs;
 
   ASSERT(green && stardis && stream);
+
+  /* Stardis can produce the green function on systems
+   * with constant properties only */
+  ASSERT(stardis->radenv.type == RADIATIVE_ENV_CONST);
+  radenv_const = &stardis->radenv.data.cst;
 
   ERR(sdis_green_function_get_paths_count(green, &sz));
   if(sz > UINT_MAX) goto abort;
@@ -1128,12 +1138,12 @@ dump_green_ascii
       sl = desc->d.solid;
       fprintf(stream, "%u\t%s\t%g\t%g\t%g\t%g",
         i, str_cget(&sl->name), sl->lambda, sl->rho, sl->cp, sl->vpower);
-      if(sl->tinit >= 0) {
+      if(SDIS_TEMPERATURE_IS_KNOWN(sl->tinit)) {
         fprintf(stream, "\t%g", sl->tinit);
       } else {
         fprintf(stream, "\tNONE");
       }
-      if(sl->imposed_temperature >= 0) {
+      if(SDIS_TEMPERATURE_IS_KNOWN(sl->imposed_temperature)) {
         fprintf(stream, "\t%g\n", sl->imposed_temperature);
       } else {
         fprintf(stream, "\tNONE\n");
@@ -1148,19 +1158,19 @@ dump_green_ascii
       const struct fluid* fl;
       if(desc->type != DESC_MAT_FLUID) continue;
       fl = desc->d.fluid;
-      if(fl->imposed_temperature >= 0) {
+      if(SDIS_TEMPERATURE_IS_KNOWN(fl->imposed_temperature)) {
         fprintf(stream, "%u\t%s\t%g\t%g",
           i, str_cget(&fl->name), fl->rho, fl->cp);
       } else {
         fprintf(stream, "%u\t%s\t%g\t%g",
           i, str_cget(&fl->name), fl->rho, fl->cp);
       }
-      if(fl->tinit >= 0) {
+      if(SDIS_TEMPERATURE_IS_KNOWN(fl->tinit)) {
         fprintf(stream, "\t%g", fl->tinit);
       } else {
         fprintf(stream, "\tNONE");
       }
-      if(fl->imposed_temperature >= 0) {
+      if(SDIS_TEMPERATURE_IS_KNOWN(fl->imposed_temperature)) {
         fprintf(stream, "\t%g\n", fl->imposed_temperature);
       } else {
         fprintf(stream, "\tNONE\n");
@@ -1211,7 +1221,7 @@ dump_green_ascii
   fprintf(stream, "# Radiative Temperatures\n");
   fprintf(stream, "# ID Trad Trad_Ref\n");
   fprintf(stream, "%u\t%g\t%g\n",
-    szd, stardis->trad, stardis->trad_ref);
+    szd, radenv_const->temperature, radenv_const->reference_temperature);
 
   fprintf(stream, "# Samples\n");
   fprintf(stream,
@@ -1285,9 +1295,11 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
   unsigned tsz, e, s, t, scount, ecount, ocount;
   int* enc_status = NULL;
   const struct description* descriptions;
-  int invalid_enclosures_count = 0;
+  int undef_count = 0, multi_count = 0;
+  struct str msg;
   ASSERT(stardis && stream);
 
+  str_init(stardis->allocator, &msg);
   descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
   ERR(sg3d_geometry_get_unique_triangles_count(stardis->geometry.sg3d, &tsz));
   trgs = MEM_CALLOC(stardis->allocator, tsz, sizeof(*trgs));
@@ -1376,6 +1388,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         if(properties_conflict_status == NO_PROPERTY_CONFLICT)
           med = stardis->undefined_medium_behind_boundary_id;
         else {
+          if(!(enc_status[e] & ENCLOSURE_WITH_UNDEF_MEDIUM)) undef_count++;
           enc_status[e] |= ENCLOSURE_WITH_UNDEF_MEDIUM;
           continue; /* Don't flag N_MEDIA at the same time */
         }
@@ -1384,18 +1397,37 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
         is_fst_med = 0;
         enc_fst_med = med;
       } else {
-        if(enc_fst_med != med)
+        if(enc_fst_med != med) {
+          /* The external (infinite) enclosure can have multiple media */
+          if(!header.is_infinite && !(enc_status[e] & ENCLOSURE_WITH_N_MEDIA))
+            multi_count++;
           enc_status[e] |= ENCLOSURE_WITH_N_MEDIA;
+        }
       }
     }
-    /* The external (infinite) enclosure is always valid */
-    if(enc_status[e] != NO_ENCLOSURE_ERROR && !header.is_infinite)
-      invalid_enclosures_count++;
     ERR(senc3d_enclosure_ref_put(enc));
   }
-  if(invalid_enclosures_count) {
-    logger_print(stardis->logger, LOG_WARNING,
-      "Found %d invalid enclosure(s).\n", invalid_enclosures_count);
+  if(multi_count) {
+    int fst = 1;
+    str_printf(&msg,
+        "Found %d enclosure(s) with more than 1 medium:", multi_count);
+    FOR_EACH(e, 0, ecount) {
+      if(!(enc_status[e] & ENCLOSURE_WITH_N_MEDIA)) continue;
+      str_append_printf(&msg, (fst ? " %u" : ", %u"), e);
+      fst = 0;
+    }
+    logger_print(stardis->logger, LOG_OUTPUT, "%s.\n",  str_cget(&msg));
+  }
+  if(undef_count) {
+    int fst = 1;
+    str_printf(&msg,
+        "Found %d enclosure(s) with undefined medium:", undef_count);
+    FOR_EACH(e, 0, ecount) {
+      if(!(enc_status[e] & ENCLOSURE_WITH_UNDEF_MEDIUM)) continue;
+      str_append_printf(&msg, (fst ? " %u" : ", %u"), e);
+      fst = 0;
+    }
+    logger_print(stardis->logger, LOG_OUTPUT, "%s.\n",  str_cget(&msg));
   }
   fprintf(stream, "FIELD EnclosuresData 2\n");
   fprintf(stream, "Enclosures %d %d unsigned_char\n", ecount, tsz);
@@ -1519,6 +1551,7 @@ dump_enclosure_related_stuff_at_the_end_of_vtk
 #undef ENC_MEMBER_NO_MEDIUM
 
 exit:
+  str_release(&msg);
   MEM_RM(stardis->allocator, trgs);
   MEM_RM(stardis->allocator, enc_status);
   return res;
@@ -1528,15 +1561,13 @@ error:
 
 res_T
 print_computation_time
-  (struct sdis_estimator* estimator,
+  (struct sdis_mc* time_per_realisation,
    struct stardis* stardis,
    struct time* start,
    struct time* compute_start,
    struct time* compute_end,
    struct time* output_end)
 {
-  res_T res = RES_OK;
-  struct sdis_mc time;
   struct time tmp;
   char buf[128];
   const int flag = TIME_MSEC | TIME_SEC | TIME_MIN | TIME_HOUR | TIME_DAY;
@@ -1561,16 +1592,13 @@ print_computation_time
       "Result output time = %s\n", buf);
   }
 
-  if(estimator) {
-    ERR(sdis_estimator_get_realisation_time(estimator, &time));
+  if(time_per_realisation) {
     logger_print(stardis->logger, LOG_OUTPUT,
-      "Time per realisation (in usec) = %g +/- %g\n", time.E, time.SE);
+      "Time per realisation (in usec) = %g +/- %g\n",
+        time_per_realisation->E, time_per_realisation->SE);
   }
 
-exit:
-  return res;
-error:
-  goto exit;
+  return RES_OK;
 }
 
 res_T
@@ -1621,24 +1649,13 @@ print_single_MC_result
     else fprintf(stream, "%g %g %lu %lu\n",
       result.E, result.SE, nfailures, nsamples);
     break;
-  case MODE_PROBE_COMPUTE_ON_INTERFACE:
-    if(stardis->mode & MODE_EXTENDED_RESULTS) {
-      if(stardis->time_range[0] == stardis->time_range[1])
-        fprintf(stream,
-          "Boundary temperature at [%g, %g, %g] at t=%g = %g K +/- %g\n",
-          SPLIT3(stardis->probe), stardis->time_range[0],
-          result.E, /* Expected value */
-          result.SE); /* Standard error */
-      else
-        fprintf(stream,
-          "Boundary temperature at [%g, %g, %g] with t in [%g %g] = %g K +/- %g\n",
-          SPLIT3(stardis->probe), SPLIT2(stardis->time_range),
-          result.E, /* Expected value */
-          result.SE); /* Standard error */
+  case MODE_PROBE_COMPUTE_ON_INTERFACE: {
+      const struct stardis_probe_boundary* probe = NULL;
+      probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
+      ERR(print_single_MC_result_probe_boundary
+        (stardis, probe, estimator, stream));
+      break;
     }
-    else fprintf(stream, "%g %g %lu %lu\n",
-      result.E, result.SE, nfailures, nsamples);
-    break;
   case MODE_MEDIUM_COMPUTE:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
       if(stardis->time_range[0] == stardis->time_range[1])
@@ -1775,6 +1792,61 @@ error:
 abort:
   res = RES_BAD_ARG;
   goto error;
+}
+
+res_T
+print_single_MC_result_probe_boundary
+  (struct stardis* stardis,
+   const struct stardis_probe_boundary* probe,
+   const struct sdis_estimator* estimator,
+   FILE* stream)
+{
+  struct sdis_mc result = SDIS_MC_NULL;
+  size_t nfailures = 0;
+  size_t nsamples = 0;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && probe && estimator);
+  ASSERT((stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
+      || (stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE));
+
+  /* Only master prints or reads estimators */
+  ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
+
+  /* Fetch the estimation data */
+  ERR(sdis_estimator_get_temperature(estimator, &result));
+  ERR(sdis_estimator_get_failure_count(estimator, &nfailures));
+  nsamples = stardis->samples;
+
+  if(nfailures == nsamples) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "All the %lu samples failed. No result to display.\n", nsamples);
+    res = RES_BAD_OP;
+    goto error;
+  }
+
+  /* Raw output */
+  if((stardis->mode & MODE_EXTENDED_RESULTS) == 0)  {
+    fprintf(stream, "%g %g %lu %lu\n",
+      result.E, result.SE, (unsigned long)nfailures, (unsigned long)nsamples);
+
+  /* Extended output */
+  } else if(stardis->time_range[0] == stardis->time_range[1]) {
+    fprintf(stream,
+      "Boundary temperature at [%g, %g, %g] at t=%g = %g K +/- %g\n",
+        SPLIT3(probe->position), probe->time[0], result.E, result.SE);
+
+  /* Extended output with time range */
+  } else {
+    fprintf(stream,
+      "Boundary temperature at [%g, %g, %g] with t in [%g %g] = %g K +/- %g\n",
+      SPLIT3(probe->position), SPLIT2(probe->time), result.E, result.SE);
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
 }
 
 res_T
@@ -1933,7 +2005,8 @@ dump_compute_region_at_the_end_of_vtk
     const struct description* descriptions;
     unsigned medium_id;
     ASSERT(stardis->mode & MODE_MEDIUM_COMPUTE);
-    medium = find_medium_by_name(stardis, &stardis->solve_name, &medium_id);
+    medium = find_medium_by_name
+      (stardis, str_cget(&stardis->solve_name), &medium_id);
     ASSERT(medium != NULL); (void)medium;
     descriptions = darray_descriptions_cdata_get(&stardis->descriptions);
     FOR_EACH(i, 0, tsz) {

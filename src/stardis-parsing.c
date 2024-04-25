@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -45,10 +45,10 @@
 #include <rsys/text_reader.h>
 #include <rsys/library.h>
 
+#include <star/sg3d.h>
 #include <wordexp.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <ctype.h>
 #include <string.h>
 #ifdef COMPILER_GCC
 #include <strings.h> /* strcasecmp */
@@ -102,12 +102,14 @@ read_sides_and_files
   unsigned current_merge_errors;
   struct sg3d_geometry_add_callbacks callbacks = SG3D_ADD_CALLBACKS_NULL__;
   struct darray_uint degenerated;
-  struct str str;
+  struct str str, name;
+  FILE* f = NULL;
   res_T res = RES_OK;
 
   ASSERT(stardis && pwordexp && idx);
 
   darray_uint_init(stardis->allocator, &degenerated);
+  str_init(stardis->allocator, &name);
   str_init(stardis->allocator, &str);
   callbacks.get_indices = add_geom_ctx_indices;
   callbacks.get_properties = add_geom_ctx_properties;
@@ -217,7 +219,21 @@ read_sides_and_files
       stardis->geometry.sg3d, &merge_errors));
     if(current_merge_errors != merge_errors) {
       int is_for_compute =
-        (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_VTK);
+        (stardis->mode & COMPUTE_MODES) && !(stardis->mode & MODE_DUMP_MODEL);
+      if(!str_is_empty(&stardis->dump_model_filename)) {
+        ERR(str_copy(&name, &stardis->dump_model_filename));
+        ERR(str_append(&name, "_merge_conflits.obj"));
+        f = fopen(str_cget(&name), "w");
+        if(!f) {
+          logger_print(stardis->logger, LOG_ERROR,
+            "cannot open file '%s' for writing.\n", str_cget(&name));
+          res = RES_IO_ERR;
+          goto error;
+        }
+        ERR(sg3d_geometry_dump_as_obj(stardis->geometry.sg3d, f,
+              SG3D_OBJ_DUMP_MERGE_CONFLICTS));
+        fclose(f); f = NULL;
+      }
       logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
         "Merge conflicts found reading file '%s' (%u triangles).\n",
         arg, merge_errors - current_merge_errors);
@@ -230,6 +246,8 @@ read_sides_and_files
   }
 
 end:
+  if(f) fclose(f);
+  str_release(&name);
   darray_uint_release(&degenerated);
   str_release(&str);
   if(sstl) SSTL(ref_put(sstl));
@@ -285,8 +303,8 @@ description_set_name
     "H_BOUNDARY_FOR_SOLID", "H_BOUNDARY_FOR_SOLID_PROG", "PROGRAM", "PROG_PARAMS",
     "SCALE", "SOLID", "SOLID_PROG", "SOLID_FLUID_CONNECTION",
     "SOLID_FLUID_CONNECTION_PROG", "SOLID_SOLID_CONNECTION",
-    "SOLID_SOLID_CONNECTION_PROG", "TRAD", "T_BOUNDARY_FOR_SOLID",
-    "T_BOUNDARY_FOR_SOLID_PROG", "UNKNOWN" };
+    "SOLID_SOLID_CONNECTION_PROG", "SPHERICAL_SOURCE", "SPHERICAL_SOURCE_PROG",
+    "TRAD", "T_BOUNDARY_FOR_SOLID", "T_BOUNDARY_FOR_SOLID_PROG", "UNKNOWN" };
   const char* reason = NULL;
   size_t i;
   ASSERT(name && arg);
@@ -382,9 +400,7 @@ process_h
 
   CHK_ARG(idx, "ref_temperature");
   res = cstr_to_double(arg, &h_boundary->ref_temperature);
-  if(res != RES_OK
-    || h_boundary->ref_temperature < 0)
-  {
+  if(res != RES_OK || h_boundary->ref_temperature < 0) {
     logger_print(stardis->logger, LOG_ERROR,
         "Invalid reference temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -395,9 +411,8 @@ process_h
   CHK_ARG(idx, "emissivity");
   res = cstr_to_double(arg, &h_boundary->emissivity);
   if(res != RES_OK
-    || h_boundary->emissivity < 0
-    || h_boundary->emissivity > 1)
-  {
+  || h_boundary->emissivity < 0
+  || h_boundary->emissivity > 1) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid emissivity: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
@@ -405,9 +420,8 @@ process_h
   CHK_ARG(idx, "specular fraction");
   res = cstr_to_double(arg, &h_boundary->specular_fraction);
   if(res != RES_OK
-    || h_boundary->specular_fraction < 0
-    || h_boundary->specular_fraction > 1)
-  {
+  || h_boundary->specular_fraction < 0
+  || h_boundary->specular_fraction > 1) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid specular fraction: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -415,9 +429,7 @@ process_h
   }
   CHK_ARG(idx, "Convection coefficient");
   res = cstr_to_double(arg, &h_boundary->hc);
-  if(res != RES_OK
-    || h_boundary->hc < 0)
-  {
+  if(res != RES_OK || h_boundary->hc < 0) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid Convection coefficient: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -426,8 +438,7 @@ process_h
   CHK_ARG(idx, "temperature");
   res = cstr_to_double(arg, &h_boundary->imposed_temperature);
   if(res != RES_OK
-    || h_boundary->imposed_temperature < 0)
-  {
+  || SDIS_TEMPERATURE_IS_UNKNOWN(h_boundary->imposed_temperature)) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
@@ -447,6 +458,7 @@ process_h
     ASSERT(sz <= UINT_MAX);
     fluid->desc_id = (unsigned)sz;
     fluid->imposed_temperature = h_boundary->imposed_temperature;
+    fluid->t0 = stardis->initial_time;
     fluid->is_outside = 1;
     fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
     ERR(create_solver_fluid(stardis, fluid));
@@ -503,9 +515,7 @@ process_hf
 
   CHK_ARG(idx, "ref_temperature");
   res = cstr_to_double(arg, &hf_boundary->ref_temperature);
-  if(res != RES_OK
-    || hf_boundary->ref_temperature < 0)
-  {
+  if(res != RES_OK || hf_boundary->ref_temperature < 0) {
     logger_print(stardis->logger, LOG_ERROR,
         "Invalid reference temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -516,9 +526,8 @@ process_hf
   CHK_ARG(idx, "emissivity");
   res = cstr_to_double(arg, &hf_boundary->emissivity);
   if(res != RES_OK
-    || hf_boundary->emissivity < 0
-    || hf_boundary->emissivity > 1)
-  {
+  || hf_boundary->emissivity < 0
+  || hf_boundary->emissivity > 1) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid emissivity: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
@@ -526,9 +535,8 @@ process_hf
   CHK_ARG(idx, "specular fraction");
   res = cstr_to_double(arg, &hf_boundary->specular_fraction);
   if(res != RES_OK
-    || hf_boundary->specular_fraction < 0
-    || hf_boundary->specular_fraction > 1)
-  {
+  || hf_boundary->specular_fraction < 0
+  || hf_boundary->specular_fraction > 1) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid specular fraction: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -536,9 +544,7 @@ process_hf
   }
   CHK_ARG(idx, "convection coefficient");
   res = cstr_to_double(arg, &hf_boundary->hc);
-  if(res != RES_OK
-    || hf_boundary->hc < 0)
-  {
+  if(res != RES_OK || hf_boundary->hc < 0) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid convection coefficient: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -547,8 +553,7 @@ process_hf
   CHK_ARG(idx, "temperature");
   res = cstr_to_double(arg, &hf_boundary->imposed_temperature);
   if(res != RES_OK
-    || hf_boundary->imposed_temperature < 0)
-  {
+  || SDIS_TEMPERATURE_IS_UNKNOWN(hf_boundary->imposed_temperature)) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
@@ -574,6 +579,7 @@ process_hf
   ASSERT(sz <= UINT_MAX);
   fluid->desc_id = (unsigned)sz;
   fluid->imposed_temperature = hf_boundary->imposed_temperature;
+  fluid->t0 = stardis->initial_time;
   fluid->is_outside = 1;
   fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   ERR(create_solver_fluid(stardis, fluid));
@@ -610,6 +616,18 @@ set_argc_argv
     goto error;
   }
   *argc = pwordexp->we_wordc - idx;
+  /* Review: why allocate an extra argument? In fact, it's necessary because
+   * this function is called even if there are no arguments to analyze. In this
+   * case, allocation would fail, as the size to be allocated would be zero.
+   * This +1 therefore guarantees that at least one element will be allocated.
+   * But this could be eliminated by checking that there are no arguments
+   * (argc==0) and, if necessary, returning before any allocation.
+   *
+   * Nevertheless, this extra argument makes sense. It should be the first
+   * argument and contain the program name. In this way, the argument list would
+   * respect the C convention for declaring an argument list. And so, anyone
+   * could use the getopt analysis function without having to declare a dummy
+   * argument as the program's first parameter */
   *argv = MEM_CALLOC(allocator, 1 + *argc, sizeof(char *));
   if(*argv == NULL) {
     res = RES_MEM_ERR;
@@ -729,7 +747,7 @@ process_program
   ERR(init_program(stardis->allocator, &desc->d.program));
   program = desc->d.program;
   desc->type = DESC_PROGRAM;
-  
+
   CHK_ARG(idx, "program name");
   ERR(description_set_name(stardis, &program->name, arg));
   if(find_description_by_name(stardis, &program->name, desc)) {
@@ -839,6 +857,7 @@ process_h_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double h_bound_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct h_boundary_prog* h_boundary_prog;
   struct stardis_description_create_context ctx;
@@ -855,7 +874,7 @@ process_h_prog
   ERR(init_h_boundary_prog(stardis->allocator, &desc->d.h_boundary_prog));
   h_boundary_prog = desc->d.h_boundary_prog;
   desc->type = type;
-  
+
   CHK_ARG(idx, "programmed h boundary name");
   ERR(description_set_name(stardis, &h_boundary_prog->name, arg));
   if(find_description_by_name(stardis, &h_boundary_prog->name, desc)) {
@@ -894,7 +913,9 @@ process_h_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(h_boundary_prog);
 
-  h_boundary_prog->t_range(h_boundary_prog->prog_data, stardis->t_range);
+  h_boundary_prog->t_range(h_boundary_prog->prog_data, h_bound_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], h_bound_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], h_bound_t_range[1]);
 
   /* create the media behind the interface */
   if(type == DESC_BOUND_H_FOR_FLUID_PROG) {
@@ -933,6 +954,7 @@ process_hf_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double hf_bound_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct hf_boundary_prog* hf_boundary_prog;
   struct stardis_description_create_context ctx;
@@ -951,7 +973,7 @@ process_hf_prog
   ERR(init_hf_boundary_prog(stardis->allocator, &desc->d.hf_boundary_prog));
   hf_boundary_prog = desc->d.hf_boundary_prog;
   desc->type = type;
-  
+
   CHK_ARG(idx, "programmed hf boundary name");
   ERR(description_set_name(stardis, &hf_boundary_prog->name, arg));
   if(find_description_by_name(stardis, &hf_boundary_prog->name, desc)) {
@@ -987,7 +1009,9 @@ process_hf_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(hf_boundary_prog);
 
-  hf_boundary_prog->t_range(hf_boundary_prog->prog_data, stardis->t_range);
+  hf_boundary_prog->t_range(hf_boundary_prog->prog_data, hf_bound_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], hf_bound_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], hf_bound_t_range[1]);
 
   /* create the media behind the interface */
   ERR(init_fluid_prog(stardis->allocator, &fluid_prog));
@@ -1036,7 +1060,7 @@ process_t
 
   ERR(get_dummy_fluid_id(stardis, &t_boundary->mat_id));
 
-  
+
   CHK_ARG(idx, "temperature boundary name");
   ERR(description_set_name(stardis, &t_boundary->name, arg));
   if(find_description_by_name(stardis, &t_boundary->name, desc)) {
@@ -1049,7 +1073,7 @@ process_t
   CHK_ARG(idx, "temperature");
   res = cstr_to_double(arg, &t_boundary->imposed_temperature);
   if(res != RES_OK
-    || t_boundary->imposed_temperature < 0)
+  || SDIS_TEMPERATURE_IS_UNKNOWN(t_boundary->imposed_temperature))
   {
     logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -1076,6 +1100,7 @@ process_t_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double t_bound_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct t_boundary_prog* t_boundary_prog;
   struct stardis_description_create_context ctx;
@@ -1094,7 +1119,7 @@ process_t_prog
   desc->type = DESC_BOUND_T_FOR_SOLID_PROG;
 
   ERR(get_dummy_fluid_id(stardis, &t_boundary_prog->mat_id));
-  
+
   CHK_ARG(idx, "programmed t boundary name");
   ERR(description_set_name(stardis, &t_boundary_prog->name, arg));
   if(find_description_by_name(stardis, &t_boundary_prog->name, desc)) {
@@ -1124,7 +1149,9 @@ process_t_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(t_boundary_prog);
 
-  t_boundary_prog->t_range(t_boundary_prog->prog_data, stardis->t_range);
+  t_boundary_prog->t_range(t_boundary_prog->prog_data, t_bound_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], t_bound_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], t_bound_t_range[1]);
 
 end:
   return res;
@@ -1170,7 +1197,7 @@ process_flx
   CHK_ARG(idx, "flux");
   res = cstr_to_double(arg, &f_boundary->imposed_flux);
   if(res != RES_OK
-    || f_boundary->imposed_flux == SDIS_FLUX_NONE) {
+  || f_boundary->imposed_flux == SDIS_FLUX_NONE) {
     /* Flux can be < 0 but not undefined */
     if(res == RES_OK) res = RES_BAD_ARG;
     logger_print(stardis->logger, LOG_ERROR, "Invalid flux: %s\n", arg);
@@ -1221,7 +1248,7 @@ process_flx_prog
   desc->type = DESC_BOUND_F_FOR_SOLID_PROG;
 
   ERR(get_dummy_fluid_id(stardis, &f_boundary_prog->mat_id));
-  
+
   CHK_ARG(idx, "programmed t boundary name");
   ERR(description_set_name(stardis, &f_boundary_prog->name, arg));
   if(find_description_by_name(stardis, &f_boundary_prog->name, desc)) {
@@ -1297,9 +1324,7 @@ process_sfc
 
   CHK_ARG(idx, "ref_temperature");
   res = cstr_to_double(arg, &sf_connect->ref_temperature);
-  if(res != RES_OK
-    || sf_connect->ref_temperature < 0)
-  {
+  if(res != RES_OK || sf_connect->ref_temperature < 0) {
     logger_print(stardis->logger, LOG_ERROR,
         "Invalid reference temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -1310,9 +1335,8 @@ process_sfc
   CHK_ARG(idx, "emissivity");
   res = cstr_to_double(arg, &sf_connect->emissivity);
   if(res != RES_OK
-    || sf_connect->emissivity < 0
-    || sf_connect->emissivity > 1)
-  {
+  || sf_connect->emissivity < 0
+  || sf_connect->emissivity > 1) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid emissivity: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
@@ -1320,9 +1344,8 @@ process_sfc
   CHK_ARG(idx, "specular fraction");
   res = cstr_to_double(arg, &sf_connect->specular_fraction);
   if(res != RES_OK
-    || sf_connect->specular_fraction < 0
-    || sf_connect->specular_fraction > 1)
-  {
+  || sf_connect->specular_fraction < 0
+  || sf_connect->specular_fraction > 1) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid specular fraction: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -1330,9 +1353,7 @@ process_sfc
   }
   CHK_ARG(idx, "convection coefficient");
   res = cstr_to_double(arg, &sf_connect->hc);
-  if(res != RES_OK
-    || sf_connect->hc < 0)
-  {
+  if(res != RES_OK || sf_connect->hc < 0) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid convection coefficient: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -1357,6 +1378,7 @@ process_sfc_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double sf_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct solid_fluid_connect_prog* sf_connect_prog;
   struct stardis_description_create_context ctx;
@@ -1407,7 +1429,9 @@ process_sfc_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(sf_connect_prog);
 
-  sf_connect_prog->t_range(sf_connect_prog->prog_data, stardis->t_range);
+  sf_connect_prog->t_range(sf_connect_prog->prog_data, sf_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], sf_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], sf_t_range[1]);
 
 end:
   return res;
@@ -1455,9 +1479,7 @@ process_ssc
 
   CHK_ARG(idx, "contact resistance");
   res = cstr_to_double(arg, &ss_connect->tcr);
-  if(res != RES_OK
-    || ss_connect->tcr < 0)
-  {
+  if(res != RES_OK || ss_connect->tcr < 0) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid contact resistance: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
@@ -1560,21 +1582,12 @@ read_imposed_temperature
   str_init(stardis->allocator, &keep);
   CHK_ARG((*idx), "imposed temperature");
   ERR(str_set(&keep, arg));
-  if(RES_OK == cstr_to_double(arg, imposed_temperature)) {
-    /* Was a number */
-    if(*imposed_temperature < 0) {
-      res = RES_BAD_ARG;
-      goto error;
-    }
-  } else {
-    /* Could be 'unknown' */
-    if(0 == strcasecmp(arg, "UNKNOWN")) {
-      *imposed_temperature = UNKNOWN_MEDIUM_TEMPERATURE;
-    } else {
-      res = RES_BAD_ARG;
-      goto error;
-    }
+  if(0 == strcasecmp(arg, "UNKNOWN")) {
+    *imposed_temperature = UNKNOWN_MEDIUM_TEMPERATURE;
+  } else if((res = cstr_to_double(arg, imposed_temperature)) != RES_OK) {
+    goto error;
   }
+
 end:
   str_release(&keep);
   return res;
@@ -1603,7 +1616,7 @@ read_delta
       goto error;
     }
   } else {
-    /* Could be 'auto' */ 
+    /* Could be 'auto' */
     if(0 == strcasecmp(arg, "AUTO")) {
       /* Set to DELTA_AUTO until actual value is substituted */
       *delta = DELTA_AUTO;
@@ -1644,10 +1657,11 @@ process_solid
   desc->type = DESC_MAT_SOLID;
   solid->solid_id = allocate_stardis_medium_id(stardis);
   solid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  solid->t0 = stardis->initial_time;
   solid->is_outside = 0;
   ASSERT(sz <= UINT_MAX);
   solid->desc_id = (unsigned)sz;
-  
+
   CHK_ARG(idx, "solid name");
   ERR(description_set_name(stardis, &solid->name, arg));
   if(find_description_by_name(stardis, &solid->name, desc)) {
@@ -1687,9 +1701,7 @@ process_solid
   ERR(read_delta(stardis, &solid->delta, pwordexp, &idx));
   CHK_ARG(idx, "Tinit");
   res = cstr_to_double(arg, &solid->tinit);
-  if(res != RES_OK
-    || solid->tinit < 0)
-  {
+  if(res != RES_OK || SDIS_TEMPERATURE_IS_UNKNOWN(solid->tinit)) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid Tinit: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
@@ -1698,8 +1710,8 @@ process_solid
   stardis->t_range[1] = MMAX(stardis->t_range[1], solid->tinit);
   ERR(read_imposed_temperature(stardis, &solid->imposed_temperature,
     pwordexp, &idx));
-  if(solid->imposed_temperature >= 0
-    && solid->imposed_temperature != solid->tinit)
+  if(SDIS_TEMPERATURE_IS_KNOWN(solid->imposed_temperature)
+  && solid->imposed_temperature != solid->tinit)
   {
     logger_print(stardis->logger, LOG_ERROR,
       "Imposed temperature, if defined, must match initial temperature "
@@ -1708,8 +1720,9 @@ process_solid
     res = RES_BAD_ARG;
     goto end;
   }
-  if(solid->imposed_temperature >= 0)
+  if(SDIS_TEMPERATURE_IS_KNOWN(solid->imposed_temperature))
     stardis->t_range[0] = MMIN(stardis->t_range[0], solid->imposed_temperature);
+
   stardis->t_range[1] = MMAX(stardis->t_range[1], solid->imposed_temperature);
   CHK_ARG(idx, "volumic power");
   res = cstr_to_double(arg, &solid->vpower);
@@ -1747,6 +1760,7 @@ process_solid_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double solid_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct solid_prog* solid_prog;
   struct stardis_description_create_context ctx;
@@ -1766,7 +1780,7 @@ process_solid_prog
   solid_prog->solid_id = allocate_stardis_medium_id(stardis);
   ASSERT(sz <= UINT_MAX);
   solid_prog->desc_id = (unsigned)sz;
-  
+
   CHK_ARG(idx, "programmed solid name");
   ERR(description_set_name(stardis, &solid_prog->name, arg));
   if(find_description_by_name(stardis, &solid_prog->name, desc)) {
@@ -1800,7 +1814,9 @@ process_solid_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(solid_prog);
 
-  solid_prog->t_range(solid_prog->prog_data, stardis->t_range);
+  solid_prog->t_range(solid_prog->prog_data, solid_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], solid_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], solid_t_range[1]);
 
   ERR(create_solver_solid_prog(stardis, solid_prog));
 
@@ -1833,11 +1849,12 @@ process_fluid
   ERR(init_fluid(stardis->allocator, &desc->d.fluid));
   fluid = desc->d.fluid;
   desc->type = DESC_MAT_FLUID;
+  fluid->t0 = stardis->initial_time;
   fluid->fluid_id = allocate_stardis_medium_id(stardis);
   fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   ASSERT(sz <= UINT_MAX);
   fluid->desc_id = (unsigned)sz;
-  
+
   CHK_ARG(idx, "fluid name");
   ERR(description_set_name(stardis, &fluid->name, arg));
   if(find_description_by_name(stardis, &fluid->name, desc)) {
@@ -1867,9 +1884,7 @@ process_fluid
   }
   CHK_ARG(idx, "Tinit");
   res = cstr_to_double(arg, &fluid->tinit);
-  if(res != RES_OK
-    || fluid->tinit < 0)
-  {
+  if(res != RES_OK || SDIS_TEMPERATURE_IS_UNKNOWN(fluid->tinit)) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid Tinit: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
@@ -1878,9 +1893,8 @@ process_fluid
   stardis->t_range[1] = MMAX(stardis->t_range[1], fluid->tinit);
   ERR(read_imposed_temperature(stardis, &fluid->imposed_temperature,
     pwordexp, &idx));
-  if(fluid->imposed_temperature >= 0
-    && fluid->imposed_temperature != fluid->tinit)
-  {
+  if(SDIS_TEMPERATURE_IS_KNOWN(fluid->imposed_temperature)
+  && fluid->imposed_temperature != fluid->tinit) {
     logger_print(stardis->logger, LOG_ERROR,
       "Imposed temperature, if defined, must match initial temperature "
       "(initial: %g; imposed: %g)\n",
@@ -1888,7 +1902,7 @@ process_fluid
     res = RES_BAD_ARG;
     goto end;
   }
-  if(fluid->imposed_temperature >= 0)
+  if(SDIS_TEMPERATURE_IS_KNOWN(fluid->imposed_temperature))
     stardis->t_range[0] = MMIN(stardis->t_range[0], fluid->imposed_temperature);
   stardis->t_range[1] = MMAX(stardis->t_range[1], fluid->imposed_temperature);
 
@@ -1911,6 +1925,7 @@ process_fluid_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
+  double fluid_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct fluid_prog* fluid_prog;
   struct stardis_description_create_context ctx;
@@ -1930,7 +1945,7 @@ process_fluid_prog
   fluid_prog->fluid_id = allocate_stardis_medium_id(stardis);
   ASSERT(sz <= UINT_MAX);
   fluid_prog->desc_id = (unsigned)sz;
-  
+
   CHK_ARG(idx, "programmed fluid name");
   ERR(description_set_name(stardis, &fluid_prog->name, arg));
   if(find_description_by_name(stardis, &fluid_prog->name, desc)) {
@@ -1961,7 +1976,9 @@ process_fluid_prog
   ctx.name = desc_name;
   CREATE_DESC_DATA(fluid_prog);
 
-  fluid_prog->t_range(fluid_prog->prog_data, stardis->t_range);
+  fluid_prog->t_range(fluid_prog->prog_data, fluid_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], fluid_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], fluid_t_range[1]);
 
   ERR(create_solver_fluid_prog(stardis, fluid_prog));
 
@@ -2012,44 +2029,267 @@ process_radiative
   (struct stardis* stardis,
    wordexp_t* pwordexp)
 {
+  double trad = 0;
+  double tref = 0;
   char* arg = NULL;
   size_t idx = 1;
   res_T res = RES_OK;
 
   ASSERT(stardis && pwordexp);
 
-  if(stardis->trad_def) {
+  if(stardis->radenv_def) {
     logger_print(stardis->logger, LOG_ERROR,
-      "TRAD cannot be specified twice\n");
+      "Radiative environment cannot be specified twice\n");
     res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
+
+  res = radiative_env_init_const(stardis->allocator, &stardis->radenv);
+  if(res != RES_OK) goto error;
+
   CHK_ARG(idx, "Trad");
-  res = cstr_to_double(arg, &stardis->trad);
-  if(res != RES_OK
-    || stardis->trad < 0)
-  {
+  res = cstr_to_double(arg, &trad);
+  if(res != RES_OK || SDIS_TEMPERATURE_IS_UNKNOWN(trad)) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid Trad: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
   CHK_ARG(idx, "Trad reference");
-  res = cstr_to_double(arg, &stardis->trad_ref);
-  if(res != RES_OK
-    || stardis->trad_ref < 0)
-  {
+  res = cstr_to_double(arg, &tref);
+  if(res != RES_OK || tref < 0) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid Trad reference: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->trad_def = 1;
+
+  stardis->radenv.data.cst.temperature = trad;
+  stardis->radenv.data.cst.reference_temperature = tref;
+  stardis->radenv_def = 1;
 
 end:
   return res;
 error:
+  radiative_env_release(&stardis->radenv);
+  stardis->radenv = RADIATIVE_ENV_DEFAULT;
   goto end;
+}
+
+static res_T
+process_radiative_prog(struct stardis* stardis, wordexp_t* pwordexp)
+{
+  struct stardis_description_create_context ctx;
+  struct radiative_env_prog* radenv = NULL;
+  double radenv_t_range[2] = {DBL_MAX, -DBL_MAX};
+  char* lib_name = NULL;
+  char* arg = NULL;
+  size_t idx = 1;
+  res_T res = RES_OK;
+
+  ASSERT(stardis && pwordexp);
+
+  radenv = &stardis->radenv.data.prg;
+
+  if(stardis->radenv_def) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Radiative environment cannot be specified twice\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = radiative_env_init_prog(stardis->allocator, &stardis->radenv);
+
+  CHK_ARG(idx, "program name");
+  ERR(str_set(&radenv->prog_name, arg));
+  lib_name = arg;
+
+  if(idx < pwordexp->we_wordc
+  && strcasecmp(pwordexp->we_wordv[idx], "PROG_PARAMS")) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Expecting PROG_PARAMS keyword while parsing `%s'.\n",
+      pwordexp->we_wordv[idx]);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  ERR(set_argc_argv
+    (stardis->allocator, &radenv->argc, &radenv->argv, pwordexp, idx));
+  ERR(get_prog_common
+    (lib_name, stardis, &radenv->program, &radenv->create, &radenv->release));
+  GET_LIB_SYMBOL(radenv, temperature,
+    stardis_radiative_env_temperature);
+  GET_LIB_SYMBOL(radenv, reference_temperature,
+    stardis_radiative_env_reference_temperature);
+  GET_LIB_SYMBOL(radenv, t_range,
+    stardis_t_range);
+
+  ctx.name = "Radiative environment";
+  radenv->data = radenv->create
+    (&ctx, radenv->program->prog_data, radenv->argc, radenv->argv);
+  if(!radenv->data) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot create data for the radiative environment\n");
+    res = RES_UNKNOWN_ERR;
+    goto error;
+  }
+
+  radenv->t_range(radenv->data, radenv_t_range);
+  stardis->t_range[0] = MMIN(stardis->t_range[0], radenv_t_range[0]);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], radenv_t_range[1]);
+
+exit:
+  return res;
+error:
+  radiative_env_release(&stardis->radenv);
+  stardis->radenv = RADIATIVE_ENV_DEFAULT;
+  goto exit;
+}
+
+static res_T
+process_spherical_source
+  (struct stardis* stardis,
+   wordexp_t* pwordexp)
+{
+  struct spherical_source* src = NULL;
+  char* arg = NULL;
+  size_t idx = 1;
+  res_T res = RES_OK;
+  ASSERT(stardis && pwordexp);
+
+  src = &stardis->extsrc.data.sphere;
+
+  if(stardis->extsrc.type != EXTERN_SOURCE_NONE__) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Only one external source can be defined\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = extern_source_init_sphere(stardis->allocator, &stardis->extsrc);
+  if(res != RES_OK) goto error;
+
+  CHK_ARG(idx, "radius");
+  res = cstr_to_double(arg, &src->radius);
+  if(res == RES_OK && src->radius < 0) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid spherical source radius: %s\n", arg);
+    goto error;
+  }
+
+  #define PARSE_POS(Name, Id) { \
+    CHK_ARG(idx, "position "Name); \
+    res = cstr_to_double(arg, &src->position[Id]); \
+    if(res != RES_OK) { \
+      logger_print(stardis->logger, LOG_ERROR, \
+        "Invalid spherical source "Name" coordinate: %s\n", arg); \
+      goto error; \
+    } \
+  } (void)0
+  PARSE_POS("X", 0);
+  PARSE_POS("Y", 1);
+  PARSE_POS("Z", 2);
+  #undef PARSE_POS
+
+  CHK_ARG(idx, "power");
+  res = cstr_to_double(arg, &src->power);
+  if(res == RES_OK && src->power < 0) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid spherical source power: %s\n", arg);
+    goto error;
+  }
+
+  CHK_ARG(idx, "diffuse radiance");
+  res = cstr_to_double(arg, &src->diffuse_radiance);
+  if(res == RES_OK && src->diffuse_radiance < 0) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid diffuse radiance for the spherical source: %s\n", arg);
+    goto error;
+  }
+
+  res = extern_source_create_solver_source(&stardis->extsrc, stardis);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  extern_source_release(&stardis->extsrc);
+  stardis->extsrc = EXTERN_SOURCE_NULL;
+  goto exit;
+}
+
+static res_T
+process_spherical_source_prog(struct stardis* stardis, wordexp_t* pwordexp)
+{
+  struct stardis_description_create_context ctx;
+  struct spherical_source_prog* src = NULL;
+  char* lib_name = NULL;
+  char* arg = NULL;
+  size_t idx = 1;
+  res_T res = RES_OK;
+  ASSERT(stardis && pwordexp);
+
+  src = &stardis->extsrc.data.sphere_prog;
+
+  if(stardis->extsrc.type != EXTERN_SOURCE_NONE__) {
+      logger_print(stardis->logger, LOG_ERROR,
+      "Only one external source can be defined\n");
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  res = extern_source_init_sphere_prog(stardis->allocator, &stardis->extsrc);
+  if(res != RES_OK) goto error;
+
+  CHK_ARG(idx, "radius");
+  res = cstr_to_double(arg, &src->radius);
+  if(res == RES_OK && src->radius < 0) res = RES_BAD_ARG;
+  if(res != RES_OK) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Invalid spherical source radius: %s\n", arg);
+    goto error;
+  }
+
+  CHK_ARG(idx, "program name");
+  ERR(str_set(&src->prog_name, arg));
+  lib_name = arg;
+
+  if(idx < pwordexp->we_wordc
+  && strcasecmp(pwordexp->we_wordv[idx], "PROG_PARAMS")) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Expecting PROG_PARAMS keyword while parsing `%s'.\n",
+      pwordexp->we_wordv[idx]);
+    res = RES_BAD_ARG;
+    goto error;
+  }
+
+  ERR(set_argc_argv(stardis->allocator, &src->argc, &src->argv, pwordexp, idx));
+  ERR(get_prog_common(lib_name, stardis, &src->program, &src->create, &src->release));
+  GET_LIB_SYMBOL(src, position, stardis_spherical_source_position);
+  GET_LIB_SYMBOL(src, power, stardis_spherical_source_power);
+  GET_LIB_SYMBOL(src, diffuse_radiance, stardis_spherical_source_diffuse_radiance);
+
+  ctx.name = "External spherical source";
+  src->data = src->create(&ctx, src->program->prog_data, src->argc, src->argv);
+  if(!src->data) {
+    logger_print(stardis->logger, LOG_ERROR,
+      "Cannot create data for the external spherical source\n");
+    res = RES_UNKNOWN_ERR;
+    goto error;
+  }
+
+  res = extern_source_create_solver_source(&stardis->extsrc, stardis);
+  if(res != RES_OK) goto error;
+
+exit:
+  return res;
+error:
+  extern_source_release(&stardis->extsrc);
+  stardis->extsrc = EXTERN_SOURCE_NULL;
+  goto exit;
 }
 
 /* Read medium or boundary line; should be one of:
@@ -2090,7 +2330,7 @@ process_model_line
   ASSERT(file_name && line && pwordexp && stardis);
 
   CHK_ARG(idx, "model line type");
-  
+
   if(0 == strcasecmp(arg, "H_BOUNDARY_FOR_SOLID"))
     ERR(process_h(stardis, DESC_BOUND_H_FOR_SOLID, pwordexp));
   else if(0 == strcasecmp(arg, "H_BOUNDARY_FOR_SOLID_PROG"))
@@ -2133,6 +2373,12 @@ process_model_line
     ERR(process_scale(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "TRAD"))
     ERR(process_radiative(stardis, pwordexp));
+  else if(0 == strcasecmp(arg, "TRAD_PROG"))
+    ERR(process_radiative_prog(stardis, pwordexp));
+  else if(0 == strcasecmp(arg, "SPHERICAL_SOURCE"))
+    ERR(process_spherical_source(stardis, pwordexp));
+  else if(0 == strcasecmp(arg, "SPHERICAL_SOURCE_PROG"))
+    ERR(process_spherical_source_prog(stardis, pwordexp));
   else {
     logger_print(stardis->logger, LOG_ERROR,
       "Unknown description type: %s\n", arg);
@@ -2171,6 +2417,7 @@ get_dummy_solid_id
   dummies->stardis_solid = dummy;
   dummies->dummy_solid_id = allocate_stardis_medium_id(stardis);
   dummy->solid_id = dummies->dummy_solid_id;
+  dummy->t0 = stardis->initial_time;
   dummy->is_outside = 1;
   dummy->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   create_solver_solid(stardis, dummy);
@@ -2204,6 +2451,7 @@ get_dummy_fluid_id
   dummies->stardis_fluid = dummy;
   dummies->dummy_fluid_id = allocate_stardis_medium_id(stardis);
   dummy->fluid_id = dummies->dummy_fluid_id;
+  dummy->t0 = stardis->initial_time;
   dummy->is_outside = 1;
   dummy->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
   create_solver_fluid(stardis, dummy);
@@ -2296,10 +2544,14 @@ exp_error:
     stardis->scale_factor = STARDIS_DEFAULT_SCALE_FACTOR;
   logger_print(stardis->logger, LOG_OUTPUT,
     "Scaling factor is %g\n", stardis->scale_factor);
-  logger_print(stardis->logger, LOG_OUTPUT,
-    "Trad is %g, Trad reference is %g\n", stardis->trad, stardis->trad_ref);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], stardis->trad_ref);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], stardis->trad_ref);
+  if(stardis->radenv.type == RADIATIVE_ENV_CONST) {
+    const double trad = stardis->radenv.data.cst.temperature;
+    const double trad_ref = stardis->radenv.data.cst.reference_temperature;
+    logger_print(stardis->logger, LOG_OUTPUT,
+      "Trad is %g, Trad reference is %g\n", trad, trad_ref);
+    stardis->t_range[0] = MMIN(stardis->t_range[0], trad_ref);
+    stardis->t_range[1] = MMAX(stardis->t_range[1], trad_ref);
+  }
   logger_print(stardis->logger, LOG_OUTPUT,
     "System T range is [%g %g]\n", SPLIT2(stardis->t_range));
   logger_print(stardis->logger, LOG_OUTPUT,

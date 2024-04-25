@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@ init_f_boundary
   str_init(allocator, &(*dst)->name);
   str_initialized = 1;
   (*dst)->mat_id = UINT_MAX;
-  (*dst)->imposed_flux = -1;
+  (*dst)->imposed_flux = SDIS_FLUX_NONE;
 end:
   return res;
 error:

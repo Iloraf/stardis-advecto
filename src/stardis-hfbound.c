@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@ init_hf_boundary
   }
   str_init(allocator, &(*dst)->name);
   str_initialized = 1;
-  (*dst)->imposed_temperature = -1;
+  (*dst)->imposed_temperature = SDIS_TEMPERATURE_NONE;
   (*dst)->mat_id = UINT_MAX;
 end:
   return res;

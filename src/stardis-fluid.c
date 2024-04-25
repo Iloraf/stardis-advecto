@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2023 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -52,12 +52,12 @@ fluid_get_temperature
    struct sdis_data* data)
 {
   const struct fluid* const* fluid_props = sdis_data_cget(data);
-  if((*fluid_props)->imposed_temperature >= 0)
+  if(SDIS_TEMPERATURE_IS_KNOWN((*fluid_props)->imposed_temperature))
     /* If there is an imposed temp, it is imposed regardless of time */
     return (*fluid_props)->imposed_temperature;
   if(vtx->time <= (*fluid_props)->t0) {
     /* If time is <= t0: use tinit */
-    if((*fluid_props)->tinit < 0) {
+    if(SDIS_TEMPERATURE_IS_UNKNOWN((*fluid_props)->tinit)) {
       if(str_is_empty(&(*fluid_props)->name)) {
         FATAL("fluid_get_temperature: getting undefined Tinit\n");
       } else {
@@ -67,7 +67,7 @@ fluid_get_temperature
     }
     return (*fluid_props)->tinit;
   }
-  return -1; /* Unknown temperature */
+  return SDIS_TEMPERATURE_NONE; /* Unknown temperature */
 }
 
 /*******************************************************************************
@@ -88,6 +88,7 @@ create_solver_fluid
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
   fluid_shader.volumic_mass = fluid_get_volumic_mass;
   fluid_shader.temperature = fluid_get_temperature;
+  fluid_shader.t0 = stardis->initial_time;
   ERR(sdis_data_create(stardis->dev, sizeof(struct fluid*), ALIGNOF(struct fluid*),
     NULL, &data));
 
@@ -122,8 +123,8 @@ init_fluid(struct mem_allocator* allocator, struct fluid** dst)
   str_initialized = 1;
   (*dst)->rho = 1;
   (*dst)->cp = 1;
-  (*dst)->tinit = -1;
-  (*dst)->imposed_temperature = -1;
+  (*dst)->tinit = SDIS_TEMPERATURE_NONE;
+  (*dst)->imposed_temperature = SDIS_TEMPERATURE_NONE;
   (*dst)->t0 = 0;
   (*dst)->is_outside = 0;
   (*dst)->is_green = 0;
@@ -154,10 +155,10 @@ str_print_fluid(struct str* str, const struct fluid* f)
   ASSERT(str && f);
   ERR(str_append_printf(str, "Fluid '%s': rho=%g cp=%g",
     str_cget(&f->name), f->rho, f->cp));
-  if(f->tinit >= 0) {
+  if(SDIS_TEMPERATURE_IS_KNOWN(f->tinit)) {
     ERR(str_append_printf(str, " Tinit=%g", f->tinit));
   }
-  if(f->imposed_temperature >= 0) {
+  if(SDIS_TEMPERATURE_IS_KNOWN(f->imposed_temperature)) {
     ERR(str_append_printf(str, " Temp=%g", f->imposed_temperature));
   }
   ERR(str_append_printf(str, " (it is medium %u)", f->fluid_id));

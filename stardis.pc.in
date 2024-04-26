@@ -1,0 +1,7 @@
+prefix=@PREFIX@
+includedir=${prefix}/include
+
+Name: stardis
+Description: Stardis
+Version: @VERSION@
+CFlags: -I${includedir}

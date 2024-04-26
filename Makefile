@@ -170,10 +170,16 @@ doc/stardis-input.5: doc/stardis-input.5.in
 ################################################################################
 # Installation
 ################################################################################
-install: all
+pkg:
+	sed -e 's#@PREFIX@#$(PREFIX)#g'\
+	    -e 's#@VERSION@#$(VERSION)#g'\
+	    stardis.pc.in > stardis.pc
+
+install: all pkg
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" stardis
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/include/stardis" src/stardis-green-types.h
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/include/stardis" src/stardis-prog-properties.h
+	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/lib/pkgconfig" stardis.pc
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/doc/stardis" COPYING README.md
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/stardis.1
 	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/stardis-input.5
@@ -183,6 +189,7 @@ uninstall:
 	rm -f "$(DESTDIR)$(PREFIX)/bin/stardis"
 	rm -f "$(DESTDIR)$(PREFIX)/include/stardis/stardis-green-types.h"
 	rm -f "$(DESTDIR)$(PREFIX)/include/stardis/stardis-prog-properties.h"
+	rm -f "$(DESTDIR)$(PREFIX)/lib/pkgconfig/stardis.pc"
 	rm -f "$(DESTDIR)$(PREFIX)/share/doc/stardis/COPYING"
 	rm -f "$(DESTDIR)$(PREFIX)/share/doc/stardis/README.md"
 	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/stardis.1"
@@ -193,7 +200,8 @@ uninstall:
 # Miscellaneous targets
 ################################################################################
 clean:
-	rm -f $(HDR) $(OBJ) .config stardis doc/stardis.1 doc/stardis-input.5
+	rm -f $(HDR) $(OBJ) .config stardis stardis.pc
+	rm -f doc/stardis.1 doc/stardis-input.5
 
 distclean: clean
 	rm -f $(DEP)

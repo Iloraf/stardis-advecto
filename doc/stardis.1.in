@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd April 24, 2024
+.Dd April 26, 2024
 .Dt STARDIS 1
 .Os
 .Sh NAME
@@ -81,7 +81,8 @@ information on the system in an unbiased and very-fast statistical model.
 .Pp
 .Nm
 also provides two additional functionalities: converting the
-.Xr stardis-input 5 geometry into a VTK file and rendering an infrared image of
+.Xr stardis-input 5
+geometry into a VTK file and rendering an infrared image of
 the submitted system.
 .Pp
 .Nm Ns '
@@ -401,7 +402,7 @@ computations.
 .Ex -std
 .Sh EXAMPLES
 Preprocess the system as described in
-.Dq Pa scene 5.txt
+.Pa scene 5.txt
 when intending to compute the mean flux on the triangles from the file
 .Pa edge.stl ,
 and write its geometry in the file

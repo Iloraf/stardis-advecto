@@ -33,6 +33,11 @@ Edit config.mk as needed, then run:
 
 ## Release notes
 
+### Version 0.10.1
+
+Add a pkg-config file to support the use of Stardis header files such as
+the one declaring function profiles for programmable properties.
+
 ### Version 0.10
 
 #### New conduction algorithm

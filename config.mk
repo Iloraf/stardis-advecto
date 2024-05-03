@@ -78,7 +78,7 @@ SDIS_VERSION = 0.15.1
 SDIS_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags sdis)
 SDIS_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs sdis)
 
-SENC3D_VERSION = 0.5
+SENC3D_VERSION = 0.7
 SENC3D_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags senc3d)
 SENC3D_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs senc3d)
 

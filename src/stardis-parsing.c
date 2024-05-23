@@ -2105,7 +2105,7 @@ process_radiative_prog(struct stardis* stardis, wordexp_t* pwordexp)
   lib_name = arg;
 
   if(idx < pwordexp->we_wordc
-  && strcasecmp(pwordexp->we_wordv[idx], "PROG_PARAMS")) {
+  && strcasecmp(pwordexp->we_wordv[idx++], "PROG_PARAMS")) {
     logger_print(stardis->logger, LOG_ERROR,
       "Expecting PROG_PARAMS keyword while parsing `%s'.\n",
       pwordexp->we_wordv[idx]);
@@ -2258,7 +2258,7 @@ process_spherical_source_prog(struct stardis* stardis, wordexp_t* pwordexp)
   lib_name = arg;
 
   if(idx < pwordexp->we_wordc
-  && strcasecmp(pwordexp->we_wordv[idx], "PROG_PARAMS")) {
+  && strcasecmp(pwordexp->we_wordv[idx++], "PROG_PARAMS")) {
     logger_print(stardis->logger, LOG_ERROR,
       "Expecting PROG_PARAMS keyword while parsing `%s'.\n",
       pwordexp->we_wordv[idx]);

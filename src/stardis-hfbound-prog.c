@@ -85,17 +85,20 @@ str_print_hf_boundary_prog
   res_T res = RES_OK;
   const struct hf_boundary_prog* b;
   ASSERT(str && desc && DESC_IS_HF(desc));
+
   b = desc->d.hf_boundary_prog;
+  ASSERT(b->argc >= 1); /* At least one argument which is the program name */
+
   ERR(str_append_printf(str,
     "programmed HF boundary for %s '%s': lib='%s', "
     "(using medium %u as external medium)",
     (desc->type == DESC_BOUND_HF_FOR_SOLID_PROG ? "solid" : "fluid"),
     str_cget(&b->name), str_cget(&b->prog_name),
     b->mat_id));
-  if(b->argc > 0) {
+  if(b->argc > 1) {
     size_t i;
     ERR(str_append_printf(str, ", provided arguments:\n"));
-    for(i = 0; i < b->argc; i++) {
+    for(i = 1; i < b->argc; i++) {
       ERR(str_append_printf(str, (i+1 == b->argc ? "\t%s" : "\t%s\n"), b->argv[i]));
     }
   }

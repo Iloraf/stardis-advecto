@@ -82,13 +82,15 @@ str_print_ss_connect_prog
 {
   res_T res = RES_OK;
   ASSERT(str && c);
+  ASSERT(c->argc >= 1); /* At least one argument which is the program name */
+
   ERR(str_append_printf(str,
     "programmed Solid-Solid connection '%s': lib='%s'",
     str_cget(&c->name), str_cget(&c->prog_name)));
-  if(c->argc > 0) {
+  if(c->argc > 1) {
     size_t i;
     ERR(str_append_printf(str, ", provided arguments:\n"));
-    for(i = 0; i < c->argc; i++) {
+    for(i = 1; i < c->argc; i++) {
       ERR(str_append_printf(str, (i+1 == c->argc ? "\t%s" : "\t%s\n"), c->argv[i]));
     }
   }

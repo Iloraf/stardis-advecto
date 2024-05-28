@@ -189,13 +189,15 @@ str_print_solid_prog(struct str* str, const struct solid_prog* f)
 {
   res_T res = RES_OK;
   ASSERT(str && f);
+  ASSERT(f->argc >= 1); /* At least one argument which is the program name */
+
   ERR(str_append_printf(str,
     "programmed solid '%s': lib='%s', it is medium %u)",
     str_cget(&f->name), str_cget(&f->prog_name), f->solid_id));
-  if(f->argc > 0) {
+  if(f->argc > 1) {
     size_t i;
     ERR(str_append_printf(str, ", provided arguments:\n"));
-    for(i = 0; i < f->argc; i++) {
+    for(i = 1; i < f->argc; i++) {
       ERR(str_append_printf(str, (i+1 == f->argc ? "\t%s" : "\t%s\n"), f->argv[i]));
     }
   }

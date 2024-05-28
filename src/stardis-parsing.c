@@ -600,55 +600,54 @@ error:
 static res_T
 set_argc_argv
   (struct mem_allocator* allocator,
-   size_t* argc,
-   char** argv[],
+   const char* prog_name, /* First argument to copy in argv[0] */
+   size_t* out_argc,
+   char** out_argv[],
    const wordexp_t* pwordexp,
    size_t idx)
 {
+  char** argv = NULL;
+  size_t argc;
   size_t i, n;
   res_T res = RES_OK;
 
-  ASSERT(argc && argv && pwordexp);
-  *argv = NULL;
+  ASSERT(prog_name && out_argc && out_argv && pwordexp);
 
   if(pwordexp->we_wordc < idx) {
     res = RES_BAD_ARG;
     goto error;
   }
-  *argc = pwordexp->we_wordc - idx;
-  /* Review: why allocate an extra argument? In fact, it's necessary because
-   * this function is called even if there are no arguments to analyze. In this
-   * case, allocation would fail, as the size to be allocated would be zero.
-   * This +1 therefore guarantees that at least one element will be allocated.
-   * But this could be eliminated by checking that there are no arguments
-   * (argc==0) and, if necessary, returning before any allocation.
-   *
-   * Nevertheless, this extra argument makes sense. It should be the first
-   * argument and contain the program name. In this way, the argument list would
-   * respect the C convention for declaring an argument list. And so, anyone
-   * could use the getopt analysis function without having to declare a dummy
-   * argument as the program's first parameter */
-  *argv = MEM_CALLOC(allocator, 1 + *argc, sizeof(char *));
-  if(*argv == NULL) {
-    res = RES_MEM_ERR;
-    goto error;
+
+  /* Allocate an additional argument to store the program name as the first
+   * argument. This is not only useful information, but also respects the C
+   * convention for declaring a list of arguments. So anyone can use the
+   * standard getopt function to parse input arguments*/
+  argc = pwordexp->we_wordc - idx + 1/*program name*/;
+  argv = MEM_CALLOC(allocator, argc, sizeof(char*));
+  if(argv == NULL) { res = RES_MEM_ERR; goto error; }
+
+  #define STRDUP(Dst, Src) { \
+    (Dst) = MEM_CALLOC(allocator, 1, 1 + strlen(Src)); \
+    if((Dst) == NULL) { res = RES_MEM_ERR; goto error; } \
+    strcpy((Dst), (Src)); /* size is adequate */ \
+  } (void)0
+  STRDUP(argv[0], prog_name);
+  for(i = idx, n = 1; i < pwordexp->we_wordc; i++, n++) {
+    STRDUP(argv[n], pwordexp->we_wordv[i]);
   }
-  for(i = idx, n = 0; i < pwordexp->we_wordc; i++, n++) {
-    (*argv)[n] = MEM_CALLOC(allocator, 1, 1 + strlen(pwordexp->we_wordv[i]));
-    if((*argv)[n] == NULL) {
-      res = RES_MEM_ERR;
-      goto error;
-    }
-    strcpy((*argv)[n], pwordexp->we_wordv[i]); /* size is adequate */
-  }
+  #undef STRDUP
+
 end:
+  *out_argc = argc;
+  *out_argv = argv;
   return res;
 error:
-  if(*argv) {
-    for(i = 0; i < *argc; i++)
-      if((*argv)[i]) MEM_RM(allocator, (*argv)[i]);
-    MEM_RM(allocator, *argv);
+  if(argv) {
+    FOR_EACH(i, 0, argc) if(argv[i]) MEM_RM(allocator, argv[i]);
+    MEM_RM(allocator, argv);
   }
+  argc = 0;
+  argv = NULL;
   goto end;
 }
 
@@ -798,8 +797,8 @@ process_program
   }
 
   /* store the end of line as args for custom init */
-  ERR(set_argc_argv(stardis->allocator, &program->argc, &program->argv,
-    pwordexp, idx));
+  ERR(set_argc_argv(stardis->allocator, str_cget(&program->name),
+    &program->argc, &program->argv, pwordexp, idx));
   if(program->create) {
     /* create and init custom data */
     struct stardis_program_context ctx;
@@ -813,7 +812,7 @@ process_program
         FATAL("error:" STR(__FILE__) ":" STR(__LINE__)": Invalid type.\n");
     }
     CREATE_DESC_DATA_BASE(program, LIST_ARG2(program->argc, program->argv));
-  } else if(program->argc != 0) {
+  } else if(program->argc != 1) {
     logger_print(stardis->logger, LOG_ERROR,
       "Library '%s' has no custom data management functions but has arguments:\n",
       lib_name);
@@ -893,8 +892,8 @@ process_h_prog
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
 
   /* store the end of line as args for custom init */
-  ERR(set_argc_argv(stardis->allocator, &h_boundary_prog->argc,
-    &h_boundary_prog->argv, pwordexp, idx));
+  ERR(set_argc_argv(stardis->allocator, str_cget(&h_boundary_prog->name),
+    &h_boundary_prog->argc, &h_boundary_prog->argv, pwordexp, idx));
   /* get the user-defined functions from the library */
   ERR(get_prog_common(lib_name, stardis,  &h_boundary_prog->program,
     &h_boundary_prog->create, &h_boundary_prog->release));
@@ -992,8 +991,8 @@ process_hf_prog
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
 
   /* store the end of line as args for custom init */
-  ERR(set_argc_argv(stardis->allocator, &hf_boundary_prog->argc,
-    &hf_boundary_prog->argv, pwordexp, idx));
+  ERR(set_argc_argv(stardis->allocator, str_cget(&hf_boundary_prog->name),
+    &hf_boundary_prog->argc, &hf_boundary_prog->argv, pwordexp, idx));
   /* get the user-defined functions from the library */
   ERR(get_prog_common(lib_name, stardis,  &hf_boundary_prog->program,
     &hf_boundary_prog->create, &hf_boundary_prog->release));
@@ -1138,8 +1137,8 @@ process_t_prog
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
 
   /* store the end of line as args for custom init */
-  ERR(set_argc_argv(stardis->allocator, &t_boundary_prog->argc,
-    &t_boundary_prog->argv, pwordexp, idx));
+  ERR(set_argc_argv(stardis->allocator, str_cget(&t_boundary_prog->name),
+    &t_boundary_prog->argc, &t_boundary_prog->argv, pwordexp, idx));
   /* get the user-defined functions from the library */
   ERR(get_prog_common(lib_name, stardis, &t_boundary_prog->program,
     &t_boundary_prog->create, &t_boundary_prog->release));
@@ -1268,8 +1267,8 @@ process_flx_prog
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
 
   /* store the end of line as args for custom init */
-  ERR(set_argc_argv(stardis->allocator, &f_boundary_prog->argc,
-    &f_boundary_prog->argv, pwordexp, idx));
+  ERR(set_argc_argv(stardis->allocator, str_cget(&f_boundary_prog->name),
+    &f_boundary_prog->argc, &f_boundary_prog->argv, pwordexp, idx));
   /* get the user-defined functions from the library */
   ERR(get_prog_common(lib_name, stardis, &f_boundary_prog->program,
     &f_boundary_prog->create, &f_boundary_prog->release));
@@ -1414,8 +1413,8 @@ process_sfc_prog
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
 
   /* store the end of line as args for custom init */
-  ERR(set_argc_argv(stardis->allocator, &sf_connect_prog->argc,
-    &sf_connect_prog->argv, pwordexp, idx));
+  ERR(set_argc_argv(stardis->allocator, str_cget(&sf_connect_prog->name),
+    &sf_connect_prog->argc, &sf_connect_prog->argv, pwordexp, idx));
   /* get the user-defined functions from the library */
   ERR(get_prog_common(lib_name, stardis, &sf_connect_prog->program,
     &sf_connect_prog->create, &sf_connect_prog->release));
@@ -1544,8 +1543,8 @@ process_ssc_prog
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
 
   /* store the end of line as args for custom init */
-  ERR(set_argc_argv(stardis->allocator, &ss_connect_prog->argc,
-    &ss_connect_prog->argv, pwordexp, idx));
+  ERR(set_argc_argv(stardis->allocator, str_cget(&ss_connect_prog->name),
+    &ss_connect_prog->argc, &ss_connect_prog->argv, pwordexp, idx));
   /* get the user-defined functions from the library */
   ERR(get_prog_common(lib_name, stardis, &ss_connect_prog->program,
     &ss_connect_prog->create, &ss_connect_prog->release));
@@ -1798,8 +1797,8 @@ process_solid_prog
   ERR(read_sides_and_files(stardis, 0, (unsigned)sz, pwordexp, &idx));
 
   /* store the end of line as args for custom init */
-  ERR(set_argc_argv(stardis->allocator, &solid_prog->argc, &solid_prog->argv,
-    pwordexp, idx));
+  ERR(set_argc_argv(stardis->allocator, str_cget(&solid_prog->name),
+    &solid_prog->argc, &solid_prog->argv, pwordexp, idx));
   /* get the user-defined functions from the library */
   ERR(get_prog_common(lib_name, stardis, &solid_prog->program,
     &solid_prog->create, &solid_prog->release));
@@ -1963,8 +1962,8 @@ process_fluid_prog
   ERR(read_sides_and_files(stardis, 0, (unsigned)sz, pwordexp, &idx));
 
   /* store the end of line as args for custom init */
-  ERR(set_argc_argv(stardis->allocator, &fluid_prog->argc, &fluid_prog->argv,
-    pwordexp, idx));
+  ERR(set_argc_argv(stardis->allocator, str_cget(&fluid_prog->name),
+    &fluid_prog->argc, &fluid_prog->argv, pwordexp, idx));
   /* get the user-defined functions from the library */
   ERR(get_prog_common(lib_name, stardis, &fluid_prog->program,
     &fluid_prog->create, &fluid_prog->release));
@@ -2113,8 +2112,8 @@ process_radiative_prog(struct stardis* stardis, wordexp_t* pwordexp)
     goto error;
   }
 
-  ERR(set_argc_argv
-    (stardis->allocator, &radenv->argc, &radenv->argv, pwordexp, idx));
+  ERR(set_argc_argv(stardis->allocator, str_cget(&radenv->prog_name),
+    &radenv->argc, &radenv->argv, pwordexp, idx));
   ERR(get_prog_common
     (lib_name, stardis, &radenv->program, &radenv->create, &radenv->release));
   GET_LIB_SYMBOL(radenv, temperature,
@@ -2266,7 +2265,8 @@ process_spherical_source_prog(struct stardis* stardis, wordexp_t* pwordexp)
     goto error;
   }
 
-  ERR(set_argc_argv(stardis->allocator, &src->argc, &src->argv, pwordexp, idx));
+  ERR(set_argc_argv(stardis->allocator, str_cget(&src->prog_name), &src->argc,
+    &src->argv, pwordexp, idx));
   ERR(get_prog_common(lib_name, stardis, &src->program, &src->create, &src->release));
   GET_LIB_SYMBOL(src, position, stardis_spherical_source_position);
   GET_LIB_SYMBOL(src, power, stardis_spherical_source_power);

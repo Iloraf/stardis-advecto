@@ -239,15 +239,6 @@ stardis_medium_temperature
   (const struct stardis_vertex* vtx,
    void* data);
 
-/* Computes the expected temperature range for this solid.
- * This functions is called once when initializing the computation.
- * data is the pointer returned by stardis_create_data for this solid.
- * Returns its modified range argument. */
-STARDIS_API double*
-stardis_t_range
-  (void* data,
-   double range[2]);
-
 /*******************************************************************************
  * Mandatory functions for a fluid
  ******************************************************************************/
@@ -279,15 +270,6 @@ STARDIS_API double
 stardis_medium_temperature
   (const struct stardis_vertex* vtx,
    void* data);
-
-/* Computes the expected temperature range for this fluid.
- * This functions is called once when initializing the computation.
- * data is the pointer returned by stardis_create_data for this fluid.
- * Returns its modified range argument. */
-STARDIS_API double*
-stardis_t_range
-  (void* data,
-   double range[2]);
 
 /*******************************************************************************
  * Mandatory functions for a H boundary for a fluid

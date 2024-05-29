@@ -443,8 +443,6 @@ process_h
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->t_range[0] = MMIN(stardis->t_range[0], h_boundary->imposed_temperature);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], h_boundary->imposed_temperature);
 
   if(type == DESC_BOUND_H_FOR_FLUID)
     ERR(get_dummy_solid_id(stardis, &h_boundary->mat_id));
@@ -568,8 +566,6 @@ process_hf
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->t_range[0] = MMIN(stardis->t_range[0], hf_boundary->imposed_temperature);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], hf_boundary->imposed_temperature);
 
   ASSERT(type == DESC_BOUND_HF_FOR_SOLID);
   ERR(init_fluid(stardis->allocator, &fluid));
@@ -913,8 +909,10 @@ process_h_prog
   CREATE_DESC_DATA(h_boundary_prog);
 
   h_boundary_prog->t_range(h_boundary_prog->prog_data, h_bound_t_range);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], h_bound_t_range[0]);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], h_bound_t_range[1]);
+  if(STARDIS_TEMPERATURE_IS_KNOWN(h_bound_t_range[0]))
+    stardis->t_range[0] = MMIN(stardis->t_range[0], h_bound_t_range[0]);
+  if(STARDIS_TEMPERATURE_IS_KNOWN(h_bound_t_range[1]))
+    stardis->t_range[1] = MMAX(stardis->t_range[1], h_bound_t_range[1]);
 
   /* create the media behind the interface */
   if(type == DESC_BOUND_H_FOR_FLUID_PROG) {
@@ -1009,8 +1007,10 @@ process_hf_prog
   CREATE_DESC_DATA(hf_boundary_prog);
 
   hf_boundary_prog->t_range(hf_boundary_prog->prog_data, hf_bound_t_range);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], hf_bound_t_range[0]);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], hf_bound_t_range[1]);
+  if(STARDIS_TEMPERATURE_IS_KNOWN(hf_bound_t_range[0]))
+    stardis->t_range[0] = MMIN(stardis->t_range[0], hf_bound_t_range[0]);
+  if(STARDIS_TEMPERATURE_IS_KNOWN(hf_bound_t_range[1]))
+    stardis->t_range[1] = MMAX(stardis->t_range[1], hf_bound_t_range[1]);
 
   /* create the media behind the interface */
   ERR(init_fluid_prog(stardis->allocator, &fluid_prog));
@@ -1078,8 +1078,6 @@ process_t
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->t_range[0] = MMIN(stardis->t_range[0], t_boundary->imposed_temperature);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], t_boundary->imposed_temperature);
 
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
@@ -1149,8 +1147,10 @@ process_t_prog
   CREATE_DESC_DATA(t_boundary_prog);
 
   t_boundary_prog->t_range(t_boundary_prog->prog_data, t_bound_t_range);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], t_bound_t_range[0]);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], t_bound_t_range[1]);
+  if(STARDIS_TEMPERATURE_IS_KNOWN(t_bound_t_range[0]))
+    stardis->t_range[0] = MMIN(stardis->t_range[0], t_bound_t_range[0]);
+  if(STARDIS_TEMPERATURE_IS_KNOWN(t_bound_t_range[1]))
+    stardis->t_range[1] = MMAX(stardis->t_range[1], t_bound_t_range[1]);
 
 end:
   return res;
@@ -1429,8 +1429,10 @@ process_sfc_prog
   CREATE_DESC_DATA(sf_connect_prog);
 
   sf_connect_prog->t_range(sf_connect_prog->prog_data, sf_t_range);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], sf_t_range[0]);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], sf_t_range[1]);
+  if(STARDIS_TEMPERATURE_IS_KNOWN(sf_t_range[0]))
+    stardis->t_range[0] = MMIN(stardis->t_range[0], sf_t_range[0]);
+  if(STARDIS_TEMPERATURE_IS_KNOWN(sf_t_range[1]))
+    stardis->t_range[1] = MMAX(stardis->t_range[1], sf_t_range[1]);
 
 end:
   return res;
@@ -1705,8 +1707,6 @@ process_solid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->t_range[0] = MMIN(stardis->t_range[0], solid->tinit);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], solid->tinit);
   ERR(read_imposed_temperature(stardis, &solid->imposed_temperature,
     pwordexp, &idx));
   if(SDIS_TEMPERATURE_IS_KNOWN(solid->imposed_temperature)
@@ -1719,10 +1719,7 @@ process_solid
     res = RES_BAD_ARG;
     goto end;
   }
-  if(SDIS_TEMPERATURE_IS_KNOWN(solid->imposed_temperature))
-    stardis->t_range[0] = MMIN(stardis->t_range[0], solid->imposed_temperature);
 
-  stardis->t_range[1] = MMAX(stardis->t_range[1], solid->imposed_temperature);
   CHK_ARG(idx, "volumic power");
   res = cstr_to_double(arg, &solid->vpower);
   if(res != RES_OK) {
@@ -1759,7 +1756,6 @@ process_solid_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
-  double solid_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct solid_prog* solid_prog;
   struct stardis_description_create_context ctx;
@@ -1808,14 +1804,9 @@ process_solid_prog
   GET_LIB_SYMBOL(solid_prog, delta, stardis_delta_solid);
   GET_LIB_SYMBOL(solid_prog, temp, stardis_medium_temperature);
   GET_LIB_SYMBOL(solid_prog, vpower, stardis_volumic_power);
-  GET_LIB_SYMBOL(solid_prog, t_range, stardis_t_range);
   /* create and init custom data */
   ctx.name = desc_name;
   CREATE_DESC_DATA(solid_prog);
-
-  solid_prog->t_range(solid_prog->prog_data, solid_t_range);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], solid_t_range[0]);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], solid_t_range[1]);
 
   ERR(create_solver_solid_prog(stardis, solid_prog));
 
@@ -1888,8 +1879,6 @@ process_fluid
     if(res == RES_OK) res = RES_BAD_ARG;
     goto end;
   }
-  stardis->t_range[0] = MMIN(stardis->t_range[0], fluid->tinit);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], fluid->tinit);
   ERR(read_imposed_temperature(stardis, &fluid->imposed_temperature,
     pwordexp, &idx));
   if(SDIS_TEMPERATURE_IS_KNOWN(fluid->imposed_temperature)
@@ -1901,9 +1890,6 @@ process_fluid
     res = RES_BAD_ARG;
     goto end;
   }
-  if(SDIS_TEMPERATURE_IS_KNOWN(fluid->imposed_temperature))
-    stardis->t_range[0] = MMIN(stardis->t_range[0], fluid->imposed_temperature);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], fluid->imposed_temperature);
 
   ERR(create_solver_fluid(stardis, fluid));
 
@@ -1924,7 +1910,6 @@ process_fluid_prog
   char* arg = NULL;
   struct description* desc;
   const char *lib_name, *desc_name;
-  double fluid_t_range[2] = {DBL_MAX, -DBL_MAX};
   size_t sz;
   struct fluid_prog* fluid_prog;
   struct stardis_description_create_context ctx;
@@ -1970,14 +1955,9 @@ process_fluid_prog
   GET_LIB_SYMBOL(fluid_prog, rho, stardis_volumic_mass);
   GET_LIB_SYMBOL(fluid_prog, cp, stardis_calorific_capacity);
   GET_LIB_SYMBOL(fluid_prog, temp, stardis_medium_temperature);
-  GET_LIB_SYMBOL(fluid_prog, t_range, stardis_t_range);
   /* create and init custom data */
   ctx.name = desc_name;
   CREATE_DESC_DATA(fluid_prog);
-
-  fluid_prog->t_range(fluid_prog->prog_data, fluid_t_range);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], fluid_t_range[0]);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], fluid_t_range[1]);
 
   ERR(create_solver_fluid_prog(stardis, fluid_prog));
 
@@ -2134,8 +2114,10 @@ process_radiative_prog(struct stardis* stardis, wordexp_t* pwordexp)
   }
 
   radenv->t_range(radenv->data, radenv_t_range);
-  stardis->t_range[0] = MMIN(stardis->t_range[0], radenv_t_range[0]);
-  stardis->t_range[1] = MMAX(stardis->t_range[1], radenv_t_range[1]);
+  if(STARDIS_TEMPERATURE_IS_KNOWN(radenv_t_range[0]))
+    stardis->t_range[0] = MMIN(stardis->t_range[0], radenv_t_range[0]);
+  if(STARDIS_TEMPERATURE_IS_KNOWN(radenv_t_range[1]))
+    stardis->t_range[1] = MMAX(stardis->t_range[1], radenv_t_range[1]);
 
 exit:
   return res;
@@ -2553,7 +2535,7 @@ exp_error:
     stardis->t_range[1] = MMAX(stardis->t_range[1], trad_ref);
   }
   logger_print(stardis->logger, LOG_OUTPUT,
-    "System T range is [%g %g]\n", SPLIT2(stardis->t_range));
+    "System Tref range is [%g %g]\n", SPLIT2(stardis->t_range));
   logger_print(stardis->logger, LOG_OUTPUT,
     "Picard order is %u\n", stardis->picard_order);
 

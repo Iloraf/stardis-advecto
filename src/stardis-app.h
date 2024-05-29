@@ -216,6 +216,10 @@ struct stardis {
   struct compute_surface compute_surface; /* 2D compute region when mode is
                                              [FLUX_]BOUNDARY_COMPUTE
                                              or MAP_COMPUTE */
+
+  /* Min/Max temperatures used to linearize radiative transfer */
+  double t_range[2]; /* [K] */
+
   struct str dump_model_filename;
   struct str paths_filename;
   struct str bin_green_filename;
@@ -230,7 +234,6 @@ struct stardis {
   int radenv_def;
   size_t samples;
   double scale_factor;
-  double t_range[2];
   double initial_time; /* [s] */
   int mode;
   unsigned nthreads;

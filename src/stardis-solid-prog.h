@@ -48,7 +48,6 @@ struct solid_prog {
   double (*delta)(const struct stardis_vertex*, void*);
   double (*temp)(const struct stardis_vertex*, void*);
   double (*vpower)(const struct stardis_vertex*, void*);
-  double* (*t_range)(void*, double trange[2]);
 };
 
 res_T

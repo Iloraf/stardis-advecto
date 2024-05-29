@@ -82,9 +82,11 @@ solid_prog_get_volumic_power
 {
   const struct solid_prog* const* solid_props = sdis_data_cget(data);
   struct stardis_vertex v;
+  double power;
   d3_set(v.P, vtx->P);
   v.time = vtx->time;
-  return (*solid_props)->vpower(&v, (*solid_props)->prog_data);
+  power = (*solid_props)->vpower(&v, (*solid_props)->prog_data);
+  return power != STARDIS_VOLUMIC_POWER_NONE ? power : SDIS_VOLUMIC_POWER_NONE;
 }
 
 static double
@@ -94,9 +96,11 @@ solid_prog_get_temperature
 {
   const struct solid_prog* const* solid_props = sdis_data_cget(data);
   struct stardis_vertex v;
+  double temp;
   d3_set(v.P, vtx->P);
   v.time = vtx->time;
-  return (*solid_props)->temp(&v, (*solid_props)->prog_data);
+  temp = (*solid_props)->temp(&v, (*solid_props)->prog_data);
+  return STARDIS_TEMPERATURE_IS_KNOWN(temp) ? temp : SDIS_TEMPERATURE_NONE;
 }
 
 /*******************************************************************************

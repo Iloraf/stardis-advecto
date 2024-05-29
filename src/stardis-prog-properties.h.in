@@ -32,12 +32,23 @@
   #define STARDIS_API extern
 #endif
 
-/*****************************************************************************/
-/* API types.                                                                */
-/* The various functions defining programmed descriptions receive arguments  */
-/* of the following types when called from the stardis simulation.           */
-/*****************************************************************************/
+/* Constants defining that no power density/imposed flux is defined */
+#define STARDIS_VOLUMIC_POWER_NONE DBL_MAX
+#define STARDIS_FLUX_NONE DBL_MAX
 
+/* Syntactic sugar used to define whether a temperature is known or not */
+#define STARDIS_TEMPERATURE_NONE (-(DBL_MAX+DBL_MAX)*0) /* NAN */
+#define STARDIS_TEMPERATURE_IS_KNOWN(Temp) (Temp==Temp)
+#define STARDIS_TEMPERATURE_IS_UNKNOWN(Temp) (Temp!=Temp)
+
+/* Indentifier of the internal source of radiation */
+#define STARDIS_INTERN_SOURCE_ID UINT_MAX
+
+/*******************************************************************************
+ * API types.
+ * The various functions defining programmed descriptions receive arguments
+ * of the following types when called from the stardis simulation.
+ ******************************************************************************/
 struct stardis_vertex {
   double P[3]; /* World space position */
   double time; /* "Time" of the vertex */
@@ -83,11 +94,11 @@ struct stardis_description_create_context {
 extern "C" {
 #endif
 
-/******************************************************************************/
-/* Optional functions for any programmed library.                             */
-/* Either all 3 or none of the 3 following functions must be defined.         */
-/* If a libray doesn't need its own data, just let these functions undefined. */
-/******************************************************************************/
+/*******************************************************************************
+ * Optional functions for any programmed library.
+ * Either all 3 or none of the 3 following functions must be defined.
+ * If a libray doesn't need its own data, just let these functions undefined.
+ ******************************************************************************/
 
 /* Create the data attached to a given libray.
  * A NULL result is interpreted as an error and ends the program.
@@ -121,9 +132,9 @@ STARDIS_API void
 stardis_release_library_data
   (void* lib_data);
 
-/******************************************************************************/
-/* Mandatory functions for any programmed description regardless of its type. */
-/******************************************************************************/
+/*******************************************************************************
+ * Mandatory functions for any programmed description regardless of its type.
+ ******************************************************************************/
 
 /* Create the data attached to a given description.
  * A NULL result is interpreted as an error and ends the program.
@@ -168,15 +179,9 @@ STARDIS_API const char*
 get_license_text
   (void* data);
 
-/*****************************************************************************/
-/* Additional mandatory function declarations (sorted by description type).  */
-/* Some functions appear multiple times as they are part of more than one    */
-/* description requirement.                                                  */
-/*****************************************************************************/
-
-/*********************************************************/
-/* Additional mandatory functions for a programmed solid */
-/*********************************************************/
+/*******************************************************************************
+ * Mandatory functions for a solid
+ ******************************************************************************/
 
 /* Returns the calorific capacity at a given vertex.
  * This functions is called at every vertex of every path of the computation
@@ -242,9 +247,9 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/*********************************************************/
-/* Additional mandatory functions for a programmed fluid */
-/*********************************************************/
+/*******************************************************************************
+ * Mandatory functions for a fluid
+ ******************************************************************************/
 
 /* Returns the calorific capacity at a given vertex.
  * This functions is called at every vertex of every path of the computation
@@ -283,9 +288,9 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/**************************************************************************/
-/* Additional mandatory functions for a programmed H boundary for a fluid */
-/**************************************************************************/
+/*******************************************************************************
+ * Mandatory functions for a H boundary for a fluid
+ ******************************************************************************/
 
 /* Returns the boundary temperature at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -352,9 +357,9 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/**************************************************************************/
-/* Additional mandatory functions for a programmed H boundary for a solid */
-/**************************************************************************/
+/*******************************************************************************
+ * Mandatory functions for a H boundary for a solid
+ ******************************************************************************/
 
 /* Returns the emissivity at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -423,9 +428,9 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/**************************************************************/
-/* Additional mandatory functions for a programmed T boundary */
-/**************************************************************/
+/*******************************************************************************
+ * Mandatory functions for a T boundary
+ ******************************************************************************/
 
 /* Returns the boundary temperature at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -445,9 +450,9 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/****************************************************************/
-/* Additional mandatory functions for a programmed F+H boundary */
-/****************************************************************/
+/*******************************************************************************
+ * Mandatory functions for a F+H boundary
+ ******************************************************************************/
 
 /* Returns the emissivity at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -525,9 +530,9 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/**************************************************************/
-/* Additional mandatory functions for a programmed F boundary */
-/**************************************************************/
+/*******************************************************************************
+ * Mandatory functions for a F boundary
+ ******************************************************************************/
 
 /* Returns the flux at the boundary at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -538,9 +543,9 @@ stardis_boundary_flux
   (const struct stardis_interface_fragment* frag,
    void* data);
 
-/**************************************************************************/
-/* Additional mandatory functions for a programmed Solid-Solid connection */
-/**************************************************************************/
+/*******************************************************************************
+ * Mandatory functions for a solid-solid connection
+ ******************************************************************************/
 
 /* Returns the thermal contact resistance at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -551,9 +556,9 @@ stardis_thermal_contact_resistance
   (const struct stardis_interface_fragment* frag,
    void* data);
 
-/**************************************************************************/
-/* Additional mandatory functions for a programmed Solid-Fluid connection */
-/**************************************************************************/
+/*******************************************************************************
+ * Mandatory functions for a solid-fluid connection
+ ******************************************************************************/
 
 /* Returns the emissivity at a given fragment.
  * This functions is called every time a path of the computation reaches
@@ -611,10 +616,10 @@ stardis_t_range
   (void* data,
    double range[2]);
 
-/******************************************************************************/
-/* Additional mandatory functions for a programmed spherical source           */
-/* These functions are used to calculate the external flux at the boundaries. */
-/******************************************************************************/
+/*******************************************************************************
+ * Mandatory functions for a spherical source.
+ * These functions are used to calculate the external flux at the boundaries
+ ******************************************************************************/
 
 /* Retrieve the position of the spherical source center.
  * This function is used to calculate the external flux at the boundaries.
@@ -642,9 +647,9 @@ stardis_spherical_source_diffuse_radiance
    const double dir[3],
    void* data);
 
-/******************************************************************************/
-/* Additional mandatory functions for a programmed radiative environment      */
-/******************************************************************************/
+/*******************************************************************************
+ * Mandatory functions for a radiative environment
+ ******************************************************************************/
 
 /* Retrieve the temperature of radiative paths that reach infinity */
 STARDIS_API double

@@ -24,7 +24,6 @@
 
 #include <limits.h>
 
-
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
@@ -59,9 +58,11 @@ fluid_prog_get_temperature
 {
   const struct fluid_prog* const* fluid_props = sdis_data_cget(data);
   struct stardis_vertex v;
+  double temp = 0;
   d3_set(v.P, vtx->P);
   v.time = vtx->time;
-  return (*fluid_props)->temp(&v, (*fluid_props)->prog_data);
+  temp = (*fluid_props)->temp(&v, (*fluid_props)->prog_data);
+  return STARDIS_TEMPERATURE_IS_KNOWN(temp) ? temp : SDIS_TEMPERATURE_NONE;;
 }
 
 /*******************************************************************************

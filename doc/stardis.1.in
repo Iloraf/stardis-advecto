@@ -12,7 +12,7 @@
 .\"
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
-.Dd April 26, 2024
+.Dd June 17, 2024
 .Dt STARDIS 1
 .Os
 .Sh NAME
@@ -271,6 +271,10 @@ The medium name must be part of the
 description.
 By default the compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
 The medium region does not need to be connex.
+.It Fl n Ar samples_count
+Number of Monte Carlo realisations.
+By default, the number of realisations is
+@STARDIS_ARGS_DEFAULT_SAMPLES_COUNT@.
 .It Fl o Ar picard_order
 Determine the iteration level used with the Picard method to deal with
 non-linear radiative transfer accross the model.

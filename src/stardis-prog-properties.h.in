@@ -45,6 +45,10 @@
 /* Indentifier of the internal source of radiation */
 #define STARDIS_INTERN_SOURCE_ID UINT_MAX
 
+/* Forward declaration of external data types */
+struct sdis_scene;
+struct ssp_rng;
+
 /*******************************************************************************
  * API types.
  * The various functions defining programmed descriptions receive arguments
@@ -90,6 +94,42 @@ struct stardis_program_context {
 struct stardis_description_create_context {
   const char* name; /* Description name */
 };
+
+struct stardis_triangle {
+  double vtx0[3];
+  double vtx1[3];
+  double vtx2[3];
+};
+#define STARDIS_TRIANGLE_NULL__ {{0,0,0}, {0,0,0}, {0,0,0}}
+static const struct stardis_triangle STARDIS_TRIANGLE_NULL =
+  STARDIS_TRIANGLE_NULL__;
+
+/* Helper macro that check if the triangle is NULL */
+#define STARDIS_TRIANGLE_NONE(T)                                               \
+  (  (T)->vtx0[0] == 0 && (T)->vtx0[1] == 0 && (T)->vtx0[2] == 0               \
+  && (T)->vtx1[0] == 0 && (T)->vtx1[1] == 0 && (T)->vtx1[2] == 0               \
+  && (T)->vtx2[0] == 0 && (T)->vtx2[1] == 0 && (T)->vtx2[2] == 0)
+
+/* A sampled path */
+struct stardis_path {
+  struct stardis_vertex vtx; /* Current position and time */
+
+  /* Triangle intersected by the path. When defined, the path is on a border */
+  struct stardis_triangle tri;
+
+  double weight; /* Monte Carlo weight update along the path */
+
+  /* Define whether the path has reached a boundary conduction in time/space */
+  int at_limit;
+};
+#define STARDIS_PATH_NULL__ {                                                  \
+  STARDIS_VERTEX_NULL__,                                                       \
+  STARDIS_TRIANGLE_NULL__,                                                     \
+  0, /* MC weight */                                                           \
+  0 /* At limit */                                                             \
+}
+static const struct stardis_path STARDIS_PATH_NULL =
+  STARDIS_PATH_NULL__;
 
 #ifdef __cplusplus
 extern "C" {
@@ -237,6 +277,19 @@ stardis_volumic_power
 STARDIS_API double
 stardis_medium_temperature
   (const struct stardis_vertex* vtx,
+   void* data);
+
+/*******************************************************************************
+ * Optional function for a solid
+ ******************************************************************************/
+
+/* Function used to sample a conductive path. When defined, it is no
+ * longer Stardis that samples the path, but the user via this function */
+STARDIS_API int /* Error code */
+stardis_sample_conductive_path
+  (struct sdis_scene* scn,
+   struct ssp_rng* rng,
+   struct stardis_path* path,
    void* data);
 
 /*******************************************************************************

@@ -48,6 +48,14 @@ struct solid_prog {
   double (*delta)(const struct stardis_vertex*, void*);
   double (*temp)(const struct stardis_vertex*, void*);
   double (*vpower)(const struct stardis_vertex*, void*);
+
+  /* User-defined function for sampling a conductive path */
+  int
+  (*sample_path)
+    (struct sdis_scene*,
+     struct ssp_rng*,
+     struct stardis_path*,
+     void*);
 };
 
 res_T

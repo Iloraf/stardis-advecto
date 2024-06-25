@@ -103,6 +103,51 @@ solid_prog_get_temperature
   return STARDIS_TEMPERATURE_IS_KNOWN(temp) ? temp : SDIS_TEMPERATURE_NONE;
 }
 
+static res_T
+solid_prog_sample_path
+  (struct sdis_scene* scn,
+   struct ssp_rng* rng,
+   struct sdis_path* path,
+   struct sdis_data* data)
+{
+  const struct solid_prog* const* solid_props = sdis_data_cget(data);
+  struct stardis_path p = STARDIS_PATH_NULL;
+  int err = 0;
+  res_T res = RES_OK;
+
+  d3_set(p.vtx.P, path->vtx.P);
+  p.vtx.time = path->vtx.time;
+
+  err = (*solid_props)->sample_path(scn, rng, &p, (*solid_props)->prog_data);
+  if(err) { res = RES_UNKNOWN_ERR; goto error; }
+
+  d3_set(path->vtx.P, p.vtx.P);
+  path->vtx.time = p.vtx.time;
+  path->weight = p.weight;
+  path->at_limit = p.at_limit;
+
+  if(!STARDIS_TRIANGLE_NONE(&p.tri)) {
+    struct sdis_primkey key = SDIS_PRIMKEY_NULL;
+
+    sdis_primkey_setup(&key, p.tri.vtx0, p.tri.vtx1, p.tri.vtx2);
+    res = sdis_scene_get_s3d_primitive(scn, &key, &path->prim_3d);
+
+    /* In fact, we'd like to log an error notifying us that the returned
+     * triangle doesn't exist in Stardis. But there's no easy way to retrieve
+     * the logger since the program has no reference to Stardis. This lack stems
+     * from design choices where internal data structures are not managed by
+     * reference and don't take a reference on the Stardis structure. In any
+     * case, until stardis' internal data structures have been thoroughly
+     * redesigned, we're only returning an error */
+    if(res != RES_OK) goto error;
+  }
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Public Functions
  ******************************************************************************/
@@ -121,10 +166,13 @@ create_solver_solid_prog
   solid_shader.calorific_capacity = solid_prog_get_calorific_capacity;
   solid_shader.thermal_conductivity = solid_prog_get_thermal_conductivity;
   solid_shader.volumic_mass = solid_prog_get_volumic_mass;
-  solid_shader.delta= solid_prog_get_delta;
+  solid_shader.delta = solid_prog_get_delta;
   solid_shader.volumic_power = solid_prog_get_volumic_power;
   solid_shader.temperature = solid_prog_get_temperature;
   solid_shader.t0 = stardis->initial_time;
+  if(solid_props->sample_path) {
+    solid_shader.sample_path = solid_prog_sample_path;
+  }
   ERR(sdis_data_create(stardis->dev, sizeof(struct solid_prog*),
     ALIGNOF(struct solid_prog*), NULL, &data));
 

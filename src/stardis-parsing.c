@@ -1804,6 +1804,10 @@ process_solid_prog
   GET_LIB_SYMBOL(solid_prog, delta, stardis_delta_solid);
   GET_LIB_SYMBOL(solid_prog, temp, stardis_medium_temperature);
   GET_LIB_SYMBOL(solid_prog, vpower, stardis_volumic_power);
+
+  GET_LIB_SYMBOL_BASE(&solid_prog->sample_path, solid_prog->program->lib_handle,
+    stardis_sample_conductive_path, 1);
+
   /* create and init custom data */
   ctx.name = desc_name;
   CREATE_DESC_DATA(solid_prog);

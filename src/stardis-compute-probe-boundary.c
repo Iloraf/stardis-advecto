@@ -360,13 +360,6 @@ move_to_boundary
 
   desc_list = darray_descriptions_cdata_get(&stardis->descriptions);
 
-  /* Undefined medium */
-  if(filter_ctx.side == SG3D_INTFACE
-  || desc_ids[filter_ctx.side] == SG3D_UNSPECIFIED_PROPERTY) {
-    logger_print(stardis->logger, LOG_WARNING,
-      "Could not determine the medium probe is in.\n");
-  }
-
   if(filter_ctx.side != SG3D_INTFACE) {
 
     /* Probe is outside the system */

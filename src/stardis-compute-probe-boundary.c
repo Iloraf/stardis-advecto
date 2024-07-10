@@ -342,10 +342,6 @@ move_to_boundary
   double proj_pos[3] = {0,0,0};
   size_t iprim = 0;
 
-  /* Properties */
-  const struct description* desc_list = NULL;
-  const struct description* desc = NULL;
-  unsigned desc_ids[SG3D_PROP_TYPES_COUNT__];
 
   /* Miscellaneous */
   size_t nvertices_close = 0;
@@ -355,12 +351,17 @@ move_to_boundary
   ASSERT(stardis && pos && time >= 0 && out_iprim && uv);
 
   ERR(find_closest_point(stardis, pos, &filter_ctx, &iprim, uv));
-  SG3D(geometry_get_unique_triangle_properties
-    (stardis->geometry.sg3d, (unsigned)iprim, desc_ids));
-
-  desc_list = darray_descriptions_cdata_get(&stardis->descriptions);
 
   if(filter_ctx.side != SG3D_INTFACE) {
+    /* Properties */
+    const struct description* desc_list = NULL;
+    const struct description* desc = NULL;
+    unsigned desc_ids[SG3D_PROP_TYPES_COUNT__];
+
+    SG3D(geometry_get_unique_triangle_properties
+      (stardis->geometry.sg3d, (unsigned)iprim, desc_ids));
+
+    desc_list = darray_descriptions_cdata_get(&stardis->descriptions);
 
     /* Probe is outside the system */
     if(desc_ids[filter_ctx.side] == SG3D_UNSPECIFIED_PROPERTY) {

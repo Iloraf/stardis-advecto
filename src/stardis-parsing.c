@@ -1079,6 +1079,12 @@ process_t
     goto end;
   }
 
+  /* Temporarily use the set temperature as a reference temperature.
+   * TODO use a different reference temperature when the file format is updated
+   * to allow explicit definition by the user. */
+  stardis->t_range[0] = MMIN(stardis->t_range[0], t_boundary->imposed_temperature);
+  stardis->t_range[1] = MMAX(stardis->t_range[1], t_boundary->imposed_temperature);
+
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
 

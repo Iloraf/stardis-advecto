@@ -560,8 +560,12 @@ create_intface
         fluid_side_shader->emissivity = interface_get_emissivity;
         interface_props->emissivity = 1;
         ASSERT(SDIS_TEMPERATURE_IS_KNOWN(intface->d.t_boundary->imposed_temperature));
-        interface_props->imposed_temperature
-          = intface->d.t_boundary->imposed_temperature;
+        interface_props->imposed_temperature = intface->d.t_boundary->imposed_temperature;
+        /* Temporarily set the reference temperature to the set temperature.
+         * TODO use a different reference temperature when the file format is
+         * updated to allow explicit definition by the user. */
+        fluid_side_shader->reference_temperature = interface_get_ref_temperature;
+        interface_props->ref_temperature = intface->d.t_boundary->imposed_temperature;
         break;
       case DESC_BOUND_T_FOR_SOLID_PROG:
         if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
@@ -592,6 +596,10 @@ create_intface
         interface_props->get_emissivity = emissivity_1;
         interface_props->get_temp = intface->d.t_boundary_prog->temperature;
         interface_props->prog_data = intface->d.t_boundary_prog->prog_data;
+        /* Temporarily set the reference temperature to the set temperature.
+         * TODO use a different reference temperature when the file format is
+         * updated to allow explicit definition by the user. */
+        fluid_side_shader->reference_temperature = intface_prog_get_temp;
         break;
       case DESC_BOUND_F_FOR_SOLID:
         if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {

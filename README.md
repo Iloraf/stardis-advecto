@@ -33,6 +33,52 @@ Edit config.mk as needed, then run:
 
 ## Release notes
 
+### Version 0.11
+
+#### Programmable properties
+
+- Custom sampling of conductive paths. On programmable solids, users
+  can now define the new `stardis_sampling_conductive_path` function, in
+  which they can write their own sampling process. As input, the
+  function takes a path whose spatio-temporal position lies within the
+  programmable solid. Once the path has been sampled, this position is
+  updated and can be either within the solid if the initial condition is
+  reached, or at the boundary, i.e.  at a boundary condition. Stardis
+  then continues the path sampling procedure in relation to the returned
+  state.
+- Addition of the property name as the first argument of the input
+  string sent to the programmable data creation functions. Not only is
+  this useful information, it also respects the convention of program
+  arguments. In this way, the standard getopt function can be used
+  directly to analyze them.
+- Addition of symbolic constants to the public API for programmable
+  properties. The constants added are those defining an unknown
+  temperature, and constants characterizing null flux or null volumic
+  power.
+
+#### Manual pages
+
+- Document the `-n` option which defines the number of realisations. Its
+  documentation was missing from the `stardis` manual page.
+- Correction of the title of the `stardis-output` manual page. It was
+  defined as `stardis-input`.
+- Updated the layout of the `stardis-output` manual page. When converted
+  to HTML, the width of the columns changed from one list to another,
+  resulting in an unstructured layout.
+
+#### Miscellaneous
+
+- Correction of the Dirichlet boundary condition definition. No
+  reference temperature was defined on a surface oriented towards a
+  fluid and on which a Dirichlet boundary condition was imposed
+  (keywords `T_BOUNDARY_FOR_SOLID[_PROG]`). Stardis therefore notified an
+  error and rejected radiative trajectories reaching such interfaces
+  without a reference temperature. From now on, its reference
+  temperature is implicitly defined as the set temperature value.
+- Removal of a warning message when calculating a list of boundary
+  probes. It incorrectly warned that the side of the boundary on which
+  the probe was located was not defined.
+
 ### Version 0.10.1
 
 Add a pkg-config file to support the use of Stardis header files such as
@@ -283,4 +329,3 @@ Copyright (C) 2018-2024 |Méso|Star> (<contact@meso-star.com>)
 Stardis is free software released under the GPL v3+ license: GNU GPL
 version 3 or later. You are welcome to redistribute it under certain
 conditions; refer to the COPYING file for details.
-

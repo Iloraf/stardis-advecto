@@ -592,7 +592,7 @@ create_intface
         interface_shader.back.temperature = intface_prog_get_temp;
         /* Set emissivity to 1 to allow radiative paths comming from
          * a possible external fluid to 'see' the imposed T */
-        fluid_side_shader->emissivity = interface_get_emissivity;
+        fluid_side_shader->emissivity = intface_prog_get_emissivity;
         interface_props->get_emissivity = emissivity_1;
         interface_props->get_temp = intface->d.t_boundary_prog->temperature;
         interface_props->prog_data = intface->d.t_boundary_prog->prog_data;

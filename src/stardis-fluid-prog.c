@@ -24,7 +24,6 @@
 
 #include <limits.h>
 
-
 /*******************************************************************************
  * Local Functions
  ******************************************************************************/
@@ -59,9 +58,11 @@ fluid_prog_get_temperature
 {
   const struct fluid_prog* const* fluid_props = sdis_data_cget(data);
   struct stardis_vertex v;
+  double temp = 0;
   d3_set(v.P, vtx->P);
   v.time = vtx->time;
-  return (*fluid_props)->temp(&v, (*fluid_props)->prog_data);
+  temp = (*fluid_props)->temp(&v, (*fluid_props)->prog_data);
+  return STARDIS_TEMPERATURE_IS_KNOWN(temp) ? temp : SDIS_TEMPERATURE_NONE;;
 }
 
 /*******************************************************************************
@@ -188,13 +189,16 @@ str_print_fluid_prog(struct str* str, const struct fluid_prog* f)
 {
   res_T res = RES_OK;
   ASSERT(str && f);
+  ASSERT(f->argc >= 1); /* At least one argument which is the program name */
+
   ERR(str_append_printf(str,
      "programmed fluid '%s': lib='%s', it is medium %u)",
     str_cget(&f->name), str_cget(&f->prog_name), f->fluid_id));
-  if(f->argc > 0) {
+
+  if(f->argc > 1) {
     size_t i;
     ERR(str_append_printf(str, ", provided arguments:\n"));
-    for(i = 0; i < f->argc; i++) {
+    for(i = 1; i < f->argc; i++) {
       ERR(str_append_printf(str, (i+1 == f->argc ? "\t%s" : "\t%s\n"), f->argv[i]));
     }
   }

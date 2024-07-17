@@ -72,11 +72,13 @@ str_print_program
    const struct program* p)
 {
   res_T res = RES_OK;
+  ASSERT(p->argc >= 1); /* At least one argument which is the program name */
+
   ERR(str_append_printf(str, "Library %s", str_cget(&p->name)));
-  if(p->argc > 0) {
+  if(p->argc > 1) {
     size_t i;
     ERR(str_append_printf(str, ", provided arguments:\n"));
-    for(i = 0; i < p->argc; i++) {
+    for(i = 1; i < p->argc; i++) {
       ERR(str_append_printf(str, (i+1 == p->argc ? "\t%s" : "\t%s\n"), p->argv[i]));
     }
   }

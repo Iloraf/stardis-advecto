@@ -13,7 +13,7 @@
 .\" You should have received a copy of the GNU General Public License
 .\" along with this program. If not, see <http://www.gnu.org/licenses/>.
 .Dd April 12, 2024
-.Dt STARDIS-INPUT 5
+.Dt STARDIS-OUTPUT 5
 .Os
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .\" Name and short description
@@ -112,30 +112,26 @@ or an extended format that mixes numbers and their descriptions
 .It Ta \& \& | Ta Ao Va medium-temp Ac # Option Fl m
 .It Ta \& \& | Ta Ao Va mean-temp Ac # Option Fl s
 .It Ta \& \& | Ta Ao Va mean-flux Ac # Option Fl F
-.El
+.It \  Ta Ta
 .\" Probe temperature
-.Bl -column (******************) (::=) ()
 .It Ao Va probe-temp Ac Ta ::= Ta Ao Va probe-temp-raw Ac | Ao Va probe-temp-ext Ac
 .It Ao Va probe-temp-raw Ac Ta ::= Ta Ao Va estimate Ac Ao Va failures Ac
 .It Ao Va probe-temp-ext Ac Ta ::= Ta Li Temperature at Ao Va position Ac Ao Va time Ac \e
 .It Ta Ta Ao Va estimate-temp-ext Ac Ao Va failures-ext Ac
-.El
+.It \  Ta Ta
 .\" Medium temperature
-.Bl -column (******************) (::=) ()
 .It Ao Va medium-temp Ac Ta ::= Ta Ao Va medium-temp-raw Ac | Ao Va medium-temp-ext Ac
 .It Ao Va medium-temp-raw Ac Ta ::= Ta Ao Va estimate Ac Ao Va failures Ac
 .It Ao Va medium-temp-ext Ac Ta ::= Ta Li Temperature in medium Ao Va medium-name Ac \e
 .It Ta Ta Ao Va time Ac Ao Va estimate-temp-ext Ac Ao Va failures-ext Ac
-.El
+.It \  Ta Ta
 .\" Mean temperature
-.Bl -column (******************) (::=) ()
 .It Ao Va mean-temp Ac Ta ::= Ta Ao Va mean-temp-raw Ac | Ao Va mean-temp-ext Ac
 .It Ao Va mean-temp-raw Ac Ta ::= Ta Ao Va estimate Ac Ao Va failures Ac
 .It Ao Va mean-temp-ext Ac Ta ::= Ta Li Temperature at boundary Ao Va stl-path Ac \e
 .It Ta Ta Ao Va time Ac Ao Va estimate-temp-ext Ac Ao Va failures-ext Ac
-.El
+.It \  Ta Ta
 .\" Mean flux
-.Bl -column (******************) (::=) ()
 .It Ao Va mean-flux Ac Ta ::= Ta Ao Va mean-flux-raw Ac | Ao Va mean-flux-ext Ac
 .It Ao Va mean-flux-raw Ac Ta ::= Ta Ao Va estimate Ac Ao Va estimate Ac Ao Va estimate Ac \e
 .It Ta Ta Ao Va estimate Ac Ao Va estimate Ac Ao Va failures Ac
@@ -150,21 +146,18 @@ or an extended format that mixes numbers and their descriptions
 .It Ta Ta Li Total flux at boundary Ao Va stl-path Ac \e
 .It Ta Ta Ao Va time Ac Ao Va estimate-flux-ext Ac
 .It Ta Ta Ao Va failures-ext Ac
-.El
+.It \  Ta Ta
 .\" Miscellaneous
-.Bl -column (******************) (::=) ()
 .It Ao Va estimate Ac Ta ::= Ta Ao Va expected-value Ac Ao Va standard-error Ac
 .It Ao Va estimate-temp-ext Ac Ta ::= Ta Ao Va expected-value Ac Li K +/- Ao Va standard-error Ac
 .It Ao Va estimate-flux-ext Ac Ta ::= Ta Ao Va expected-value Ac Li W +/- Ao Va standard-error Ac
 .It Ao Va expected-value Ac Ta ::= Ta Vt real
 .It Ao Va standard-error Ac Ta ::= Ta Vt real
-.El
-.Bl -column (******************) (::=) ()
+.It \  Ta Ta
 .It Ao Va failures Ac Ta ::= Ta Ao Va error-count Ac Ao Va success-count Ac
 .It Ao Va error-count Ac Ta ::= Ta Vt integer
 .It Ao Va success-count Ac Ta ::= Ta Vt integer
-.El
-.Bl -column (******************) (::=) ()
+.It \  Ta Ta
 .It Ao Va position Ac Ta ::= Ta [ Vt real , Vt real , Vt real ]
 .It Ao Va time Ac Ta ::= Ta Li at t= Ns Vt real
 .It Ta \& \& | Ta Li with t in [ Vt real , Vt real ]
@@ -510,8 +503,7 @@ List the file identifier in which each triangle first appeared:
 .It Ta Ta Li LOOKUP_TABLE default
 .It Ta Ta Aq Va file-rank
 .It Ta Ta ... # Up to Aq Va #triangles
-.El
-.Bl -column (******************) (::=) ()
+.It \  Ta Ta
 .It Ao Va #vertices Ac Ta ::= Ta Vt integer
 .It Ao Va #triangles Ac Ta ::= Ta Vt integer
 .It Ao Va #triangles*4 Ac Ta ::= Ta Vt integer

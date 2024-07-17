@@ -126,13 +126,15 @@ intface_prog_get_temp
 {
   const struct intface* interface_props = sdis_data_cget(data);
   struct stardis_interface_fragment f;
+  double temp;
   d3_set(f.P, frag->P);
   d3_set(f.Ng, frag->Ng);
   d3_set(f.uv, frag->uv);
   f.time = frag->time;
   ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
   f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
-  return interface_props->get_temp(&f, interface_props->prog_data);
+  temp = interface_props->get_temp(&f, interface_props->prog_data);
+  return STARDIS_TEMPERATURE_IS_KNOWN(temp) ? temp : SDIS_TEMPERATURE_NONE;
 }
 
 static double
@@ -142,13 +144,15 @@ intface_prog_get_flux
 {
   const struct intface* interface_props = sdis_data_cget(data);
   struct stardis_interface_fragment f;
+  double flux;
   d3_set(f.P, frag->P);
   d3_set(f.Ng, frag->Ng);
   d3_set(f.uv, frag->uv);
   f.time = frag->time;
   ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
   f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
-  return interface_props->get_flux(&f, interface_props->prog_data);
+  flux = interface_props->get_flux(&f, interface_props->prog_data);
+  return flux != STARDIS_FLUX_NONE ? flux : SDIS_FLUX_NONE;
 }
 
 static double
@@ -170,39 +174,39 @@ intface_prog_get_hc
 static double
 intface_prog_get_emissivity
   (const struct sdis_interface_fragment* frag,
-   const unsigned source_id,
+   const unsigned src_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
   struct stardis_interface_fragment f;
-  (void)source_id;
+  unsigned id;
   d3_set(f.P, frag->P);
   d3_set(f.Ng, frag->Ng);
   d3_set(f.uv, frag->uv);
   f.time = frag->time;
   ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
   f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
-  return interface_props->get_emissivity
-    (&f, source_id, interface_props->prog_data);
+  id = src_id != SDIS_INTERN_SOURCE_ID ? src_id : STARDIS_INTERN_SOURCE_ID;
+  return interface_props->get_emissivity(&f, id, interface_props->prog_data);
 }
 
 static double
 intface_prog_get_alpha
   (const struct sdis_interface_fragment* frag,
-   const unsigned source_id,
+   const unsigned src_id,
    struct sdis_data* data)
 {
   const struct intface* interface_props = sdis_data_cget(data);
   struct stardis_interface_fragment f;
-  (void)source_id;
+  unsigned id;
   d3_set(f.P, frag->P);
   d3_set(f.Ng, frag->Ng);
   d3_set(f.uv, frag->uv);
   f.time = frag->time;
   ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
   f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
-  return interface_props->get_alpha
-    (&f, source_id, interface_props->prog_data);
+  id = src_id != SDIS_INTERN_SOURCE_ID ? src_id : STARDIS_INTERN_SOURCE_ID;
+  return interface_props->get_alpha(&f, id, interface_props->prog_data);
 }
 
 static double
@@ -212,13 +216,15 @@ intface_prog_get_ref_temp
 {
   const struct intface* interface_props = sdis_data_cget(data);
   struct stardis_interface_fragment f;
+  double temp;
   d3_set(f.P, frag->P);
   d3_set(f.Ng, frag->Ng);
   d3_set(f.uv, frag->uv);
   f.time = frag->time;
   ASSERT(frag->side == SDIS_FRONT || frag->side == SDIS_BACK);
   f.side = (frag->side == SDIS_FRONT) ? FRONT : BACK;
-  return interface_props->get_ref_temp(&f, interface_props->prog_data);
+  temp = interface_props->get_ref_temp(&f, interface_props->prog_data);
+  return STARDIS_TEMPERATURE_IS_KNOWN(temp) ? temp : SDIS_TEMPERATURE_NONE;
 }
 
 static double
@@ -554,8 +560,12 @@ create_intface
         fluid_side_shader->emissivity = interface_get_emissivity;
         interface_props->emissivity = 1;
         ASSERT(SDIS_TEMPERATURE_IS_KNOWN(intface->d.t_boundary->imposed_temperature));
-        interface_props->imposed_temperature
-          = intface->d.t_boundary->imposed_temperature;
+        interface_props->imposed_temperature = intface->d.t_boundary->imposed_temperature;
+        /* Temporarily set the reference temperature to the set temperature.
+         * TODO use a different reference temperature when the file format is
+         * updated to allow explicit definition by the user. */
+        fluid_side_shader->reference_temperature = interface_get_ref_temperature;
+        interface_props->ref_temperature = intface->d.t_boundary->imposed_temperature;
         break;
       case DESC_BOUND_T_FOR_SOLID_PROG:
         if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {
@@ -586,6 +596,10 @@ create_intface
         interface_props->get_emissivity = emissivity_1;
         interface_props->get_temp = intface->d.t_boundary_prog->temperature;
         interface_props->prog_data = intface->d.t_boundary_prog->prog_data;
+        /* Temporarily set the reference temperature to the set temperature.
+         * TODO use a different reference temperature when the file format is
+         * updated to allow explicit definition by the user. */
+        fluid_side_shader->reference_temperature = intface_prog_get_temp;
         break;
       case DESC_BOUND_F_FOR_SOLID:
         if(sdis_medium_get_type(def_medium) != SDIS_SOLID) {

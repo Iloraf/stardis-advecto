@@ -33,6 +33,16 @@ Edit config.mk as needed, then run:
 
 ## Release notes
 
+### Version 0.11.1
+
+- Corrects the writing of the RNG state when resolving a probe
+  temperature on the boundary: the RNG state was written to the file in
+  which the RNG state was read or it was not written at all, depending
+  on whether the RNG state to be read was defined or not, respectively.
+- Corrects the emissivity of a programmable Dirichlet boundary
+  condition: it was set to a constant value, not the programmable value.
+- Minor update of stardis man page typesetting.
+
 ### Version 0.11
 
 #### Programmable properties

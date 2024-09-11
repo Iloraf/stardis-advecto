@@ -636,7 +636,7 @@ solve
   is_master_process = !stardis->mpi_initialized || stardis->mpi_rank == 0;
 
   rng_in = &stardis->rndgen_state_in_filename;
-  rng_out = &stardis->rndgen_state_in_filename;
+  rng_out = &stardis->rndgen_state_out_filename;
 
   /* Read RNG state from file */
   if(!str_is_empty(rng_in)) {

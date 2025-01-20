@@ -2492,29 +2492,29 @@ read_model
       ERR(txtrdr_read_line(txtrdr));
       line = txtrdr_get_line(txtrdr);
       if(!line) break;
-      word_initialized = 1;
       switch(wordexp(line, &pwordexp, flags)) {
         case 0: /* No error */
+          word_initialized = 1;
           break;
         case WRDE_NOSPACE: /* Ran out of memory.  */
           res = RES_MEM_ERR;
           goto error;
         case WRDE_BADCHAR: /* A metachar appears in the wrong place.  */
           logger_print(stardis->logger, LOG_ERROR,
-            "%s: word expansion error: invalid character:\n", name);
+            "%s: word expansion error: invalid character.\n", name);
           goto exp_error;
         case WRDE_BADVAL: /* Undefined var reference with WRDE_UNDEF.  */
           logger_print(stardis->logger, LOG_ERROR,
-            "%s: word expansion error: undefined environment variable:\n", name);
+            "%s: word expansion error: undefined environment variable.\n", name);
           goto exp_error;
         case WRDE_CMDSUB: /* Command substitution with WRDE_NOCMD.  */
           logger_print(stardis->logger, LOG_ERROR,
-            "%s: word expansion error: command substitution is not enabled:\n",
+            "%s: word expansion error: command substitution is not enabled.\n",
             name);
           goto exp_error;
         case WRDE_SYNTAX: /* Shell syntax error.  */
           logger_print(stardis->logger, LOG_ERROR,
-            "%s: word expansion error: syntax error:\n", name);
+            "%s: word expansion error: syntax error.\n", name);
           goto exp_error;
         default:
           FATAL("Unexpected return code.\n");

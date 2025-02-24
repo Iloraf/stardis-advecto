@@ -461,7 +461,7 @@ usage(FILE* stream)
   PRINT("stardis [-eghiv] [-a diff_algo] [-D path_type,files_name_prefix]\n");
   PRINT("        [-d file_base_name] [-F surface[,time[,time]]]\n");
   PRINT("        [-f x,y,z[,time[,time]]] [-G green_bin[,green_ascii]]\n");
-  PRINT("        [-I initial_time] [-L interface_probes]\n");
+  PRINT("        [-g] [-I initial_time] [-L interface_probes]\n");
   PRINT("        [-m medium_name[,time[,time]]] [-n samples_count]\n");
   PRINT("        [-o picard_order] [-P x,y,z[,time[,time]][:side_indicator]]\n");
   PRINT("        [-p x,y,z[,time[,time]]] [-R rendering_opt[:rendering_opt ...]]\n");

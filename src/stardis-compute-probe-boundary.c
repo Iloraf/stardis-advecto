@@ -235,7 +235,8 @@ check_move_to_solid_boundary
    const struct description* desc, /* Solid medium in which pos lies */
    const size_t iprim, /* Triangle index to which to move */
    const double uv[2], /* Triangle coordinates to which to move */
-   const double distance) /* Move distance */
+   const double distance, /* Move distance */
+   const int advice)
 {
   struct stardis_vertex vtx = STARDIS_VERTEX_NULL;
   const char* prefix = "";
@@ -261,7 +262,7 @@ check_move_to_solid_boundary
       vtx.P[2] = pos[2];
       vtx.time = time;
       delta = desc->d.solid_prog->delta(&vtx, desc->d.solid_prog->prog_data);
-      prefix = "programmed";
+      prefix = "programmed ";
       break;
 
     default: FATAL("Unreachable code.\n");
@@ -271,7 +272,7 @@ check_move_to_solid_boundary
   logger_print(stardis->logger, LOG_OUTPUT, "Probe was in %ssolid '%s'.\n",
     prefix, solid_name);
 
-  /* The position is closed from the triangle */
+  /* The position is close from the triangle */
   if(distance < 0.5*delta) {
     logger_print(stardis->logger, LOG_OUTPUT,
       "Probe was %g delta from closest boundary.\n",
@@ -280,9 +281,9 @@ check_move_to_solid_boundary
   /* Notice that the position is a little far from the triangle */
   } else if(distance < 2*delta) {
     logger_print(stardis->logger, LOG_WARNING,
-      "Probe was %g delta from closest boundary. "
-      "Consider using -p instead of -P.\n",
-      distance/delta);
+      "Probe was %g delta from closest boundary.%s\n",
+      distance/delta,
+      (advice ? " Consider using -p instead of -P.\n" : ""));
 
   /* The position is too far from the triangle */
   } else {
@@ -316,7 +317,7 @@ check_move_to_fluid_boundary
 
   switch(desc->type) {
     case DESC_MAT_FLUID: prefix = ""; break;
-    case DESC_MAT_FLUID_PROG: prefix = "programmed"; break;
+    case DESC_MAT_FLUID_PROG: prefix = "programmed "; break;
     default: FATAL("Unreachable code.\n");
   }
 
@@ -334,6 +335,7 @@ move_to_boundary
   (struct stardis* stardis,
    const double pos[3],
    const double time, /* [s] */
+   const int is_probe_temp_computation,
    size_t* out_iprim,
    double uv[2])
 {
@@ -341,7 +343,6 @@ move_to_boundary
   struct filter_ctx filter_ctx = FILTER_CTX_DEFAULT;
   double proj_pos[3] = {0,0,0};
   size_t iprim = 0;
-
 
   /* Miscellaneous */
   size_t nvertices_close = 0;
@@ -376,7 +377,8 @@ move_to_boundary
         case DESC_MAT_SOLID:
         case DESC_MAT_SOLID_PROG:
           ERR(check_move_to_solid_boundary
-            (stardis, pos, time, desc, iprim, uv, filter_ctx.distance));
+            (stardis, pos, time, desc, iprim, uv, filter_ctx.distance,
+             is_probe_temp_computation));
           break;
         case DESC_MAT_FLUID:
         case DESC_MAT_FLUID_PROG:
@@ -826,6 +828,91 @@ error:
 }
 
 static res_T
+setup_solve_probe_boundary_flux_args
+  (struct stardis* stardis,
+   const struct stardis_probe_boundary* probe,
+   struct sdis_solve_probe_boundary_flux_args* args)
+{
+  double uv[2] = {0, 0};
+  size_t iprim = SIZE_MAX;
+  unsigned desc_ids[SG3D_PROP_TYPES_COUNT__];
+  res_T res = RES_OK;
+  ASSERT(stardis && probe && args);
+
+  /* Calculate the probe position on the boundary */
+  ERR(move_to_boundary(stardis, probe->position, probe->time[0], 0, &iprim, uv));
+
+  ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
+    (unsigned)iprim, desc_ids));
+
+  d3_set(stardis->probe, probe->position);
+  /* Setup of solve input parameters */
+
+  args->nrealisations = stardis->samples;
+  args->iprim = iprim;
+  d2_set(args->uv, uv);
+  args->picard_order = stardis->picard_order;
+  d2_set(args->time_range, stardis->time_range);
+  args->diff_algo = stardis->diff_algo;
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+compute_single_flux_probe_on_interface
+  (struct stardis* stardis,
+   struct time* start,
+   const struct stardis_probe_boundary* probe)
+{
+  res_T res = RES_OK;
+  struct sdis_green_function* green = NULL;
+  struct sdis_estimator* estimator = NULL;
+  struct sdis_solve_probe_boundary_flux_args args
+    = SDIS_SOLVE_PROBE_BOUNDARY_FLUX_ARGS_DEFAULT;
+  struct dump_path_context dump_ctx;
+  FILE* stream_r = NULL;
+  struct time compute_start, compute_end;
+
+  ASSERT(stardis && start && probe);
+
+  ERR(setup_solve_probe_boundary_flux_args(stardis, probe, &args));
+
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
+
+  if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
+    ERR(sdis_solve_probe_boundary_flux(stardis->sdis_scn, &args, &estimator));
+  } else {
+    struct sdis_mc time = SDIS_MC_NULL;
+    time_current(&compute_start);
+    ERR(sdis_solve_probe_boundary_flux(stardis->sdis_scn, &args, &estimator));
+    time_current(&compute_end);
+    ERR(sdis_estimator_get_realisation_time(estimator, &time));
+    ERR(print_computation_time
+      (&time, stardis, start, &compute_start, &compute_end, NULL));
+
+    ERR(print_single_MC_result(estimator, stardis, stdout));
+
+    /* TODO: warning if dump paths requested */
+
+  }
+
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
+end:
+  if(estimator) SDIS(estimator_ref_put(estimator));
+  if(green) SDIS(green_function_ref_put(green));
+  if(args.rng_state) SSP(rng_ref_put(args.rng_state));
+  return res;
+error:
+  goto end;
+}
+
+static res_T
 setup_solve_probe_boundary_args
   (struct stardis* stardis,
    const struct stardis_probe_boundary* probe,
@@ -836,10 +923,10 @@ setup_solve_probe_boundary_args
   size_t iprim = SIZE_MAX;
   unsigned desc_ids[SG3D_PROP_TYPES_COUNT__];
   res_T res = RES_OK;
-  ASSERT(stardis && probe && args);
+  ASSERT(stardis && probe && args && (stardis->mode && MODE_MAP_COMPUTE));
 
   /* Calculate the probe position on the boundary */
-  ERR(move_to_boundary(stardis, probe->position, probe->time[0], &iprim, uv));
+  ERR(move_to_boundary(stardis, probe->position, probe->time[0], 1, &iprim, uv));
 
   ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
     (unsigned)iprim, desc_ids));
@@ -962,7 +1049,8 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   res_T res = RES_OK;
   ASSERT(stardis && start);
   ASSERT((stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
-      || (stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE));
+      || (stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE)
+      || (stardis->mode & MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE));
 
   /* Multiple probes */
   if(stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE) {
@@ -978,6 +1066,13 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
 
     probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
     res = compute_single_probe_on_interface(stardis, start, probe);
+    if(res != RES_OK) goto error;
+  } else if(stardis->mode & MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE) {
+    const struct stardis_probe_boundary* probe = NULL;
+    ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) == 1);
+
+    probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
+    res = compute_single_flux_probe_on_interface(stardis, start, probe);
     if(res != RES_OK) goto error;
   }
 

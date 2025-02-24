@@ -328,6 +328,7 @@ stardis_init
     ERR(str_set(&stardis->solve_name, args->medium_name));
   }
   else if((args->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
+       || (args->mode & MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE)
        || (args->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE)) {
     ERR(darray_probe_boundary_copy
       (&stardis->probe_boundary_list, &args->probe_boundary_list));

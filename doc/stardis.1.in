@@ -27,6 +27,7 @@
 .Op Fl D Ar path_type , Ns Ar files_name_prefix
 .Op Fl d Ar file_base_name
 .Op Fl F Pa surface Ns Op , Ns Ar time Ns Op , Ns Ar time
+.Op Fl f Ar x , Ns Ar y , Ns Ar z Ns Op , Ns Ar time Ns Op , Ns Ar time
 .Op Fl G Pa green_bin Ns Op , Ns Pa green_ascii
 .Op Fl I Ar initial_time
 .Op Fl L Pa interface_probes
@@ -209,6 +210,14 @@ positive from the solid to the fluid.
 These triangles are not added to the geometry, but must be part of it.
 By default the compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
 The surface does not need to be connex.
+.It Fl f Ar x , Ns Ar y , Ns Ar z Ns Op , Ns Ar time Ns Op , Ns Ar time
+Compute the flux density at a given probe on an interface at a given time.
+The probe is supposed to be on an interface and is moved to the closest point of
+the closest interface before the computation starts.
+The flux density can only be computed on a solid-fluid interface and is
+accounted positive from the solid to the fluid.
+The probe coordinates must be in the same system as the geometry.
+By default the compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
 .It Fl G Pa green_bin Ns Op , Ns Pa green_ascii
 Compute the Green function at the specified time and write it to a binary file.
 If a

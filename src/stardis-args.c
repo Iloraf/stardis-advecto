@@ -113,6 +113,7 @@ mode_option(const int m)
   if(m & MODE_DUMP_PATHS) { found++; res = 'D'; }
   if(m & MODE_EXTENDED_RESULTS) { found++; res = 'e'; }
   if(m & MODE_FLUX_BOUNDARY_COMPUTE) { found++; res = 'F'; }
+  if(m & MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE) { found++; res = 'f'; }
   if(m & MODE_GREEN) { found++; res = 'g'; }
   if(m & MODE_BIN_GREEN) { found++; res = 'G'; }
   if(m & MODE_DUMP_HELP) { found++; res = 'h'; }
@@ -459,10 +460,10 @@ usage(FILE* stream)
   #define PRINT(Msg) fprintf(stream, Msg)
   PRINT("stardis [-eghiv] [-a diff_algo] [-D path_type,files_name_prefix]\n");
   PRINT("        [-d file_base_name] [-F surface[,time[,time]]]\n");
-  PRINT("        [-G green_bin[,green_ascii]] [-I initial_time]\n");
-  PRINT("        [-L interface_probes] [-m medium_name[,time[,time]]]\n");
-  PRINT("        [-n samples_count] [-o picard_order]\n");
-  PRINT("        [-P x,y,z[,time[,time]][:side_indicator]]\n");
+  PRINT("        [-f x,y,z[,time[,time]]] [-G green_bin[,green_ascii]]\n");
+  PRINT("        [-I initial_time] [-L interface_probes]\n");
+  PRINT("        [-m medium_name[,time[,time]]] [-n samples_count]\n");
+  PRINT("        [-o picard_order] [-P x,y,z[,time[,time]][:side_indicator]]\n");
   PRINT("        [-p x,y,z[,time[,time]]] [-R rendering_opt[:rendering_opt ...]]\n");
   PRINT("        [-S surface[,time[,time]]] [-s surface[,time[,time]]]\n");
   PRINT("        [-t threads_count] [-V verbosity_level] [-X output_rng]\n");
@@ -525,7 +526,7 @@ parse_args
 {
   int opt = 0, n_used = 0, o_used = 0;
   size_t len = 0;
-  const char option_list[] = "a:c:d:D:eF:gG:hiI:L:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
+  const char option_list[] = "a:c:d:D:ef:F:gG:hiI:L:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -608,6 +609,25 @@ parse_args
     case 'e':
       args->mode |= MODE_EXTENDED_RESULTS;
       break;
+
+    case 'f':
+      {
+        struct stardis_probe_boundary* probe = NULL;
+
+        if(args->mode & EXCLUSIVE_MODES) {
+          logger_print(args->logger, LOG_ERROR,
+            "Options -%c and -%c are exclusive.\n",
+            (char)opt, mode_option(args->mode));
+          res = RES_BAD_ARG;
+          goto error;
+        }
+        args->mode |= MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE;
+        res = allocate_probe_boundary(args, &probe);
+        if(res != RES_OK) goto error;
+        res = parse_position_and_time(optarg, probe->position, probe->time);
+        if(res != RES_OK) goto error;
+        break;
+      }
 
     /*case 'F': see 's' */
 

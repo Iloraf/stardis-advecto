@@ -333,50 +333,6 @@ error:
   goto end;
 }
 
-#define READ_RANDOM_STATE(Name) \
-  if(!stardis->mpi_initialized || stardis->mpi_rank == 0) { \
-    if(str_is_empty(Name)) { \
-      /* Force using threefry independently of the default RNG type */ \
-      args.rng_type = SSP_RNG_THREEFRY; \
-    } else { \
-      const char* name = str_cget(Name); \
-      stream_r = fopen(name, "r"); \
-      if(!stream_r) { \
-        res = RES_IO_ERR; \
-        logger_print(stardis->logger, LOG_ERROR, \
-          "Cannot open generator's state file ('%s').\n", \
-          name); \
-        goto error; \
-      } \
-      ERR(ssp_rng_create(stardis->allocator, SSP_RNG_THREEFRY, &args.rng_state)); \
-      res =  read_random_generator_state(args.rng_state, stream_r); \
-      if(res != RES_OK) { \
-        logger_print(stardis->logger, LOG_ERROR, \
-          "Cannot read random generator's state ('%s').\n", \
-          name); \
-        goto error; \
-      } \
-      fclose(stream_r); stream_r = NULL; \
-    } \
-  }
-
-#define WRITE_RANDOM_STATE(Name) \
-  if(!stardis->mpi_initialized || stardis->mpi_rank == 0) { \
-    if(!str_is_empty(Name)) { \
-      const char* name = str_cget(Name); \
-      stream_r = fopen(name, "wb"); \
-      if(!stream_r) { \
-        res = RES_IO_ERR; \
-        logger_print(stardis->logger, LOG_ERROR, \
-          "Cannot write random generator's state ('%s').\n", \
-          name); \
-        goto error; \
-      } \
-      ERR(write_random_generator_state(estimator, stream_r)); \
-      fclose(stream_r); stream_r = NULL; \
-    } \
-  }
-
 static res_T
 compute_probe(struct stardis* stardis, struct time* start)
 {
@@ -1065,9 +1021,6 @@ error:
   goto end;
 }
 
-#undef READ_RANDOM_STATE
-#undef WRITE_RANDOM_STATE
-
 /*******************************************************************************
  * Public Functions
  ******************************************************************************/
@@ -1187,6 +1140,8 @@ stardis_compute
   else if(stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
     ERR(compute_probe_on_interface(stardis, start));
   else if(stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE)
+    ERR(compute_probe_on_interface(stardis, start));
+  else if(stardis->mode & MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE)
     ERR(compute_probe_on_interface(stardis, start));
   else if(stardis->mode & MODE_IR_COMPUTE)
     ERR(compute_camera(stardis, start));

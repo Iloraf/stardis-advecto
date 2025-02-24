@@ -931,12 +931,12 @@ parse_args
   }
 
   if(args->mode & MODE_DUMP_PATHS) {
-    if(!(args->mode & COMPUTE_MODES)) {
+    if(!(args->mode & CAN_DUMP_PATHS)) {
       res = RES_BAD_ARG;
-      print_multiple_modes(buf, sizeof(buf), COMPUTE_MODES, 0);
+      print_multiple_modes(buf, sizeof(buf), CAN_DUMP_PATHS, 0);
       logger_print(args->logger, LOG_ERROR,
-        "Option -%c can only be used in conjunction with an option"
-        " that samples heat paths (%s).\n",
+        "Option -%c can only be used in conjunction with some options"
+        " that sample heat paths (%s).\n",
         mode_option(MODE_DUMP_PATHS), buf);
       goto error;
     }

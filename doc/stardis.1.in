@@ -180,6 +180,9 @@ and possibly followed by
 .Ql _err
 for failure paths
 .Pq e.g. Pa prefix00000000.vtk , Pa prefix00000001_err.vtk
+.Pp
+Can only be used in conjunction with some options that sample heat paths
+.Pq Fl m , Fl p , Fl P , Fl R, Fl s No or Fl S .
 .It Fl d Ar file_base_name
 Write the geometry to a file in VTK format along with various properties,
 including possible errors.

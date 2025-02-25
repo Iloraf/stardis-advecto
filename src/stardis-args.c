@@ -112,21 +112,21 @@ mode_option(const int m)
   if(m & MODE_DUMP_MODEL) { found++; res = 'd'; }
   if(m & MODE_DUMP_PATHS) { found++; res = 'D'; }
   if(m & MODE_EXTENDED_RESULTS) { found++; res = 'e'; }
-  if(m & MODE_FLUX_BOUNDARY_COMPUTE) { found++; res = 'F'; }
-  if(m & MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE) { found++; res = 'f'; }
-  if(m & MODE_GREEN) { found++; res = 'g'; }
-  if(m & MODE_BIN_GREEN) { found++; res = 'G'; }
+  if(m & MODE_COMPUTE_FLUX_THROUGH_SURF) { found++; res = 'F'; }
+  if(m & MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF) { found++; res = 'f'; }
+  if(m & MODE_GREEN_ASCII) { found++; res = 'g'; }
+  if(m & MODE_GREEN_BIN) { found++; res = 'G'; }
   if(m & MODE_DUMP_HELP) { found++; res = 'h'; }
-  if(m & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE) { found++; res = 'L'; }
-  if(m & MODE_MEDIUM_COMPUTE) { found++; res = 'm'; }
-  if(m & MODE_PROBE_COMPUTE) { found++; res = 'p'; }
-  if(m & MODE_PROBE_COMPUTE_ON_INTERFACE) { found++; res = 'P'; }
-  if(m & MODE_IR_COMPUTE) { found++; res = 'R'; }
-  if(m & MODE_BOUNDARY_COMPUTE) { found++; res = 's'; }
-  if(m & MODE_MAP_COMPUTE) { found++; res = 'S'; }
+  if(m & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF) { found++; res = 'L'; }
+  if(m & MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM) { found++; res = 'm'; }
+  if(m & MODE_COMPUTE_PROBE_TEMP_ON_VOL) { found++; res = 'p'; }
+  if(m & MODE_COMPUTE_PROBE_TEMP_ON_SURF) { found++; res = 'P'; }
+  if(m & MODE_COMPUTE_IMAGE_IR) { found++; res = 'R'; }
+  if(m & MODE_COMPUTE_TEMP_MEAN_ON_SURF) { found++; res = 's'; }
+  if(m & MODE_COMPUTE_TEMP_MAP_ON_SURF) { found++; res = 'S'; }
   if(m & MODE_VERBOSITY) { found++; res = 'V'; }
   if(m & MODE_DUMP_VERSION) { found++; res = 'v'; }
-  ASSERT(found == 1);
+  ASSERT(found == 1);(void)found;
   return res;
 }
 
@@ -621,7 +621,7 @@ parse_args
           res = RES_BAD_ARG;
           goto error;
         }
-        args->mode |= MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE;
+        args->mode |= MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF;
         res = allocate_probe_boundary(args, &probe);
         if(res != RES_OK) goto error;
         res = parse_position_and_time(optarg, probe->position, probe->time);
@@ -632,33 +632,33 @@ parse_args
     /*case 'F': see 's' */
 
     case 'g':
-      if(args->mode & MODE_BIN_GREEN) {
+      if(args->mode & MODE_GREEN_BIN) {
         res = RES_BAD_ARG;
         logger_print(args->logger, LOG_ERROR,
           "Options -%c and -%c are exclusive.\n",
-          (char)opt, mode_option(MODE_BIN_GREEN));
+          (char)opt, mode_option(MODE_GREEN_BIN));
         goto error;
       }
-      args->mode |= MODE_GREEN;
+      args->mode |= MODE_GREEN_ASCII;
       break;
 
     case 'G': {
       char* ptr = strrchr(optarg, ',');
       if(ptr && ptr != strchr(optarg, ','))
         res = RES_BAD_ARG; /* Expecting 1 or 0 ',' */
-      if(args->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+      if(args->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII)) {
         res = RES_BAD_ARG;
-        if(args->mode & MODE_BIN_GREEN)
+        if(args->mode & MODE_GREEN_BIN)
           logger_print(args->logger, LOG_ERROR,
             "Option -%c cannot be used twice.\n",
             (char)opt);
         else
           logger_print(args->logger, LOG_ERROR,
             "Options -%c and -%c are exclusive.\n",
-            (char)opt, mode_option(MODE_GREEN));
+            (char)opt, mode_option(MODE_GREEN_ASCII));
         goto error;
       }
-      args->mode |= MODE_BIN_GREEN;
+      args->mode |= MODE_GREEN_BIN;
       if(ptr) {
         args->end_paths_filename = ptr + 1;
         *ptr = '\0';
@@ -695,7 +695,7 @@ parse_args
           (char)opt, mode_option(args->mode));
         goto error;
       }
-      args->mode |= MODE_PROBE_LIST_COMPUTE_ON_INTERFACE;
+      args->mode |= MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF;
       res = parse_probe_boundary_list
         (optarg, args->logger, args->allocator, &args->probe_boundary_list);
       if(res != RES_OK) goto error;
@@ -710,7 +710,7 @@ parse_args
           (char)opt, mode_option(args->mode));
         goto error;
       }
-      args->mode |= MODE_MEDIUM_COMPUTE;
+      args->mode |= MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM;
       GET_STR_AND_OPTIONAL_TIME_RANGE(args->medium_name, args->pos_and_time + 3);
       break;
     }
@@ -765,7 +765,7 @@ parse_args
           (char)opt, mode_option(args->mode));
         goto error;
       }
-      args->mode |= MODE_PROBE_COMPUTE;
+      args->mode |= MODE_COMPUTE_PROBE_TEMP_ON_VOL;
       GET_POS_AND_OPTIONAL_TIME_RANGE(optarg, args->pos_and_time, optarg);
       break;
 
@@ -779,7 +779,7 @@ parse_args
           res = RES_BAD_ARG;
           goto error;
         }
-        args->mode |= MODE_PROBE_COMPUTE_ON_INTERFACE;
+        args->mode |= MODE_COMPUTE_PROBE_TEMP_ON_SURF;
         res = allocate_probe_boundary(args, &probe);
         if(res != RES_OK) goto error;
         res = parse_probe_boundary(optarg, probe);
@@ -795,7 +795,7 @@ parse_args
           (char)opt, mode_option(args->mode));
         goto error;
       }
-      args->mode |= MODE_IR_COMPUTE;
+      args->mode |= MODE_COMPUTE_IMAGE_IR;
       args->camera = optarg;
       break;
 
@@ -812,13 +812,13 @@ parse_args
       }
       switch (opt) {
       case 's':
-        args->mode |= MODE_BOUNDARY_COMPUTE;
+        args->mode |= MODE_COMPUTE_TEMP_MEAN_ON_SURF;
         break;
       case 'S':
-        args->mode |= MODE_MAP_COMPUTE;
+        args->mode |= MODE_COMPUTE_TEMP_MAP_ON_SURF;
         break;
       case 'F':
-        args->mode |= MODE_FLUX_BOUNDARY_COMPUTE;
+        args->mode |= MODE_COMPUTE_FLUX_THROUGH_SURF;
         break;
       }
       GET_STR_AND_OPTIONAL_TIME_RANGE(args->solve_filename, args->pos_and_time + 3);
@@ -920,29 +920,29 @@ parse_args
     goto error;
   }
 
-  if(args->mode & (MODE_BIN_GREEN | MODE_GREEN)
+  if(args->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII)
     && !(args->mode & GREEN_COMPATIBLE_MODES))
   {
     print_multiple_modes(buf, sizeof(buf), GREEN_COMPATIBLE_MODES, 0);
     logger_print(args->logger, LOG_ERROR,
       "Option -%c can only be used in conjunction with: %s\n",
-      mode_option(args->mode & (MODE_BIN_GREEN | MODE_GREEN)), buf);
+      mode_option(args->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII)), buf);
     res = RES_BAD_ARG;
     goto error;
   }
 
-  if(args->mode & (MODE_BIN_GREEN | MODE_GREEN)
+  if(args->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII)
     && o_used && args->picard_order > 1)
   {
     logger_print(args->logger, LOG_ERROR,
       "Option -%c cannot be used if Picard order is not 1 (here order is %u)\n",
-      mode_option(args->mode & (MODE_BIN_GREEN | MODE_GREEN)),
+      mode_option(args->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII)),
         args->picard_order);
     res = RES_BAD_ARG;
     goto error;
   }
 
-  if(args->mode & MODE_IR_COMPUTE && n_used) {
+  if(args->mode & MODE_COMPUTE_IMAGE_IR && n_used) {
     logger_print(args->logger, LOG_ERROR,
       "The -n option has no effect in rendering mode;"
       " use rendering's SPP suboption instead.\n");
@@ -960,12 +960,12 @@ parse_args
         mode_option(MODE_DUMP_PATHS), buf);
       goto error;
     }
-    if(args->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+    if(args->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII)) {
       res = RES_BAD_ARG;
       logger_print(args->logger, LOG_ERROR,
         "Option -%c cannot be used in conjunction with -%c nor -%c.\n",
-        mode_option(MODE_DUMP_PATHS), mode_option(MODE_GREEN)
-        , mode_option(MODE_BIN_GREEN));
+        mode_option(MODE_DUMP_PATHS), mode_option(MODE_GREEN_ASCII)
+        , mode_option(MODE_GREEN_BIN));
       goto error;
     }
   }
@@ -980,12 +980,12 @@ parse_args
         mode_option(MODE_EXTENDED_RESULTS), buf);
       goto error;
     }
-    if(args->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+    if(args->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII)) {
       res = RES_BAD_ARG;
       logger_print(args->logger, LOG_ERROR,
         "Option -%c cannot be used in conjunction with -%c nor -%c.\n",
-        mode_option(MODE_EXTENDED_RESULTS), mode_option(MODE_GREEN)
-        , mode_option(MODE_BIN_GREEN));
+        mode_option(MODE_EXTENDED_RESULTS), mode_option(MODE_GREEN_ASCII)
+        , mode_option(MODE_GREEN_BIN));
       goto error;
     }
   }

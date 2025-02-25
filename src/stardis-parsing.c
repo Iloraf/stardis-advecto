@@ -458,7 +458,7 @@ process_h
     fluid->imposed_temperature = h_boundary->imposed_temperature;
     fluid->t0 = stardis->initial_time;
     fluid->is_outside = 1;
-    fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+    fluid->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
     ERR(create_solver_fluid(stardis, fluid));
     logger_print(stardis->logger, LOG_OUTPUT,
       "External fluid created: T=%g (it is medium %u)\n",
@@ -577,7 +577,7 @@ process_hf
   fluid->imposed_temperature = hf_boundary->imposed_temperature;
   fluid->t0 = stardis->initial_time;
   fluid->is_outside = 1;
-  fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  fluid->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
   ERR(create_solver_fluid(stardis, fluid));
   logger_print(stardis->logger, LOG_OUTPUT,
     "External fluid created: T=%g (it is medium %u)\n",
@@ -1663,7 +1663,7 @@ process_solid
   solid = desc->d.solid;
   desc->type = DESC_MAT_SOLID;
   solid->solid_id = allocate_stardis_medium_id(stardis);
-  solid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  solid->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
   solid->t0 = stardis->initial_time;
   solid->is_outside = 0;
   ASSERT(sz <= UINT_MAX);
@@ -1851,7 +1851,7 @@ process_fluid
   desc->type = DESC_MAT_FLUID;
   fluid->t0 = stardis->initial_time;
   fluid->fluid_id = allocate_stardis_medium_id(stardis);
-  fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  fluid->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
   ASSERT(sz <= UINT_MAX);
   fluid->desc_id = (unsigned)sz;
 
@@ -2411,7 +2411,7 @@ get_dummy_solid_id
   dummy->solid_id = dummies->dummy_solid_id;
   dummy->t0 = stardis->initial_time;
   dummy->is_outside = 1;
-  dummy->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  dummy->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
   create_solver_solid(stardis, dummy);
   dummies->dummy_solid
     = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_solid_id];
@@ -2445,7 +2445,7 @@ get_dummy_fluid_id
   dummy->fluid_id = dummies->dummy_fluid_id;
   dummy->t0 = stardis->initial_time;
   dummy->is_outside = 1;
-  dummy->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  dummy->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
   create_solver_fluid(stardis, dummy);
   dummies->dummy_fluid
     = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_fluid_id];

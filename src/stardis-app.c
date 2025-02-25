@@ -321,15 +321,15 @@ stardis_init
     ERR(str_set(&stardis->dump_model_filename, args->dump_model_filename));
   }
 
-  if(args->mode & MODE_IR_COMPUTE) {
+  if(args->mode & MODE_COMPUTE_IMAGE_IR) {
     ERR(parse_camera(stardis->logger, args->camera, stardis));
   }
-  else if(args->mode & MODE_MEDIUM_COMPUTE) {
+  else if(args->mode & MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM) {
     ERR(str_set(&stardis->solve_name, args->medium_name));
   }
-  else if((args->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
-       || (args->mode & MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE)
-       || (args->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE)) {
+  else if((args->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF)
+       || (args->mode & MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF)
+       || (args->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF)) {
     ERR(darray_probe_boundary_copy
       (&stardis->probe_boundary_list, &args->probe_boundary_list));
   }
@@ -494,7 +494,7 @@ stardis_init
   }
 
   /* If computation is on a volume, check medium is known */
-  if(args->mode & MODE_MEDIUM_COMPUTE) {
+  if(args->mode & MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM) {
     if(!find_medium_by_name(stardis, str_cget(&stardis->solve_name), NULL)) {
       logger_print(stardis->logger, (is_for_compute ? LOG_ERROR : LOG_WARNING),
         "Cannot find medium '%s'\n", str_cget(&stardis->solve_name));

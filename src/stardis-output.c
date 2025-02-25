@@ -1632,7 +1632,7 @@ print_single_MC_result
 
   /* Print the results */
   switch (stardis->mode & COMPUTE_MODES) {
-  case MODE_PROBE_COMPUTE:
+  case MODE_COMPUTE_PROBE_TEMP_ON_VOL:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
       if(stardis->time_range[0] == stardis->time_range[1])
         fprintf(stream, "Temperature at [%g, %g, %g] at t=%g = %g K +/- %g\n",
@@ -1649,14 +1649,14 @@ print_single_MC_result
     else fprintf(stream, "%g %g %lu %lu\n",
       result.E, result.SE, nfailures, nsamples);
     break;
-  case MODE_PROBE_COMPUTE_ON_INTERFACE: {
+  case MODE_COMPUTE_PROBE_TEMP_ON_SURF: {
       const struct stardis_probe_boundary* probe = NULL;
       probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
       ERR(print_single_MC_result_probe_boundary
         (stardis, probe, estimator, stream));
       break;
     }
-  case MODE_MEDIUM_COMPUTE:
+  case MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
       if(stardis->time_range[0] == stardis->time_range[1])
         fprintf(stream, "Temperature in medium '%s' at t=%g = %g K +/- %g\n",
@@ -1673,7 +1673,7 @@ print_single_MC_result
     else fprintf(stream, "%g %g %lu %lu\n",
       result.E, result.SE, nfailures, nsamples);
     break;
-  case MODE_BOUNDARY_COMPUTE:
+  case MODE_COMPUTE_TEMP_MEAN_ON_SURF:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
       if(stardis->time_range[0] == stardis->time_range[1])
         fprintf(stream, "Temperature at boundary '%s' at t=%g = %g K +/- %g\n",
@@ -1691,7 +1691,7 @@ print_single_MC_result
       result.E, result.SE, nfailures, nsamples);
     break;
 
-  case MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE:
+  case MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF:
   {
     enum sdis_estimator_type type;
     ERR(sdis_estimator_get_type(estimator, &type));
@@ -1780,7 +1780,7 @@ print_single_MC_result
     break;
   }
 
-  case MODE_FLUX_BOUNDARY_COMPUTE:
+  case MODE_COMPUTE_FLUX_THROUGH_SURF:
   {
     enum sdis_estimator_type type;
     ERR(sdis_estimator_get_type(estimator, &type));
@@ -1898,8 +1898,8 @@ print_single_MC_result_probe_boundary
   res_T res = RES_OK;
 
   ASSERT(stardis && probe && estimator);
-  ASSERT((stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
-      || (stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE));
+  ASSERT((stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF)
+      || (stardis->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF));
 
   /* Only master prints or reads estimators */
   ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
@@ -2095,7 +2095,7 @@ dump_compute_region_at_the_end_of_vtk
     struct sdis_medium* medium;
     const struct description* descriptions;
     unsigned medium_id;
-    ASSERT(stardis->mode & MODE_MEDIUM_COMPUTE);
+    ASSERT(stardis->mode & MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM);
     medium = find_medium_by_name
       (stardis, str_cget(&stardis->solve_name), &medium_id);
     ASSERT(medium != NULL); (void)medium;

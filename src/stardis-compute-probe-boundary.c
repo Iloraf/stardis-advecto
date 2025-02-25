@@ -764,7 +764,7 @@ solve_green
   }
 
   /* Try to open output files to detect errors early */
-  if(is_master_process && (stardis->mode & MODE_BIN_GREEN)) {
+  if(is_master_process && (stardis->mode & MODE_GREEN_BIN)) {
     const char* green_filename = str_cget(&stardis->bin_green_filename);
     const char* path_filename = str_cget(&stardis->end_paths_filename);
 
@@ -794,12 +794,12 @@ solve_green
   if(is_master_process) goto exit;
 
   /* Write ASCII Green */
-  if(stardis->mode & MODE_GREEN) {
+  if(stardis->mode & MODE_GREEN_ASCII) {
     ERR(dump_green_ascii(green, stardis, stdout));
   }
 
   /* Write binary Green */
-  if(stardis->mode & MODE_BIN_GREEN) {
+  if(stardis->mode & MODE_GREEN_BIN) {
     ERR(dump_green_bin(green, stardis, fp_green));
     if(fp_path) {
       ERR(dump_paths_end(green, stardis, fp_path));
@@ -919,7 +919,7 @@ setup_solve_probe_boundary_args
   size_t iprim = SIZE_MAX;
   unsigned desc_ids[SG3D_PROP_TYPES_COUNT__];
   res_T res = RES_OK;
-  ASSERT(stardis && probe && args && (stardis->mode && MODE_MAP_COMPUTE));
+  ASSERT(stardis && probe && args && (stardis->mode && MODE_COMPUTE_TEMP_MAP_ON_SURF));
 
   /* Calculate the probe position on the boundary */
   ERR(move_to_boundary(stardis, probe->position, probe->time[0], 1, &iprim, uv));
@@ -971,7 +971,7 @@ compute_single_probe_on_interface
   ERR(setup_solve_probe_boundary_args(stardis, probe, &args));
 
   /* Run the calculation */
-  if(stardis->mode & (MODE_GREEN | MODE_BIN_GREEN)) {
+  if(stardis->mode & (MODE_GREEN_ASCII | MODE_GREEN_BIN)) {
     ERR(solve_green(stardis, start, &args));
   } else {
     ERR(solve(stardis, start, &args, output_status));
@@ -1044,26 +1044,26 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
 {
   res_T res = RES_OK;
   ASSERT(stardis && start);
-  ASSERT((stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
-      || (stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE)
-      || (stardis->mode & MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE));
+  ASSERT((stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF)
+      || (stardis->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF)
+      || (stardis->mode & MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF));
 
   /* Multiple probes */
-  if(stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE) {
+  if(stardis->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF) {
     ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) > 1);
 
     res = compute_multiple_probes_on_interface(stardis, start);
     if(res != RES_OK) goto error;
 
   /* Single probe */
-  } else if(stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE) {
+  } else if(stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF) {
     const struct stardis_probe_boundary* probe = NULL;
     ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) == 1);
 
     probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
     res = compute_single_probe_on_interface(stardis, start, probe);
     if(res != RES_OK) goto error;
-  } else if(stardis->mode & MODE_PROBE_COMPUTE_FLUX_ON_INTERFACE) {
+  } else if(stardis->mode & MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF) {
     const struct stardis_probe_boundary* probe = NULL;
     ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) == 1);
 

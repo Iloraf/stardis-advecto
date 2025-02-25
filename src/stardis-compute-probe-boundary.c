@@ -872,7 +872,6 @@ compute_single_flux_probe_on_interface
   struct sdis_estimator* estimator = NULL;
   struct sdis_solve_probe_boundary_flux_args args
     = SDIS_SOLVE_PROBE_BOUNDARY_FLUX_ARGS_DEFAULT;
-  struct dump_path_context dump_ctx;
   FILE* stream_r = NULL;
   struct time compute_start, compute_end;
 
@@ -895,9 +894,6 @@ compute_single_flux_probe_on_interface
       (&time, stardis, start, &compute_start, &compute_end, NULL));
 
     ERR(print_single_MC_result(estimator, stardis, stdout));
-
-    /* TODO: warning if dump paths requested */
-
   }
 
   /* Output random state? */

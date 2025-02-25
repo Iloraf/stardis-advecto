@@ -203,7 +203,7 @@ Use extended format to output Monte Carlo results.
 Can only be used in conjunction with options that compute a single Monte-Carlo
 .Pq Fl F , Fl m , Fl P , Fl p No or Fl s No without options Fl g No or Fl G .
 .It Fl F Pa surface Ns Op , Ns Ar time Ns Op , Ns Ar time
-Compute the mean flux on a given 2D surface at a given time, the surface being
+Compute the flux through a given 2D surface at a given time, the surface being
 defined by the triangles in a STL file.
 The flux can only be computed on a solid-fluid interface and is accounted
 positive from the solid to the fluid.

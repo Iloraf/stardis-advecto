@@ -1692,6 +1692,7 @@ print_single_MC_result
     break;
 
   case MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF:
+  case MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF:
   {
     enum sdis_estimator_type type;
     ERR(sdis_estimator_get_type(estimator, &type));

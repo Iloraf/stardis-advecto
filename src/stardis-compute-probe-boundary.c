@@ -736,6 +736,84 @@ error:
 }
 
 static res_T
+setup_solve_probe_boundary_flux_args
+  (struct stardis* stardis,
+   const struct stardis_probe_boundary* probe,
+   struct sdis_solve_probe_boundary_flux_args* args)
+{
+  double uv[2] = {0, 0};
+  size_t iprim = SIZE_MAX;
+  unsigned desc_ids[SG3D_PROP_TYPES_COUNT__];
+  res_T res = RES_OK;
+  ASSERT(stardis && probe && args);
+
+  /* Calculate the probe position on the boundary */
+  ERR(move_to_boundary(stardis, probe->position, probe->time[0], 0, &iprim, uv));
+
+  ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
+    (unsigned)iprim, desc_ids));
+
+  d3_set(stardis->probe, probe->position);
+  /* Setup of solve input parameters */
+
+  args->nrealisations = stardis->samples;
+  args->iprim = iprim;
+  d2_set(args->uv, uv);
+  args->picard_order = stardis->picard_order;
+  d2_set(args->time_range, stardis->time_range);
+  args->diff_algo = stardis->diff_algo;
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
+solve_flux_list
+  (struct stardis* stardis,
+   struct time* start,
+   const struct stardis_probe_boundary* probes,
+   size_t nprobes)
+{
+  struct time t0, t1;
+  struct sdis_mc time = SDIS_MC_NULL; /* Time per realisation */
+  struct sdis_estimator_buffer* buffer = NULL;
+  size_t i = 0;
+  struct sdis_estimator* estimator = NULL;
+  FILE* stream_r = NULL;
+  struct sdis_solve_probe_boundary_flux_args args;
+  res_T res = RES_OK;
+  ASSERT(stardis && start);
+
+  /* Input random state? */
+  READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
+
+  time_current(&t0);
+  for(i = 0; i < nprobes; i++) {
+    args = SDIS_SOLVE_PROBE_BOUNDARY_FLUX_ARGS_DEFAULT;
+    ERR(setup_solve_probe_boundary_flux_args(stardis, &probes[i], &args));
+    /* Run the calculation */
+    ERR(sdis_solve_probe_boundary_flux(stardis->sdis_scn, &args, &estimator));
+    /* Print the estimated temperature */
+    ERR(print_single_MC_result(estimator, stardis, stdout));
+    ERR(sdis_estimator_ref_put(estimator));
+  }
+  time_current(&t1);
+
+  /* Output random state? */
+  WRITE_RANDOM_STATE(&stardis->rndgen_state_out_filename);
+
+  ERR(print_computation_time(&time, stardis, start, &t0, &t1, NULL));
+
+exit:
+  if(buffer) SDIS(estimator_buffer_ref_put(buffer));
+  return res;
+error:
+  goto exit;
+}
+
+static res_T
 solve_green
   (struct stardis* stardis,
    struct time* start,
@@ -822,40 +900,6 @@ exit:
   if(fp_path) CHK(fclose(fp_path) == 0);
   if(green) SDIS(green_function_ref_put(green));
   if(rng) SSP(rng_ref_put(rng));
-  return res;
-error:
-  goto exit;
-}
-
-static res_T
-setup_solve_probe_boundary_flux_args
-  (struct stardis* stardis,
-   const struct stardis_probe_boundary* probe,
-   struct sdis_solve_probe_boundary_flux_args* args)
-{
-  double uv[2] = {0, 0};
-  size_t iprim = SIZE_MAX;
-  unsigned desc_ids[SG3D_PROP_TYPES_COUNT__];
-  res_T res = RES_OK;
-  ASSERT(stardis && probe && args);
-
-  /* Calculate the probe position on the boundary */
-  ERR(move_to_boundary(stardis, probe->position, probe->time[0], 0, &iprim, uv));
-
-  ERR(sg3d_geometry_get_unique_triangle_properties(stardis->geometry.sg3d,
-    (unsigned)iprim, desc_ids));
-
-  d3_set(stardis->probe, probe->position);
-  /* Setup of solve input parameters */
-
-  args->nrealisations = stardis->samples;
-  args->iprim = iprim;
-  d2_set(args->uv, uv);
-  args->picard_order = stardis->picard_order;
-  d2_set(args->time_range, stardis->time_range);
-  args->diff_algo = stardis->diff_algo;
-
-exit:
   return res;
 error:
   goto exit;
@@ -1036,6 +1080,31 @@ error:
   goto exit;
 }
 
+static res_T
+compute_multiple_flux_probes_on_interface
+  (struct stardis* stardis,
+   struct time* start)
+{
+  /* Probes */
+  const struct stardis_probe_boundary* probes = NULL;
+  size_t nprobes = 0;
+  res_T res = RES_OK;
+  ASSERT(stardis && start);
+
+  /* Fetch the list of probes arguments */
+  probes = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
+  nprobes = darray_probe_boundary_size_get(&stardis->probe_boundary_list);
+  ASSERT(nprobes > 1);
+
+  /* Run calculations */
+  ERR(solve_flux_list(stardis, start, probes, nprobes));
+
+exit:
+  return res;
+error:
+  goto exit;
+}
+
 /*******************************************************************************
  * Local functions
  ******************************************************************************/
@@ -1046,6 +1115,7 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
   ASSERT(stardis && start);
   ASSERT((stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF)
       || (stardis->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF)
+      || (stardis->mode & MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF)
       || (stardis->mode & MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF));
 
   /* Multiple probes */
@@ -1053,6 +1123,12 @@ compute_probe_on_interface(struct stardis* stardis, struct time* start)
     ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) > 1);
 
     res = compute_multiple_probes_on_interface(stardis, start);
+    if(res != RES_OK) goto error;
+
+  } else if(stardis->mode & MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF) {
+    ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) > 1);
+
+    res = compute_multiple_flux_probes_on_interface(stardis, start);
     if(res != RES_OK) goto error;
 
   /* Single probe */

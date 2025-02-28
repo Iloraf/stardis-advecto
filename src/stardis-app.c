@@ -329,7 +329,8 @@ stardis_init
   }
   else if((args->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF)
        || (args->mode & MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF)
-       || (args->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF)) {
+       || (args->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF)
+       || (args->mode & MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF)) {
     ERR(darray_probe_boundary_copy
       (&stardis->probe_boundary_list, &args->probe_boundary_list));
   }

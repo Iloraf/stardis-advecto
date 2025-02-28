@@ -1145,6 +1145,9 @@ stardis_compute
     case MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF:
       ERR(compute_probe_on_interface(stardis, start));
       break;
+    case MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF:
+      ERR(compute_probe_on_interface(stardis, start));
+      break;
     case MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF:
       ERR(compute_probe_on_interface(stardis, start));
       break;

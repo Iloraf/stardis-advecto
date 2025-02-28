@@ -118,6 +118,7 @@ mode_option(const int m)
   if(m & MODE_GREEN_BIN) { found++; res = 'G'; }
   if(m & MODE_DUMP_HELP) { found++; res = 'h'; }
   if(m & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF) { found++; res = 'L'; }
+  if(m & MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF) { found++; res = 'l'; }
   if(m & MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM) { found++; res = 'm'; }
   if(m & MODE_COMPUTE_PROBE_TEMP_ON_VOL) { found++; res = 'p'; }
   if(m & MODE_COMPUTE_PROBE_TEMP_ON_SURF) { found++; res = 'P'; }
@@ -268,7 +269,10 @@ error:
 }
 
 static res_T
-parse_probe_boundary(const char* str, struct stardis_probe_boundary* probe)
+parse_probe_boundary
+  (const char* str,
+   int with_sides,
+   struct stardis_probe_boundary* probe)
 {
   char buf[128];
   char* pos_and_time = NULL;
@@ -286,12 +290,12 @@ parse_probe_boundary(const char* str, struct stardis_probe_boundary* probe)
   strncpy(buf, str, sizeof(buf));
 
   pos_and_time = strtok_r(buf, ":", &ctx);
-  side = strtok_r(NULL, "", &ctx);
+  if(with_sides) side = strtok_r(NULL, "", &ctx);
 
   res = parse_position_and_time(pos_and_time, probe->position, probe->time);
   if(res != RES_OK) goto error;
 
-  if(side) {
+  if(with_sides && side) {
     res = parse_side_indicator(side, probe->side);
     if(res != RES_OK) goto error;
   }
@@ -334,6 +338,7 @@ parse_probe_boundary_list
   (const char* filename,
    struct logger* logger,
    struct mem_allocator* allocator,
+   int with_sides,
    struct darray_probe_boundary* list)
 {
   struct txtrdr* txtrdr = NULL;
@@ -358,7 +363,7 @@ parse_probe_boundary_list
 
     if(!(line = txtrdr_get_cline(txtrdr))) goto exit; /* No line to parse */
 
-    res = parse_probe_boundary(line, &probe);
+    res = parse_probe_boundary(line, with_sides, &probe);
     if(res != RES_OK) goto error;
 
     res = darray_probe_boundary_push_back(list, &probe);
@@ -461,7 +466,7 @@ usage(FILE* stream)
   PRINT("stardis [-eghiv] [-a diff_algo] [-D path_type,files_name_prefix]\n");
   PRINT("        [-d file_base_name] [-F surface[,time[,time]]]\n");
   PRINT("        [-f x,y,z[,time[,time]]] [-G green_bin[,green_ascii]]\n");
-  PRINT("        [-g] [-I initial_time] [-L interface_probes]\n");
+  PRINT("        [-g] [-I initial_time] [-L interface_probes] [-l interface_probes]\n");
   PRINT("        [-m medium_name[,time[,time]]] [-n samples_count]\n");
   PRINT("        [-o picard_order] [-P x,y,z[,time[,time]][:side_indicator]]\n");
   PRINT("        [-p x,y,z[,time[,time]]] [-R rendering_opt[:rendering_opt ...]]\n");
@@ -526,7 +531,7 @@ parse_args
 {
   int opt = 0, n_used = 0, o_used = 0;
   size_t len = 0;
-  const char option_list[] = "a:c:d:D:ef:F:gG:hiI:L:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
+  const char option_list[] = "a:c:d:D:ef:F:gG:hiI:L:l:m:M:n:o:p:P:R:s:S:t:vV:x:X:";
   char buf[128];
   struct str keep;
   char** line = NULL;
@@ -624,7 +629,7 @@ parse_args
         args->mode |= MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF;
         res = allocate_probe_boundary(args, &probe);
         if(res != RES_OK) goto error;
-        res = parse_position_and_time(optarg, probe->position, probe->time);
+        res = parse_probe_boundary(optarg, 0, probe);
         if(res != RES_OK) goto error;
         break;
       }
@@ -697,7 +702,20 @@ parse_args
       }
       args->mode |= MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF;
       res = parse_probe_boundary_list
-        (optarg, args->logger, args->allocator, &args->probe_boundary_list);
+        (optarg, args->logger, args->allocator, 1, &args->probe_boundary_list);
+      if(res != RES_OK) goto error;
+      break;
+
+    case 'l':
+      if(args->mode & EXCLUSIVE_MODES) {
+        logger_print(args->logger, LOG_ERROR,
+          "Options -%c and -%c are exclusive.\n",
+          (char)opt, mode_option(args->mode));
+        goto error;
+      }
+      args->mode |= MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF;
+      res = parse_probe_boundary_list
+        (optarg, args->logger, args->allocator, 0, &args->probe_boundary_list);
       if(res != RES_OK) goto error;
       break;
 
@@ -782,7 +800,7 @@ parse_args
         args->mode |= MODE_COMPUTE_PROBE_TEMP_ON_SURF;
         res = allocate_probe_boundary(args, &probe);
         if(res != RES_OK) goto error;
-        res = parse_probe_boundary(optarg, probe);
+        res = parse_probe_boundary(optarg, 1, probe);
         if(res != RES_OK) goto error;
         break;
       }

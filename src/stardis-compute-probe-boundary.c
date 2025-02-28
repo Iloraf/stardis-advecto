@@ -1111,41 +1111,34 @@ error:
 res_T
 compute_probe_on_interface(struct stardis* stardis, struct time* start)
 {
+  int temp_flags = MODE_COMPUTE_PROBE_TEMP_ON_SURF
+    | MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF;
+  int flux_flags = MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF
+    | MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF;
   res_T res = RES_OK;
   ASSERT(stardis && start);
-  ASSERT((stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF)
-      || (stardis->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF)
-      || (stardis->mode & MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF)
-      || (stardis->mode & MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF));
+  ASSERT((stardis->mode & temp_flags) != (stardis->mode & flux_flags)); /* xor */
 
-  /* Multiple probes */
-  if(stardis->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF) {
-    ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) > 1);
-
-    res = compute_multiple_probes_on_interface(stardis, start);
-    if(res != RES_OK) goto error;
-
-  } else if(stardis->mode & MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF) {
-    ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) > 1);
-
-    res = compute_multiple_flux_probes_on_interface(stardis, start);
-    if(res != RES_OK) goto error;
-
-  /* Single probe */
-  } else if(stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF) {
-    const struct stardis_probe_boundary* probe = NULL;
-    ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) == 1);
-
-    probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
-    res = compute_single_probe_on_interface(stardis, start, probe);
-    if(res != RES_OK) goto error;
-  } else if(stardis->mode & MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF) {
-    const struct stardis_probe_boundary* probe = NULL;
-    ASSERT(darray_probe_boundary_size_get(&stardis->probe_boundary_list) == 1);
-
-    probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
-    res = compute_single_flux_probe_on_interface(stardis, start, probe);
-    if(res != RES_OK) goto error;
+  if(stardis->mode & temp_flags) {
+    if(darray_probe_boundary_size_get(&stardis->probe_boundary_list) > 1) {
+      res = compute_multiple_probes_on_interface(stardis, start);
+      if(res != RES_OK) goto error;
+    } else {
+      const struct stardis_probe_boundary* probe
+        = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
+      res = compute_single_probe_on_interface(stardis, start, probe);
+      if(res != RES_OK) goto error;
+    }
+  } else if(stardis->mode & flux_flags) {
+    if(darray_probe_boundary_size_get(&stardis->probe_boundary_list) > 1) {
+      res = compute_multiple_flux_probes_on_interface(stardis, start);
+      if(res != RES_OK) goto error;
+    } else {
+      const struct stardis_probe_boundary* probe
+        = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
+      res = compute_single_flux_probe_on_interface(stardis, start, probe);
+      if(res != RES_OK) goto error;
+    }
   }
 
 exit:

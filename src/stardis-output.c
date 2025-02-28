@@ -1649,7 +1649,9 @@ print_single_MC_result
     else fprintf(stream, "%g %g %lu %lu\n",
       result.E, result.SE, nfailures, nsamples);
     break;
-  case MODE_COMPUTE_PROBE_TEMP_ON_SURF: {
+  case MODE_COMPUTE_PROBE_TEMP_ON_SURF:
+  case MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF:
+    {
       const struct stardis_probe_boundary* probe = NULL;
       probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
       ERR(print_single_MC_result_probe_boundary
@@ -1869,7 +1871,7 @@ print_single_MC_result
     }
     break;
   }
-  default: FATAL("Invalid mode.");
+  default: FATAL("Invalid mode\n.");
   }
   if(stardis->mode & MODE_EXTENDED_RESULTS)
     fprintf(stream, "#failures: %lu/%lu\n", nfailures, nsamples);

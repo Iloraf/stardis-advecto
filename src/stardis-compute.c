@@ -1135,38 +1135,28 @@ stardis_compute
   ASSERT(stardis && start && (stardis->mode & COMPUTE_MODES));
 
   /* Compute */
-  switch(stardis->mode) {
-    case MODE_COMPUTE_PROBE_TEMP_ON_VOL:
+  if(stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_VOL) {
       ERR(compute_probe(stardis, start));
-      break;
-    case MODE_COMPUTE_PROBE_TEMP_ON_SURF:
+  } else if(stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF) {
       ERR(compute_probe_on_interface(stardis, start));
-      break;
-    case MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF:
+  } else if(stardis->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF) {
       ERR(compute_probe_on_interface(stardis, start));
-      break;
-    case MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF:
+  } else if(stardis->mode & MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF) {
       ERR(compute_probe_on_interface(stardis, start));
-      break;
-    case MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF:
+  } else if(stardis->mode & MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF) {
       ERR(compute_probe_on_interface(stardis, start));
-      break;
-    case MODE_COMPUTE_IMAGE_IR:
+  } else if(stardis->mode & MODE_COMPUTE_IMAGE_IR) {
       ERR(compute_camera(stardis, start));
-      break;
-    case MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM:
+  } else if(stardis->mode & MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM) {
       ERR(compute_medium(stardis, start));
-      break;
-    case MODE_COMPUTE_TEMP_MEAN_ON_SURF:
+  } else if(stardis->mode & MODE_COMPUTE_TEMP_MEAN_ON_SURF) {
       ERR(compute_boundary(stardis, start));
-      break;
-    case MODE_COMPUTE_FLUX_THROUGH_SURF:
+  } else if(stardis->mode & MODE_COMPUTE_FLUX_THROUGH_SURF) {
       ERR(compute_flux_boundary(stardis, start));
-      break;
-    case MODE_COMPUTE_TEMP_MAP_ON_SURF:
+  } else if(stardis->mode & MODE_COMPUTE_TEMP_MAP_ON_SURF) {
       ERR(compute_map(stardis, start));
-      break;
-    default: FATAL("Unknown mode.\n");
+  } else {
+    FATAL("Unknown mode.\n");
   }
 
 end:

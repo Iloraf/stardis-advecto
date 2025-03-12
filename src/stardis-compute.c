@@ -348,7 +348,7 @@ compute_probe(struct stardis* stardis, struct time* start)
   FILE* stream_p = NULL;
   struct time compute_start, compute_end;
 
-  ASSERT(stardis && start && (stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF));
+  ASSERT(stardis && start && (stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_VOL));
 
   ERR(check_probe_conform_to_type(stardis, stardis->probe,
     stardis->time_range[0], &iprim, uv));

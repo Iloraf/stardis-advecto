@@ -422,7 +422,7 @@ init_args
   struct args* args = NULL;
   ASSERT(logger && allocator && out_args);
 
-  args = calloc(sizeof(struct args), 1);
+  args = calloc(1, sizeof(struct args));
   if(!args) {
     res = RES_MEM_ERR;
     goto error;

@@ -136,7 +136,7 @@ create_solver_solid
 #endif
   solid_shader.temperature = solid_get_temperature;
   solid_shader.t0 = stardis->initial_time;
-  ERR(sdis_data_create(stardis->dev, sizeof(struct solid), ALIGNOF(struct solid),
+  ERR(sdis_data_create(stardis->dev, sizeof(struct solid*), ALIGNOF(struct solid*),
     NULL, &data));
 
   props = sdis_data_get(data); /* Fetch the allocated memory space */

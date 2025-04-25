@@ -638,10 +638,10 @@ medium_get_t0
   type = sdis_medium_get_type(medium);
   data = sdis_medium_get_data(medium);
   if(type == SDIS_FLUID) {
-    const struct fluid* fluid_props = sdis_data_cget(data);
+    const struct fluid* fluid_props = *((const struct fluid**)sdis_data_cget(data));
     return fluid_props->t0;
   } else {
-    const struct solid* solid_props = sdis_data_cget(data);
+    const struct solid* solid_props = *((const struct solid**)sdis_data_cget(data));
     ASSERT(type == SDIS_SOLID);
     return solid_props->t0;
   }

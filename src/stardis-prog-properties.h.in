@@ -25,7 +25,8 @@
 /* The version of the API described thereafter */
 #define STARDIS_PROG_PROPERTIES_VERSION @STARDIS_PROG_PROPERTIES_VERSION@
 
-#include <stddef.h>
+#include <limits.h> /* UINT_MAX */
+#include <stddef.h> /* size_t */
 
 #if defined(__GNUC__)
   #define STARDIS_API extern __attribute__((visibility("default")))

@@ -105,4 +105,3 @@ sf_connect_prog_get_hmax
 {
   return connect->hmax(connect->prog_data);
 }
-

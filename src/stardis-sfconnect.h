@@ -31,6 +31,7 @@ struct solid_fluid_connect {
   double emissivity;
   double specular_fraction;
   double hc;
+  double flux; /* [W/m^2] */
   unsigned connection_id;
 };
 

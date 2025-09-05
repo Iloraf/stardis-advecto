@@ -185,8 +185,11 @@ that changes at
 .\""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .Ss Connection
 .Bl -column (description-line) (::) ()
-.It Ao Va connection Ac Ta ::= Ta Ao Va solid-fluid Ac | Ao Va solid-solid Ac
+.It Ao Va connection Ac Ta ::= Ta Ao Va solid-fluid Ac
+.It Ta \& \& | Ta Ao Va solid-solid Ac
+.It Ta \& \& | Ta Ao Va solid-fluid-flux Ac
 .It \  Ta Ta
+.\" Solid/fluid connection
 .It Ao Va solid-fluid Ac Ta ::= Ta Ao Va solid-fluid-const Ac | Ao Va solid-fluid-prog Ac
 .It Ao Va solid-fluid-const Ac Ta ::= Ta Li SOLID_FLUID_CONNECTION Ao Va connect-name Ac \e
 .It Ta Ta Ao Va Tref Ac Ao Va emissivity Ac Ao Va specular-fraction Ac \e
@@ -194,12 +197,22 @@ that changes at
 .It Ao Va solid-fluid-prog Ac Ta ::= Ta Li SOLID_FLUID_CONNECTION_PROG \e
 .It Ta Ta Ao Va connect-name Ac Ao Va prog-desc Ac
 .It \  Ta Ta
+.\" Solid/solid connection
 .It Ao Va solid-solid Ac Ta ::= Ta Ao Va solid-solid-const Ac | Ao Va solid-solid-prog Ac
 .It Ao Va solid-solid-const Ac Ta ::= Ta Li SOLID_SOLID_CONNECTION Ao Va connect-name Ac \e
 .It Ta Ta Ao Va contact-resistance Ac Ao Va triangles Ac ...
 .It Ao Va solid-solid-prog Ac Ta ::= Ta Li SOLID_SOLID_CONNECTION_PROG \e
 .It Ta Ta Ao Va connect-name Ac Ao Va prog-desc Ac
 .It \  Ta Ta
+.\" Solid/fluid connection with flux
+.It Ao Va solid-fluid-flux Ac Ta :: Ta Ao Va sf-flux-const Ac | Ao Va s-flux-prog Ac
+.It Ao Va sf-flux-const Ac Ta :: Ta Li F_SOLID_FLUID_CONNECTION Ao Va connect-name Ac \e
+.It Ta Ta Ao Va Tref Ac Ao Va emissivity Ac Ao Va specular-fraction Ac \e
+.It Ta Ta Ao Va hc Ac Ao Va flux Ac Ao Va triangles Ac ...
+.It Ao Va sf-flux-prog Ac Ta :: Ta Li F_SOLID_FLUID_CONNECTION_PROG \e
+.It Ta Ta Ao Va connect-name Ac Ao Va prog-desc Ac
+.It \  Ta Ta
+.\" Miscellaneous
 .It Ao Va emissivity Ac Ta ::= Ta Vt real No # \&In [0,1]
 .It Ao Va specular-fraction Ac Ta ::= Ta Vt real No # \&In [0,1]
 .It Ao Va hc Ac Ta ::= Ta Vt real No # Convective coefficient > 0 [W/m^2/K]

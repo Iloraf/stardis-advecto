@@ -1292,6 +1292,7 @@ error:
 static res_T
 process_sfc
   (struct stardis* stardis,
+   const int with_flux,
    wordexp_t* pwordexp)
 {
   char* arg = NULL;
@@ -1364,6 +1365,16 @@ process_sfc
     goto error;
   }
 
+  if(with_flux) {
+    CHK_ARG(idx, "flux");
+    res = cstr_to_double(arg, &sf_connect->flux);
+    if(res != RES_OK) {
+      logger_print(stardis->logger, LOG_ERROR,
+        "Invalid flux: %s\n", arg);
+      goto error;
+    }
+  }
+
   ASSERT(sz <= UINT_MAX);
   ERR(read_sides_and_files(stardis, 1, (unsigned)sz, pwordexp, &idx));
 
@@ -1377,6 +1388,7 @@ error:
 static res_T
 process_sfc_prog
   (struct stardis* stardis,
+   const int with_flux,
    wordexp_t* pwordexp)
 {
   char* arg = NULL;
@@ -1429,6 +1441,9 @@ process_sfc_prog
   GET_LIB_SYMBOL(sf_connect_prog, hc, stardis_convection_coefficient);
   GET_LIB_SYMBOL(sf_connect_prog, hmax, stardis_max_convection_coefficient);
   GET_LIB_SYMBOL(sf_connect_prog, t_range, stardis_t_range);
+  if(with_flux) {
+    GET_LIB_SYMBOL(sf_connect_prog, flux, stardis_boundary_flux);
+  }
   /* create and init custom data */
   ctx.name = desc_name;
   CREATE_DESC_DATA(sf_connect_prog);
@@ -2330,9 +2345,13 @@ process_model_line
   else if(0 == strcasecmp(arg, "F_BOUNDARY_FOR_SOLID_PROG"))
     ERR(process_flx_prog(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "SOLID_FLUID_CONNECTION"))
-    ERR(process_sfc(stardis, pwordexp));
+    ERR(process_sfc(stardis, 0/* No flux*/, pwordexp));
+  else if(0 == strcasecmp(arg, "F_SOLID_FLUID_CONNECTION"))
+    ERR(process_sfc(stardis, 1/* Flux */, pwordexp));
   else if(0 == strcasecmp(arg, "SOLID_FLUID_CONNECTION_PROG"))
-    ERR(process_sfc_prog(stardis, pwordexp));
+    ERR(process_sfc_prog(stardis, 0/* No flux*/, pwordexp));
+  else if(0 == strcasecmp(arg, "F_SOLID_FLUID_CONNECTION_PROG"))
+    ERR(process_sfc_prog(stardis, 1/* Flux */, pwordexp));
   else if(0 == strcasecmp(arg, "SOLID_SOLID_CONNECTION"))
     ERR(process_ssc(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "SOLID_SOLID_CONNECTION_PROG"))

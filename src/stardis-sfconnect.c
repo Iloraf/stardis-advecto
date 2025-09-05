@@ -43,6 +43,7 @@ init_sf_connect
   str_init(allocator, &(*dst)->name);
   str_initialized = 1;
   (*dst)->connection_id = UINT_MAX;
+  (*dst)->flux = SDIS_FLUX_NONE;
 end:
   return res;
 error:

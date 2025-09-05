@@ -48,6 +48,7 @@ struct solid_fluid_connect_prog {
   double (*alpha)
     (const struct stardis_interface_fragment*, const unsigned src_id, void*);
   double (*hc)(const struct stardis_interface_fragment*, void*);
+  double (*flux)(const struct stardis_interface_fragment*, void*);
   double (*hmax)(void*);
   double* (*t_range)(void*, double trange[2]);
 };

@@ -1820,10 +1820,21 @@ process_solid_prog
 
   GET_LIB_SYMBOL_BASE(&solid_prog->sample_path, solid_prog->program->lib_handle,
     stardis_sample_conductive_path, 1);
+  GET_LIB_SYMBOL_BASE(&solid_prog->t_range, solid_prog->program->lib_handle,
+    stardis_t_range, 1);
 
   /* create and init custom data */
   ctx.name = desc_name;
   CREATE_DESC_DATA(solid_prog);
+
+  if(solid_prog->t_range) {
+    double t_range[2];
+    solid_prog->t_range(solid_prog->prog_data, t_range);
+    if(STARDIS_TEMPERATURE_IS_KNOWN(t_range[0]))
+      stardis->t_range[0] = MMIN(stardis->t_range[0], t_range[0]);
+    if(STARDIS_TEMPERATURE_IS_KNOWN(t_range[1]))
+      stardis->t_range[1] = MMAX(stardis->t_range[1], t_range[1]);
+  }
 
   ERR(create_solver_solid_prog(stardis, solid_prog));
 

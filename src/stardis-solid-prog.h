@@ -48,6 +48,7 @@ struct solid_prog {
   double (*delta)(const struct stardis_vertex*, void*);
   double (*temp)(const struct stardis_vertex*, void*);
   double (*vpower)(const struct stardis_vertex*, void*);
+  double (*t_range)(void* data, double t_range[2]);
 
   /* User-defined function for sampling a conductive path */
   int

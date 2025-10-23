@@ -685,6 +685,7 @@ create_intface
         interface_props->get_alpha = intface->d.sf_connect_prog->alpha;
         interface_shader.convection_coef = intface_prog_get_hc;
         if(intface->d.sf_connect_prog->flux) {
+          interface_props->get_flux = intface->d.sf_connect_prog->flux;
           interface_shader.front.flux = intface_prog_get_flux;
           interface_shader.back.flux = intface_prog_get_flux;
         }

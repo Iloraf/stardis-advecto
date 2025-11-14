@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -395,7 +395,7 @@ process_h
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   CHK_ARG(idx, "ref_temperature");
@@ -404,7 +404,7 @@ process_h
     logger_print(stardis->logger, LOG_ERROR,
         "Invalid reference temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   stardis->t_range[0] = MMIN(stardis->t_range[0], h_boundary->ref_temperature);
   stardis->t_range[1] = MMAX(stardis->t_range[1], h_boundary->ref_temperature);
@@ -415,7 +415,7 @@ process_h
   || h_boundary->emissivity > 1) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid emissivity: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "specular fraction");
   res = cstr_to_double(arg, &h_boundary->specular_fraction);
@@ -425,7 +425,7 @@ process_h
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid specular fraction: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "Convection coefficient");
   res = cstr_to_double(arg, &h_boundary->hc);
@@ -433,7 +433,7 @@ process_h
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid Convection coefficient: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "temperature");
   res = cstr_to_double(arg, &h_boundary->imposed_temperature);
@@ -441,7 +441,7 @@ process_h
   || SDIS_TEMPERATURE_IS_UNKNOWN(h_boundary->imposed_temperature)) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   if(type == DESC_BOUND_H_FOR_FLUID)
@@ -458,7 +458,7 @@ process_h
     fluid->imposed_temperature = h_boundary->imposed_temperature;
     fluid->t0 = stardis->initial_time;
     fluid->is_outside = 1;
-    fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+    fluid->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
     ERR(create_solver_fluid(stardis, fluid));
     logger_print(stardis->logger, LOG_OUTPUT,
       "External fluid created: T=%g (it is medium %u)\n",
@@ -508,7 +508,7 @@ process_hf
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   CHK_ARG(idx, "ref_temperature");
@@ -517,7 +517,7 @@ process_hf
     logger_print(stardis->logger, LOG_ERROR,
         "Invalid reference temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   stardis->t_range[0] = MMIN(stardis->t_range[0], hf_boundary->ref_temperature);
   stardis->t_range[1] = MMAX(stardis->t_range[1], hf_boundary->ref_temperature);
@@ -528,7 +528,7 @@ process_hf
   || hf_boundary->emissivity > 1) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid emissivity: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "specular fraction");
   res = cstr_to_double(arg, &hf_boundary->specular_fraction);
@@ -538,7 +538,7 @@ process_hf
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid specular fraction: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "convection coefficient");
   res = cstr_to_double(arg, &hf_boundary->hc);
@@ -546,7 +546,7 @@ process_hf
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid convection coefficient: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "temperature");
   res = cstr_to_double(arg, &hf_boundary->imposed_temperature);
@@ -554,7 +554,7 @@ process_hf
   || SDIS_TEMPERATURE_IS_UNKNOWN(hf_boundary->imposed_temperature)) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "flux");
   res = cstr_to_double(arg, &hf_boundary->imposed_flux);
@@ -564,7 +564,7 @@ process_hf
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid flux: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   ASSERT(type == DESC_BOUND_HF_FOR_SOLID);
@@ -577,7 +577,7 @@ process_hf
   fluid->imposed_temperature = hf_boundary->imposed_temperature;
   fluid->t0 = stardis->initial_time;
   fluid->is_outside = 1;
-  fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  fluid->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
   ERR(create_solver_fluid(stardis, fluid));
   logger_print(stardis->logger, LOG_OUTPUT,
     "External fluid created: T=%g (it is medium %u)\n",
@@ -698,13 +698,13 @@ get_prog_common
     logger_print(stardis->logger, LOG_ERROR,
       "Undefined PROGRAM: %s\n", lib_name);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   else if(desc->type != DESC_PROGRAM) {
     logger_print(stardis->logger, LOG_ERROR,
       "Is not a PROGRAM: %s\n", lib_name);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   *program = desc->d.program;
   /* get the mandatory user-defined functions from the library */
@@ -749,7 +749,7 @@ process_program
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   lib_name = arg;
 
@@ -876,7 +876,7 @@ process_h_prog
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   desc_name = arg;
 
@@ -977,7 +977,7 @@ process_hf_prog
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   desc_name = arg;
 
@@ -1066,17 +1066,16 @@ process_t
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   CHK_ARG(idx, "temperature");
   res = cstr_to_double(arg, &t_boundary->imposed_temperature);
   if(res != RES_OK
-  || SDIS_TEMPERATURE_IS_UNKNOWN(t_boundary->imposed_temperature))
-  {
+  || SDIS_TEMPERATURE_IS_UNKNOWN(t_boundary->imposed_temperature)) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   /* Temporarily use the set temperature as a reference temperature.
@@ -1129,7 +1128,7 @@ process_t_prog
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   desc_name = arg;
 
@@ -1196,7 +1195,7 @@ process_flx
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   CHK_ARG(idx, "flux");
@@ -1206,7 +1205,7 @@ process_flx
     /* Flux can be < 0 but not undefined */
     if(res == RES_OK) res = RES_BAD_ARG;
     logger_print(stardis->logger, LOG_ERROR, "Invalid flux: %s\n", arg);
-    goto end;
+    goto error;
   }
   if(f_boundary->imposed_flux != 0 && stardis->picard_order > 1) {
     logger_print(stardis->logger, LOG_ERROR,
@@ -1214,7 +1213,7 @@ process_flx
       "is not 1 (here order is %u)\n",
       f_boundary->imposed_flux, stardis->picard_order);
     res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   ASSERT(sz <= UINT_MAX);
@@ -1260,7 +1259,7 @@ process_flx_prog
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   CHK_ARG(idx, "program name");
@@ -1293,6 +1292,7 @@ error:
 static res_T
 process_sfc
   (struct stardis* stardis,
+   const int with_flux,
    wordexp_t* pwordexp)
 {
   char* arg = NULL;
@@ -1324,7 +1324,7 @@ process_sfc
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   CHK_ARG(idx, "ref_temperature");
@@ -1333,7 +1333,7 @@ process_sfc
     logger_print(stardis->logger, LOG_ERROR,
         "Invalid reference temperature: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   stardis->t_range[0] = MMIN(stardis->t_range[0], sf_connect->ref_temperature);
   stardis->t_range[1] = MMAX(stardis->t_range[1], sf_connect->ref_temperature);
@@ -1344,7 +1344,7 @@ process_sfc
   || sf_connect->emissivity > 1) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid emissivity: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "specular fraction");
   res = cstr_to_double(arg, &sf_connect->specular_fraction);
@@ -1354,7 +1354,7 @@ process_sfc
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid specular fraction: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "convection coefficient");
   res = cstr_to_double(arg, &sf_connect->hc);
@@ -1362,7 +1362,17 @@ process_sfc
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid convection coefficient: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
+  }
+
+  if(with_flux) {
+    CHK_ARG(idx, "flux");
+    res = cstr_to_double(arg, &sf_connect->flux);
+    if(res != RES_OK) {
+      logger_print(stardis->logger, LOG_ERROR,
+        "Invalid flux: %s\n", arg);
+      goto error;
+    }
   }
 
   ASSERT(sz <= UINT_MAX);
@@ -1378,6 +1388,7 @@ error:
 static res_T
 process_sfc_prog
   (struct stardis* stardis,
+   const int with_flux,
    wordexp_t* pwordexp)
 {
   char* arg = NULL;
@@ -1407,7 +1418,7 @@ process_sfc_prog
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   desc_name = arg;
 
@@ -1430,6 +1441,9 @@ process_sfc_prog
   GET_LIB_SYMBOL(sf_connect_prog, hc, stardis_convection_coefficient);
   GET_LIB_SYMBOL(sf_connect_prog, hmax, stardis_max_convection_coefficient);
   GET_LIB_SYMBOL(sf_connect_prog, t_range, stardis_t_range);
+  if(with_flux) {
+    GET_LIB_SYMBOL(sf_connect_prog, flux, stardis_boundary_flux);
+  }
   /* create and init custom data */
   ctx.name = desc_name;
   CREATE_DESC_DATA(sf_connect_prog);
@@ -1481,7 +1495,7 @@ process_ssc
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   CHK_ARG(idx, "contact resistance");
@@ -1490,7 +1504,7 @@ process_ssc
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid contact resistance: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   else if(ss_connect->tcr == 0) {
     logger_print(stardis->logger, LOG_WARNING,
@@ -1539,7 +1553,7 @@ process_ssc_prog
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   desc_name = arg;
 
@@ -1663,7 +1677,7 @@ process_solid
   solid = desc->d.solid;
   desc->type = DESC_MAT_SOLID;
   solid->solid_id = allocate_stardis_medium_id(stardis);
-  solid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  solid->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
   solid->t0 = stardis->initial_time;
   solid->is_outside = 0;
   ASSERT(sz <= UINT_MAX);
@@ -1675,35 +1689,29 @@ process_solid
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   CHK_ARG(idx, "lambda");
   res = cstr_to_double(arg, &solid->lambda);
-  if(res != RES_OK
-    || solid->lambda <= 0)
-  {
+  if(res != RES_OK || solid->lambda <= 0) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid lambda: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "rho");
   res = cstr_to_double(arg, &solid->rho);
-  if(res != RES_OK
-    || solid->rho <= 0)
-  {
+  if(res != RES_OK || solid->rho <= 0) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid rho: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "cp");
   res = cstr_to_double(arg, &solid->cp);
-  if(res != RES_OK
-    || solid->cp <= 0)
-  {
+  if(res != RES_OK || solid->cp <= 0) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid cp: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   ERR(read_delta(stardis, &solid->delta, pwordexp, &idx));
   CHK_ARG(idx, "Tinit");
@@ -1711,19 +1719,18 @@ process_solid
   if(res != RES_OK || SDIS_TEMPERATURE_IS_UNKNOWN(solid->tinit)) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid Tinit: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   ERR(read_imposed_temperature(stardis, &solid->imposed_temperature,
     pwordexp, &idx));
   if(SDIS_TEMPERATURE_IS_KNOWN(solid->imposed_temperature)
-  && solid->imposed_temperature != solid->tinit)
-  {
+  && solid->imposed_temperature != solid->tinit) {
     logger_print(stardis->logger, LOG_ERROR,
       "Imposed temperature, if defined, must match initial temperature "
       "(initial: %g; imposed: %g)\n",
       solid->tinit, solid->imposed_temperature);
     res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   CHK_ARG(idx, "volumic power");
@@ -1731,7 +1738,7 @@ process_solid
   if(res != RES_OK) {
     /* VPower can be < 0 */
     logger_print(stardis->logger, LOG_ERROR, "Invalid volumic power: %s\n", arg);
-    goto end;
+    goto error;
   }
   if(solid->vpower != 0 && stardis->picard_order > 1) {
     logger_print(stardis->logger, LOG_ERROR,
@@ -1739,7 +1746,7 @@ process_solid
       "(here order is %u)\n",
       solid->vpower, stardis->picard_order);
     res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   /* Actual solid creation is defered until geometry is read to allow
@@ -1788,7 +1795,7 @@ process_solid_prog
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   desc_name = arg;
 
@@ -1813,10 +1820,21 @@ process_solid_prog
 
   GET_LIB_SYMBOL_BASE(&solid_prog->sample_path, solid_prog->program->lib_handle,
     stardis_sample_conductive_path, 1);
+  GET_LIB_SYMBOL_BASE(&solid_prog->t_range, solid_prog->program->lib_handle,
+    stardis_t_range, 1);
 
   /* create and init custom data */
   ctx.name = desc_name;
   CREATE_DESC_DATA(solid_prog);
+
+  if(solid_prog->t_range) {
+    double t_range[2];
+    solid_prog->t_range(solid_prog->prog_data, t_range);
+    if(STARDIS_TEMPERATURE_IS_KNOWN(t_range[0]))
+      stardis->t_range[0] = MMIN(stardis->t_range[0], t_range[0]);
+    if(STARDIS_TEMPERATURE_IS_KNOWN(t_range[1]))
+      stardis->t_range[1] = MMAX(stardis->t_range[1], t_range[1]);
+  }
 
   ERR(create_solver_solid_prog(stardis, solid_prog));
 
@@ -1851,7 +1869,7 @@ process_fluid
   desc->type = DESC_MAT_FLUID;
   fluid->t0 = stardis->initial_time;
   fluid->fluid_id = allocate_stardis_medium_id(stardis);
-  fluid->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  fluid->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
   ASSERT(sz <= UINT_MAX);
   fluid->desc_id = (unsigned)sz;
 
@@ -1861,33 +1879,29 @@ process_fluid
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   CHK_ARG(idx, "rho");
   res = cstr_to_double(arg, &fluid->rho);
-  if(res != RES_OK
-    || fluid->rho <= 0)
-  {
+  if(res != RES_OK || fluid->rho <= 0) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid rho: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "cp");
   res = cstr_to_double(arg, &fluid->cp);
-  if(res != RES_OK
-    || fluid->cp <= 0)
-  {
+  if(res != RES_OK || fluid->cp <= 0) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid cp: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "Tinit");
   res = cstr_to_double(arg, &fluid->tinit);
   if(res != RES_OK || SDIS_TEMPERATURE_IS_UNKNOWN(fluid->tinit)) {
     logger_print(stardis->logger, LOG_ERROR, "Invalid Tinit: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   ERR(read_imposed_temperature(stardis, &fluid->imposed_temperature,
     pwordexp, &idx));
@@ -1898,7 +1912,7 @@ process_fluid
       "(initial: %g; imposed: %g)\n",
       fluid->tinit, fluid->imposed_temperature);
     res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   ERR(create_solver_fluid(stardis, fluid));
@@ -1946,7 +1960,7 @@ process_fluid_prog
     logger_print(stardis->logger, LOG_ERROR,
       "Name already used: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   desc_name = arg;
 
@@ -1993,17 +2007,15 @@ process_scale
     logger_print(stardis->logger, LOG_ERROR,
       "SCALE cannot be specified twice\n");
     res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "scale factor");
   res = cstr_to_double(arg, &stardis->scale_factor);
-  if(res != RES_OK
-    || stardis->scale_factor <= 0)
-  {
+  if(res != RES_OK || stardis->scale_factor <= 0) {
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid scale factor: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
 end:
@@ -2042,7 +2054,7 @@ process_radiative
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid Trad: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
   CHK_ARG(idx, "Trad reference");
   res = cstr_to_double(arg, &tref);
@@ -2050,7 +2062,7 @@ process_radiative
     logger_print(stardis->logger, LOG_ERROR,
       "Invalid Trad reference: %s\n", arg);
     if(res == RES_OK) res = RES_BAD_ARG;
-    goto end;
+    goto error;
   }
 
   stardis->radenv.data.cst.temperature = trad;
@@ -2344,9 +2356,13 @@ process_model_line
   else if(0 == strcasecmp(arg, "F_BOUNDARY_FOR_SOLID_PROG"))
     ERR(process_flx_prog(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "SOLID_FLUID_CONNECTION"))
-    ERR(process_sfc(stardis, pwordexp));
+    ERR(process_sfc(stardis, 0/* No flux*/, pwordexp));
+  else if(0 == strcasecmp(arg, "F_SOLID_FLUID_CONNECTION"))
+    ERR(process_sfc(stardis, 1/* Flux */, pwordexp));
   else if(0 == strcasecmp(arg, "SOLID_FLUID_CONNECTION_PROG"))
-    ERR(process_sfc_prog(stardis, pwordexp));
+    ERR(process_sfc_prog(stardis, 0/* No flux*/, pwordexp));
+  else if(0 == strcasecmp(arg, "F_SOLID_FLUID_CONNECTION_PROG"))
+    ERR(process_sfc_prog(stardis, 1/* Flux */, pwordexp));
   else if(0 == strcasecmp(arg, "SOLID_SOLID_CONNECTION"))
     ERR(process_ssc(stardis, pwordexp));
   else if(0 == strcasecmp(arg, "SOLID_SOLID_CONNECTION_PROG"))
@@ -2411,7 +2427,7 @@ get_dummy_solid_id
   dummy->solid_id = dummies->dummy_solid_id;
   dummy->t0 = stardis->initial_time;
   dummy->is_outside = 1;
-  dummy->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  dummy->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
   create_solver_solid(stardis, dummy);
   dummies->dummy_solid
     = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_solid_id];
@@ -2445,7 +2461,7 @@ get_dummy_fluid_id
   dummy->fluid_id = dummies->dummy_fluid_id;
   dummy->t0 = stardis->initial_time;
   dummy->is_outside = 1;
-  dummy->is_green = stardis->mode & (MODE_BIN_GREEN | MODE_GREEN);
+  dummy->is_green = stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII);
   create_solver_fluid(stardis, dummy);
   dummies->dummy_fluid
     = darray_media_ptr_data_get(&stardis->media)[dummies->dummy_fluid_id];
@@ -2492,29 +2508,29 @@ read_model
       ERR(txtrdr_read_line(txtrdr));
       line = txtrdr_get_line(txtrdr);
       if(!line) break;
-      word_initialized = 1;
       switch(wordexp(line, &pwordexp, flags)) {
         case 0: /* No error */
+          word_initialized = 1;
           break;
         case WRDE_NOSPACE: /* Ran out of memory.  */
           res = RES_MEM_ERR;
           goto error;
         case WRDE_BADCHAR: /* A metachar appears in the wrong place.  */
           logger_print(stardis->logger, LOG_ERROR,
-            "%s: word expansion error: invalid character:\n", name);
+            "%s: word expansion error: invalid character.\n", name);
           goto exp_error;
         case WRDE_BADVAL: /* Undefined var reference with WRDE_UNDEF.  */
           logger_print(stardis->logger, LOG_ERROR,
-            "%s: word expansion error: undefined environment variable:\n", name);
+            "%s: word expansion error: undefined environment variable.\n", name);
           goto exp_error;
         case WRDE_CMDSUB: /* Command substitution with WRDE_NOCMD.  */
           logger_print(stardis->logger, LOG_ERROR,
-            "%s: word expansion error: command substitution is not enabled:\n",
+            "%s: word expansion error: command substitution is not enabled.\n",
             name);
           goto exp_error;
         case WRDE_SYNTAX: /* Shell syntax error.  */
           logger_print(stardis->logger, LOG_ERROR,
-            "%s: word expansion error: syntax error:\n", name);
+            "%s: word expansion error: syntax error.\n", name);
           goto exp_error;
         default:
           FATAL("Unexpected return code.\n");

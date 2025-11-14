@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,6 +48,7 @@ struct solid_fluid_connect_prog {
   double (*alpha)
     (const struct stardis_interface_fragment*, const unsigned src_id, void*);
   double (*hc)(const struct stardis_interface_fragment*, void*);
+  double (*flux)(const struct stardis_interface_fragment*, void*);
   double (*hmax)(void*);
   double* (*t_range)(void*, double trange[2]);
 };

@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@ struct solid_fluid_connect {
   double emissivity;
   double specular_fraction;
   double hc;
+  double flux; /* [W/m^2] */
   unsigned connection_id;
 };
 

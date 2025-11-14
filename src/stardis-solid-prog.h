@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,6 +48,7 @@ struct solid_prog {
   double (*delta)(const struct stardis_vertex*, void*);
   double (*temp)(const struct stardis_vertex*, void*);
   double (*vpower)(const struct stardis_vertex*, void*);
+  double (*t_range)(void* data, double t_range[2]);
 
   /* User-defined function for sampling a conductive path */
   int

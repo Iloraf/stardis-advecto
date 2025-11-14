@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -333,50 +333,6 @@ error:
   goto end;
 }
 
-#define READ_RANDOM_STATE(Name) \
-  if(!stardis->mpi_initialized || stardis->mpi_rank == 0) { \
-    if(str_is_empty(Name)) { \
-      /* Force using threefry independently of the default RNG type */ \
-      args.rng_type = SSP_RNG_THREEFRY; \
-    } else { \
-      const char* name = str_cget(Name); \
-      stream_r = fopen(name, "r"); \
-      if(!stream_r) { \
-        res = RES_IO_ERR; \
-        logger_print(stardis->logger, LOG_ERROR, \
-          "Cannot open generator's state file ('%s').\n", \
-          name); \
-        goto error; \
-      } \
-      ERR(ssp_rng_create(stardis->allocator, SSP_RNG_THREEFRY, &args.rng_state)); \
-      res =  read_random_generator_state(args.rng_state, stream_r); \
-      if(res != RES_OK) { \
-        logger_print(stardis->logger, LOG_ERROR, \
-          "Cannot read random generator's state ('%s').\n", \
-          name); \
-        goto error; \
-      } \
-      fclose(stream_r); stream_r = NULL; \
-    } \
-  }
-
-#define WRITE_RANDOM_STATE(Name) \
-  if(!stardis->mpi_initialized || stardis->mpi_rank == 0) { \
-    if(!str_is_empty(Name)) { \
-      const char* name = str_cget(Name); \
-      stream_r = fopen(name, "wb"); \
-      if(!stream_r) { \
-        res = RES_IO_ERR; \
-        logger_print(stardis->logger, LOG_ERROR, \
-          "Cannot write random generator's state ('%s').\n", \
-          name); \
-        goto error; \
-      } \
-      ERR(write_random_generator_state(estimator, stream_r)); \
-      fclose(stream_r); stream_r = NULL; \
-    } \
-  }
-
 static res_T
 compute_probe(struct stardis* stardis, struct time* start)
 {
@@ -392,7 +348,7 @@ compute_probe(struct stardis* stardis, struct time* start)
   FILE* stream_p = NULL;
   struct time compute_start, compute_end;
 
-  ASSERT(stardis && start && (stardis->mode & MODE_PROBE_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_VOL));
 
   ERR(check_probe_conform_to_type(stardis, stardis->probe,
     stardis->time_range[0], &iprim, uv));
@@ -405,12 +361,12 @@ compute_probe(struct stardis* stardis, struct time* start)
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
 
-  if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+  if(stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII)) {
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
     } else {
       /* Try to open output files to detect errors early */
-      if(stardis->mode & MODE_BIN_GREEN) {
+      if(stardis->mode & MODE_GREEN_BIN) {
         ASSERT(!str_is_empty(&stardis->bin_green_filename));
         stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream_g) {
@@ -437,7 +393,7 @@ compute_probe(struct stardis* stardis, struct time* start)
       time_current(&compute_start);
       ERR(sdis_solve_probe_green_function(stardis->sdis_scn, &args, &green));
       time_current(&compute_end);
-      if(stardis->mode & MODE_BIN_GREEN) {
+      if(stardis->mode & MODE_GREEN_BIN) {
         struct time output_end;
         ERR(dump_green_bin(green, stardis, stream_g));
         if(stream_p) {
@@ -447,7 +403,7 @@ compute_probe(struct stardis* stardis, struct time* start)
         ERR(print_computation_time(NULL, stardis,
           start, &compute_start, &compute_end, &output_end));
       }
-      if(stardis->mode & MODE_GREEN) {
+      if(stardis->mode & MODE_GREEN_ASCII) {
         ERR(dump_green_ascii(green, stardis, stdout));
       }
     }
@@ -585,8 +541,8 @@ compute_camera(struct stardis* stardis, struct time* start)
   struct time compute_start, compute_end, output_end;
 
   ASSERT(stardis && start
-    && !(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN))
-    && (stardis->mode & MODE_IR_COMPUTE));
+    && !(stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII))
+    && (stardis->mode & MODE_COMPUTE_IMAGE_IR));
 
   width = (size_t)stardis->camera.img_width;
   height = (size_t)stardis->camera.img_height;
@@ -683,7 +639,7 @@ compute_medium(struct stardis* stardis, struct time* start)
   FILE* stream_p = NULL;
   struct time compute_start, compute_end;
 
-  ASSERT(stardis && start && (stardis->mode & MODE_MEDIUM_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM));
 
   /* Find medium */
   medium = find_medium_by_name(stardis, str_cget(&stardis->solve_name), NULL);
@@ -703,12 +659,12 @@ compute_medium(struct stardis* stardis, struct time* start)
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
 
-  if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+  if(stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII)) {
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
     } else {
       /* Try to open output files to detect errors early */
-      if(stardis->mode & MODE_BIN_GREEN) {
+      if(stardis->mode & MODE_GREEN_BIN) {
         ASSERT(!str_is_empty(&stardis->bin_green_filename));
         stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream_g) {
@@ -735,7 +691,7 @@ compute_medium(struct stardis* stardis, struct time* start)
       time_current(&compute_start);
       ERR(sdis_solve_medium_green_function(stardis->sdis_scn, &args, &green));
       time_current(&compute_end);
-      if(stardis->mode & MODE_BIN_GREEN) {
+      if(stardis->mode & MODE_GREEN_BIN) {
         struct time output_end;
         ASSERT(!str_is_empty(&stardis->bin_green_filename));
         ERR(dump_green_bin(green, stardis, stream_g));
@@ -746,7 +702,7 @@ compute_medium(struct stardis* stardis, struct time* start)
         ERR(print_computation_time(NULL, stardis,
           start, &compute_start, &compute_end, &output_end));
       }
-      if(stardis->mode & MODE_GREEN) {
+      if(stardis->mode & MODE_GREEN_ASCII) {
         ERR(dump_green_ascii(green, stardis, stdout));
       }
     }
@@ -851,7 +807,7 @@ compute_boundary(struct stardis* stardis, struct time* start)
   FILE* stream_p = NULL;
   struct time compute_start, compute_end;
 
-  ASSERT(stardis && start && (stardis->mode & MODE_BOUNDARY_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_COMPUTE_TEMP_MEAN_ON_SURF));
 
   args.nrealisations = stardis->samples;
   args.primitives
@@ -865,12 +821,12 @@ compute_boundary(struct stardis* stardis, struct time* start)
   /* Input random state? */
   READ_RANDOM_STATE(&stardis->rndgen_state_in_filename);
 
-  if(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)) {
+  if(stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII)) {
     if(stardis->mpi_initialized && stardis->mpi_rank != 0) {
       ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
     } else {
       /* Try to open output files to detect errors early */
-      if(stardis->mode & MODE_BIN_GREEN) {
+      if(stardis->mode & MODE_GREEN_BIN) {
         ASSERT(!str_is_empty(&stardis->bin_green_filename));
         stream_g = fopen(str_cget(&stardis->bin_green_filename), "wb");
         if(!stream_g) {
@@ -897,7 +853,7 @@ compute_boundary(struct stardis* stardis, struct time* start)
       time_current(&compute_start);
       ERR(sdis_solve_boundary_green_function(stardis->sdis_scn, &args, &green));
       time_current(&compute_end);
-      if(stardis->mode & MODE_BIN_GREEN) {
+      if(stardis->mode & MODE_GREEN_BIN) {
         struct time output_end;
         ERR(dump_green_bin(green, stardis, stream_g));
         if(stream_p) {
@@ -907,7 +863,7 @@ compute_boundary(struct stardis* stardis, struct time* start)
         ERR(print_computation_time(NULL, stardis,
           start, &compute_start, &compute_end, &output_end));
       }
-      if(stardis->mode & MODE_GREEN) {
+      if(stardis->mode & MODE_GREEN_ASCII) {
         ERR(dump_green_ascii(green, stardis, stdout));
       }
     }
@@ -962,7 +918,7 @@ compute_flux_boundary(struct stardis* stardis, struct time* start)
   FILE* stream_r = NULL;
   struct time compute_start, compute_end;
 
-  ASSERT(stardis && start && (stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE));
+  ASSERT(stardis && start && (stardis->mode & MODE_COMPUTE_FLUX_THROUGH_SURF));
 
   args.nrealisations = stardis->samples;
   args.primitives
@@ -1021,8 +977,8 @@ compute_map(struct stardis* stardis, struct time* start)
 
   (void)start;
   ASSERT(stardis && start
-    && (stardis->mode & MODE_MAP_COMPUTE)
-    && !(stardis->mode & (MODE_BIN_GREEN | MODE_GREEN)));
+    && (stardis->mode & MODE_COMPUTE_TEMP_MAP_ON_SURF)
+    && !(stardis->mode & (MODE_GREEN_BIN | MODE_GREEN_ASCII)));
 
   darray_estimators_init(stardis->allocator, &estimators);
   estimators_initialized = 1;
@@ -1064,9 +1020,6 @@ end:
 error:
   goto end;
 }
-
-#undef READ_RANDOM_STATE
-#undef WRITE_RANDOM_STATE
 
 /*******************************************************************************
  * Public Functions
@@ -1182,23 +1135,29 @@ stardis_compute
   ASSERT(stardis && start && (stardis->mode & COMPUTE_MODES));
 
   /* Compute */
-  if(stardis->mode & MODE_PROBE_COMPUTE)
-    ERR(compute_probe(stardis, start));
-  else if(stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
-    ERR(compute_probe_on_interface(stardis, start));
-  else if(stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE)
-    ERR(compute_probe_on_interface(stardis, start));
-  else if(stardis->mode & MODE_IR_COMPUTE)
-    ERR(compute_camera(stardis, start));
-  else if(stardis->mode & MODE_MEDIUM_COMPUTE)
-    ERR(compute_medium(stardis, start));
-  else if(stardis->mode & MODE_BOUNDARY_COMPUTE)
-    ERR(compute_boundary(stardis, start));
-  else if(stardis->mode & MODE_FLUX_BOUNDARY_COMPUTE)
-    ERR(compute_flux_boundary(stardis, start));
-  else if(stardis->mode & MODE_MAP_COMPUTE)
-    ERR(compute_map(stardis, start));
-  else FATAL("Unknown mode.\n");
+  if(stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_VOL) {
+      ERR(compute_probe(stardis, start));
+  } else if(stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF) {
+      ERR(compute_probe_on_interface(stardis, start));
+  } else if(stardis->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF) {
+      ERR(compute_probe_on_interface(stardis, start));
+  } else if(stardis->mode & MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF) {
+      ERR(compute_probe_on_interface(stardis, start));
+  } else if(stardis->mode & MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF) {
+      ERR(compute_probe_on_interface(stardis, start));
+  } else if(stardis->mode & MODE_COMPUTE_IMAGE_IR) {
+      ERR(compute_camera(stardis, start));
+  } else if(stardis->mode & MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM) {
+      ERR(compute_medium(stardis, start));
+  } else if(stardis->mode & MODE_COMPUTE_TEMP_MEAN_ON_SURF) {
+      ERR(compute_boundary(stardis, start));
+  } else if(stardis->mode & MODE_COMPUTE_FLUX_THROUGH_SURF) {
+      ERR(compute_flux_boundary(stardis, start));
+  } else if(stardis->mode & MODE_COMPUTE_TEMP_MAP_ON_SURF) {
+      ERR(compute_map(stardis, start));
+  } else {
+    FATAL("Unknown mode.\n");
+  }
 
 end:
   return res;

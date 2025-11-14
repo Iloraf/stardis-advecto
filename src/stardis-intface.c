@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -650,8 +650,13 @@ create_intface
         interface_props->ref_temperature = intface->d.sf_connect->ref_temperature;
         interface_props->emissivity = intface->d.sf_connect->emissivity;
         interface_props->alpha = intface->d.sf_connect->specular_fraction;
+        interface_props->imposed_flux = intface->d.sf_connect->flux;
         if(intface->d.sf_connect->hc > 0) {
           interface_shader.convection_coef = interface_get_convection_coef;
+        }
+        if(intface->d.sf_connect->flux != SDIS_FLUX_NONE) {
+          interface_shader.front.flux = interface_get_flux;
+          interface_shader.back.flux = interface_get_flux;
         }
         ASSERT(fluid_side_shader);
         fluid_side_shader->reference_temperature = interface_get_ref_temperature;
@@ -679,6 +684,11 @@ create_intface
           = intface->d.sf_connect_prog->emissivity;
         interface_props->get_alpha = intface->d.sf_connect_prog->alpha;
         interface_shader.convection_coef = intface_prog_get_hc;
+        if(intface->d.sf_connect_prog->flux) {
+          interface_props->get_flux = intface->d.sf_connect_prog->flux;
+          interface_shader.front.flux = intface_prog_get_flux;
+          interface_shader.back.flux = intface_prog_get_flux;
+        }
         ASSERT(fluid_side_shader);
         fluid_side_shader->emissivity = intface_prog_get_emissivity;
         fluid_side_shader->specular_fraction = intface_prog_get_alpha;

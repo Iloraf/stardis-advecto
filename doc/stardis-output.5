@@ -1,4 +1,4 @@
-.\" Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+.\" Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
 .\"
 .\" This program is free software: you can redistribute it and/or modify
 .\" it under the terms of the GNU General Public License as published by
@@ -112,6 +112,7 @@ or an extended format that mixes numbers and their descriptions
 .It Ta \& \& | Ta Ao Va medium-temp Ac # Option Fl m
 .It Ta \& \& | Ta Ao Va mean-temp Ac # Option Fl s
 .It Ta \& \& | Ta Ao Va mean-flux Ac # Option Fl F
+.It Ta \& \& | Ta Ao Va flux-density Ac # Option Fl f
 .It \  Ta Ta
 .\" Probe temperature
 .It Ao Va probe-temp Ac Ta ::= Ta Ao Va probe-temp-raw Ac | Ao Va probe-temp-ext Ac
@@ -133,7 +134,10 @@ or an extended format that mixes numbers and their descriptions
 .It \  Ta Ta
 .\" Mean flux
 .It Ao Va mean-flux Ac Ta ::= Ta Ao Va mean-flux-raw Ac | Ao Va mean-flux-ext Ac
+.It Ao Va flux-density Ac Ta ::= Ta Ao Va flux-density-raw Ac | Ao Va flux-density-ext Ac
 .It Ao Va mean-flux-raw Ac Ta ::= Ta Ao Va estimate Ac Ao Va estimate Ac Ao Va estimate Ac \e
+.It Ta Ta Ao Va estimate Ac Ao Va estimate Ac Ao Va failures Ac
+.It Ao Va flux-density-raw Ac Ta ::= Ta Ao Va estimate Ac Ao Va estimate Ac Ao Va estimate Ac \e
 .It Ta Ta Ao Va estimate Ac Ao Va estimate Ac Ao Va failures Ac
 .It Ao Va mean-flux-ext Ac Ta ::= Ta Li Temperature at boundary Ao Va stl-path Ac \e
 .It Ta Ta Ao Va time Ac Ao Va estimate-temp-ext Ac
@@ -146,11 +150,23 @@ or an extended format that mixes numbers and their descriptions
 .It Ta Ta Li Total flux at boundary Ao Va stl-path Ac \e
 .It Ta Ta Ao Va time Ac Ao Va estimate-flux-ext Ac
 .It Ta Ta Ao Va failures-ext Ac
+.It Ao Va flux-density-ext Ac Ta ::= Ta Li Temperature at Ao Va position Ac Ao Va time Ac \e
+.It Ta Ta Ao Va estimate-temp-ext Ac
+.It Ta Ta Li Convective flux density at Ao Va position Ac Ao Va time Ac \e
+.It Ta Ta Ao Va estimate-f-dsity-ext Ac
+.It Ta Ta Li Radiative flux density at Ao Va position Ac Ao Va time Ac \e
+.It Ta Ta Ao Va estimate-f-dsity-ext Ac
+.It Ta Ta Li Imposed flux density at Ao Va position Ac Ao Va time Ac \e
+.It Ta Ta Ao Va estimate-f-dsity-ext Ac
+.It Ta Ta Li Total flux density at Ao Va position Ac Ao Va time Ac \e
+.It Ta Ta Ao Va estimate-f-dsity-ext Ac
+.It Ta Ta Ao Va failures-ext Ac
 .It \  Ta Ta
 .\" Miscellaneous
 .It Ao Va estimate Ac Ta ::= Ta Ao Va expected-value Ac Ao Va standard-error Ac
 .It Ao Va estimate-temp-ext Ac Ta ::= Ta Ao Va expected-value Ac Li K +/- Ao Va standard-error Ac
 .It Ao Va estimate-flux-ext Ac Ta ::= Ta Ao Va expected-value Ac Li W +/- Ao Va standard-error Ac
+.It Ao Va estimate-f-dsity-ext Ac Ta ::= Ta Ao Va expected-value Ac Li W/m² +/- Ao Va standard-error Ac
 .It Ao Va expected-value Ac Ta ::= Ta Vt real
 .It Ao Va standard-error Ac Ta ::= Ta Vt real
 .It \  Ta Ta

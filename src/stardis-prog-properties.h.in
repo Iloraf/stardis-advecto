@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -25,7 +25,8 @@
 /* The version of the API described thereafter */
 #define STARDIS_PROG_PROPERTIES_VERSION @STARDIS_PROG_PROPERTIES_VERSION@
 
-#include <stddef.h>
+#include <limits.h> /* UINT_MAX */
+#include <stddef.h> /* size_t */
 
 #if defined(__GNUC__)
   #define STARDIS_API extern __attribute__((visibility("default")))

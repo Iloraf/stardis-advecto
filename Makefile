@@ -1,4 +1,4 @@
-# Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+# Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -68,31 +68,24 @@ OBJ = $(SRC:.c=.o)
 DEP = $(SRC:.c=.d)
 
 build_executable: .config $(HDR) $(DEP)
-	@$(MAKE) -fMakefile $$(for i in $(DEP); do echo -f $${i}; done) stardis
+	@$(MAKE) -fMakefile $$(for i in $(DEP); do echo -f "$${i}"; done) stardis
 
-$(DEP) $(OBJ): config.mk
+stardis $(DEP) $(OBJ): config.mk
 
 stardis: $(OBJ)
-	$(CC) $(CFLAGS) $(DPDC_CFLAGS) -o $@ $(OBJ) $(LDFLAGS) $(DPDC_LIBS)
+	$(CC) $(CFLAGS) $(INCS) -o $@ $(OBJ) $(LDFLAGS) $(LIBS)
 
 .config: config.mk
-	@if [ "$(DISTRIB_PARALLELISM)" = "MPI" ]; then \
-	  if ! $(PKG_CONFIG) --atleast-version $(MPI_VERSION) $(MPI_PC); then \
-	    echo "$(MPI_PC) $(MPI_VERSION) not found" >&2; exit 1; fi; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys; then \
-	  echo "rsys $(RSYS_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d; then \
-	  echo "s3d $(S3D_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SDIS_VERSION) sdis; then \
-	  echo "sdis $(SDIS_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SENC3D_VERSION) senc3d; then \
-	  echo "senc3d $(SENC3D_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SG3D_VERSION) sg3d; then \
-	  echo "sg3d $(SG3D_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp; then \
-	  echo "star-sp $(SSP_VERSION) not found" >&2; exit 1; fi
-	@if ! $(PKG_CONFIG) --atleast-version $(SSTL_VERSION) sstl; then \
-	  echo "sstl $(SSTL_VERSION) not found" >&2; exit 1; fi
+	if [ "$(DISTRIB_PARALLELISM)" = "MPI" ]; then \
+	  $(PKG_CONFIG) --atleast-version $(MPI_VERSION) $(MPI_PC); \
+	fi
+	$(PKG_CONFIG) --atleast-version $(RSYS_VERSION) rsys
+	$(PKG_CONFIG) --atleast-version $(S3D_VERSION) s3d
+	$(PKG_CONFIG) --atleast-version $(SDIS_VERSION) sdis
+	$(PKG_CONFIG) --atleast-version $(SENC3D_VERSION) senc3d
+	$(PKG_CONFIG) --atleast-version $(SG3D_VERSION) sg3d
+	$(PKG_CONFIG) --atleast-version $(SSP_VERSION) star-sp
+	$(PKG_CONFIG) --atleast-version $(SSTL_VERSION) sstl
 	@echo "config done" > $@
 
 src/stardis-default.h: config.mk src/stardis-default.h.in
@@ -135,11 +128,11 @@ src/stardis-prog-properties.h: config.mk src/stardis-prog-properties.h.in
 
 .SUFFIXES: .c .d .o
 .c.d:
-	@$(CC) $(CFLAGS) $(DPDC_CFLAGS) $($(DISTRIB_PARALLELISM)_DEF) -MM -MT \
+	@$(CC) $(CFLAGS) $(INCS) $($(DISTRIB_PARALLELISM)_DEF) -MM -MT \
 	"$(@:.d=.o) $@" $< -MF $@
 
 .c.o:
-	$(CC) $(CFLAGS) $(DPDC_CFLAGS) $($(DISTRIB_PARALLELISM)_DEF) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCS) $($(DISTRIB_PARALLELISM)_DEF) -c $< -o $@
 
 ################################################################################
 # Man pages
@@ -176,35 +169,40 @@ pkg:
 	    stardis.pc.in > stardis.pc
 
 install: all pkg
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/bin" stardis
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/include/stardis" src/stardis-green-types.h
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/include/stardis" src/stardis-prog-properties.h
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/lib/pkgconfig" stardis.pc
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/doc/stardis" COPYING README.md
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man1" doc/stardis.1
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/stardis-input.5
-	@$(SHELL) make.sh install "$(DESTDIR)$(PREFIX)/share/man/man5" doc/stardis-output.5
+	install() { mode="$$1"; prefix="$$2"; shift 2; \
+	  mkdir -p "$${prefix}"; \
+	  cp "$$@" "$${prefix}"; \
+	  for i in "$$@"; do \
+	    chmod "$${mode}" "$${prefix}/$$(basename "$${i}")";\
+	  done; \
+	}; \
+	install 755 "$(DESTDIR)$(BINPREFIX)" stardis; \
+	install 644 "$(DESTDIR)$(INCPREFIX)/stardis" src/stardis-green-types.h; \
+	install 644 "$(DESTDIR)$(INCPREFIX)/stardis" src/stardis-prog-properties.h; \
+	install 644 "$(DESTDIR)$(LIBPREFIX)/pkgconfig" stardis.pc; \
+	install 644 "$(DESTDIR)$(PREFIX)/share/doc/stardis" COPYING README.md; \
+	install 644 "$(DESTDIR)$(MANPREFIX)/man1" doc/stardis.1; \
+	install 644 "$(DESTDIR)$(MANPREFIX)/man5" doc/stardis-input.5; \
+	install 644 "$(DESTDIR)$(MANPREFIX)/man5" doc/stardis-output.5
 
 uninstall:
-	rm -f "$(DESTDIR)$(PREFIX)/bin/stardis"
-	rm -f "$(DESTDIR)$(PREFIX)/include/stardis/stardis-green-types.h"
-	rm -f "$(DESTDIR)$(PREFIX)/include/stardis/stardis-prog-properties.h"
-	rm -f "$(DESTDIR)$(PREFIX)/lib/pkgconfig/stardis.pc"
+	rm -f "$(DESTDIR)$(BINPREFIX)/stardis"
+	rm -f "$(DESTDIR)$(INCPREFIX)/stardis/stardis-green-types.h"
+	rm -f "$(DESTDIR)$(INCPREFIX)/stardis/stardis-prog-properties.h"
+	rm -f "$(DESTDIR)$(LIBPREFIX)/pkgconfig/stardis.pc"
 	rm -f "$(DESTDIR)$(PREFIX)/share/doc/stardis/COPYING"
 	rm -f "$(DESTDIR)$(PREFIX)/share/doc/stardis/README.md"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man1/stardis.1"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/stardis-input.5"
-	rm -f "$(DESTDIR)$(PREFIX)/share/man/man5/stardis-output.5"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man1/stardis.1"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man5/stardis-input.5"
+	rm -f "$(DESTDIR)$(MANPREFIX)/man5/stardis-output.5"
 
 ################################################################################
 # Miscellaneous targets
 ################################################################################
 clean:
 	rm -f $(HDR) $(OBJ) .config stardis stardis.pc
-	rm -f doc/stardis.1 doc/stardis-input.5
-
-distclean: clean
 	rm -f $(DEP)
+	rm -f doc/stardis.1 doc/stardis-input.5
 
 lint: man
 	shellcheck -o all make.sh

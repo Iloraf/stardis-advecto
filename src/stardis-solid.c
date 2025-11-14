@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -136,7 +136,7 @@ create_solver_solid
 #endif
   solid_shader.temperature = solid_get_temperature;
   solid_shader.t0 = stardis->initial_time;
-  ERR(sdis_data_create(stardis->dev, sizeof(struct solid), ALIGNOF(struct solid),
+  ERR(sdis_data_create(stardis->dev, sizeof(struct solid*), ALIGNOF(struct solid*),
     NULL, &data));
 
   props = sdis_data_get(data); /* Fetch the allocated memory space */

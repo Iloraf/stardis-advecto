@@ -1,4 +1,4 @@
-.\" Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+.\" Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
 .\"
 .\" This program is free software: you can redistribute it and/or modify
 .\" it under the terms of the GNU General Public License as published by
@@ -27,9 +27,11 @@
 .Op Fl D Ar path_type , Ns Ar files_name_prefix
 .Op Fl d Ar file_base_name
 .Op Fl F Pa surface Ns Op , Ns Ar time Ns Op , Ns Ar time
+.Op Fl f Ar x , Ns Ar y , Ns Ar z Ns Op , Ns Ar time Ns Op , Ns Ar time
 .Op Fl G Pa green_bin Ns Op , Ns Pa green_ascii
 .Op Fl I Ar initial_time
 .Op Fl L Pa interface_probes
+.Op Fl l Pa interface_probes
 .Op Fl m Ar medium_name Ns Op , Ns Ar time Ns Op , Ns Ar time
 .Op Fl n Ar samples_count
 .Op Fl o Ar picard_order
@@ -180,6 +182,9 @@ and possibly followed by
 .Ql _err
 for failure paths
 .Pq e.g. Pa prefix00000000.vtk , Pa prefix00000001_err.vtk
+.Pp
+Can only be used in conjunction with some options that sample heat paths
+.Pq Fl m , Fl p , Fl P , Fl R, Fl s No or Fl S .
 .It Fl d Ar file_base_name
 Write the geometry to a file in VTK format along with various properties,
 including possible errors.
@@ -199,14 +204,21 @@ Use extended format to output Monte Carlo results.
 Can only be used in conjunction with options that compute a single Monte-Carlo
 .Pq Fl F , Fl m , Fl P , Fl p No or Fl s No without options Fl g No or Fl G .
 .It Fl F Pa surface Ns Op , Ns Ar time Ns Op , Ns Ar time
-Compute the mean flux on a given 2D surface at a given time, the surface
-being defined as the front sides of the triangles in the provided STL
-file.
+Compute the flux through a given 2D surface at a given time, the surface being
+defined by the triangles in a STL file.
+The flux can only be computed on a solid-fluid interface and is accounted
+positive from the solid to the fluid.
 These triangles are not added to the geometry, but must be part of it.
-Flux is accounted positive when going from the front side to the back
-side, at a single-triangle level.
 By default the compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
 The surface does not need to be connex.
+.It Fl f Ar x , Ns Ar y , Ns Ar z Ns Op , Ns Ar time Ns Op , Ns Ar time
+Compute the flux density at a given probe on an interface at a given time.
+The probe is supposed to be on an interface and is moved to the closest point of
+the closest interface before the computation starts.
+The flux density can only be computed on a solid-fluid interface and is
+accounted positive from the solid to the fluid.
+The probe coordinates must be in the same system as the geometry.
+By default the compute time is @STARDIS_ARGS_DEFAULT_COMPUTE_TIME@.
 .It Fl G Pa green_bin Ns Op , Ns Pa green_ascii
 Compute the Green function at the specified time and write it to a binary file.
 If a
@@ -258,6 +270,22 @@ and not the calculation of each individual probe.
 Its use is therefore more advantageous in terms of load distribution
 when the number of probes to be evaluated is large, compared with the
 cost of calculating a single probe point.
+.It Fl l Pa interface_probes
+Defines a set of interface probes for which
+.Nm
+calculates the flux density.
+The argument file lists the interface probe points.
+Each line of this file describes a probe point using the same grammar as
+that used to describe a single interface probe
+.Pq see Fl f No option .
+In addition to this syntax, characters behind the hash mark
+.Pq Ql #
+are considered comments and are therefore ignored, as are empty lines,
+i.e. lines with no characters at all or composed solely of spaces and
+tabs.
+.Pp
+This option allows the calculation of the probe list while reading and
+constructing the system only once.
 .It Fl M Pa system
 Read a text file containing a possibly partial description of the system.
 Can include programs, media enclosures and boundary conditions.

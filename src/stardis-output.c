@@ -1,4 +1,4 @@
-/* Copyright (C) 2018-2024 |Méso|Star> (contact@meso-star.com)
+/* Copyright (C) 2018-2025 |Méso|Star> (contact@meso-star.com)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -638,10 +638,10 @@ medium_get_t0
   type = sdis_medium_get_type(medium);
   data = sdis_medium_get_data(medium);
   if(type == SDIS_FLUID) {
-    const struct fluid* fluid_props = sdis_data_cget(data);
+    const struct fluid* fluid_props = *((const struct fluid**)sdis_data_cget(data));
     return fluid_props->t0;
   } else {
-    const struct solid* solid_props = sdis_data_cget(data);
+    const struct solid* solid_props = *((const struct solid**)sdis_data_cget(data));
     ASSERT(type == SDIS_SOLID);
     return solid_props->t0;
   }
@@ -1632,7 +1632,7 @@ print_single_MC_result
 
   /* Print the results */
   switch (stardis->mode & COMPUTE_MODES) {
-  case MODE_PROBE_COMPUTE:
+  case MODE_COMPUTE_PROBE_TEMP_ON_VOL:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
       if(stardis->time_range[0] == stardis->time_range[1])
         fprintf(stream, "Temperature at [%g, %g, %g] at t=%g = %g K +/- %g\n",
@@ -1649,14 +1649,16 @@ print_single_MC_result
     else fprintf(stream, "%g %g %lu %lu\n",
       result.E, result.SE, nfailures, nsamples);
     break;
-  case MODE_PROBE_COMPUTE_ON_INTERFACE: {
+  case MODE_COMPUTE_PROBE_TEMP_ON_SURF:
+  case MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF:
+    {
       const struct stardis_probe_boundary* probe = NULL;
       probe = darray_probe_boundary_cdata_get(&stardis->probe_boundary_list);
       ERR(print_single_MC_result_probe_boundary
         (stardis, probe, estimator, stream));
       break;
     }
-  case MODE_MEDIUM_COMPUTE:
+  case MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
       if(stardis->time_range[0] == stardis->time_range[1])
         fprintf(stream, "Temperature in medium '%s' at t=%g = %g K +/- %g\n",
@@ -1673,7 +1675,7 @@ print_single_MC_result
     else fprintf(stream, "%g %g %lu %lu\n",
       result.E, result.SE, nfailures, nsamples);
     break;
-  case MODE_BOUNDARY_COMPUTE:
+  case MODE_COMPUTE_TEMP_MEAN_ON_SURF:
     if(stardis->mode & MODE_EXTENDED_RESULTS) {
       if(stardis->time_range[0] == stardis->time_range[1])
         fprintf(stream, "Temperature at boundary '%s' at t=%g = %g K +/- %g\n",
@@ -1690,7 +1692,99 @@ print_single_MC_result
     else fprintf(stream, "%g %g %lu %lu\n",
       result.E, result.SE, nfailures, nsamples);
     break;
-  case MODE_FLUX_BOUNDARY_COMPUTE: {
+
+  case MODE_COMPUTE_PROBE_FLUX_DNSTY_ON_SURF:
+  case MODE_COMPUTE_LIST_PROBE_FLUX_DNSTY_ON_SURF:
+  {
+    enum sdis_estimator_type type;
+    ERR(sdis_estimator_get_type(estimator, &type));
+    ASSERT(type == SDIS_ESTIMATOR_FLUX);
+
+    if(stardis->mode & MODE_EXTENDED_RESULTS) {
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Temperature at [%g, %g, %g] at t=%g = %g K +/- %g\n",
+          SPLIT3(stardis->probe), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream,
+          "Temperature at [%g, %g, %g] with t in [%g %g] = %g K +/- %g\n",
+          SPLIT3(stardis->probe), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      ERR(sdis_estimator_get_convective_flux(estimator, &result));
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Convective flux density at [%g, %g, %g] at t=%g = %g W/m² +/- %g\n",
+          SPLIT3(stardis->probe), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream,
+          "Convective flux density at [%g, %g, %g] with t in [%g %g] = %g W/m² +/- %g\n",
+          SPLIT3(stardis->probe), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      ERR(sdis_estimator_get_radiative_flux(estimator, &result));
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Radiative flux density at [%g, %g, %g] at t=%g = %g W/m² +/- %g\n",
+          SPLIT3(stardis->probe), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream,
+          "Radiative flux density at [%g, %g, %g] with t in [%g %g] = %g W/m² +/- %g\n",
+          SPLIT3(stardis->probe), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      ERR(sdis_estimator_get_imposed_flux(estimator, &result));
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Imposed flux density at [%g, %g, %g] at t=%g = %g W/m² +/- %g\n",
+          SPLIT3(stardis->probe), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream,
+          "Imposed flux density at [%g, %g, %g] with t in [%g %g] = %g W/m² +/- %g\n",
+          SPLIT3(stardis->probe), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      ERR(sdis_estimator_get_total_flux(estimator, &result));
+      if(stardis->time_range[0] == stardis->time_range[1])
+        fprintf(stream, "Total flux density at [%g, %g, %g] at t=%g = %g W/m² +/- %g\n",
+          SPLIT3(stardis->probe), stardis->time_range[0],
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+      else
+        fprintf(stream,
+          "Total flux density at [%g, %g, %g] with t in [%g %g] = %g W/m² +/- %g\n",
+          SPLIT3(stardis->probe), SPLIT2(stardis->time_range),
+          result.E, /* Expected value */
+          result.SE); /* Standard error */
+    } else {
+      fprintf(stream, "%g %g ", result.E, result.SE); /* Temperature */
+      ERR(sdis_estimator_get_convective_flux(estimator, &result));
+      fprintf(stream, "%g %g ",
+        result.E,
+        result.SE);
+      ERR(sdis_estimator_get_radiative_flux(estimator, &result));
+      fprintf(stream, "%g %g ",
+        result.E,
+        result.SE);
+      ERR(sdis_estimator_get_imposed_flux(estimator, &result));
+      fprintf(stream, "%g %g ",
+        result.E,
+        result.SE);
+      ERR(sdis_estimator_get_total_flux(estimator, &result));
+      fprintf(stream, "%g %g ",
+        result.E,
+        result.SE);
+      fprintf(stream, "%lu %lu\n", nfailures, nsamples);
+    }
+    break;
+  }
+
+  case MODE_COMPUTE_FLUX_THROUGH_SURF:
+  {
     enum sdis_estimator_type type;
     ERR(sdis_estimator_get_type(estimator, &type));
     ASSERT(type == SDIS_ESTIMATOR_FLUX);
@@ -1745,13 +1839,13 @@ print_single_MC_result
           stardis->compute_surface.area * result.SE); /* Standard error */
       ERR(sdis_estimator_get_total_flux(estimator, &result));
       if(stardis->time_range[0] == stardis->time_range[1])
-        fprintf(stream, "Total flux Flux at boundary '%s' at t=%g = %g W +/- %g\n",
+        fprintf(stream, "Total flux at boundary '%s' at t=%g = %g W +/- %g\n",
           str_cget(&stardis->solve_name), stardis->time_range[0],
           stardis->compute_surface.area * result.E, /* Expected value */
           stardis->compute_surface.area * result.SE); /* Standard error */
       else
         fprintf(stream,
-          "Total flux Flux at boundary '%s' with t in [%g %g] = %g W +/- %g\n",
+          "Total flux at boundary '%s' with t in [%g %g] = %g W +/- %g\n",
           str_cget(&stardis->solve_name), SPLIT2(stardis->time_range),
           stardis->compute_surface.area * result.E, /* Expected value */
           stardis->compute_surface.area * result.SE); /* Standard error */
@@ -1777,7 +1871,7 @@ print_single_MC_result
     }
     break;
   }
-  default: FATAL("Invalid mode.");
+  default: FATAL("Invalid mode\n.");
   }
   if(stardis->mode & MODE_EXTENDED_RESULTS)
     fprintf(stream, "#failures: %lu/%lu\n", nfailures, nsamples);
@@ -1807,8 +1901,8 @@ print_single_MC_result_probe_boundary
   res_T res = RES_OK;
 
   ASSERT(stardis && probe && estimator);
-  ASSERT((stardis->mode & MODE_PROBE_COMPUTE_ON_INTERFACE)
-      || (stardis->mode & MODE_PROBE_LIST_COMPUTE_ON_INTERFACE));
+  ASSERT((stardis->mode & MODE_COMPUTE_PROBE_TEMP_ON_SURF)
+      || (stardis->mode & MODE_COMPUTE_LIST_PROBE_TEMP_ON_SURF));
 
   /* Only master prints or reads estimators */
   ASSERT(!stardis->mpi_initialized || stardis->mpi_rank == 0);
@@ -2004,7 +2098,7 @@ dump_compute_region_at_the_end_of_vtk
     struct sdis_medium* medium;
     const struct description* descriptions;
     unsigned medium_id;
-    ASSERT(stardis->mode & MODE_MEDIUM_COMPUTE);
+    ASSERT(stardis->mode & MODE_COMPUTE_TEMP_MEAN_IN_MEDIUM);
     medium = find_medium_by_name
       (stardis, str_cget(&stardis->solve_name), &medium_id);
     ASSERT(medium != NULL); (void)medium;

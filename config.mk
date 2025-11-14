@@ -13,6 +13,11 @@ LIB_TYPE = SHARED
 BUILD_TYPE = RELEASE
 #BUILD_TYPE = DEBUG
 
+BINPREFIX = $(PREFIX)/bin
+LIBPREFIX = $(PREFIX)/lib
+INCPREFIX = $(PREFIX)/include
+MANPREFIX = $(PREFIX)/share/man
+
 # Defines whether distributed parallelism  is supported. Any value other
 # than MPI disables its supports. So, simply comment the macro to
 # deactivate it.
@@ -63,56 +68,18 @@ PCFLAGS_STATIC = --static
 PCFLAGS = $(PCFLAGS_$(LIB_TYPE))
 
 MPI_VERSION = 2
-MPI_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags $(MPI_PC))
-MPI_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs $(MPI_PC))
-
 RSYS_VERSION = 0.14
-RSYS_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags rsys)
-RSYS_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs rsys)
-
 S3D_VERSION = 0.10
-S3D_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags s3d)
-S3D_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs s3d)
-
 SDIS_VERSION = 0.16
-SDIS_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags sdis)
-SDIS_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs sdis)
-
 SENC3D_VERSION = 0.7.2
-SENC3D_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags senc3d)
-SENC3D_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs senc3d)
-
 SG3D_VERSION = 0.2
-SG3D_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags sg3d)
-SG3D_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs sg3d)
-
 SSP_VERSION = 0.14
-SSP_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags star-sp)
-SSP_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs star-sp)
-
 SSTL_VERSION = 0.5
-SSTL_CFLAGS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags sstl)
-SSTL_LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs sstl)
 
-DPDC_CFLAGS =\
- $(RSYS_CFLAGS)\
- $(S3D_CFLAGS)\
- $(SDIS_CFLAGS)\
- $(SENC3D_CFLAGS)\
- $(SG3D_CFLAGS)\
- $(SSP_CFLAGS)\
- $(SSTL_CFLAGS)\
- $($(DISTRIB_PARALLELISM)_CFLAGS)
-DPDC_LIBS =\
- $(RSYS_LIBS)\
- $(S3D_LIBS)\
- $(SDIS_LIBS)\
- $(SENC3D_LIBS)\
- $(SG3D_LIBS)\
- $(SSP_LIBS)\
- $(SSTL_LIBS)\
- $($(DISTRIB_PARALLELISM)_LIBS)\
- -lm
+INCS = $$($(PKG_CONFIG) $(PCFLAGS) --cflags\
+ rsys s3d sdis senc3d sg3d star-sp sstl $($(DISTRIB_PARALLELISM)_PC))
+LIBS = $$($(PKG_CONFIG) $(PCFLAGS) --libs\
+ rsys s3d sdis senc3d sg3d star-sp sstl $($(DISTRIB_PARALLELISM)_PC)) -lm
 
 ################################################################################
 # Compilation options

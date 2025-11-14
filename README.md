@@ -33,6 +33,41 @@ Edit config.mk as needed, then run:
 
 ## Release notes
 
+### Version 0.12
+
+- Add a new solid/fluid connection with imposed flux.
+  The new directives `F_SOLID_FLUID_CONNECTION` and
+  `F_SOLID_FLUID_CONNECTION_PROG` describe a connection between a solid
+  and a fluid with imposed flux at their common interface, the latter
+  using programmable properties.
+- Add the `-f` and `-l` options to calculate the flux density for a
+  probe or a list of probes, respectively.
+- Add the missing inclusion of the `limits.h` header to the programmable
+  properties file.
+  This is necessary in order to use the `UINT_MAX` constant.
+- Partial correction of the calculation of a system's temperature range.
+  Only the temperature ranges of the connection conditions and boundary
+  conditions were used.
+  Now, programmable solids are also taken into account.
+  Regular solids and fluids should also be taken into account.
+  However, this more significant correction requires further review and
+  additional testing to ensure that the new method for calculating the
+  temperature range does not disrupt existing simulations.
+  Hence this limited correction, sufficient to verify that it corrects
+  the problem on the system that highlighted it,  but not overly
+  optimistic as to what it corrects versus what it could deteriorate.
+- Fix the `-L` option, which defines a list of surface probes to be
+  calculated.
+  It was not working correctly with a list containing only one probe.
+- Fix the definition of solid properties.
+  The size and alignment of the allocated memory were incorrect.
+- Fix an invalid memory access when handling errors in the analysis of
+  input files with variable expansion.
+- Fix an invalid memory access when writing the green function.
+- Small improvement of the build system.
+  Simplify it by doing everything in one place (the Makefile).
+  Add macros to control installation subdirectories
+
 ### Version 0.11.1
 
 - Corrects the writing of the RNG state when resolving a probe

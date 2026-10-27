@@ -100,7 +100,7 @@ CFLAGS_HARDENED =\
  -fstack-protector-strong
 
 CFLAGS_COMMON =\
- -std=c89\
+ -std=c99\
  -pedantic\
  -fvisibility=hidden\
  -fstrict-aliasing\

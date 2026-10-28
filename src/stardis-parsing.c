@@ -1844,7 +1844,7 @@ error:
   goto end;
 }
 
-/* FLUID Name rho cp Tinit Timposed STL_filenames */
+/* FLUID Name lambda rho cp Tinit Timposed STL_filenames */
 static res_T
 process_fluid
   (struct stardis* stardis,
@@ -1882,6 +1882,13 @@ process_fluid
     goto error;
   }
 
+  CHK_ARG(idx, "lambda");
+  res = cstr_to_double(arg, &fluid->lambda);
+  if(res != RES_OK || fluid->lambda <= 0) {
+    logger_print(stardis->logger, LOG_ERROR, "Invalid lambda: %s\n", arg);
+    if(res == RES_OK) res = RES_BAD_ARG;
+    goto error;
+  }
   CHK_ARG(idx, "rho");
   res = cstr_to_double(arg, &fluid->rho);
   if(res != RES_OK || fluid->rho <= 0) {
@@ -1976,6 +1983,7 @@ process_fluid_prog
   /* get the user-defined functions from the library */
   ERR(get_prog_common(lib_name, stardis, &fluid_prog->program,
     &fluid_prog->create, &fluid_prog->release));
+  GET_LIB_SYMBOL(fluid_prog, lambda, stardis_thermal_capacity);
   GET_LIB_SYMBOL(fluid_prog, rho, stardis_volumic_mass);
   GET_LIB_SYMBOL(fluid_prog, cp, stardis_calorific_capacity);
   GET_LIB_SYMBOL(fluid_prog, temp, stardis_medium_temperature);
@@ -2298,7 +2306,7 @@ error:
 
 /* Read medium or boundary line; should be one of:
  * SOLID Name lambda rho cp delta Tinit Timposed volumic_power STL_sides_filenames
- * FLUID Name rho cp Tinit Timposed STL_filenames
+ * FLUID Name lambda rho cp Tinit Timposed STL_filenames
  * H_BOUNDARY_FOR_SOLID Name ref_temperature emissivity specular_fraction hc T_env STL_sides_filenames
  * H_BOUNDARY_FOR_FLUID Name ref_temperature emissivity specular_fraction hc T_env STL_filenames
  * T_BOUNDARY_FOR_SOLID Name T STL_filenames

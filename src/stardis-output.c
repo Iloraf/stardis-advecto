@@ -100,6 +100,7 @@ copy_desc_to_green_desc
     case DESC_MAT_FLUID:
       gdesc->type = GREEN_MAT_FLUID;
       strcpy(gdesc->d.fluid.name, str_cget(&desc->d.fluid->name));
+      gdesc->d.fluid.conductivity = desc->d.fluid->lambda;
       gdesc->d.fluid.volumic_mass = desc->d.fluid->rho;
       gdesc->d.fluid.calorific_capacity = desc->d.fluid->cp;
       gdesc->d.fluid.initial_temperature = desc->d.fluid->tinit;
@@ -1152,18 +1153,18 @@ dump_green_ascii
   }
   if(stardis->counts.fmed_count) {
     fprintf(stream, "# Fluids\n");
-    fprintf(stream, "# ID Name rho cp initial_temp imposed_temp\n");
+    fprintf(stream, "# ID Name lambda rho cp initial_temp imposed_temp\n");
     FOR_EACH(i, 0, szd) {
       const struct description* desc = descs + i;
       const struct fluid* fl;
       if(desc->type != DESC_MAT_FLUID) continue;
       fl = desc->d.fluid;
       if(SDIS_TEMPERATURE_IS_KNOWN(fl->imposed_temperature)) {
-        fprintf(stream, "%u\t%s\t%g\t%g",
-          i, str_cget(&fl->name), fl->rho, fl->cp);
+        fprintf(stream, "%u\t%s\t%g\t%g\t%g",
+          i, str_cget(&fl->name), fl->lambda, fl->rho, fl->cp);
       } else {
-        fprintf(stream, "%u\t%s\t%g\t%g",
-          i, str_cget(&fl->name), fl->rho, fl->cp);
+        fprintf(stream, "%u\t%s\t%g\t%g\t%g",
+          i, str_cget(&fl->name), fl->lambda, fl->rho, fl->cp);
       }
       if(SDIS_TEMPERATURE_IS_KNOWN(fl->tinit)) {
         fprintf(stream, "\t%g", fl->tinit);

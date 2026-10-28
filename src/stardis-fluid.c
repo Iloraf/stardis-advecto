@@ -47,6 +47,16 @@ fluid_get_volumic_mass
 }
 
 static double
+fluid_get_thermal_conductivity
+  (const struct sdis_rwalk_vertex* vtx,
+   struct sdis_data* data)
+{
+  const struct fluid* const* fluid_props = sdis_data_cget(data);
+  (void)vtx;
+  return (*fluid_props)->lambda;
+}
+
+static double
 fluid_get_temperature
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)

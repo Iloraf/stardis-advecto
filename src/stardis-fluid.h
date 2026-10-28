@@ -31,6 +31,7 @@ struct fluid {
   struct str name;
   double rho; /* Volumic mass */
   double cp; /* Calorific capacity */
+  double lambda; /* Thermal conductivity */
   double tinit;
   double imposed_temperature;
   double t0; /* End time of tinit */

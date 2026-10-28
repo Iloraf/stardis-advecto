@@ -52,6 +52,18 @@ fluid_prog_get_volumic_mass
 }
 
 static double
+fluid_prog_get_thermal_conductivity
+  (const struct sdis_rwalk_vertex* vtx,
+   struct sdis_data* data)
+{
+  const struct fluid_prog* const* fluid_props = sdis_data_cget(data);
+  struct stardis_vertex v;
+  d3_set(v.P, vtx->P);
+  v.time = vtx->time;
+  return (*fluid_props)->lambda(&v, (*fluid_props)->prog_data);
+}
+
+static double
 fluid_prog_get_temperature
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)

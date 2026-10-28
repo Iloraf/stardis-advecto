@@ -42,6 +42,7 @@ struct fluid_prog {
   void* (*create)
     (const struct stardis_description_create_context*, void*, size_t, char**);
   void (*release)(void*);
+  double (*lambda)(const struct stardis_vertex*, void*);
   double (*rho)(const struct stardis_vertex*, void*);
   double (*cp)(const struct stardis_vertex*, void*);
   double (*temp)(const struct stardis_vertex*, void*);

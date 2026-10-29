@@ -297,6 +297,15 @@ stardis_sample_conductive_path
  * Mandatory functions for a fluid
  ******************************************************************************/
 
+/* Returns the conductivity at a given vertex.
+ * This functions is called at every vertex of every path of the computation
+ * crossing this solid.
+ * data is the pointer returned by stardis_create_data for this solid. */
+STARDIS_API double
+stardis_conductivity
+  (const struct stardis_vertex* vtx,
+   void* data);
+
 /* Returns the calorific capacity at a given vertex.
  * This functions is called at every vertex of every path of the computation
  * crossing this fluid.

@@ -32,6 +32,7 @@ struct fluid {
   double rho; /* Volumic mass */
   double cp; /* Calorific capacity */
   double lambda; /* Thermal conductivity */
+  double v_fluid; /* Fluid velocity */
   double tinit;
   double imposed_temperature;
   double t0; /* End time of tinit */

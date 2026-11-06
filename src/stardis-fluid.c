@@ -47,6 +47,16 @@ fluid_get_volumic_mass
 }
 
 static double
+fluid_get_velocity
+  (const struct sdis_rwalk_vertex* vtx,
+   struct sdis_data* data)
+{
+  const struct fluid* const* fluid_props = sdis_data_cget(data);
+  (void)vtx;
+  return (*fluid_props)->v_fluid;
+}
+
+static double
 fluid_get_thermal_conductivity
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
@@ -96,6 +106,8 @@ create_solver_fluid
 
   ASSERT(stardis && fluid_props);
   fluid_shader.calorific_capacity = fluid_get_calorific_capacity;
+  fluid_shader.thermal_conductivity = fluid_get_thermal_conductivity;
+  fluid_shader.velocity = fluid_get_velocity;
   fluid_shader.volumic_mass = fluid_get_volumic_mass;
   fluid_shader.temperature = fluid_get_temperature;
   fluid_shader.t0 = stardis->initial_time;
@@ -132,6 +144,8 @@ init_fluid(struct mem_allocator* allocator, struct fluid** dst)
   str_init(allocator, &(*dst)->name);
   str_initialized = 1;
   (*dst)->rho = 1;
+  (*dst)->lambda = 1;
+  (*dst)->velocity = 1;
   (*dst)->cp = 1;
   (*dst)->tinit = SDIS_TEMPERATURE_NONE;
   (*dst)->imposed_temperature = SDIS_TEMPERATURE_NONE;
@@ -163,8 +177,8 @@ str_print_fluid(struct str* str, const struct fluid* f)
 {
   res_T res = RES_OK;
   ASSERT(str && f);
-  ERR(str_append_printf(str, "Fluid '%s': rho=%g cp=%g",
-    str_cget(&f->name), f->rho, f->cp));
+  ERR(str_append_printf(str, "Fluid '%s': lambda=%g rho=%g cp=%g",
+    str_cget(&f->name), f->lambda, f->rho, f->cp));
   if(SDIS_TEMPERATURE_IS_KNOWN(f->tinit)) {
     ERR(str_append_printf(str, " Tinit=%g", f->tinit));
   }

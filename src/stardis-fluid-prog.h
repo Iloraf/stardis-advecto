@@ -45,6 +45,7 @@ struct fluid_prog {
   double (*lambda)(const struct stardis_vertex*, void*);
   double (*rho)(const struct stardis_vertex*, void*);
   double (*cp)(const struct stardis_vertex*, void*);
+  double (*v_fluid)(const struct stardis_vertex*, void*);
   double (*temp)(const struct stardis_vertex*, void*);
 };
 

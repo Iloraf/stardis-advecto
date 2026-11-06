@@ -52,6 +52,18 @@ fluid_prog_get_volumic_mass
 }
 
 static double
+fluid_prog_get_velocity
+  (const struct sdis_rwalk_vertex* vtx,
+   struct sdis_data* data)
+{
+  const struct fluid_prog* const* fluid_props = sdis_data_cget(data);
+  struct stardis_vertex v;
+  d3_set(v.P, vtx->P);
+  v.time = vtx->time;
+  return (*fluid_props)->v_fluid(&v, (*fluid_props)->prog_data);
+}
+
+static double
 fluid_prog_get_thermal_conductivity
   (const struct sdis_rwalk_vertex* vtx,
    struct sdis_data* data)
@@ -92,6 +104,8 @@ create_solver_fluid_prog
 
   ASSERT(stardis && fluid_props);
   fluid_shader.calorific_capacity = fluid_prog_get_calorific_capacity;
+  fluid_shader.thermal_conductivity = fluid_prog_get_thermal_conductivity;
+  fluid_shader.velocity = fluid_prog_get_velocity;
   fluid_shader.volumic_mass = fluid_prog_get_volumic_mass;
   fluid_shader.temperature = fluid_prog_get_temperature;
   fluid_shader.t0 = stardis->initial_time;
@@ -126,6 +140,8 @@ create_solver_external_fluid_prog
 
   ASSERT(stardis && fluid_props);
   fluid_shader.calorific_capacity = fluid_prog_get_calorific_capacity;
+  fluid_shader.thermal_conductivity = fluid_prog_get_thermal_conductivity;
+  fluid_shader.velocity = fluid_prog_get_velocity;
   fluid_shader.volumic_mass = fluid_prog_get_volumic_mass;
   fluid_shader.temperature = fluid_prog_get_temperature;
   fluid_shader.t0 = stardis->initial_time;

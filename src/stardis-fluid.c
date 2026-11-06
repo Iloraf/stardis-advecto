@@ -145,7 +145,7 @@ init_fluid(struct mem_allocator* allocator, struct fluid** dst)
   str_initialized = 1;
   (*dst)->rho = 1;
   (*dst)->lambda = 1;
-  (*dst)->velocity = 1;
+  (*dst)->v_fluid = 1;
   (*dst)->cp = 1;
   (*dst)->tinit = SDIS_TEMPERATURE_NONE;
   (*dst)->imposed_temperature = SDIS_TEMPERATURE_NONE;

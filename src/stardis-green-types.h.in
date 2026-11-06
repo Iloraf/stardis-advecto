@@ -71,6 +71,7 @@ struct green_fluid {
   char name[DESC_NAME_MAX_LEN+1];
   double conductivity;
   double volumic_mass;
+  double velocity;
   double calorific_capacity;
   double initial_temperature;
   double imposed_temperature;

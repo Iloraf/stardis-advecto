@@ -324,6 +324,15 @@ stardis_volumic_mass
   (const struct stardis_vertex* vtx,
    void* data);
 
+/* Returns the fluid velocity at a given vertex.
+ * This functions is called at every vertex of every path of the computation
+ * crossing this fluid.
+ * data is the pointer returned by stardis_create_data for this fluid. */
+STARDIS_API double
+stardis_velocity
+  (const struct stardis_vertex* vtx,
+   void* data);
+
 /* Returns the temperature at a given vertex.
  * If the temperature is not known/imposed the expected return value is -1.
  * This functions is called at every vertex of every path of the computation

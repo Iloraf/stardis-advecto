@@ -102,6 +102,7 @@ copy_desc_to_green_desc
       strcpy(gdesc->d.fluid.name, str_cget(&desc->d.fluid->name));
       gdesc->d.fluid.conductivity = desc->d.fluid->lambda;
       gdesc->d.fluid.volumic_mass = desc->d.fluid->rho;
+      gdesc->d.fluid.velocity = desc->d.fluid->v_fluid;
       gdesc->d.fluid.calorific_capacity = desc->d.fluid->cp;
       gdesc->d.fluid.initial_temperature = desc->d.fluid->tinit;
       gdesc->d.fluid.imposed_temperature = desc->d.fluid->imposed_temperature;
